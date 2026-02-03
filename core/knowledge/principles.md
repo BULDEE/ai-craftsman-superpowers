@@ -266,3 +266,44 @@ public function process(User $user): void  // Type forces non-null
     // If null somehow passed, it fails immediately
 }
 ```
+
+## Pragmatism over Dogmatism
+
+> Optimize for working software and developer experience, not academic purity.
+
+**The Rule:** If a "best practice" adds complexity without proportional value, skip it.
+
+| Dogmatic | Pragmatic | Why |
+|----------|-----------|-----|
+| `final` everywhere | No `final` on Doctrine entities | Breaks proxy/lazy loading |
+| Pure PHP config | Attributes/Annotations | Better DX, colocation |
+| Abstract everything | Concrete first | YAGNI - abstraction costs |
+| 100% test coverage | Critical paths covered | Diminishing returns >80% |
+| Pure DDD everywhere | DDD for complex domains | CRUD doesn't need aggregates |
+| Separate mapping files | Attributes on entity | Colocation > purity |
+
+```php
+// DOGMATIC: Separate XML mapping, pure domain entity
+// src/Domain/Entity/User.php - no Doctrine
+// src/Infrastructure/Doctrine/mapping/User.orm.xml - mapping elsewhere
+
+// PRAGMATIC: Attributes on entity - 10x better DX
+#[ORM\Entity]
+#[ORM\Table(name: 'users')]
+class User  // No final - Doctrine needs proxies
+{
+    #[ORM\Id]
+    #[ORM\Column(type: 'uuid')]
+    private Uuid $id;
+}
+```
+
+**When to be strict:**
+- Security: Never compromise
+- Domain logic: Keep it pure
+- API contracts: Maintain stability
+
+**When to be pragmatic:**
+- Framework integration: Work with it, not against it
+- Tooling: Let IDE/framework help you
+- Simple CRUD: Don't over-engineer

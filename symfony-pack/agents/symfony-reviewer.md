@@ -8,13 +8,13 @@ Review PHP/Symfony code against DDD and Clean Architecture patterns. Ensure doma
 
 ### Domain Layer
 
-- [ ] All classes are `final`
+- [ ] Services and Value Objects are `final`
+- [ ] Entities NOT `final` (Doctrine proxy compatibility)
 - [ ] Private constructors with static factories
 - [ ] No setters - behavior methods only
 - [ ] Value Objects for domain primitives (Email, Money, etc.)
 - [ ] Domain Events for state changes
-- [ ] No framework imports (except Uid, annotations)
-- [ ] No infrastructure imports
+- [ ] Framework imports OK: Uid, ORM attributes (pragmatic DX)
 - [ ] Repository interfaces (not implementations)
 
 ### Application Layer
@@ -99,20 +99,30 @@ Review PHP/Symfony code against DDD and Clean Architecture patterns. Ensure doma
 
 ## Common Issues
 
-### Issue: Doctrine Entity as Domain Entity
+### Issue: Final Doctrine Entity
 
 ```php
-// BAD: Doctrine annotations on domain entity
+// BAD: final breaks Doctrine proxies
 #[ORM\Entity]
-final class User
+final class User  // ❌ Cannot create proxy for lazy loading
 {
     #[ORM\Id]
     #[ORM\Column(type: 'uuid')]
     private Uuid $id;
 }
 
-// BETTER: Separate mapping (XML or attributes in Infrastructure)
-// Domain entity stays pure
+// GOOD: No final on Doctrine entities (pragmatic)
+#[ORM\Entity]
+#[ORM\Table(name: 'users')]
+class User  // ✓ Doctrine can create proxy
+{
+    #[ORM\Id]
+    #[ORM\Column(type: 'uuid')]
+    private Uuid $id;
+}
+
+// NOTE: Attributes on entity is pragmatic choice for DX.
+// Pure DDD would separate mapping, but colocation > purity.
 ```
 
 ### Issue: Controller with Business Logic

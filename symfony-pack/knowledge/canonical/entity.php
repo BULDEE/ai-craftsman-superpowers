@@ -10,19 +10,26 @@ use App\Domain\Event\UserVerifiedEvent;
 use App\Domain\ValueObject\Email;
 use App\Domain\ValueObject\HashedPassword;
 use DateTimeImmutable;
+use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Uid\Uuid;
 
 /**
  * CANONICAL ENTITY PATTERN
  *
  * Key characteristics:
- * - final class (no inheritance)
+ * - NOT final (Doctrine needs proxies for lazy loading)
  * - private constructor + static factory
  * - no setters, only behavior methods
  * - domain events for state changes
  * - value objects for typed fields
+ * - Attributes for mapping (pragmatic DX over purity)
+ *
+ * WHY NO FINAL: Doctrine creates proxy classes that extend entities
+ * for lazy loading. `final` breaks this. Pragmatism > dogmatism.
  */
-final class User
+#[ORM\Entity]
+#[ORM\Table(name: 'users')]
+class User
 {
     /** @var array<DomainEventInterface> */
     private array $domainEvents = [];

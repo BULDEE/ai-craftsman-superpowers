@@ -65,7 +65,9 @@ use App\Domain\ValueObject\{Field}; // For each VO field
 use DateTimeImmutable;
 use Symfony\Component\Uid\Uuid;
 
-final class {Name}
+#[ORM\Entity]
+#[ORM\Table(name: '{table_name}')]
+class {Name}  // NOT final - Doctrine needs proxies for lazy loading
 {
     /** @var array<DomainEventInterface> */
     private array $domainEvents = [];
@@ -248,7 +250,8 @@ final class {Name}Test extends TestCase
 
 From `.craft-config.yml`:
 
-- `final_classes: true` → All classes are final
+- `final_classes: true` → Final on services/VOs, NOT on Doctrine entities (proxy compatibility)
 - `private_constructors: true` → Private constructor + static factory
 - `no_setters: true` → Behavior methods only
 - `strict_types: true` → declare(strict_types=1)
+- `use_attributes: true` → Doctrine/Symfony attributes for mapping (pragmatic DX)
