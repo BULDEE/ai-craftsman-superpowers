@@ -33,6 +33,22 @@ Transform Claude Code into a senior software craftsman with battle-tested method
 - Canonical patterns: Branded Types, Components, Query Hooks
 - Agent: React Reviewer
 
+### AI Pack (Optional)
+
+| Skill | Purpose |
+|-------|---------|
+| `/craft rag` | Design RAG pipelines (Ingestion, Retrieval, Generation) |
+| `/craft mlops` | Audit ML projects for production readiness |
+| `/craft agent` | Design AI agents using 3P pattern (Perceive/Plan/Perform) |
+
+**Knowledge base:**
+- RAG Architecture (3 pipelines, chunking, embeddings)
+- Vector Databases (pgvector, Pinecone, comparison)
+- MLOps Principles (6 principles, checklist)
+- Agent 3P Pattern (cognitive architecture)
+
+**Agent:** AI/ML Reviewer - Reviews AI code for production best practices
+
 ## Installation
 
 ```bash
