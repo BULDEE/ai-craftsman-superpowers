@@ -128,3 +128,12 @@ Confirm before I refactor.
 
 - **over_optimize**: Only fix identified smells. Don't add abstractions.
 - **scope_creep**: Refactor the target only. Note other areas for later.
+
+## References
+
+| Resource | Focus |
+|----------|-------|
+| [refactoring.guru/refactoring](https://refactoring.guru/refactoring) | Visual catalog of refactorings with examples |
+| [refactoring.com](https://refactoring.com/) | Martin Fowler's canonical refactoring reference |
+
+> "Any fool can write code that a computer can understand. Good programmers write code that humans can understand." — Martin Fowler

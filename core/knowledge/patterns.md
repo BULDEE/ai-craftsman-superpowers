@@ -1,5 +1,7 @@
 # Design Patterns
 
+> Reference: [refactoring.guru/design-patterns](https://refactoring.guru/design-patterns)
+
 ## Creational Patterns
 
 ### Factory Method
@@ -380,4 +382,13 @@ final class Order
         return $events;
     }
 }
+
+## References
+
+| Resource | Focus |
+|----------|-------|
+| [refactoring.guru/design-patterns](https://refactoring.guru/design-patterns) | Visual catalog with examples in multiple languages |
+| [martinfowler.com/eaaCatalog](https://martinfowler.com/eaaCatalog/) | Patterns of Enterprise Application Architecture |
+
+> "Each pattern describes a problem which occurs over and over again in our environment, and then describes the core of the solution to that problem." — Christopher Alexander
 ```

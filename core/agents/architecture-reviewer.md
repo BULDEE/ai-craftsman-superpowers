@@ -45,9 +45,9 @@ Dependencies ONLY point inward (down in this diagram)
 
 ### Domain Layer (STRICTEST)
 
-- [ ] No framework imports (Symfony, Doctrine annotations OK)
 - [ ] No infrastructure imports (repositories, HTTP, filesystem)
-- [ ] All classes are `final`
+- [ ] Framework imports OK: Uid, ORM attributes (pragmatic DX)
+- [ ] Services/VOs are `final`, Entities NOT final (Doctrine proxies)
 - [ ] Private constructors with static factories
 - [ ] No setters - behavioral methods only
 - [ ] Value Objects for domain primitives
@@ -77,10 +77,10 @@ Dependencies ONLY point inward (down in this diagram)
 
 ### BLOCKING (Stop PR)
 
-- Domain imports Infrastructure
+- Domain imports Infrastructure (except ORM attributes - pragmatic)
 - Business logic in Controller
-- Missing `final` on Entity
 - Public setters on domain objects
+- Security vulnerabilities
 
 ### MUST FIX (Before merge)
 
@@ -195,3 +195,12 @@ After review, challenge the developer:
 2. "What if the business rule changes?"
 3. "How would you test this in isolation?"
 4. "What domain event should this emit?"
+
+## References
+
+| Resource | Focus |
+|----------|-------|
+| [martinfowler.com/architecture](https://martinfowler.com/architecture/) | Architecture patterns and practices |
+| [Clean Architecture (Uncle Bob)](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html) | Original Clean Architecture article |
+
+> "Architecture is about the important stuff. Whatever that is." — Ralph Johnson
