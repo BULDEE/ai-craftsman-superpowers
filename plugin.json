@@ -70,6 +70,22 @@
         "react-pack/knowledge/anti-patterns/*"
       ],
       "templates": ["react-pack/templates/bounded-context-frontend.template.md"]
+    },
+    "ai": {
+      "description": "AI/ML Engineering pack - RAG, MLOps, Agent Design (3P Pattern)",
+      "required": false,
+      "skills": [
+        "ai-pack/skills/rag",
+        "ai-pack/skills/mlops",
+        "ai-pack/skills/agent"
+      ],
+      "agents": ["ai-pack/agents/ai-reviewer.md"],
+      "knowledge": [
+        "ai-pack/knowledge/rag-architecture.md",
+        "ai-pack/knowledge/vector-databases.md",
+        "ai-pack/knowledge/mlops-principles.md",
+        "ai-pack/knowledge/agent-3p-pattern.md"
+      ]
     }
   },
 
