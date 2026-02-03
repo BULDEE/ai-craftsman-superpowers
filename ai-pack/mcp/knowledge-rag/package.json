@@ -1,0 +1,32 @@
+{
+  "name": "@craftsman/knowledge-rag-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for RAG over local AI/Architecture knowledge base (Ollama)",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "knowledge-rag-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "index": "tsx scripts/index-pdfs.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "better-sqlite3": "^11.0.0",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^20.0.0",
+    "@types/pdf-parse": "^1.1.4",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
