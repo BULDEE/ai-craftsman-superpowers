@@ -73,13 +73,38 @@ This detects your entities, value objects, services, and generates a context age
 
 > "Weeks of coding can save hours of planning."
 
-This plugin enforces:
+### SOLID Principles
+
+| Principle | Application |
+|-----------|-------------|
+| **S**ingle Responsibility | One reason to change per class |
+| **O**pen/Closed | Extend behavior without modifying existing code |
+| **L**iskov Substitution | Subtypes must be substitutable for their base types |
+| **I**nterface Segregation | Many specific interfaces > one general interface |
+| **D**ependency Inversion | Depend on abstractions, not concretions |
+
+### Pragmatism over Dogmatism
+
+Craftsman ≠ Purist. We optimize for **working software** and **developer experience**, not academic purity.
+
+| Dogmatic | Pragmatic (our choice) | Why |
+|----------|------------------------|-----|
+| `final` on all entities | No `final` on Doctrine entities | Breaks proxy/lazy loading |
+| Pure PHP config only | Attributes/Annotations | 10x better DX, colocation with code |
+| Always abstract | Concrete first, abstract when needed | YAGNI - abstraction has a cost |
+| 100% test coverage | Critical paths covered | Diminishing returns past 80% |
+| Pure DDD everywhere | DDD for complex domains only | CRUD doesn't need aggregates |
+
+**The rule:** If a "best practice" adds complexity without proportional value, skip it.
+
+### Core Principles
 
 1. **Design before code** - Understand, challenge, then implement
 2. **Test-first** - If you can't write the test, you don't understand the requirement
 3. **Systematic debugging** - No random fixes, find root cause first
 4. **YAGNI** - Build what's needed, not what might be needed
 5. **Clean Architecture** - Dependencies point inward
+6. **Make it work, make it right, make it fast** - In that order
 
 ## Bias Protection
 
