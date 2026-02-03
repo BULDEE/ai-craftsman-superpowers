@@ -1,0 +1,26 @@
+{
+  "name": "ai-craftsman-superpowers",
+  "owner": {
+    "name": "Alexandre Mallet",
+    "email": "contact@woprrr.dev"
+  },
+  "metadata": {
+    "description": "Senior craftsman methodology for Claude Code. DDD, Clean Architecture, TDD.",
+    "version": "2.0.0"
+  },
+  "plugins": [
+    {
+      "name": "craftsman",
+      "source": "./plugins/craftsman",
+      "description": "Core craftsman methodology - DDD design, systematic debugging, structured planning, architecture review, and safe git workflows.",
+      "version": "2.0.0",
+      "author": {
+        "name": "Alexandre Mallet"
+      },
+      "license": "MIT",
+      "keywords": ["ddd", "clean-architecture", "tdd", "craftsman", "methodology"],
+      "category": "development",
+      "tags": ["architecture", "quality", "php", "symfony", "react", "typescript"]
+    }
+  ]
+}

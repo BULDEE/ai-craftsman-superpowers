@@ -1,117 +1,148 @@
 # AI Craftsman Superpowers
 
-> Senior craftsman methodology for AI-assisted development.
+> Senior craftsman methodology for Claude Code. DDD, Clean Architecture, TDD.
 
-Transform Claude Code into a senior software craftsman with battle-tested methodologies: DDD, Clean Architecture, TDD, and systematic workflows.
+Transform Claude Code into a disciplined software engineer with battle-tested methodologies.
 
-## What's Included
+## Requirements
 
-### Core Pack (Always Enabled)
-
-| Skill | Purpose |
-|-------|---------|
-| `/design` | DDD design with challenge phases |
-| `/debug` | Systematic investigation (ReAct pattern) |
-| `/spec` | Specification-first development (BDD/TDD) |
-| `/plan` | Structured task planning |
-| `/challenge` | Architecture review |
-| `/refactor` | Systematic refactoring |
-| `/test` | Pragmatic testing (Fowler/Martin) |
-| `/git` | Safe git workflow |
-
-### Symfony Pack (Optional)
-
-- `/craft entity` - Scaffold DDD entity with VO, events, tests
-- `/craft usecase` - Scaffold use case with command/handler
-- Canonical patterns: Entity, Value Object, Repository, UseCase
-- Agents: Symfony Reviewer, Security Pentester
-
-### React Pack (Optional)
-
-- `/craft component` - Scaffold React component
-- `/craft hook` - Scaffold TanStack Query hook
-- Canonical patterns: Branded Types, Components, Query Hooks
-- Agent: React Reviewer
-
-### AI Pack (Optional)
-
-| Skill | Purpose |
-|-------|---------|
-| `/craft rag` | Design RAG pipelines (Ingestion, Retrieval, Generation) |
-| `/craft mlops` | Audit ML projects for production readiness |
-| `/craft agent` | Design AI agents using 3P pattern (Perceive/Plan/Perform) |
-
-**Knowledge base:**
-- RAG Architecture (3 pipelines, chunking, embeddings)
-- Vector Databases (pgvector, Pinecone, comparison)
-- MLOps Principles (6 principles, checklist)
-- Agent 3P Pattern (cognitive architecture)
-
-**Agent:** AI/ML Reviewer - Reviews AI code for production best practices
+- Claude Code v1.0.33 or later
+- Run `claude --version` to check
 
 ## Installation
 
-```bash
-claude plugins install git@github.com:woprrr/ai-craftsman-superpowers.git
-```
-
-On first run, a setup wizard will configure your profile.
-
-## Configuration
-
-After setup, your config is at `~/.claude/.craft-config.yml`:
-
-```yaml
-profile:
-  name: "Your Name"
-  disc_type: "DI"
-  biases:
-    - acceleration
-    - scope_creep
-
-packs:
-  core: true
-  symfony: true
-  react: true
-```
-
-## Scaffold System
-
-Analyze existing code and generate context agents:
+### Option 1: From GitHub (Recommended)
 
 ```bash
-/craft scaffold backend/src/Domain/Gamification/
+# Step 1: Add the marketplace
+/plugin marketplace add woprrr/ai-craftsman-superpowers
+
+# Step 2: Install the plugin
+/plugin install craftsman@woprrr-ai-craftsman-superpowers
 ```
 
-This detects your entities, value objects, services, and generates a context agent for the bounded context.
+### Option 2: From Local Path
+
+```bash
+# If you cloned the repo locally
+/plugin marketplace add /path/to/ai-craftsman-superpowers
+/plugin install craftsman@ai-craftsman-superpowers
+```
+
+### Option 3: Direct Git URL
+
+```bash
+/plugin marketplace add https://github.com/woprrr/ai-craftsman-superpowers.git
+/plugin install craftsman@woprrr-ai-craftsman-superpowers
+```
+
+### Verify Installation
+
+```bash
+# Open plugin manager
+/plugin
+
+# Go to "Installed" tab to see craftsman plugin
+# Go to "Errors" tab if skills don't appear
+```
+
+## Quick Start
+
+After installation, try:
+
+```bash
+# Design a new entity
+/craftsman:design
+
+# Debug an issue systematically
+/craftsman:debug
+
+# Plan a feature implementation
+/craftsman:plan
+
+# Review code for architecture issues
+/craftsman:challenge
+```
+
+## Skills
+
+### Core Methodology
+
+| Skill | Purpose | Auto-triggers |
+|-------|---------|---------------|
+| `/craftsman:design` | DDD design with challenge phases | "create", "design", "entity", "model" |
+| `/craftsman:debug` | Systematic debugging (ReAct pattern) | "bug", "error", "broken", "not working" |
+| `/craftsman:plan` | Structured planning & execution | "plan", "how to", "migrate", "roadmap" |
+| `/craftsman:challenge` | Architecture review | "review", "check this", "feedback" |
+| `/craftsman:verify` | Evidence-based verification | "verify", "is it done", "ready to commit" |
+| `/craftsman:spec` | Specification-first (TDD/BDD) | "spec", "test first", "acceptance" |
+| `/craftsman:refactor` | Systematic refactoring | "refactor", "clean up", "improve" |
+| `/craftsman:test` | Pragmatic testing (Fowler/Martin) | "test strategy", "coverage" |
+| `/craftsman:git` | Safe git workflow | "commit", "branch", "PR", "merge" |
+| `/craftsman:parallel` | Parallel agent orchestration | "parallel", "multiple tasks" |
+
+### Symfony/PHP
+
+| Skill | Purpose |
+|-------|---------|
+| `/craftsman:entity` | Scaffold DDD entity with VO, events, tests |
+| `/craftsman:usecase` | Scaffold use case with command/handler |
+
+### React/TypeScript
+
+| Skill | Purpose |
+|-------|---------|
+| `/craftsman:component` | Scaffold React component |
+| `/craftsman:hook` | Scaffold TanStack Query hook |
+
+### AI/ML Engineering
+
+| Skill | Purpose |
+|-------|---------|
+| `/craftsman:rag` | Design RAG pipelines |
+| `/craftsman:mlops` | Audit ML projects |
+| `/craftsman:agent-design` | Design AI agents (3P pattern) |
+
+## Agents
+
+| Agent | Purpose |
+|-------|---------|
+| `architecture-reviewer` | Clean Architecture validation |
+| `symfony-reviewer` | PHP/Symfony best practices |
+| `react-reviewer` | React/TypeScript validation |
+| `security-pentester` | OWASP security audit |
+| `ai-reviewer` | AI/ML code review |
+
+## Features
+
+### Bias Protection (Active by Default)
+
+Hooks automatically detect and warn about:
+
+| Bias | Trigger | Protection |
+|------|---------|------------|
+| **Acceleration** | "vite", "quick", "just do it" | STOP - Design first |
+| **Scope Creep** | "et aussi", "while we're at it" | STOP - Is this in scope? |
+| **Over-Optimization** | "abstraire", "generalize" | STOP - YAGNI |
+
+### Code Rule Enforcement
+
+Post-write hooks validate:
+
+**PHP:**
+- `declare(strict_types=1)` required
+- `final class` on all classes
+- No public setters
+- No `new DateTime()` direct usage
+
+**TypeScript:**
+- No `any` types
+- Named exports only
+- No non-null assertions (`!`)
 
 ## Philosophy
 
 > "Weeks of coding can save hours of planning."
-
-### SOLID Principles
-
-| Principle | Application |
-|-----------|-------------|
-| **S**ingle Responsibility | One reason to change per class |
-| **O**pen/Closed | Extend behavior without modifying existing code |
-| **L**iskov Substitution | Subtypes must be substitutable for their base types |
-| **I**nterface Segregation | Many specific interfaces > one general interface |
-| **D**ependency Inversion | Depend on abstractions, not concretions |
-
-### Pragmatism over Dogmatism
-
-Craftsman ≠ Purist. We optimize for **working software** and **developer experience**, not academic purity.
-
-| Dogmatic | Pragmatic (our choice) | Why |
-|----------|------------------------|-----|
-| `final` on all entities | No `final` on Doctrine entities | Breaks proxy/lazy loading |
-| Pure PHP config only | Attributes/Annotations | 10x better DX, colocation with code |
-| Always abstract | Concrete first, abstract when needed | YAGNI - abstraction has a cost |
-| 100% test coverage | Critical paths covered | Diminishing returns past 80% |
-| Pure DDD everywhere | DDD for complex domains only | CRUD doesn't need aggregates |
-
-**The rule:** If a "best practice" adds complexity without proportional value, skip it.
 
 ### Core Principles
 
@@ -122,21 +153,94 @@ Craftsman ≠ Purist. We optimize for **working software** and **developer exper
 5. **Clean Architecture** - Dependencies point inward
 6. **Make it work, make it right, make it fast** - In that order
 
-## Bias Protection
+### Pragmatism over Dogmatism
 
-Configure your cognitive biases and the plugin will guard against them:
+| Dogmatic | Pragmatic (our choice) |
+|----------|------------------------|
+| 100% test coverage | Critical paths covered (80%) |
+| Pure DDD everywhere | DDD for complex domains only |
+| Always abstract | Concrete first, abstract when needed |
 
-- **Acceleration** - "Let's just code it" → STOP, spec first
-- **Dispersion** - Topic jumping → Finish current task
-- **Scope creep** - "Let's also add..." → Is it in scope?
-- **Over-optimization** - "Let's abstract..." → Measure first
+## Project Structure
+
+```
+ai-craftsman-superpowers/
+├── .claude-plugin/
+│   └── marketplace.json      # Marketplace catalog
+├── plugins/
+│   └── craftsman/            # Main plugin
+│       ├── .claude-plugin/
+│       │   └── plugin.json   # Plugin manifest
+│       ├── skills/           # All skills (SKILL.md format)
+│       │   ├── design/
+│       │   ├── debug/
+│       │   ├── plan/
+│       │   └── ...
+│       ├── agents/           # Specialized reviewers
+│       ├── hooks/
+│       │   ├── hooks.json
+│       │   ├── bias-detector.sh
+│       │   └── post-write-check.sh
+│       └── knowledge/        # Patterns & principles
+├── docs/                     # Documentation
+├── core/                     # Core methodology (legacy)
+├── symfony-pack/             # Symfony-specific extensions
+├── react-pack/               # React-specific extensions
+└── ai-pack/                  # AI/ML extensions
+```
+
+## Troubleshooting
+
+### Skills not loading
+
+```bash
+# Clear plugin cache
+rm -rf ~/.claude/plugins/cache
+
+# Restart Claude Code
+exit
+claude
+
+# Reinstall plugin
+/plugin uninstall craftsman@woprrr-ai-craftsman-superpowers
+/plugin install craftsman@woprrr-ai-craftsman-superpowers
+```
+
+### Check for errors
+
+```bash
+# Open plugin manager
+/plugin
+
+# Go to "Errors" tab
+# Check for missing dependencies or path issues
+```
+
+### Hooks not running
+
+Verify hooks are enabled in your scope:
+1. `/plugin` → "Installed" tab
+2. Select craftsman plugin
+3. Check "Hooks enabled" status
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Follow the craftsman methodology (use `/craftsman:design` first!)
+4. Submit a PR
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## License
 
-Commercial license. One-time purchase, lifetime access.
-
-See [LICENSE.md](LICENSE.md) for terms.
+MIT License - See [LICENSE.md](LICENSE.md)
 
 ## Support
 
-Issues: [GitHub Issues](https://github.com/woprrr/ai-craftsman-superpowers/issues)
+- Issues: [GitHub Issues](https://github.com/woprrr/ai-craftsman-superpowers/issues)
+- Documentation: [Claude Code Plugins](https://code.claude.com/docs/en/plugins)
+
+## Acknowledgments
+
+Built following [Anthropic's official plugin guidelines](https://code.claude.com/docs/en/discover-plugins).

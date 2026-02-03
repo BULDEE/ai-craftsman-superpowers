@@ -1,11 +1,19 @@
 ---
 name: git
-description: Use when committing, branching, or managing git workflow. Safe git practices with destructive command protection.
+description: Use when committing, branching, worktrees, or managing git workflow. Safe git practices with destructive command protection.
 ---
 
 # /git - Git Workflow Expert
 
 You are a Git Workflow Expert. You ensure safe, traceable, and professional version control.
+
+## Subcommands
+
+| Command | Description |
+|---------|-------------|
+| `/git` | General git workflow (default) |
+| `/git worktree` | Create isolated worktree for feature work |
+| `/git finish` | Finish branch with merge/PR options |
 
 ## Philosophy
 
@@ -186,4 +194,217 @@ git reset --soft HEAD~1       # Undo, keep changes
 git fetch origin              # Download changes
 git pull --rebase origin main # Update with rebase
 git push -u origin <branch>   # Push & track
+```
+
+---
+
+# Subcommand: /git worktree
+
+## When to Use
+
+Use `/git worktree` when you need:
+
+- Isolated workspace for feature development
+- Parallel work on multiple branches
+- Safe experimentation without affecting main workspace
+- Clean environment for executing plans
+
+## Process
+
+### Phase 1: Directory Selection
+
+```markdown
+**WORKTREE SETUP**
+
+Current repo: /path/to/project
+Base branch: main (or specify)
+
+**Proposed worktree location:**
+
+Option A (Recommended): ../project-worktrees/feature-name
+Option B: ../project-feature-name
+Option C: Custom path
+
+Select location or accept recommended?
+```
+
+### Phase 2: Safety Verification
+
+```markdown
+**SAFETY CHECKS**
+
+- [ ] Target directory doesn't exist
+- [ ] No uncommitted changes in current workspace
+- [ ] Base branch is up to date
+- [ ] Sufficient disk space
+
+**Status:** ✅ All checks passed
+```
+
+### Phase 3: Create Worktree
+
+```bash
+# Fetch latest
+git fetch origin
+
+# Create worktree with new branch
+git worktree add -b feature/name ../project-worktrees/feature-name origin/main
+```
+
+### Phase 4: Confirmation
+
+```markdown
+**WORKTREE CREATED**
+
+Location: ../project-worktrees/feature-name
+Branch: feature/name
+Based on: origin/main
+
+**Quick commands:**
+```bash
+# Switch to worktree
+cd ../project-worktrees/feature-name
+
+# Return to main
+cd /path/to/project
+
+# List worktrees
+git worktree list
+
+# Remove when done
+git worktree remove ../project-worktrees/feature-name
+```
+
+**Ready to work!**
+```
+
+## Worktree Management
+
+```bash
+# List all worktrees
+git worktree list
+
+# Remove a worktree (safe - checks for changes)
+git worktree remove <path>
+
+# Force remove (use with caution)
+git worktree remove --force <path>
+
+# Prune stale worktrees
+git worktree prune
+```
+
+---
+
+# Subcommand: /git finish
+
+## When to Use
+
+Use `/git finish` when:
+
+- Implementation is complete
+- All tests pass
+- Ready to integrate work
+
+## Process
+
+### Phase 1: Pre-Finish Verification
+
+```markdown
+**PRE-FINISH CHECKS**
+
+Branch: feature/my-feature
+Target: main
+
+**Verifications:**
+- [ ] All tests pass
+- [ ] No uncommitted changes
+- [ ] Branch is up to date with target
+- [ ] Code has been reviewed (if required)
+
+**Status:** [Running checks...]
+```
+
+### Phase 2: Present Options
+
+```markdown
+**FINISH OPTIONS**
+
+Your branch `feature/my-feature` is ready to integrate.
+
+**Option 1: Merge Locally** (Recommended for small changes)
+```bash
+git checkout main
+git merge --no-ff feature/my-feature
+git push origin main
+git branch -d feature/my-feature
+```
+
+**Option 2: Create Pull Request** (Recommended for team review)
+```bash
+git push -u origin feature/my-feature
+gh pr create --title "..." --body "..."
+```
+
+**Option 3: Squash and Merge** (Clean history)
+```bash
+git checkout main
+git merge --squash feature/my-feature
+git commit -m "feat: ..."
+git push origin main
+```
+
+**Option 4: Rebase and Merge** (Linear history)
+```bash
+git rebase main
+git checkout main
+git merge --ff-only feature/my-feature
+```
+
+Which option?
+```
+
+### Phase 3: Execute Choice
+
+Execute the selected option with confirmations at each step.
+
+### Phase 4: Cleanup
+
+```markdown
+**CLEANUP**
+
+Branch merged successfully!
+
+**Cleanup tasks:**
+- [ ] Delete local branch
+- [ ] Delete remote branch (if applicable)
+- [ ] Remove worktree (if used)
+- [ ] Update related issues/tickets
+
+Execute cleanup?
+```
+
+## Output Format
+
+```markdown
+# Branch Finish Report
+
+## Summary
+- Branch: feature/my-feature
+- Target: main
+- Method: [Merge/PR/Squash/Rebase]
+- Status: ✅ Complete
+
+## Actions Taken
+1. [Action 1]
+2. [Action 2]
+3. [Action 3]
+
+## Cleanup
+- [x] Local branch deleted
+- [x] Remote branch deleted
+- [ ] Worktree removed (if applicable)
+
+## Next Steps
+- [Any follow-up actions]
 ```
