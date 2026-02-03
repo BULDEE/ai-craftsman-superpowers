@@ -1,0 +1,91 @@
+{
+  "name": "ai-craftsman-superpowers",
+  "version": "1.0.0",
+  "description": "Senior craftsman methodology for AI-assisted development. DDD, Clean Architecture, TDD.",
+  "author": "Alexandre Mallet",
+  "license": "commercial",
+  "homepage": "https://github.com/woprrr/ai-craftsman-superpowers",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:woprrr/ai-craftsman-superpowers.git"
+  },
+
+  "claude-code": {
+    "minVersion": "1.0.0"
+  },
+
+  "setup": {
+    "wizard": "setup/wizard.md",
+    "configFile": ".craft-config.yml",
+    "configLocation": "~/.claude/"
+  },
+
+  "packs": {
+    "core": {
+      "description": "Methodology essentials - always enabled",
+      "required": true,
+      "skills": [
+        "core/skills/design",
+        "core/skills/debug",
+        "core/skills/spec",
+        "core/skills/plan",
+        "core/skills/challenge",
+        "core/skills/refactor",
+        "core/skills/test",
+        "core/skills/git"
+      ],
+      "agents": ["core/agents/architecture-reviewer.md"],
+      "knowledge": [
+        "core/knowledge/principles.md",
+        "core/knowledge/patterns.md"
+      ]
+    },
+    "symfony": {
+      "description": "PHP/Symfony/DDD patterns and enforcement",
+      "required": false,
+      "skills": [
+        "symfony-pack/skills/entity",
+        "symfony-pack/skills/usecase"
+      ],
+      "agents": [
+        "symfony-pack/agents/symfony-reviewer.md",
+        "symfony-pack/agents/security-pentester.md"
+      ],
+      "knowledge": [
+        "symfony-pack/knowledge/canonical/*",
+        "symfony-pack/knowledge/anti-patterns/*"
+      ],
+      "templates": ["symfony-pack/templates/bounded-context-backend.template.md"]
+    },
+    "react": {
+      "description": "React/TypeScript patterns and enforcement",
+      "required": false,
+      "skills": [
+        "react-pack/skills/component",
+        "react-pack/skills/hook"
+      ],
+      "agents": ["react-pack/agents/react-reviewer.md"],
+      "knowledge": [
+        "react-pack/knowledge/canonical/*",
+        "react-pack/knowledge/anti-patterns/*"
+      ],
+      "templates": ["react-pack/templates/bounded-context-frontend.template.md"]
+    }
+  },
+
+  "commands": {
+    "scaffold": {
+      "description": "Analyze code and generate context agent",
+      "skill": "commands/scaffold.md"
+    },
+    "agent:create": {
+      "description": "Interactive agent creation from template",
+      "skill": "commands/agent-create.md"
+    }
+  },
+
+  "hooks": {
+    "onFirstRun": "setup/wizard.md",
+    "onSessionStart": "core/skills/craft-hub/SKILL.md"
+  }
+}

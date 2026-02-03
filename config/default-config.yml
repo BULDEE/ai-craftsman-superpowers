@@ -1,0 +1,62 @@
+# AI Craftsman Superpowers - Default Configuration
+# This file is copied to ~/.claude/.craft-config.yml on first run
+# Users can customize it freely
+
+version: "1.0"
+
+# User profile (configured by setup wizard)
+profile:
+  name: ""
+  disc_type: ""  # D, I, S, C, DI, DC, IS, SC
+  biases: []     # acceleration, dispersion, scope_creep, over_optimize
+
+# Packs activation
+packs:
+  core: true      # Always true (required)
+  symfony: false  # Enable for PHP/Symfony projects
+  react: false    # Enable for React/TypeScript projects
+
+# Stack versions (used by scaffold and code generation)
+stack:
+  php_version: "8.4"
+  symfony_version: "7.4"
+  node_version: "22"
+  react_version: "19"
+
+# Enforcement rules (applied by skills)
+rules:
+  php:
+    final_classes: true
+    private_constructors: true
+    no_setters: true
+    strict_types: true
+    no_datetime_direct: true
+    no_empty_catch: true
+  typescript:
+    no_any: true
+    readonly_default: true
+    branded_types: true
+    named_exports: true
+    no_non_null_assertion: true
+  git:
+    conventional_commits: true
+    no_ai_attribution: true
+
+# Quality gates (commands to run)
+quality:
+  pre_commit:
+    - "make phpstan"
+    - "make test-unit"
+  pre_pr:
+    - "make quality"
+
+# Project paths (relative to project root)
+# Override per-project in project's .craft-config.yml
+paths:
+  domain: "src/Domain"
+  application: "src/Application"
+  infrastructure: "src/Infrastructure"
+  presentation: "src/Presentation"
+  tests_unit: "tests/Unit"
+  tests_integration: "tests/Integration"
+  tests_functional: "tests/Functional"

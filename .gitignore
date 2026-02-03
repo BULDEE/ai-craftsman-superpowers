@@ -1,0 +1,19 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local config (users generate their own)
+.craft-config.yml
+
+# Logs
+*.log
+
+# Test artifacts
+coverage/
+.nyc_output/
