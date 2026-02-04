@@ -1,6 +1,0 @@
-{
-  "knowledge-rag": {
-    "command": "node",
-    "args": ["ai-pack/mcp/knowledge-rag/dist/src/index.js"]
-  }
-}
