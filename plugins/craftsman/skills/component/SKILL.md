@@ -179,13 +179,27 @@ interface DataFetcherProps<T> {
 
 ## Process
 
-1. **Ask for component name and purpose**
-2. **Identify required props**
-3. **Generate component file**
-4. **Generate test file**
-5. **Generate Storybook (if requested)**
-6. **Generate index export**
-7. **Verify**
+### Step 0: MANDATORY - Load Canonical Examples
+
+**BEFORE generating any code, you MUST use the Read tool to load:**
+
+```
+Read: knowledge/canonical/ts-react-component.tsx
+Read: knowledge/canonical/ts-branded-type.ts
+```
+
+This ensures generated code matches project standards exactly.
+
+### Steps
+
+1. **Load canonical examples** (Step 0 above - NON-NEGOTIABLE)
+2. **Ask for component name and purpose**
+3. **Identify required props**
+4. **Generate component file**
+5. **Generate test file**
+6. **Generate Storybook (if requested)**
+7. **Generate index export**
+8. **Verify**
 
 ```bash
 npm run typecheck
@@ -194,8 +208,10 @@ npm test -- --filter={ComponentName}
 
 ## Anti-Patterns to Avoid
 
-- Prop drilling (use context or composition)
-- `any` types (use proper types or `unknown`)
-- Default exports (use named exports)
-- Non-null assertion `!` (handle null explicitly)
-- Inline styles (use Tailwind or CSS modules)
+| Anti-Pattern | Why Bad | Correct Approach |
+|--------------|---------|------------------|
+| Prop drilling | Tight coupling | Context or composition |
+| `any` types | No type safety | Proper types or `unknown` |
+| Default exports | Harder refactoring | Named exports only |
+| Non-null assertion `!` | Hides bugs | Handle null explicitly |
+| Inline styles | Inconsistent | Tailwind or CSS modules |

@@ -250,12 +250,26 @@ export type { {Entity}ListFilters, {Entity}ListResponse } from './use{Entity}Lis
 
 ## Process
 
-1. **Ask for hook purpose and entity**
-2. **Identify operations (query/mutation)**
-3. **Generate hook files**
-4. **Generate tests**
-5. **Generate index export**
-6. **Verify**
+### Step 0: MANDATORY - Load Canonical Examples
+
+**BEFORE generating any code, you MUST use the Read tool to load:**
+
+```
+Read: knowledge/canonical/ts-tanstack-hook.ts
+Read: knowledge/canonical/ts-branded-type.ts
+```
+
+This ensures generated code matches project standards exactly.
+
+### Steps
+
+1. **Load canonical examples** (Step 0 above - NON-NEGOTIABLE)
+2. **Ask for hook purpose and entity**
+3. **Identify operations (query/mutation)**
+4. **Generate hook files**
+5. **Generate tests**
+6. **Generate index export**
+7. **Verify**
 
 ```bash
 npm run typecheck

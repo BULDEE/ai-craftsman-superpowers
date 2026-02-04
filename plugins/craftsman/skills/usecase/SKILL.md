@@ -218,13 +218,27 @@ public function __invoke(
 
 ## Process
 
-1. **Ask for use case name and action**
-2. **Identify involved entities**
-3. **Generate Command**
-4. **Generate Handler**
-5. **Generate Response (if needed)**
-6. **Generate Tests**
-7. **Verify**
+### Step 0: MANDATORY - Load Canonical Examples
+
+**BEFORE generating any code, you MUST use the Read tool to load:**
+
+```
+Read: knowledge/canonical/php-usecase.php
+Read: knowledge/anti-patterns/php-god-service.md
+```
+
+This ensures generated code matches project standards exactly.
+
+### Steps
+
+1. **Load canonical examples** (Step 0 above - NON-NEGOTIABLE)
+2. **Ask for use case name and action**
+3. **Identify involved entities**
+4. **Generate Command**
+5. **Generate Handler**
+6. **Generate Response (if needed)**
+7. **Generate Tests**
+8. **Verify**
 
 ```bash
 vendor/bin/phpstan analyse src/Application/UseCase/{UseCaseName}/
@@ -233,7 +247,9 @@ vendor/bin/phpunit --filter={UseCaseName}HandlerTest
 
 ## Anti-Patterns to Avoid
 
-- Handler doing too much (>1 responsibility)
-- Business logic in handler (should be in domain)
-- Missing error handling
-- No tests
+| Anti-Pattern | Why Bad | Correct Approach |
+|--------------|---------|------------------|
+| Handler doing too much | >1 responsibility | Single action per handler |
+| Business logic in handler | Domain bleeding | Delegate to domain entities |
+| Missing error handling | Silent failures | Explicit result types |
+| No tests | No confidence | Test behavior, not implementation |

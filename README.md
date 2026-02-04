@@ -145,6 +145,26 @@ Post-write hooks validate your code automatically:
 - Named exports only
 - No non-null assertions (`!`)
 
+## Advanced: Knowledge Base RAG
+
+The plugin includes a knowledge base that can be queried via RAG (Retrieval-Augmented Generation).
+
+### Setup (Ollama Recommended)
+
+```bash
+# 1. Install Ollama
+brew install ollama && ollama pull nomic-embed-text
+
+# 2. Index knowledge base
+cd ai-pack/mcp/knowledge-rag
+npm install && npm run build
+npm run index:ollama
+```
+
+See [Local RAG Setup Guide](docs/guides/local-rag-ollama.md) for detailed instructions.
+
+> **Why Ollama?** 100% local, free, private. OpenAI API is supported but not recommended. See [ADR-0002](docs/adr/0002-ollama-over-openai.md).
+
 ## Architecture Decisions
 
 See [`/docs/adr`](docs/adr/) for Architecture Decision Records:
@@ -152,6 +172,7 @@ See [`/docs/adr`](docs/adr/) for Architecture Decision Records:
 - [ADR-001: Model Tiering Strategy](docs/adr/001-model-tiering.md)
 - [ADR-002: Context Fork Strategy](docs/adr/002-context-fork-strategy.md)
 - [ADR-003: Progressive Disclosure](docs/adr/003-progressive-disclosure.md)
+- [ADR-0002: Ollama over OpenAI](docs/adr/0002-ollama-over-openai.md)
 
 ## Examples
 
@@ -267,12 +288,25 @@ Apache License 2.0 - See [LICENSE](LICENSE)
 - Discussions: [GitHub Discussions](https://github.com/woprrr/ai-craftsman-superpowers/discussions)
 - Documentation: [Claude Code Plugins](https://code.claude.com/docs/en/plugins)
 
+## Sponsors
+
+This project is proudly sponsored by:
+
+| Sponsor | Description |
+|---------|-------------|
+| **[BULDEE](https://buldee.com)** | Building the future of AI-assisted development |
+| **[Time Hacking Limited](https://thelabio.com)** | Maximizing developer productivity |
+
+Interested in sponsoring? [Contact us](https://github.com/woprrr/ai-craftsman-superpowers/discussions)
+
 ## Acknowledgments
 
 - Built following [Anthropic's official plugin guidelines](https://code.claude.com/docs/en/discover-plugins)
 - Inspired by DDD, Clean Architecture, and TDD principles
-- Thanks to all contributors!
+- Thanks to all contributors and sponsors!
 
 ---
 
 **Made with craftsmanship by [Alexandre Mallet](https://github.com/woprrr)**
+
+*Sponsored by [BULDEE](https://buldee.com) & [Time Hacking Limited](https://thelabio.com)*

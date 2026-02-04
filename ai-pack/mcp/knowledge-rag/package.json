@@ -11,6 +11,8 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "index": "tsx scripts/index-pdfs.ts",
+    "index:ollama": "EMBEDDING_PROVIDER=ollama tsx scripts/index-pdfs.ts",
+    "index:openai": "EMBEDDING_PROVIDER=openai tsx scripts/index-pdfs.ts",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit"
   },

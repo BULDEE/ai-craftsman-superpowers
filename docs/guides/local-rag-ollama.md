@@ -2,6 +2,15 @@
 
 This guide explains how to set up a local RAG (Retrieval-Augmented Generation) knowledge base using Ollama for embeddings and local LLM inference.
 
+> **Recommendation:** We recommend **Ollama** (local, free, private) over OpenAI API (cloud, paid). See [ADR-0002: Ollama over OpenAI](../adr/0002-ollama-over-openai.md) for rationale.
+
+## Embedding Options
+
+| Option | Privacy | Cost | Setup | Recommended |
+|--------|---------|------|-------|-------------|
+| **Ollama** (local) | ✅ 100% private | Free | Medium | ✅ Yes |
+| OpenAI API | ❌ Cloud | ~$0.0001/1K tokens | Easy | For quick start only |
+
 ## Overview
 
 ```
@@ -373,9 +382,92 @@ EMBEDDING_MODEL = "all-minilm"
 chunk_size = 500
 ```
 
+## Alternative: OpenAI Embeddings
+
+If you prefer cloud-based embeddings (faster setup, but not private):
+
+### Setup
+
+```bash
+# Set API key
+export OPENAI_API_KEY=sk-...
+
+# Install OpenAI package
+pip install openai langchain-openai
+```
+
+### Code Change
+
+```python
+# Replace OllamaEmbeddings with OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
+
+embeddings = OpenAIEmbeddings(
+    model="text-embedding-3-small",  # or text-embedding-3-large
+    # api_key is read from OPENAI_API_KEY env var
+)
+```
+
+### Cost Comparison
+
+| Model | Cost per 1M tokens | Quality |
+|-------|-------------------|---------|
+| `text-embedding-3-small` | $0.02 | Good |
+| `text-embedding-3-large` | $0.13 | High |
+| Ollama `nomic-embed-text` | **Free** | Good |
+
+> **Our recommendation:** Start with Ollama for privacy and cost. Use OpenAI only if you need faster initial setup or higher embedding quality for production.
+
+## Connecting to Plugin Knowledge Base
+
+The plugin's knowledge base is located at:
+
+```
+plugins/craftsman/knowledge/
+├── canonical/           # Golden standard examples
+├── anti-patterns/       # What to avoid
+├── patterns.md          # Design patterns
+├── principles.md        # SOLID, DDD, etc.
+├── event-driven.md      # Event sourcing
+├── microservices-patterns.md
+└── stack-specifics.md   # PHP/TS rules
+```
+
+### Index Plugin Knowledge
+
+```bash
+# Point RAG to plugin knowledge
+DOCS_DIR = "/path/to/ai-craftsman-superpowers/plugins/craftsman/knowledge"
+
+# Rebuild index
+python scripts/local-rag.py --rebuild
+```
+
+### Use with MCP Server
+
+The `ai-pack/mcp/knowledge-rag` MCP server provides RAG over the knowledge base:
+
+```bash
+cd ai-pack/mcp/knowledge-rag
+
+# Install
+npm install
+
+# Build
+npm run build
+
+# Index (uses Ollama by default, or OPENAI_API_KEY if set)
+npm run index
+
+# Add to Claude Code MCP config
+```
+
+See [ai-pack/mcp/knowledge-rag/README.md](../../ai-pack/mcp/knowledge-rag/README.md) for MCP integration.
+
 ## References
 
 - [Ollama Documentation](https://ollama.ai/docs)
 - [LangChain + Ollama](https://python.langchain.com/docs/integrations/llms/ollama)
 - [ChromaDB Documentation](https://docs.trychroma.com/)
 - [ADR-001: Model Tiering](../adr/001-model-tiering.md)
+- [ADR-0002: Ollama over OpenAI](../adr/0002-ollama-over-openai.md)

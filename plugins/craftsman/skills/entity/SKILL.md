@@ -233,20 +233,36 @@ final class {Name}Test extends TestCase
 
 ## Process
 
-1. **Ask for entity name and properties**
-2. **Generate ID Value Object + Test**
-3. **Generate Entity + Test**
-4. **Generate Domain Event**
-5. **Run verification**
+### Step 0: MANDATORY - Load Canonical Examples
+
+**BEFORE generating any code, you MUST use the Read tool to load:**
+
+```
+Read: knowledge/canonical/php-entity.php
+Read: knowledge/canonical/php-value-object.php
+Read: knowledge/anti-patterns/php-anemic-domain.md
+```
+
+This ensures generated code matches project standards exactly.
+
+### Steps
+
+1. **Load canonical examples** (Step 0 above - NON-NEGOTIABLE)
+2. **Ask for entity name and properties**
+3. **Generate ID Value Object + Test**
+4. **Generate Entity + Test**
+5. **Generate Domain Event**
+6. **Run verification**
 
 ```bash
 vendor/bin/phpstan analyse src/Domain/Entity/{Name}.php
 vendor/bin/phpunit --filter={Name}Test
 ```
 
-## Anti-Patterns Detected
+## Anti-Patterns to Avoid
 
-Read `knowledge/anti-patterns/` before generating:
-- Anemic domain (getters/setters only)
-- Setter abuse
-- Missing events for state changes
+| Anti-Pattern | Why Bad | Correct Approach |
+|--------------|---------|------------------|
+| Anemic domain | Getters/setters = no behavior | Behavior methods |
+| Setter abuse | Breaks encapsulation | Immutable + factory |
+| Missing events | No audit trail | Record domain events |
