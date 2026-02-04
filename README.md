@@ -165,6 +165,30 @@ See [Local RAG Setup Guide](docs/guides/local-rag-ollama.md) for detailed instru
 
 > **Why Ollama?** 100% local, free, private. OpenAI API is supported but not recommended. See [ADR-0002](docs/adr/0002-ollama-over-openai.md).
 
+## CLAUDE.md Configuration
+
+Understanding how to structure your CLAUDE.md files is crucial for optimal plugin integration.
+
+### Priority Hierarchy
+
+```
+1. Explicit user instruction     ← Highest
+2. Project CLAUDE.md (./CLAUDE.md)
+3. Plugin (skills, hooks, knowledge)
+4. Global CLAUDE.md (~/.claude/CLAUDE.md)  ← Lowest
+```
+
+### Quick Rules
+
+| Put in Global | Put in Project | Let Plugin Handle |
+|---------------|----------------|-------------------|
+| DISC profile | Architecture | Code enforcement |
+| Communication style | Key entities | Design patterns |
+| Personal biases | External services | Canonical examples |
+| Stack versions | Project rules | Skill routing |
+
+See **[CLAUDE.md Best Practices Guide](docs/guides/claude-md-best-practices.md)** for complete documentation.
+
 ## Architecture Decisions
 
 See [`/docs/adr`](docs/adr/) for Architecture Decision Records:
