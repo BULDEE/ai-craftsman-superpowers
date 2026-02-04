@@ -10,6 +10,7 @@ Thumbs.db
 
 # Local config (users generate their own)
 .craft-config.yml
+.claude/
 
 # Logs
 *.log
