@@ -7,7 +7,21 @@ on:
     branches: [main]
 
 jobs:
+  secrets-scan:
+    name: Secrets & Sensitive Data Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for git log scan
+
+      - name: Run secrets scanner
+        run: |
+          chmod +x .github/scripts/secrets-scan.sh
+          ./.github/scripts/secrets-scan.sh .
+
   validate-json:
+    needs: [secrets-scan]
     name: Validate JSON Files
     runs-on: ubuntu-latest
     steps:
@@ -49,6 +63,7 @@ jobs:
   validate-hooks-schema:
     name: Validate Hooks Schema
     runs-on: ubuntu-latest
+    needs: [secrets-scan]
     steps:
       - uses: actions/checkout@v4
 
@@ -109,6 +124,7 @@ jobs:
   validate-plugin-manifest:
     name: Validate Plugin Manifest
     runs-on: ubuntu-latest
+    needs: [secrets-scan]
     steps:
       - uses: actions/checkout@v4
 
@@ -156,6 +172,7 @@ jobs:
   validate-shell-scripts:
     name: Validate Shell Scripts
     runs-on: ubuntu-latest
+    needs: [secrets-scan]
     steps:
       - uses: actions/checkout@v4
 
@@ -244,6 +261,7 @@ jobs:
   validate-skills:
     name: Validate Skills Structure
     runs-on: ubuntu-latest
+    needs: [secrets-scan]
     steps:
       - uses: actions/checkout@v4
 
@@ -324,6 +342,7 @@ jobs:
   validate-knowledge-base:
     name: Validate Knowledge Base
     runs-on: ubuntu-latest
+    needs: [secrets-scan]
     steps:
       - uses: actions/checkout@v4
 
@@ -392,6 +411,7 @@ jobs:
   check-agents:
     name: Validate Agent Definitions
     runs-on: ubuntu-latest
+    needs: [secrets-scan]
     steps:
       - uses: actions/checkout@v4
 
@@ -435,7 +455,7 @@ jobs:
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [validate-json, validate-hooks-schema, validate-plugin-manifest, validate-shell-scripts, validate-skills, validate-knowledge-base, run-tests, check-agents]
+    needs: [secrets-scan, validate-json, validate-hooks-schema, validate-plugin-manifest, validate-shell-scripts, validate-skills, validate-knowledge-base, run-tests, check-agents]
     if: always()
     steps:
       - name: Check all jobs status
@@ -447,6 +467,7 @@ jobs:
           echo "All validation jobs completed."
           echo ""
           echo "Jobs status:"
+          echo "  - Secrets scan: ${{ needs.secrets-scan.result }}"
           echo "  - JSON validation: ${{ needs.validate-json.result }}"
           echo "  - Hooks schema: ${{ needs.validate-hooks-schema.result }}"
           echo "  - Plugin manifest: ${{ needs.validate-plugin-manifest.result }}"
@@ -458,7 +479,8 @@ jobs:
           echo ""
 
           # Fail if any job failed
-          if [[ "${{ needs.validate-json.result }}" == "failure" ]] || \
+          if [[ "${{ needs.secrets-scan.result }}" == "failure" ]] || \
+             [[ "${{ needs.validate-json.result }}" == "failure" ]] || \
              [[ "${{ needs.validate-hooks-schema.result }}" == "failure" ]] || \
              [[ "${{ needs.validate-plugin-manifest.result }}" == "failure" ]] || \
              [[ "${{ needs.validate-shell-scripts.result }}" == "failure" ]] || \
