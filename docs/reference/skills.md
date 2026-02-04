@@ -2,7 +2,7 @@
 
 Complete reference for all available commands.
 
-> **Note:** As of v1.1.0, all user-invocable workflows are now in `commands/` instead of `skills/`. See [ADR-0007](../adr/0007-commands-over-skills.md) for rationale.
+> **Note:** As of v1.0.0, all user-invocable workflows are now in `commands/` instead of `skills/`. See [ADR-0007](../adr/0007-commands-over-skills.md) for rationale.
 
 ## Core Pack (Always Enabled)
 
@@ -309,8 +309,8 @@ Check security, tests, and style.
 
 ## Quick Reference Table
 
-| Skill | Pack | Purpose |
-|-------|------|---------|
+| Command | Pack | Purpose |
+|---------|------|---------|
 | `/craftsman:design` | Core | DDD entity design |
 | `/craftsman:debug` | Core | Systematic debugging |
 | `/craftsman:test` | Core | Test strategy |
@@ -319,6 +319,8 @@ Check security, tests, and style.
 | `/craftsman:challenge` | Core | Architecture review |
 | `/craftsman:spec` | Core | Specifications |
 | `/craftsman:git` | Core | Git operations |
+| `/craftsman:verify` | Core | Evidence-based verification |
+| `/craftsman:parallel` | Core | Parallel agent orchestration |
 | `/craftsman:entity` | Symfony | Entity scaffolding |
 | `/craftsman:usecase` | Symfony | Use case scaffolding |
 | `/craftsman:component` | React | Component scaffolding |
@@ -326,3 +328,6 @@ Check security, tests, and style.
 | `/craftsman:rag` | AI | RAG pipeline design |
 | `/craftsman:mlops` | AI | MLOps audit |
 | `/craftsman:agent-design` | AI | Agent design |
+| `/craftsman:source-verify` | AI | Verify AI capabilities |
+| `/craftsman:scaffold` | Utility | Generate context agent |
+| `/craftsman:agent-create` | Utility | Create bounded agent |

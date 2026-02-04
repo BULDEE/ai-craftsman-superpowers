@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-**19 Skills with `craftsman:*` namespace**
+**20 Commands with `craftsman:*` namespace**
 
 All skills use consistent `/craftsman:*` naming convention for better discoverability and ecosystem coherence.
 

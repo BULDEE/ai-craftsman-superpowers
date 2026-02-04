@@ -338,18 +338,59 @@ main() {
 
     # Run tests
     if [[ -n "$SPECIFIC_SKILL" ]]; then
-        # Test specific skill only
-        if [[ -d "$SKILLS_DIR/$SPECIFIC_SKILL" ]]; then
-            test_skill_structure "$SKILLS_DIR/$SPECIFIC_SKILL"
+        # Test specific skill only (handles namespace/subskill notation like "craftsman/session-init")
+        local skill_path="$SKILLS_DIR/$SPECIFIC_SKILL"
+        if [[ -d "$skill_path" ]]; then
+            # Check if this is a namespace
+            local has_subskills=false
+            for subdir in "$skill_path"/*; do
+                if [[ -d "$subdir" ]] && [[ -f "$subdir/SKILL.md" ]]; then
+                    has_subskills=true
+                    break
+                fi
+            done
+
+            if [[ "$has_subskills" == true ]]; then
+                log_info "Namespace: $SPECIFIC_SKILL"
+                for subdir in "$skill_path"/*; do
+                    if [[ -d "$subdir" ]]; then
+                        test_skill_structure "$subdir"
+                    fi
+                done
+            else
+                test_skill_structure "$skill_path"
+            fi
         else
             log_error "Skill not found: $SPECIFIC_SKILL"
             exit 1
         fi
     else
-        # Test all skills
+        # Test all skills (handling namespaces)
         for skill_dir in "$SKILLS_DIR"/*; do
             if [[ -d "$skill_dir" ]]; then
-                test_skill_structure "$skill_dir"
+                # Check if this is a namespace (contains subdirectories with SKILL.md)
+                has_subskills=false
+                for subdir in "$skill_dir"/*; do
+                    if [[ -d "$subdir" ]] && [[ -f "$subdir/SKILL.md" ]]; then
+                        has_subskills=true
+                        break
+                    fi
+                done
+
+                if [[ "$has_subskills" == true ]]; then
+                    # This is a namespace - validate sub-skills
+                    namespace_name=$(basename "$skill_dir")
+                    echo ""
+                    log_info "Namespace: $namespace_name"
+                    for subdir in "$skill_dir"/*; do
+                        if [[ -d "$subdir" ]]; then
+                            test_skill_structure "$subdir"
+                        fi
+                    done
+                else
+                    # This is a direct skill
+                    test_skill_structure "$skill_dir"
+                fi
             fi
         done
 

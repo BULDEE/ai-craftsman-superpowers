@@ -272,61 +272,97 @@ jobs:
           SKILLS_DIR="skills"
           FAILED=0
 
+          # Function to validate a single skill
+          validate_skill() {
+            local skill_dir="$1"
+            local skill_name=$(basename "$skill_dir")
+            local skill_file="$skill_dir/SKILL.md"
+
+            echo ""
+            echo "Checking: $skill_name"
+
+            # Check SKILL.md exists
+            if [ ! -f "$skill_file" ]; then
+              echo "  ✗ SKILL.md missing"
+              return 1
+            fi
+            echo "  ✓ SKILL.md exists"
+
+            # Check YAML frontmatter
+            if ! grep -m1 "^---$" "$skill_file" > /dev/null 2>&1; then
+              echo "  ✗ Missing YAML frontmatter"
+              return 1
+            fi
+            echo "  ✓ Has YAML frontmatter"
+
+            local local_failed=0
+
+            # Check required fields
+            if ! grep -q "^name:" "$skill_file"; then
+              echo "  ✗ Missing 'name' field"
+              local_failed=1
+            else
+              echo "  ✓ Has 'name' field"
+            fi
+
+            if ! grep -q "^description:" "$skill_file"; then
+              echo "  ✗ Missing 'description' field"
+              local_failed=1
+            else
+              echo "  ✓ Has 'description' field"
+            fi
+
+            # Check model field (except session-init)
+            if [ "$skill_name" != "session-init" ]; then
+              if grep -q "^model:" "$skill_file"; then
+                model=$(grep "^model:" "$skill_file" | head -1 | cut -d: -f2 | tr -d ' ')
+                if [[ "$model" =~ ^(haiku|sonnet|opus)$ ]]; then
+                  echo "  ✓ Has valid 'model' field: $model"
+                else
+                  echo "  ✗ Invalid model value: $model (must be haiku|sonnet|opus)"
+                  local_failed=1
+                fi
+              else
+                echo "  ✗ Missing 'model' field"
+                local_failed=1
+              fi
+            else
+              echo "  ○ 'model' field skipped (session-init exempt)"
+            fi
+
+            return $local_failed
+          }
+
           for skill_dir in "$SKILLS_DIR"/*; do
             if [ -d "$skill_dir" ]; then
               skill_name=$(basename "$skill_dir")
               skill_file="$skill_dir/SKILL.md"
 
-              echo ""
-              echo "Checking: $skill_name"
+              # Check if this is a namespace (contains subdirectories with SKILL.md)
+              has_subskills=false
+              for subdir in "$skill_dir"/*; do
+                if [ -d "$subdir" ] && [ -f "$subdir/SKILL.md" ]; then
+                  has_subskills=true
+                  break
+                fi
+              done
 
-              # Check SKILL.md exists
-              if [ ! -f "$skill_file" ]; then
-                echo "  ✗ SKILL.md missing"
-                FAILED=1
-                continue
-              fi
-              echo "  ✓ SKILL.md exists"
-
-              # Check YAML frontmatter
-              if ! grep -m1 "^---$" "$skill_file" > /dev/null 2>&1; then
-                echo "  ✗ Missing YAML frontmatter"
-                FAILED=1
-                continue
-              fi
-              echo "  ✓ Has YAML frontmatter"
-
-              # Check required fields
-              if ! grep -q "^name:" "$skill_file"; then
-                echo "  ✗ Missing 'name' field"
-                FAILED=1
-              else
-                echo "  ✓ Has 'name' field"
-              fi
-
-              if ! grep -q "^description:" "$skill_file"; then
-                echo "  ✗ Missing 'description' field"
-                FAILED=1
-              else
-                echo "  ✓ Has 'description' field"
-              fi
-
-              # Check model field (except session-init)
-              if [ "$skill_name" != "session-init" ]; then
-                if grep -q "^model:" "$skill_file"; then
-                  model=$(grep "^model:" "$skill_file" | head -1 | cut -d: -f2 | tr -d ' ')
-                  if [[ "$model" =~ ^(haiku|sonnet|opus)$ ]]; then
-                    echo "  ✓ Has valid 'model' field: $model"
-                  else
-                    echo "  ✗ Invalid model value: $model (must be haiku|sonnet|opus)"
-                    FAILED=1
+              if [ "$has_subskills" = true ]; then
+                # This is a namespace - validate sub-skills
+                echo ""
+                echo "Namespace: $skill_name"
+                for subdir in "$skill_dir"/*; do
+                  if [ -d "$subdir" ]; then
+                    if ! validate_skill "$subdir"; then
+                      FAILED=1
+                    fi
                   fi
-                else
-                  echo "  ✗ Missing 'model' field"
+                done
+              else
+                # This is a direct skill
+                if ! validate_skill "$skill_dir"; then
                   FAILED=1
                 fi
-              else
-                echo "  ○ 'model' field skipped (session-init exempt)"
               fi
             fi
           done

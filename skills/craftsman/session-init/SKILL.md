@@ -37,6 +37,11 @@ Welcome to **AI Craftsman Superpowers**. Your coding assistant is now operating 
 - `/craftsman:rag` - Design RAG pipeline
 - `/craftsman:mlops` - MLOps audit
 - `/craftsman:agent-design` - Agent 3P pattern
+- `/craftsman:source-verify` - Verify AI capabilities
+
+**Utility:**
+- `/craftsman:scaffold` - Generate context agent from code
+- `/craftsman:agent-create` - Create bounded context agent
 
 ## Bias Protection Active
 
