@@ -51,7 +51,7 @@ npm run index:ollama
 
 ### Configure Claude Code
 
-Add to `~/.claude/settings.local.json`:
+Create or edit `~/.mcp.json` (global MCP configuration):
 
 **If installed via plugin marketplace:**
 ```json
@@ -59,7 +59,7 @@ Add to `~/.claude/settings.local.json`:
   "mcpServers": {
     "knowledge-rag": {
       "command": "node",
-      "args": ["~/.claude/plugins/marketplaces/ai-craftsman-superpowers/ai-pack/mcp/knowledge-rag/dist/src/index.js"]
+      "args": ["/Users/YOUR_USERNAME/.claude/plugins/marketplaces/ai-craftsman-superpowers/ai-pack/mcp/knowledge-rag/dist/src/index.js"]
     }
   }
 }
@@ -79,7 +79,7 @@ Add to `~/.claude/settings.local.json`:
 
 Then restart Claude Code.
 
-> **Note:** Replace `~` with your actual home directory path (e.g., `/Users/username` on macOS).
+> **Note:** Replace `YOUR_USERNAME` with your actual username. The `~` shorthand is not supported in MCP args - use absolute paths.
 
 ## Project-Specific Knowledge
 

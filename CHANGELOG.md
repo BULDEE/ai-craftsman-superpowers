@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.2.0] - 2025-02-04
+## [2.1.2] - 2025-02-04
 
 ### Added
 
@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PostToolUse Hook Matcher**: Changed from `Write` to `Write|Edit` to validate all file modifications
   - Previously only Write tool was validated, missing 50% of file changes
   - Edit tool modifications now trigger the same validation rules
+- **Knowledge RAG README**: Fixed MCP configuration path (`~/.mcp.json` instead of `settings.local.json`)
 
 ### Changed
 
