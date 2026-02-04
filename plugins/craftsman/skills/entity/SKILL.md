@@ -6,6 +6,7 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "entity", "aggregate",
   "Doctrine entity", "create [noun] entity", PHP/Symfony context
+model: sonnet
 allowed-tools:
   - Read
   - Glob

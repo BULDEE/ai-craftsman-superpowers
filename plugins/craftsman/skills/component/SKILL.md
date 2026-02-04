@@ -6,6 +6,7 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "component", "React",
   "create component", "UI component", TypeScript/React context
+model: sonnet
 allowed-tools:
   - Read
   - Glob

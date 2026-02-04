@@ -6,6 +6,7 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "use case", "command handler",
   "application service", "CQRS", PHP/Symfony context
+model: sonnet
 allowed-tools:
   - Read
   - Glob

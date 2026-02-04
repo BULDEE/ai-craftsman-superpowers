@@ -9,6 +9,9 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "plan", "how should I",
   "steps to", "migrate", "roadmap", "strategy", "break down"
+model: opus
+context: fork
+agent: Plan
 allowed-tools:
   - Read
   - Glob

@@ -6,6 +6,9 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "MLOps", "ML pipeline",
   "model deployment", "ML infrastructure", "model monitoring"
+model: opus
+context: fork
+agent: Explore
 allowed-tools:
   - Read
   - Glob

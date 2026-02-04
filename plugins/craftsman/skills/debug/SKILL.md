@@ -9,6 +9,9 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "bug", "error", "not working",
   "broken", "fails", "exception", "crash", "slow", "memory leak", "debug"
+model: sonnet
+context: fork
+agent: general-purpose
 allowed-tools:
   - Read
   - Glob

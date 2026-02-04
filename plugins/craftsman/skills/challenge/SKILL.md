@@ -9,6 +9,9 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "review", "check this",
   "feedback", "audit", "what do you think", "code review", "PR review"
+model: opus
+context: fork
+agent: general-purpose
 allowed-tools:
   - Read
   - Glob

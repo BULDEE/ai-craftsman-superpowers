@@ -9,6 +9,7 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "entity", "aggregate", "value object",
   "domain model", "bounded context", "design", "architect", "create [noun]"
+model: sonnet
 allowed-tools:
   - Read
   - Glob

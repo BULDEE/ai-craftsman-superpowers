@@ -6,6 +6,7 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "RAG", "retrieval", "embeddings",
   "vector database", "semantic search", "knowledge base", "document Q&A"
+model: opus
 allowed-tools:
   - Read
   - Glob

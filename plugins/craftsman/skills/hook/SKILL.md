@@ -6,6 +6,7 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "hook", "useQuery", "useMutation",
   "custom hook", "TanStack Query", "data fetching"
+model: sonnet
 allowed-tools:
   - Read
   - Glob

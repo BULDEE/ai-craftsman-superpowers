@@ -9,6 +9,9 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "refactor", "clean up",
   "improve", "simplify", "extract", "rename", "technical debt"
+model: sonnet
+context: fork
+agent: general-purpose
 allowed-tools:
   - Read
   - Glob

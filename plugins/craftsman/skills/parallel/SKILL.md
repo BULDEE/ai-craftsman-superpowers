@@ -9,6 +9,7 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "parallel", "simultaneously",
   "at the same time", "multiple tasks", "independent tasks"
+model: opus
 allowed-tools:
   - Read
   - Glob

@@ -9,6 +9,7 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "implement", "create test",
   "TDD", "test first", "specify", "behavior", "what should it do"
+model: sonnet
 allowed-tools:
   - Read
   - Glob

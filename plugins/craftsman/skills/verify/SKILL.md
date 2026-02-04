@@ -9,6 +9,7 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "verify", "check", "is it done",
   "does it work", "ready to commit", "ready for PR", "finished"
+model: haiku
 allowed-tools:
   - Bash
   - Read

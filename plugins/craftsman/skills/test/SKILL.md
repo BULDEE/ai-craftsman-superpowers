@@ -9,6 +9,7 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "test", "coverage", "what to test",
   "testing strategy", "unit test", "integration test", "mock"
+model: sonnet
 allowed-tools:
   - Read
   - Glob

@@ -6,6 +6,7 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "AI agent", "autonomous agent",
   "agent architecture", "tool use", "agent workflow", "3P pattern"
+model: opus
 allowed-tools:
   - Read
   - Glob

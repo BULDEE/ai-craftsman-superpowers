@@ -7,10 +7,7 @@
     "url": "https://github.com/woprrr"
   },
   "homepage": "https://github.com/woprrr/ai-craftsman-superpowers",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/woprrr/ai-craftsman-superpowers.git"
-  },
+  "repository": "https://github.com/woprrr/ai-craftsman-superpowers",
   "license": "MIT",
   "keywords": [
     "ddd",
@@ -21,8 +18,5 @@
     "react",
     "typescript",
     "php"
-  ],
-  "claude-code": {
-    "minVersion": "1.0.33"
-  }
+  ]
 }

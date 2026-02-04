@@ -9,6 +9,7 @@ description: |
 
   ACTIVATES AUTOMATICALLY when detecting: "commit", "git", "branch",
   "merge", "PR", "pull request", "push", "worktree"
+model: haiku
 allowed-tools:
   - Bash
   - Read
