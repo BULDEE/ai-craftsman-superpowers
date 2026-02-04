@@ -31,7 +31,10 @@ ollama pull nomic-embed-text
 ollama serve
 
 # 4. Navigate to MCP directory
-cd ai-pack/mcp/knowledge-rag
+# If installed via plugin marketplace:
+cd ~/.claude/plugins/marketplaces/ai-craftsman-superpowers/ai-pack/mcp/knowledge-rag
+# If cloned locally:
+# cd /path/to/ai-craftsman-superpowers/ai-pack/mcp/knowledge-rag
 
 # 5. Install dependencies & build
 npm install && npm run build
@@ -50,18 +53,33 @@ npm run index:ollama
 
 Add to `~/.claude/settings.local.json`:
 
+**If installed via plugin marketplace:**
 ```json
 {
   "mcpServers": {
     "knowledge-rag": {
       "command": "node",
-      "args": ["/path/to/ai-pack/mcp/knowledge-rag/dist/src/index.js"]
+      "args": ["~/.claude/plugins/marketplaces/ai-craftsman-superpowers/ai-pack/mcp/knowledge-rag/dist/src/index.js"]
+    }
+  }
+}
+```
+
+**If cloned locally:**
+```json
+{
+  "mcpServers": {
+    "knowledge-rag": {
+      "command": "node",
+      "args": ["/path/to/ai-craftsman-superpowers/ai-pack/mcp/knowledge-rag/dist/src/index.js"]
     }
   }
 }
 ```
 
 Then restart Claude Code.
+
+> **Note:** Replace `~` with your actual home directory path (e.g., `/Users/username` on macOS).
 
 ## Project-Specific Knowledge
 

@@ -293,28 +293,50 @@ Include:
 
 ## Lesson 4: Custom Knowledge Indexing
 
-### Adding Your Own PDFs
+### Adding Your Own Documents
+
+The MCP supports two knowledge base modes:
+
+**Option 1: Global Knowledge (shared across all projects)**
 
 ```bash
-# 1. Add PDFs to source directory
-cp ~/new-papers/*.pdf ~/Desktop/IA\ ressources/
+# 1. Add documents to global knowledge directory
+mkdir -p ~/.claude/ai-craftsman-superpowers/knowledge
+cp ~/new-papers/*.pdf ~/.claude/ai-craftsman-superpowers/knowledge/
 
 # 2. Re-index
 cd ai-pack/mcp/knowledge-rag
-npm run index
+npm run index:ollama
 
 # Output:
+# Mode: GLOBAL knowledge base
 # Processing: new-paper.pdf
 #   - Pages: 15
 #   - Chunks: 42
 #   - Done
 ```
 
+**Option 2: Project-Specific Knowledge (recommended)**
+
+```bash
+# 1. Create project knowledge directory
+mkdir -p .claude/ai-craftsman-superpowers/knowledge
+
+# 2. Add project-specific documents
+cp specs.pdf architecture.md .claude/ai-craftsman-superpowers/knowledge/
+
+# 3. Index from project root
+npx tsx /path/to/ai-pack/mcp/knowledge-rag/scripts/index-pdfs.ts
+
+# 4. Add to .gitignore
+echo ".claude/ai-craftsman-superpowers/knowledge/.index/" >> .gitignore
+```
+
 ### Custom Source Directory
 
 ```bash
-# Index different directory
-npm run index /path/to/your/documents
+# Index specific directory
+npm run index:ollama /path/to/your/documents
 ```
 
 ### Verifying Indexation

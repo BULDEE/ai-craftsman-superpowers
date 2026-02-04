@@ -77,7 +77,7 @@ List all indexed documents.
   "mcpServers": {
     "knowledge-rag": {
       "command": "node",
-      "args": ["/path/to/ai-pack/mcp/knowledge-rag/dist/index.js"]
+      "args": ["/path/to/ai-pack/mcp/knowledge-rag/dist/src/index.js"]
     }
   }
 }
@@ -114,8 +114,12 @@ knowledge-rag/
 │       └── provider.ts      # Ollama integration
 ├── scripts/
 │   └── index-pdfs.ts      # One-time indexing
-└── data/
-    └── knowledge.db       # SQLite database
+└── dist/src/              # Compiled output
+    └── index.js           # Entry point
+
+# Database locations (auto-detected):
+# Project: .claude/ai-craftsman-superpowers/knowledge/.index/knowledge.db
+# Global:  ~/.claude/ai-craftsman-superpowers/knowledge/knowledge.db
 ```
 
 ### Setup

@@ -145,25 +145,57 @@ Post-write hooks validate your code automatically:
 - Named exports only
 - No non-null assertions (`!`)
 
-## Advanced: Knowledge Base RAG
+## Advanced: Knowledge Base RAG (Optional)
 
-The plugin includes a knowledge base that can be queried via RAG (Retrieval-Augmented Generation).
+The plugin includes an **optional** MCP server for RAG (Retrieval-Augmented Generation) over local documents.
 
-### Setup (Ollama Recommended)
+> **Note:** The plugin is fully functional without the MCP. This is a power-user feature.
+
+### Prerequisites
+
+- Node.js 20+
+- [Ollama](https://ollama.ai) with `nomic-embed-text` model
+
+### Setup
 
 ```bash
 # 1. Install Ollama
 brew install ollama && ollama pull nomic-embed-text
+ollama serve  # Keep running
 
-# 2. Index knowledge base
-cd ai-pack/mcp/knowledge-rag
+# 2. Build MCP server
+cd ~/.claude/plugins/marketplaces/ai-craftsman-superpowers/ai-pack/mcp/knowledge-rag
 npm install && npm run build
+
+# 3. Create knowledge directory & add documents
+mkdir -p ~/.claude/ai-craftsman-superpowers/knowledge
+cp ~/your-docs/*.pdf ~/.claude/ai-craftsman-superpowers/knowledge/
+
+# 4. Index knowledge base
 npm run index:ollama
+
+# 5. Configure Claude Code
+# Add to ~/.claude/settings.local.json:
 ```
 
-See [Local RAG Setup Guide](docs/guides/local-rag-ollama.md) for detailed instructions.
+```json
+{
+  "mcpServers": {
+    "knowledge-rag": {
+      "command": "node",
+      "args": ["~/.claude/plugins/marketplaces/ai-craftsman-superpowers/ai-pack/mcp/knowledge-rag/dist/src/index.js"]
+    }
+  }
+}
+```
 
-> **Why Ollama?** 100% local, free, private. OpenAI API is supported but not recommended. See [ADR-0002](docs/adr/0002-ollama-over-openai.md).
+```bash
+# 6. Restart Claude Code
+```
+
+See [Local RAG Setup Guide](docs/guides/local-rag-ollama.md) and [MCP Reference](docs/reference/mcp-servers.md) for detailed instructions.
+
+> **Why Ollama?** 100% local, free, private. See [ADR-0002](docs/adr/0002-ollama-over-openai.md).
 
 ## CLAUDE.md Configuration
 
