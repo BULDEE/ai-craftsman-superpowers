@@ -4,7 +4,7 @@ Complete reference for all available skills.
 
 ## Core Pack (Always Enabled)
 
-### /design
+### /craftsman:design
 
 **Purpose**: Design domain entities, value objects, and aggregates using DDD principles.
 
@@ -21,13 +21,13 @@ Complete reference for all available skills.
 
 **Example**:
 ```
-> /design
+> /craftsman:design
 Create a Money value object for handling currency amounts
 ```
 
 ---
 
-### /debug
+### /craftsman:debug
 
 **Purpose**: Systematic debugging using the ReAct pattern.
 
@@ -45,14 +45,14 @@ Create a Money value object for handling currency amounts
 
 **Example**:
 ```
-> /debug
+> /craftsman:debug
 The checkout process fails silently for some users.
 No error in logs, payment not processed.
 ```
 
 ---
 
-### /test
+### /craftsman:test
 
 **Purpose**: Design test strategies and generate tests.
 
@@ -65,14 +65,14 @@ No error in logs, payment not processed.
 
 **Example**:
 ```
-> /test
+> /craftsman:test
 Add tests for the Order aggregate.
 Focus on state transitions and invariants.
 ```
 
 ---
 
-### /refactor
+### /craftsman:refactor
 
 **Purpose**: Systematic code improvement without changing behavior.
 
@@ -89,14 +89,14 @@ Focus on state transitions and invariants.
 
 **Example**:
 ```
-> /refactor
+> /craftsman:refactor
 The OrderService has too many responsibilities.
 Extract payment handling.
 ```
 
 ---
 
-### /plan
+### /craftsman:plan
 
 **Purpose**: Break complex tasks into actionable steps.
 
@@ -107,14 +107,14 @@ Extract payment handling.
 
 **Example**:
 ```
-> /plan
+> /craftsman:plan
 Implement user authentication with OAuth2.
 Need Google and GitHub providers.
 ```
 
 ---
 
-### /challenge
+### /craftsman:challenge
 
 **Purpose**: Review and question architectural decisions.
 
@@ -125,14 +125,14 @@ Need Google and GitHub providers.
 
 **Example**:
 ```
-> /challenge
+> /craftsman:challenge
 We're planning to use microservices.
 Currently have 3 developers and 1 product.
 ```
 
 ---
 
-### /spec
+### /craftsman:spec
 
 **Purpose**: Write formal specifications (BDD/TDD style).
 
@@ -143,14 +143,14 @@ Currently have 3 developers and 1 product.
 
 **Example**:
 ```
-> /spec
+> /craftsman:spec
 Specify the password reset flow.
 Include email verification and expiration.
 ```
 
 ---
 
-### /git
+### /craftsman:git
 
 **Purpose**: Safe git operations with guardrails.
 
@@ -161,7 +161,7 @@ Include email verification and expiration.
 
 **Example**:
 ```
-> /git
+> /craftsman:git
 Rebase feature branch onto main.
 Resolve any conflicts preserving feature changes.
 ```
@@ -170,7 +170,7 @@ Resolve any conflicts preserving feature changes.
 
 ## Symfony Pack
 
-### /craft entity
+### /craftsman:entity
 
 **Purpose**: Scaffold DDD entity with all components.
 
@@ -182,13 +182,13 @@ Resolve any conflicts preserving feature changes.
 
 **Example**:
 ```
-> /craft entity
+> /craftsman:entity
 Create Product entity with SKU, name, price, stock.
 ```
 
 ---
 
-### /craft usecase
+### /craftsman:usecase
 
 **Purpose**: Scaffold application use case.
 
@@ -200,7 +200,7 @@ Create Product entity with SKU, name, price, stock.
 
 **Example**:
 ```
-> /craft usecase
+> /craftsman:usecase
 PlaceOrder - validates stock and creates order
 ```
 
@@ -208,7 +208,7 @@ PlaceOrder - validates stock and creates order
 
 ## React Pack
 
-### /craft component
+### /craftsman:component
 
 **Purpose**: Scaffold React component with TypeScript.
 
@@ -220,13 +220,13 @@ PlaceOrder - validates stock and creates order
 
 **Example**:
 ```
-> /craft component
+> /craftsman:component
 ProductCard - shows image, name, price, add to cart
 ```
 
 ---
 
-### /craft hook
+### /craftsman:hook
 
 **Purpose**: Scaffold TanStack Query hook.
 
@@ -237,7 +237,7 @@ ProductCard - shows image, name, price, add to cart
 
 **Example**:
 ```
-> /craft hook
+> /craftsman:hook
 useProducts - fetches paginated product list
 ```
 
@@ -245,7 +245,7 @@ useProducts - fetches paginated product list
 
 ## AI Pack
 
-### /craft rag
+### /craftsman:rag
 
 **Purpose**: Design RAG (Retrieval-Augmented Generation) pipelines.
 
@@ -257,14 +257,14 @@ useProducts - fetches paginated product list
 
 **Example**:
 ```
-> /craft rag
+> /craftsman:rag
 Build RAG for customer support documentation.
 500 markdown files, need high accuracy.
 ```
 
 ---
 
-### /craft mlops
+### /craftsman:mlops
 
 **Purpose**: Audit ML projects for production readiness.
 
@@ -278,13 +278,13 @@ Build RAG for customer support documentation.
 
 **Example**:
 ```
-> /craft mlops
+> /craftsman:mlops
 Audit our recommendation model for production.
 ```
 
 ---
 
-### /craft agent
+### /craftsman:agent-design
 
 **Purpose**: Design AI agents using 3P pattern.
 
@@ -298,7 +298,7 @@ Audit our recommendation model for production.
 
 **Example**:
 ```
-> /craft agent
+> /craftsman:agent-design
 Design a code review agent for GitHub PRs.
 Check security, tests, and style.
 ```
@@ -309,18 +309,18 @@ Check security, tests, and style.
 
 | Skill | Pack | Purpose |
 |-------|------|---------|
-| `/design` | Core | DDD entity design |
-| `/debug` | Core | Systematic debugging |
-| `/test` | Core | Test strategy |
-| `/refactor` | Core | Code improvement |
-| `/plan` | Core | Task breakdown |
-| `/challenge` | Core | Architecture review |
-| `/spec` | Core | Specifications |
-| `/git` | Core | Git operations |
-| `/craft entity` | Symfony | Entity scaffolding |
-| `/craft usecase` | Symfony | Use case scaffolding |
-| `/craft component` | React | Component scaffolding |
-| `/craft hook` | React | Hook scaffolding |
-| `/craft rag` | AI | RAG pipeline design |
-| `/craft mlops` | AI | MLOps audit |
-| `/craft agent` | AI | Agent design |
+| `/craftsman:design` | Core | DDD entity design |
+| `/craftsman:debug` | Core | Systematic debugging |
+| `/craftsman:test` | Core | Test strategy |
+| `/craftsman:refactor` | Core | Code improvement |
+| `/craftsman:plan` | Core | Task breakdown |
+| `/craftsman:challenge` | Core | Architecture review |
+| `/craftsman:spec` | Core | Specifications |
+| `/craftsman:git` | Core | Git operations |
+| `/craftsman:entity` | Symfony | Entity scaffolding |
+| `/craftsman:usecase` | Symfony | Use case scaffolding |
+| `/craftsman:component` | React | Component scaffolding |
+| `/craftsman:hook` | React | Hook scaffolding |
+| `/craftsman:rag` | AI | RAG pipeline design |
+| `/craftsman:mlops` | AI | MLOps audit |
+| `/craftsman:agent-design` | AI | Agent design |

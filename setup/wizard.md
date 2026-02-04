@@ -1,5 +1,5 @@
 ---
-name: craft-setup
+name: setup
 description: Interactive setup wizard for AI Craftsman Superpowers - runs on first launch
 ---
 
@@ -102,26 +102,26 @@ Save this configuration? [Y/n]
 Configuration saved to ~/.claude/.craft-config.yml
 
 Available skills:
-- /design    - DDD design with challenge
-- /debug     - Systematic investigation
-- /spec      - Specification-first (TDD)
-- /plan      - Structured planning
-- /challenge - Architecture review
-- /refactor  - Systematic refactoring
-- /test      - Pragmatic testing
-- /git       - Safe git workflow
+- /craftsman:design    - DDD design with challenge
+- /craftsman:debug     - Systematic investigation
+- /craftsman:spec      - Specification-first (TDD)
+- /craftsman:plan      - Structured planning
+- /craftsman:challenge - Architecture review
+- /craftsman:refactor  - Systematic refactoring
+- /craftsman:test      - Pragmatic testing
+- /craftsman:git       - Safe git workflow
 
 {if symfony}
-- /craft entity  - Scaffold DDD entity
-- /craft usecase - Scaffold use case
+- /craftsman:entity  - Scaffold DDD entity
+- /craftsman:usecase - Scaffold use case
 {/if}
 
 {if react}
-- /craft component - Scaffold React component
-- /craft hook      - Scaffold query hook
+- /craftsman:component - Scaffold React component
+- /craftsman:hook      - Scaffold query hook
 {/if}
 
-Type /craft for the full command reference.
+Type /craftsman: for the full command reference.
 
 Happy crafting!
 ```
@@ -130,7 +130,7 @@ Happy crafting!
 
 User can re-run setup anytime with:
 ```
-/craft setup
+/craftsman:setup
 ```
 
 This will show current config and allow modifications.

@@ -1,16 +1,16 @@
 ---
 name: agent-create
-description: Interactively create a bounded context agent from template. Usage /craft agent:create
+description: Interactively create a bounded context agent from template. Usage /craftsman:agent-create
 ---
 
-# /craft agent:create - Interactive Agent Creation
+# /craftsman:agent-create - Interactive Agent Creation
 
 Create a bounded context agent through guided questions.
 
 ## Usage
 
 ```
-/craft agent:create
+/craftsman:agent-create
 ```
 
 ## Process

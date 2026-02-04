@@ -28,10 +28,10 @@ Each skill:
 - Includes bias protection
 
 ```
-/design    → DDD entity design with challenge phases
-/debug     → Systematic debugging (ReAct pattern)
-/test      → Test strategy (Fowler/Martin methodology)
-/craft rag → RAG pipeline design
+/craftsman:design    → DDD entity design with challenge phases
+/craftsman:debug     → Systematic debugging (ReAct pattern)
+/craftsman:test      → Test strategy (Fowler/Martin methodology)
+/craftsman:rag       → RAG pipeline design
 ```
 
 ## Consequences

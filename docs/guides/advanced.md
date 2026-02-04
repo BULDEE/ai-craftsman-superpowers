@@ -4,7 +4,7 @@ This guide is for AI engineers, ML practitioners, and those building intelligent
 
 ## What You'll Learn
 
-- [x] Designing RAG pipelines with /craft rag
+- [x] Designing RAG pipelines with /craftsman:rag
 - [x] MLOps audit and implementation
 - [x] Agent architecture with 3P pattern
 - [x] Custom knowledge indexing
@@ -39,10 +39,10 @@ RETRIEVAL:   Query → Embed → Search → Rerank → Top-K
 GENERATION:  Query + Context → Prompt → LLM → Response
 ```
 
-### /craft rag in Action
+### /craftsman:rag in Action
 
 ```
-> /craft rag
+> /craftsman:rag
 
 Build a RAG system for our technical documentation.
 - 500 markdown files
@@ -103,7 +103,7 @@ src/rag/
 #### Hybrid Search (Vector + Keyword)
 
 ```
-> /craft rag
+> /craftsman:rag
 
 Add hybrid search combining vector similarity with BM25.
 Some queries need exact keyword matching.
@@ -112,7 +112,7 @@ Some queries need exact keyword matching.
 #### Multi-Index RAG
 
 ```
-> /craft rag
+> /craftsman:rag
 
 Build RAG with separate indexes for:
 - Code documentation (technical)
@@ -123,7 +123,7 @@ Build RAG with separate indexes for:
 #### Iterative Retrieval
 
 ```
-> /craft rag
+> /craftsman:rag
 
 Implement iterative retrieval for complex questions.
 First retrieval informs second query.
@@ -142,10 +142,10 @@ First retrieval informs second query.
 5. **Monitoring** - Drift, performance, alerts
 6. **Reproducibility** - Seeds, environment, configs
 
-### /craft mlops Audit
+### /craftsman:mlops Audit
 
 ```
-> /craft mlops
+> /craftsman:mlops
 
 Audit our recommendation system for production readiness.
 ```
@@ -208,10 +208,10 @@ RECOMMENDATIONS:
       └───────── feedback ────────────┘
 ```
 
-### /craft agent in Action
+### /craftsman:agent-design in Action
 
 ```
-> /craft agent
+> /craftsman:agent-design
 
 Design a code review agent.
 It should:
@@ -411,7 +411,7 @@ npm run build
 ### Exercise 1: Build a QA RAG
 
 ```
-> /craft rag
+> /craftsman:rag
 
 Build a customer support RAG system.
 - Index: FAQ documents, support tickets, product docs
@@ -422,7 +422,7 @@ Build a customer support RAG system.
 ### Exercise 2: MLOps Pipeline
 
 ```
-> /craft mlops
+> /craftsman:mlops
 
 Design an MLOps pipeline for a fraud detection model.
 Include: data versioning, experiment tracking, A/B testing.
@@ -431,7 +431,7 @@ Include: data versioning, experiment tracking, A/B testing.
 ### Exercise 3: Custom Agent
 
 ```
-> /craft agent
+> /craftsman:agent-design
 
 Design a documentation agent that:
 - Monitors code changes

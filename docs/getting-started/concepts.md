@@ -26,11 +26,11 @@ This plugin encodes these practices into repeatable skills.
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐ │
 │  │  CORE PACK  │  │SYMFONY PACK │  │ REACT PACK  │  │  AI PACK   │ │
 │  │             │  │             │  │             │  │            │ │
-│  │ /design     │  │ /craft      │  │ /craft      │  │ /craft rag │ │
-│  │ /debug      │  │   entity    │  │   component │  │ /craft     │ │
-│  │ /test       │  │ /craft      │  │ /craft hook │  │   mlops    │ │
-│  │ /refactor   │  │   usecase   │  │             │  │ /craft     │ │
-│  │ /plan       │  │             │  │             │  │   agent    │ │
+│  │ /craftsman: │  │ /craftsman: │  │ /craftsman: │  │/craftsman: │ │
+│  │   design    │  │   entity    │  │   component │  │   rag      │ │
+│  │   debug     │  │   usecase   │  │   hook      │  │   mlops    │ │
+│  │   test      │  │             │  │             │  │   agent-   │ │
+│  │   plan      │  │             │  │             │  │   design   │ │
 │  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘ │
 │         │                │                │                │        │
 │         ↓                ↓                ↓                ↓        │
@@ -63,9 +63,9 @@ This plugin encodes these practices into repeatable skills.
 - Bias protection
 
 ```
-/design = DDD expertise
-/debug  = Systematic investigation (ReAct)
-/test   = Test strategy (Fowler methodology)
+/craftsman:design = DDD expertise
+/craftsman:debug  = Systematic investigation (ReAct)
+/craftsman:test   = Test strategy (Fowler methodology)
 ```
 
 ### 2. Packs

@@ -22,10 +22,10 @@ You've mastered the basics. Now let's go deeper into advanced patterns, pack-spe
 
 The Symfony pack provides DDD-focused scaffolding.
 
-#### /craft entity
+#### /craftsman:entity
 
 ```
-> /craft entity
+> /craftsman:entity
 
 Create a Product entity for an e-commerce bounded context.
 Products have SKU, name, price, and stock quantity.
@@ -57,10 +57,10 @@ tests/Unit/Domain/Product/
 - Domain events for state changes
 - Full test coverage
 
-#### /craft usecase
+#### /craftsman:usecase
 
 ```
-> /craft usecase
+> /craftsman:usecase
 
 Create a PlaceOrder use case.
 It should validate stock and create an order.
@@ -79,10 +79,10 @@ tests/Unit/Application/UseCase/
 
 ### React Pack
 
-#### /craft component
+#### /craftsman:component
 
 ```
-> /craft component
+> /craftsman:component
 
 Create a ProductCard component.
 Shows product image, name, price, and add to cart button.
@@ -103,10 +103,10 @@ src/components/ProductCard/
 - No `any` types
 - Named exports only
 
-#### /craft hook
+#### /craftsman:hook
 
 ```
-> /craft hook
+> /craftsman:hook
 
 Create a useProduct hook.
 Fetches product by ID with loading and error states.
@@ -243,17 +243,17 @@ What aggregates do we need for Shipping?
 Consider: Shipment, Route, Carrier.
 
 # 3. Create entities
-> /craft entity
+> /craftsman:entity
 Create the Shipment aggregate.
 
-> /craft entity
+> /craftsman:entity
 Create the Route entity.
 
 # 4. Create use cases
-> /craft usecase
+> /craftsman:usecase
 CreateShipment use case.
 
-> /craft usecase
+> /craftsman:usecase
 UpdateShipmentStatus use case.
 
 # 5. Review architecture
@@ -300,14 +300,14 @@ What are the alternatives?
 
 ```
 # Create a Subscription entity (Symfony)
-> /craft entity
+> /craftsman:entity
 Subscription with: plan, status, billing cycle, next billing date.
 
 # Write comprehensive tests
 > /test
 
 # Create use cases
-> /craft usecase
+> /craftsman:usecase
 CreateSubscription, CancelSubscription, RenewSubscription
 ```
 
@@ -315,13 +315,13 @@ CreateSubscription, CancelSubscription, RenewSubscription
 
 ```
 # Create subscription management UI (React)
-> /craft component
+> /craftsman:component
 SubscriptionCard - shows plan, status, renewal date
 
-> /craft hook
+> /craftsman:hook
 useSubscription - manages subscription state
 
-> /craft component
+> /craftsman:component
 SubscriptionForm - create/edit subscription
 ```
 

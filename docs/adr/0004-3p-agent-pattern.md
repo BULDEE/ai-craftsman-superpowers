@@ -18,7 +18,7 @@ When designing AI agents (LLM-based autonomous systems), multiple architectural 
 4. **OODA Loop**: Observe → Orient → Decide → Act
 
 We needed a structured approach for:
-- Teaching agent design in the `/craft agent` skill
+- Teaching agent design in the `/craftsman:agent-design` skill
 - Reviewing agent implementations
 - Building our own agents (code reviewers)
 
