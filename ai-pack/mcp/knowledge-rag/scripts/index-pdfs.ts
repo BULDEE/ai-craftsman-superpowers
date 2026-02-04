@@ -1,11 +1,15 @@
 #!/usr/bin/env tsx
 
-import { readdir, readFile } from "fs/promises";
-import { join, basename } from "path";
+import { readdir, readFile, stat } from "fs/promises";
+import { join, basename, dirname, extname } from "path";
+import { fileURLToPath } from "url";
 import pdf from "pdf-parse";
 
 import { VectorStore } from "../src/db/vector-store.js";
 import { OpenAIEmbeddingProvider } from "../src/embeddings/provider.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 interface ChunkResult {
   readonly content: string;
@@ -15,14 +19,53 @@ interface ChunkResult {
 
 const CHUNK_SIZE = 500;
 const CHUNK_OVERLAP = 100;
-const DEFAULT_SOURCE_DIR = "***REDACTED_PATH***";
+// Default to knowledge directory in ai-pack (relative to scripts/)
+const DEFAULT_SOURCE_DIR = join(__dirname, "../../../knowledge");
+
+async function checkOllamaRunning(): Promise<boolean> {
+  try {
+    const response = await fetch("http://localhost:11434/api/tags");
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+function printSetupInstructions(): void {
+  console.log("\n" + "=".repeat(60));
+  console.log("SETUP REQUIRED: Ollama is not running");
+  console.log("=".repeat(60));
+  console.log("\nTo use the Knowledge RAG MCP, follow these steps:\n");
+  console.log("1. Install Ollama:");
+  console.log("   macOS:  brew install ollama");
+  console.log("   Linux:  curl -fsSL https://ollama.ai/install.sh | sh\n");
+  console.log("2. Pull the embedding model:");
+  console.log("   ollama pull nomic-embed-text\n");
+  console.log("3. Start Ollama server (keep running in a terminal):");
+  console.log("   ollama serve\n");
+  console.log("4. Run this indexer again:");
+  console.log("   npm run index:ollama\n");
+  console.log("5. Restart Claude Code to connect the MCP server\n");
+  console.log("=".repeat(60) + "\n");
+}
 
 async function main(): Promise<void> {
   const sourceDir = process.argv[2] ?? DEFAULT_SOURCE_DIR;
+  const provider = process.env.EMBEDDING_PROVIDER ?? "ollama";
+
+  // Check Ollama is running for ollama provider
+  if (provider === "ollama") {
+    const ollamaRunning = await checkOllamaRunning();
+    if (!ollamaRunning) {
+      printSetupInstructions();
+      process.exit(1);
+    }
+  }
 
   console.log("=".repeat(60));
   console.log("Knowledge Base Indexer");
   console.log("=".repeat(60));
+  console.log(`Embedding provider: ${provider}`);
   console.log(`Source directory: ${sourceDir}`);
   console.log(`Chunk size: ${CHUNK_SIZE} chars`);
   console.log(`Chunk overlap: ${CHUNK_OVERLAP} chars`);
@@ -37,23 +80,35 @@ async function main(): Promise<void> {
   store.clear();
 
   const files = await readdir(sourceDir);
-  const pdfFiles = files.filter((f) => f.toLowerCase().endsWith(".pdf"));
+  const supportedFiles = files.filter((f) => {
+    const ext = extname(f).toLowerCase();
+    return ext === ".pdf" || ext === ".md" || ext === ".txt";
+  });
 
-  console.log(`Found ${pdfFiles.length} PDF files\n`);
+  console.log(`Found ${supportedFiles.length} files to index\n`);
 
   let totalChunks = 0;
   let totalTokensEstimate = 0;
 
-  for (const filename of pdfFiles) {
+  for (const filename of supportedFiles) {
     const filepath = join(sourceDir, filename);
+    const ext = extname(filename).toLowerCase();
     console.log(`Processing: ${filename}`);
 
     try {
-      const buffer = await readFile(filepath);
-      const data = await pdf(buffer);
+      let text: string;
+      let pageCount: number;
 
-      const pageCount = data.numpages;
-      const text = data.text;
+      if (ext === ".pdf") {
+        const buffer = await readFile(filepath);
+        const data = await pdf(buffer);
+        pageCount = data.numpages;
+        text = data.text;
+      } else {
+        // Markdown or text file
+        text = await readFile(filepath, "utf-8");
+        pageCount = 1;
+      }
 
       console.log(`  - Pages: ${pageCount}`);
       console.log(`  - Characters: ${text.length}`);
@@ -94,11 +149,20 @@ async function main(): Promise<void> {
   console.log("=".repeat(60));
   console.log("Indexing Complete");
   console.log("=".repeat(60));
-  console.log(`Total documents: ${pdfFiles.length}`);
+  console.log(`Total documents: ${supportedFiles.length}`);
   console.log(`Total chunks: ${totalChunks}`);
   console.log(`Estimated tokens embedded: ~${totalTokensEstimate.toLocaleString()}`);
   console.log(`Estimated cost: ~$${((totalTokensEstimate / 1_000_000) * 0.02).toFixed(4)}`);
   console.log("");
+  console.log("=".repeat(60));
+  console.log("NEXT STEPS");
+  console.log("=".repeat(60));
+  console.log("\n1. Ensure Ollama is running: ollama serve");
+  console.log("\n2. Restart Claude Code to connect the MCP server");
+  console.log("\n3. Use the knowledge base with:");
+  console.log("   - search_knowledge tool: Search for specific topics");
+  console.log("   - list_knowledge_sources tool: List indexed documents");
+  console.log("\n" + "=".repeat(60) + "\n");
 }
 
 function chunkText(

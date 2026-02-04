@@ -4,16 +4,14 @@ MCP server for RAG (Retrieval-Augmented Generation) over local AI/Architecture k
 
 > **Recommendation:** Use Ollama for embeddings (local, free, private). OpenAI API is supported but not recommended for privacy-sensitive projects.
 
-## Embedding Options
+## Quick Start
 
-| Option | Command | Privacy | Cost |
-|--------|---------|---------|------|
-| **Ollama** (recommended) | `npm run index:ollama` | ✅ 100% local | Free |
-| OpenAI API | `npm run index:openai` | ❌ Cloud | ~$0.02/1M tokens |
+### Prerequisites
 
-## Setup
+- Node.js 20+
+- Ollama (recommended) or OpenAI API key
 
-### Option A: Ollama (Recommended)
+### Installation
 
 ```bash
 # 1. Install Ollama
@@ -23,38 +21,50 @@ brew install ollama  # macOS
 # 2. Pull embedding model
 ollama pull nomic-embed-text
 
-# 3. Start Ollama server
+# 3. Start Ollama server (keep running in a terminal)
 ollama serve
 
-# 4. Install dependencies
+# 4. Navigate to MCP directory
+cd ai-pack/mcp/knowledge-rag
+
+# 5. Install dependencies
 npm install
 
-# 5. Build TypeScript
+# 6. Build TypeScript
 npm run build
 
-# 6. Index knowledge base with Ollama
+# 7. Index knowledge base
 npm run index:ollama
 ```
 
-### Option B: OpenAI API (Quick Start)
+## Embedding Options
+
+| Option | Command | Privacy | Cost |
+|--------|---------|---------|------|
+| **Ollama** (recommended) | `npm run index:ollama` | 100% local | Free |
+| OpenAI API | `npm run index:openai` | Cloud | ~$0.02/1M tokens |
+
+### Using OpenAI (Alternative)
 
 ```bash
-# 1. Set API key
 export OPENAI_API_KEY=sk-...
-
-# 2. Install dependencies
-npm install
-
-# 3. Build TypeScript
-npm run build
-
-# 4. Index knowledge base with OpenAI
 npm run index:openai
 ```
 
-## Usage
+## Custom Knowledge Sources
 
-The MCP server exposes two tools:
+By default, the indexer uses `ai-pack/knowledge/` directory. To index custom files:
+
+```bash
+# Index PDFs from custom directory
+npm run index:ollama /path/to/your/documents
+
+# Supports: .pdf, .md, .txt files
+```
+
+## MCP Tools
+
+The server exposes two tools:
 
 ### search_knowledge
 
@@ -64,52 +74,32 @@ Search the knowledge base for relevant information.
 {
   "query": "What are the 3 pipelines in RAG?",
   "top_k": 5,
-  "sources": ["RAG Fundamentals.pdf"]
+  "sources": ["rag-architecture.md"]
 }
 ```
 
 ### list_knowledge_sources
 
-List all indexed documents.
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                    Knowledge RAG Architecture                     │
-├──────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│   plugins/craftsman/knowledge/                                    │
-│   ├── canonical/         ──┐                                      │
-│   ├── anti-patterns/       │                                      │
-│   ├── patterns.md          ├──► Chunking ──► Embeddings ──► DB    │
-│   ├── principles.md        │         │           │          │     │
-│   └── ...                ──┘         │      [Ollama or      │     │
-│                                      │       OpenAI]        │     │
-│                                      │           │          │     │
-│                                      └───────────┴──────────┘     │
-│                                                   │                │
-│   Claude Code ◄──────────────────────────────────┘                │
-│       │                                                           │
-│       └── MCP: search_knowledge, list_knowledge_sources           │
-│                                                                   │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-## Topics Covered
-
-The knowledge base includes:
-
-- **Design Patterns** - Factory, Strategy, Observer, etc.
-- **DDD Patterns** - Entity, Value Object, Aggregate, Repository
-- **SOLID Principles** - With PHP/TypeScript examples
-- **Clean Architecture** - Layer separation, dependency rules
-- **Event-Driven** - Event sourcing, CQRS
-- **Microservices** - Patterns and anti-patterns
-- **Canonical Examples** - Golden standard code (PHP, TypeScript)
-- **Anti-Patterns** - What to avoid with explanations
+List all indexed documents with metadata.
 
 ## Configuration
+
+### Claude Code Integration
+
+The MCP is auto-configured via `.mcp.json` when using the ai-craftsman plugin.
+
+For manual setup, add to `~/.claude/settings.local.json`:
+
+```json
+{
+  "mcpServers": {
+    "knowledge-rag": {
+      "command": "node",
+      "args": ["/path/to/ai-pack/mcp/knowledge-rag/dist/src/index.js"]
+    }
+  }
+}
+```
 
 ### Environment Variables
 
@@ -123,17 +113,27 @@ OPENAI_API_KEY=sk-...
 OPENAI_EMBED_MODEL=text-embedding-3-small
 ```
 
-### Adding to Claude Code
+## Architecture
 
-Add to your `.mcp.json`:
-
-```json
-{
-  "knowledge-rag": {
-    "command": "node",
-    "args": ["path/to/ai-craftsman-superpowers/ai-pack/mcp/knowledge-rag/dist/index.js"]
-  }
-}
+```
+ai-pack/
+├── knowledge/               # Source documents (.md, .pdf, .txt)
+│   ├── agent-3p-pattern.md
+│   ├── mlops-principles.md
+│   ├── rag-architecture.md
+│   └── vector-databases.md
+│
+└── mcp/knowledge-rag/
+    ├── src/
+    │   ├── index.ts         # MCP server entry
+    │   ├── db/              # SQLite vector store
+    │   ├── embeddings/      # Ollama/OpenAI providers
+    │   └── tools/           # search_knowledge, list_sources
+    ├── scripts/
+    │   └── index-pdfs.ts    # Indexing script
+    ├── data/
+    │   └── knowledge.db     # SQLite database (auto-created)
+    └── dist/                # Compiled JavaScript
 ```
 
 ## Troubleshooting
@@ -158,8 +158,30 @@ ollama list | grep nomic-embed-text
 echo $OPENAI_API_KEY
 ```
 
+### MCP not connecting in Claude Code
+
+1. Verify build: `ls dist/src/index.js`
+2. Test manually: `node dist/src/index.js` (should start without errors)
+3. Restart Claude Code after configuration changes
+
+### Database issues
+
+```bash
+# Reset database
+rm data/knowledge.db*
+npm run index:ollama
+```
+
+## Topics Covered
+
+The default knowledge base includes:
+
+- **AI Agent Patterns** - 3P pattern (Perceive/Plan/Perform)
+- **RAG Architecture** - Retrieval pipelines, chunking, embeddings
+- **MLOps Principles** - Model lifecycle, monitoring, deployment
+- **Vector Databases** - Comparison, selection criteria
+
 ## References
 
-- [Local RAG Setup Guide](../../../docs/guides/local-rag-ollama.md)
-- [ADR-0002: Ollama over OpenAI](../../../docs/adr/0002-ollama-over-openai.md)
 - [Ollama Documentation](https://ollama.ai/docs)
+- [MCP Protocol](https://modelcontextprotocol.io)

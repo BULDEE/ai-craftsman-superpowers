@@ -1,9 +1,24 @@
 import Database from "better-sqlite3";
 import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import { dirname, join, resolve } from "path";
+import { existsSync, mkdirSync } from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+/**
+ * Find project root by looking for package.json
+ */
+function findProjectRoot(): string {
+  let dir = __dirname;
+  for (let i = 0; i < 10; i++) {
+    if (existsSync(join(dir, "package.json"))) {
+      return dir;
+    }
+    dir = dirname(dir);
+  }
+  throw new Error("Could not find project root (package.json)");
+}
 
 export interface Chunk {
   readonly id: number;
@@ -40,7 +55,15 @@ export class VectorStore {
   }
 
   static create(dbPath?: string, dimensions: number = 768): VectorStore {
-    const path = dbPath ?? join(__dirname, "../../data/knowledge.db");
+    const projectRoot = findProjectRoot();
+    const dataDir = join(projectRoot, "data");
+
+    // Ensure data directory exists
+    if (!existsSync(dataDir)) {
+      mkdirSync(dataDir, { recursive: true });
+    }
+
+    const path = dbPath ?? join(dataDir, "knowledge.db");
     const db = new Database(path);
     db.pragma("journal_mode = WAL");
     return new VectorStore(db, dimensions);
