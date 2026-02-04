@@ -2,8 +2,12 @@
   "hooks": {
     "SessionStart": [
       {
-        "type": "skill",
-        "skill": "session-init"
+        "hooks": [
+          {
+            "type": "skill",
+            "skill": "session-init"
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -30,8 +34,12 @@
     ],
     "UserPromptSubmit": [
       {
-        "type": "command",
-        "command": "./hooks/bias-detector.sh"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/bias-detector.sh"
+          }
+        ]
       }
     ]
   }
