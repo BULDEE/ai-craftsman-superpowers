@@ -1,0 +1,473 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate-json:
+    name: Validate JSON Files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate JSON syntax
+        run: |
+          echo "Validating JSON files..."
+
+          # List of critical JSON files
+          JSON_FILES=(
+            "plugins/craftsman/hooks/hooks.json"
+            "plugins/craftsman/.claude-plugin/plugin.json"
+            ".claude-plugin/marketplace.json"
+          )
+
+          FAILED=0
+          for file in "${JSON_FILES[@]}"; do
+            if [ -f "$file" ]; then
+              if python3 -c "import json; json.load(open('$file'))" 2>/dev/null; then
+                echo "✓ $file"
+              else
+                echo "✗ $file - Invalid JSON"
+                FAILED=1
+              fi
+            else
+              echo "✗ $file - File not found"
+              FAILED=1
+            fi
+          done
+
+          exit $FAILED
+
+  validate-hooks-schema:
+    name: Validate Hooks Schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate hooks.json schema
+        run: |
+          python3 << 'EOF'
+          import json
+          import sys
+
+          VALID_HOOK_EVENTS = ["PreToolUse", "PostToolUse", "UserPromptSubmit", "Notification", "Stop"]
+          VALID_HOOK_TYPES = ["command"]
+
+          with open("plugins/craftsman/hooks/hooks.json") as f:
+              data = json.load(f)
+
+          errors = []
+
+          if "hooks" not in data:
+              errors.append("Missing 'hooks' root key")
+          else:
+              hooks = data["hooks"]
+              for event_name, event_hooks in hooks.items():
+                  if event_name not in VALID_HOOK_EVENTS:
+                      errors.append(f"Unknown hook event: {event_name}")
+
+                  if not isinstance(event_hooks, list):
+                      errors.append(f"Event '{event_name}' must be an array")
+                      continue
+
+                  for i, hook_group in enumerate(event_hooks):
+                      if "hooks" not in hook_group:
+                          errors.append(f"{event_name}[{i}]: Missing 'hooks' array")
+                          continue
+
+                      for j, hook in enumerate(hook_group["hooks"]):
+                          if "type" not in hook:
+                              errors.append(f"{event_name}[{i}].hooks[{j}]: Missing 'type' field")
+                          elif hook["type"] not in VALID_HOOK_TYPES:
+                              errors.append(f"{event_name}[{i}].hooks[{j}]: Invalid type '{hook['type']}' (valid: {VALID_HOOK_TYPES})")
+
+                          if hook.get("type") == "command" and "command" not in hook:
+                              errors.append(f"{event_name}[{i}].hooks[{j}]: command type requires 'command' field")
+
+          if errors:
+              print("Schema validation FAILED:")
+              for e in errors:
+                  print(f"  - {e}")
+              sys.exit(1)
+          else:
+              print("✓ hooks.json schema is valid")
+          EOF
+
+  validate-plugin-manifest:
+    name: Validate Plugin Manifest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate plugin.json schema
+        run: |
+          python3 << 'EOF'
+          import json
+          import sys
+
+          REQUIRED_FIELDS = ["name", "description", "version"]
+
+          with open("plugins/craftsman/.claude-plugin/plugin.json") as f:
+              data = json.load(f)
+
+          errors = []
+
+          for field in REQUIRED_FIELDS:
+              if field not in data:
+                  errors.append(f"Missing required field: {field}")
+
+          # repository must be string, not object
+          if "repository" in data and not isinstance(data["repository"], str):
+              errors.append("'repository' must be a string, not an object")
+
+          # version must match semver pattern
+          if "version" in data:
+              import re
+              if not re.match(r'^\d+\.\d+\.\d+(-[\w.]+)?$', data["version"]):
+                  errors.append(f"Invalid version format: {data['version']}")
+
+          if errors:
+              print("Plugin manifest validation FAILED:")
+              for e in errors:
+                  print(f"  - {e}")
+              sys.exit(1)
+          else:
+              print("✓ plugin.json manifest is valid")
+          EOF
+
+  validate-shell-scripts:
+    name: Validate Shell Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check shell script syntax
+        run: |
+          echo "Checking shell script syntax..."
+
+          SCRIPTS=(
+            "plugins/craftsman/hooks/post-write-check.sh"
+            "plugins/craftsman/hooks/bias-detector.sh"
+            "tests/run-tests.sh"
+          )
+
+          FAILED=0
+          for script in "${SCRIPTS[@]}"; do
+            if [ -f "$script" ]; then
+              if bash -n "$script" 2>/dev/null; then
+                echo "✓ $script"
+              else
+                echo "✗ $script - Syntax error"
+                bash -n "$script"
+                FAILED=1
+              fi
+            else
+              echo "✗ $script - File not found"
+              FAILED=1
+            fi
+          done
+
+          exit $FAILED
+
+      - name: Check scripts are executable
+        run: |
+          echo "Checking script permissions..."
+
+          SCRIPTS=(
+            "plugins/craftsman/hooks/post-write-check.sh"
+            "plugins/craftsman/hooks/bias-detector.sh"
+            "tests/run-tests.sh"
+          )
+
+          FAILED=0
+          for script in "${SCRIPTS[@]}"; do
+            if [ -f "$script" ]; then
+              if [ -x "$script" ]; then
+                echo "✓ $script is executable"
+              else
+                echo "✗ $script is not executable"
+                FAILED=1
+              fi
+            fi
+          done
+
+          exit $FAILED
+
+      - name: Install ShellCheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck
+        run: |
+          echo "Running ShellCheck..."
+
+          SCRIPTS=(
+            "plugins/craftsman/hooks/post-write-check.sh"
+            "plugins/craftsman/hooks/bias-detector.sh"
+            "tests/run-tests.sh"
+          )
+
+          FAILED=0
+          for script in "${SCRIPTS[@]}"; do
+            if [ -f "$script" ]; then
+              if shellcheck -x "$script"; then
+                echo "✓ $script passed ShellCheck"
+              else
+                echo "✗ $script has ShellCheck warnings"
+                FAILED=1
+              fi
+            fi
+          done
+
+          # Exit with warning only, not failure (ShellCheck can be strict)
+          if [ $FAILED -eq 1 ]; then
+            echo "::warning::ShellCheck found issues in some scripts"
+          fi
+
+  validate-skills:
+    name: Validate Skills Structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate SKILL.md files
+        run: |
+          echo "Validating SKILL.md files..."
+
+          SKILLS_DIR="plugins/craftsman/skills"
+          FAILED=0
+
+          for skill_dir in "$SKILLS_DIR"/*; do
+            if [ -d "$skill_dir" ]; then
+              skill_name=$(basename "$skill_dir")
+              skill_file="$skill_dir/SKILL.md"
+
+              echo ""
+              echo "Checking: $skill_name"
+
+              # Check SKILL.md exists
+              if [ ! -f "$skill_file" ]; then
+                echo "  ✗ SKILL.md missing"
+                FAILED=1
+                continue
+              fi
+              echo "  ✓ SKILL.md exists"
+
+              # Check YAML frontmatter
+              if ! grep -m1 "^---$" "$skill_file" > /dev/null 2>&1; then
+                echo "  ✗ Missing YAML frontmatter"
+                FAILED=1
+                continue
+              fi
+              echo "  ✓ Has YAML frontmatter"
+
+              # Check required fields
+              if ! grep -q "^name:" "$skill_file"; then
+                echo "  ✗ Missing 'name' field"
+                FAILED=1
+              else
+                echo "  ✓ Has 'name' field"
+              fi
+
+              if ! grep -q "^description:" "$skill_file"; then
+                echo "  ✗ Missing 'description' field"
+                FAILED=1
+              else
+                echo "  ✓ Has 'description' field"
+              fi
+
+              # Check model field (except session-init)
+              if [ "$skill_name" != "session-init" ]; then
+                if grep -q "^model:" "$skill_file"; then
+                  model=$(grep "^model:" "$skill_file" | head -1 | cut -d: -f2 | tr -d ' ')
+                  if [[ "$model" =~ ^(haiku|sonnet|opus)$ ]]; then
+                    echo "  ✓ Has valid 'model' field: $model"
+                  else
+                    echo "  ✗ Invalid model value: $model (must be haiku|sonnet|opus)"
+                    FAILED=1
+                  fi
+                else
+                  echo "  ✗ Missing 'model' field"
+                  FAILED=1
+                fi
+              else
+                echo "  ○ 'model' field skipped (session-init exempt)"
+              fi
+            fi
+          done
+
+          echo ""
+          if [ $FAILED -eq 1 ]; then
+            echo "FAILED: Some skills have validation errors"
+            exit 1
+          else
+            echo "SUCCESS: All skills validated"
+          fi
+
+  validate-knowledge-base:
+    name: Validate Knowledge Base
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check knowledge base structure
+        run: |
+          echo "Validating knowledge base..."
+
+          KNOWLEDGE_DIR="plugins/craftsman/knowledge"
+          FAILED=0
+
+          # Check directory exists
+          if [ ! -d "$KNOWLEDGE_DIR" ]; then
+            echo "✗ knowledge/ directory missing"
+            exit 1
+          fi
+          echo "✓ knowledge/ directory exists"
+
+          # Check core files
+          CORE_FILES=("patterns.md" "principles.md")
+          for file in "${CORE_FILES[@]}"; do
+            if [ -f "$KNOWLEDGE_DIR/$file" ]; then
+              echo "✓ $file exists"
+            else
+              echo "✗ $file missing"
+              FAILED=1
+            fi
+          done
+
+          # Check anti-patterns directory
+          if [ -d "$KNOWLEDGE_DIR/anti-patterns" ]; then
+            count=$(find "$KNOWLEDGE_DIR/anti-patterns" -name "*.md" | wc -l)
+            echo "✓ anti-patterns/ exists ($count files)"
+          else
+            echo "✗ anti-patterns/ directory missing"
+            FAILED=1
+          fi
+
+          # Check canonical directory
+          if [ -d "$KNOWLEDGE_DIR/canonical" ]; then
+            count=$(find "$KNOWLEDGE_DIR/canonical" -name "*.md" | wc -l)
+            echo "✓ canonical/ exists ($count files)"
+          else
+            echo "✗ canonical/ directory missing"
+            FAILED=1
+          fi
+
+          exit $FAILED
+
+  run-tests:
+    name: Run Test Suite
+    runs-on: ubuntu-latest
+    needs: [validate-json, validate-shell-scripts]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run test suite
+        run: |
+          chmod +x tests/run-tests.sh
+          ./tests/run-tests.sh
+
+  check-agents:
+    name: Validate Agent Definitions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check agent files
+        run: |
+          echo "Validating agent definitions..."
+
+          AGENTS_DIR="plugins/craftsman/agents"
+          FAILED=0
+
+          if [ ! -d "$AGENTS_DIR" ]; then
+            echo "✗ agents/ directory missing"
+            exit 1
+          fi
+          echo "✓ agents/ directory exists"
+
+          for agent_file in "$AGENTS_DIR"/*.md; do
+            if [ -f "$agent_file" ]; then
+              agent_name=$(basename "$agent_file" .md)
+
+              # Check YAML frontmatter
+              if grep -m1 "^---$" "$agent_file" > /dev/null 2>&1; then
+                echo "✓ $agent_name has YAML frontmatter"
+              else
+                echo "✗ $agent_name missing YAML frontmatter"
+                FAILED=1
+              fi
+
+              # Check required fields
+              if grep -q "^name:" "$agent_file"; then
+                echo "  ✓ has 'name' field"
+              else
+                echo "  ✗ missing 'name' field"
+                FAILED=1
+              fi
+            fi
+          done
+
+          exit $FAILED
+
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [validate-json, validate-hooks-schema, validate-plugin-manifest, validate-shell-scripts, validate-skills, validate-knowledge-base, run-tests, check-agents]
+    if: always()
+    steps:
+      - name: Check all jobs status
+        run: |
+          echo "==================================="
+          echo "        CI Summary"
+          echo "==================================="
+          echo ""
+          echo "All validation jobs completed."
+          echo ""
+          echo "Jobs status:"
+          echo "  - JSON validation: ${{ needs.validate-json.result }}"
+          echo "  - Hooks schema: ${{ needs.validate-hooks-schema.result }}"
+          echo "  - Plugin manifest: ${{ needs.validate-plugin-manifest.result }}"
+          echo "  - Shell scripts: ${{ needs.validate-shell-scripts.result }}"
+          echo "  - Skills structure: ${{ needs.validate-skills.result }}"
+          echo "  - Knowledge base: ${{ needs.validate-knowledge-base.result }}"
+          echo "  - Test suite: ${{ needs.run-tests.result }}"
+          echo "  - Agent definitions: ${{ needs.check-agents.result }}"
+          echo ""
+
+          # Fail if any job failed
+          if [[ "${{ needs.validate-json.result }}" == "failure" ]] || \
+             [[ "${{ needs.validate-hooks-schema.result }}" == "failure" ]] || \
+             [[ "${{ needs.validate-plugin-manifest.result }}" == "failure" ]] || \
+             [[ "${{ needs.validate-shell-scripts.result }}" == "failure" ]] || \
+             [[ "${{ needs.validate-skills.result }}" == "failure" ]] || \
+             [[ "${{ needs.validate-knowledge-base.result }}" == "failure" ]] || \
+             [[ "${{ needs.run-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.check-agents.result }}" == "failure" ]]; then
+            echo "FAILED: One or more validation jobs failed"
+            exit 1
+          fi
+
+          echo "SUCCESS: All validations passed!"
