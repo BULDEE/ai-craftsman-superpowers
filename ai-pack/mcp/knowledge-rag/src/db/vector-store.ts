@@ -1,14 +1,13 @@
 import Database from "better-sqlite3";
 import { fileURLToPath } from "url";
-import { dirname, join, resolve } from "path";
+import { dirname, join } from "path";
 import { existsSync, mkdirSync } from "fs";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+import { homedir } from "os";
 
 const PLUGIN_NAME = "ai-craftsman-superpowers";
 const PROJECT_KNOWLEDGE_PATH = `.claude/${PLUGIN_NAME}/knowledge`;
 const PROJECT_INDEX_PATH = `.claude/${PLUGIN_NAME}/knowledge/.index`;
+const GLOBAL_KNOWLEDGE_PATH = join(homedir(), ".claude", PLUGIN_NAME, "knowledge");
 
 export interface KnowledgeLocation {
   readonly type: "project" | "global";
@@ -17,21 +16,7 @@ export interface KnowledgeLocation {
 }
 
 /**
- * Find project root by looking for package.json
- */
-function findPluginRoot(): string {
-  let dir = __dirname;
-  for (let i = 0; i < 10; i++) {
-    if (existsSync(join(dir, "package.json"))) {
-      return dir;
-    }
-    dir = dirname(dir);
-  }
-  throw new Error("Could not find plugin root (package.json)");
-}
-
-/**
- * Detect knowledge location - project-specific or global
+ * Detect knowledge location - project-specific or global (~/.claude/knowledge-rag/)
  */
 function detectKnowledgeLocation(cwd: string): KnowledgeLocation {
   const projectKnowledgeDir = join(cwd, PROJECT_KNOWLEDGE_PATH);
@@ -49,18 +34,15 @@ function detectKnowledgeLocation(cwd: string): KnowledgeLocation {
     };
   }
 
-  // Fallback to global plugin knowledge
-  const pluginRoot = findPluginRoot();
-  const globalDataDir = join(pluginRoot, "data");
-
-  if (!existsSync(globalDataDir)) {
-    mkdirSync(globalDataDir, { recursive: true });
+  // Fallback to global user knowledge (~/.claude/knowledge-rag/)
+  if (!existsSync(GLOBAL_KNOWLEDGE_PATH)) {
+    mkdirSync(GLOBAL_KNOWLEDGE_PATH, { recursive: true });
   }
 
   return {
     type: "global",
-    knowledgeDir: join(pluginRoot, "../../knowledge"),
-    dbPath: join(globalDataDir, "knowledge.db"),
+    knowledgeDir: GLOBAL_KNOWLEDGE_PATH,
+    dbPath: join(GLOBAL_KNOWLEDGE_PATH, "knowledge.db"),
   };
 }
 

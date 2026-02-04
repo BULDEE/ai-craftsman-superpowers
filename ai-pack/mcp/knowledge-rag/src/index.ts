@@ -8,9 +8,20 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { VectorStore } from "./db/vector-store.js";
-import { OpenAIEmbeddingProvider } from "./embeddings/provider.js";
+import { OllamaEmbeddingProvider } from "./embeddings/provider.js";
 import { SearchKnowledgeTool } from "./tools/search-knowledge.js";
 import { ListSourcesTool } from "./tools/list-sources.js";
+
+async function checkOllamaAvailable(baseUrl: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${baseUrl}/api/tags`, {
+      signal: AbortSignal.timeout(2000)
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
 
 async function main(): Promise<void> {
   const server = new Server(
@@ -29,11 +40,31 @@ async function main(): Promise<void> {
   const store = VectorStore.create(cwd);
   const location = store.getLocation();
 
+  // Initialize database tables if not exists
+  store.initialize();
+
   // Log which knowledge base is being used (visible in debug logs)
   console.error(`[knowledge-rag] Using ${location.type} knowledge base`);
   console.error(`[knowledge-rag] DB: ${location.dbPath}`);
 
-  const embeddings = OpenAIEmbeddingProvider.create();
+  // Check if knowledge base has any content
+  const stats = store.getStats();
+  if (stats.totalChunks === 0) {
+    console.error(`[knowledge-rag] WARNING: Knowledge base is empty. Run 'npm run index:ollama' to index documents.`);
+  } else {
+    console.error(`[knowledge-rag] Loaded ${stats.totalChunks} chunks from ${stats.totalSources} sources`);
+  }
+
+  // Create embedding provider with env var support
+  const embeddings = OllamaEmbeddingProvider.create();
+
+  // Check Ollama availability (non-blocking warning)
+  const ollamaAvailable = await checkOllamaAvailable(embeddings.baseUrl);
+  if (!ollamaAvailable) {
+    console.error(`[knowledge-rag] WARNING: Ollama not responding at ${embeddings.baseUrl}`);
+    console.error(`[knowledge-rag] Search will fail until Ollama is started: ollama serve`);
+  }
+
   const searchTool = SearchKnowledgeTool.create(store, embeddings);
   const listTool = ListSourcesTool.create(store);
 

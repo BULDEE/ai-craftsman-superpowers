@@ -52,7 +52,10 @@ async function testGlobalKnowledgeDetection(): Promise<void> {
     const location = store.getLocation();
 
     assert.equal(location.type, "global", "Should detect global knowledge when no project folder exists");
-    assert.ok(location.dbPath.includes("data/knowledge.db"), "DB path should be in data folder");
+    assert.ok(
+      location.dbPath.includes(".claude/ai-craftsman-superpowers/knowledge/knowledge.db"),
+      "DB path should be in ~/.claude/ai-craftsman-superpowers/knowledge/"
+    );
 
     store.close();
     console.log("✓ testGlobalKnowledgeDetection passed");

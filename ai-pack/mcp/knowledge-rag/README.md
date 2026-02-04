@@ -2,21 +2,20 @@
 
 MCP server for RAG (Retrieval-Augmented Generation) over local AI/Architecture knowledge base.
 
-> **Recommendation:** Use Ollama for embeddings (local, free, private). OpenAI API is supported but not recommended for privacy-sensitive projects.
-
 ## Features
 
 - **Project-specific knowledge** - Auto-detects `.claude/ai-craftsman-superpowers/knowledge/` in your project
-- **Global fallback** - Uses plugin's global knowledge base if no project knowledge exists
+- **Global fallback** - Uses `~/.claude/ai-craftsman-superpowers/knowledge/` if no project knowledge exists
 - **Multi-format support** - PDF, Markdown, and TXT files
 - **Local embeddings** - Ollama for 100% private, offline operation
+- **Zero cost** - No API fees, runs entirely on your machine
 
 ## Quick Start
 
 ### Prerequisites
 
 - Node.js 20+
-- Ollama (recommended) or OpenAI API key
+- Ollama
 
 ### Installation
 
@@ -28,21 +27,41 @@ brew install ollama  # macOS
 # 2. Pull embedding model
 ollama pull nomic-embed-text
 
-# 3. Start Ollama server (keep running in a terminal)
+# 3. Start Ollama server (keep running)
 ollama serve
 
 # 4. Navigate to MCP directory
 cd ai-pack/mcp/knowledge-rag
 
-# 5. Install dependencies
-npm install
+# 5. Install dependencies & build
+npm install && npm run build
 
-# 6. Build TypeScript
-npm run build
+# 6. Create global knowledge directory
+mkdir -p ~/.claude/ai-craftsman-superpowers/knowledge
 
-# 7. Index knowledge base
+# 7. Add your documents
+cp ~/Desktop/your-docs/*.pdf ~/.claude/ai-craftsman-superpowers/knowledge/
+
+# 8. Index knowledge base
 npm run index:ollama
 ```
+
+### Configure Claude Code
+
+Add to `~/.claude/settings.local.json`:
+
+```json
+{
+  "mcpServers": {
+    "knowledge-rag": {
+      "command": "node",
+      "args": ["/path/to/ai-pack/mcp/knowledge-rag/dist/src/index.js"]
+    }
+  }
+}
+```
+
+Then restart Claude Code.
 
 ## Project-Specific Knowledge
 
@@ -56,11 +75,10 @@ mkdir -p .claude/ai-craftsman-superpowers/knowledge
 cp specs.pdf architecture.md .claude/ai-craftsman-superpowers/knowledge/
 
 # Index (run from your project directory)
-cd /path/to/your/project
 npx tsx /path/to/ai-pack/mcp/knowledge-rag/scripts/index-pdfs.ts
 ```
 
-### Structure
+### Project Structure
 
 ```
 your-project/
@@ -69,7 +87,7 @@ your-project/
 │       └── knowledge/              # Your documents here
 │           ├── specs.pdf
 │           ├── architecture.md
-│           └── .index/             # Auto-generated (gitignore this)
+│           └── .index/             # Auto-generated
 │               └── knowledge.db
 ├── src/
 └── ...
@@ -86,23 +104,9 @@ Add to your project's `.gitignore`:
 ## Knowledge Detection Priority
 
 1. **Project** - `.claude/ai-craftsman-superpowers/knowledge/` in current working directory
-2. **Global** - `ai-pack/knowledge/` in the plugin installation
+2. **Global** - `~/.claude/ai-craftsman-superpowers/knowledge/` (user home)
 
 The MCP server automatically uses project knowledge when available.
-
-## Embedding Options
-
-| Option | Command | Privacy | Cost |
-|--------|---------|---------|------|
-| **Ollama** (recommended) | `npm run index:ollama` | 100% local | Free |
-| OpenAI API | `npm run index:openai` | Cloud | ~$0.02/1M tokens |
-
-### Using OpenAI (Alternative)
-
-```bash
-export OPENAI_API_KEY=sk-...
-npm run index:openai
-```
 
 ## MCP Tools
 
@@ -126,60 +130,55 @@ List all indexed documents with metadata.
 
 ## Configuration
 
-### Claude Code Integration
-
-The MCP is auto-configured via `.mcp.json` when using the ai-craftsman plugin.
-
-For manual setup, add to `~/.claude/settings.local.json`:
-
-```json
-{
-  "mcpServers": {
-    "knowledge-rag": {
-      "command": "node",
-      "args": ["/path/to/ai-pack/mcp/knowledge-rag/dist/src/index.js"]
-    }
-  }
-}
-```
-
 ### Environment Variables
 
 ```bash
-# Ollama (default)
+# Ollama configuration (optional - defaults shown)
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_EMBED_MODEL=nomic-embed-text
+```
 
-# OpenAI (alternative)
-OPENAI_API_KEY=sk-...
-OPENAI_EMBED_MODEL=text-embedding-3-small
+### Supported Embedding Models
+
+| Model | Dimensions | Notes |
+|-------|------------|-------|
+| `nomic-embed-text` | 768 | Default, good balance |
+| `mxbai-embed-large` | 1024 | Higher quality |
+| `all-minilm` | 384 | Faster, smaller |
+| `snowflake-arctic-embed` | 1024 | High quality |
+
+To use a different model:
+
+```bash
+ollama pull mxbai-embed-large
+OLLAMA_EMBED_MODEL=mxbai-embed-large npm run index:ollama
 ```
 
 ## Architecture
 
 ```
-ai-pack/
-├── knowledge/                      # Global knowledge (plugin default)
-│   ├── agent-3p-pattern.md
-│   ├── mlops-principles.md
-│   └── ...
-│
-└── mcp/knowledge-rag/
-    ├── src/
-    │   ├── index.ts                # MCP server entry
-    │   ├── db/vector-store.ts      # SQLite + auto-detection
-    │   ├── embeddings/             # Ollama/OpenAI providers
-    │   └── tools/                  # search_knowledge, list_sources
-    ├── scripts/
-    │   └── index-pdfs.ts           # Indexing script
-    └── data/
-        └── knowledge.db            # Global database
+~/.claude/ai-craftsman-superpowers/
+└── knowledge/                      # Global knowledge (user default)
+    ├── your-documents.pdf
+    ├── notes.md
+    └── knowledge.db                # SQLite + embeddings
+
+ai-pack/mcp/knowledge-rag/
+├── src/
+│   ├── index.ts                    # MCP server entry
+│   ├── db/vector-store.ts          # SQLite + auto-detection
+│   ├── embeddings/provider.ts      # Ollama provider
+│   └── tools/                      # search_knowledge, list_sources
+├── scripts/
+│   └── index-pdfs.ts               # Indexing script
+└── tests/
+    └── vector-store.test.ts        # Test suite
 
 your-project/
 └── .claude/ai-craftsman-superpowers/
-    └── knowledge/                  # Project-specific knowledge
-        ├── your-docs.pdf
-        └── .index/knowledge.db     # Project database
+    └── knowledge/                  # Project-specific (takes priority)
+        ├── project-docs.pdf
+        └── .index/knowledge.db
 ```
 
 ## Troubleshooting
@@ -200,8 +199,8 @@ pkill ollama && ollama serve
 # Check embedding model is available
 ollama list | grep nomic-embed-text
 
-# Or verify OpenAI key
-echo $OPENAI_API_KEY
+# Pull if missing
+ollama pull nomic-embed-text
 ```
 
 ### MCP not connecting in Claude Code
@@ -214,26 +213,37 @@ echo $OPENAI_API_KEY
 
 ```bash
 # Reset global database
-rm data/knowledge.db*
+rm ~/.claude/ai-craftsman-superpowers/knowledge/knowledge.db*
 npm run index:ollama
 
 # Reset project database
 rm .claude/ai-craftsman-superpowers/knowledge/.index/knowledge.db*
-# Then re-index
+# Then re-index from project directory
 ```
 
 ### Project knowledge not detected
 
 Ensure you're running Claude Code from the project root where `.claude/ai-craftsman-superpowers/knowledge/` exists.
 
-## Topics Covered (Global)
+### Empty search results
 
-The default knowledge base includes:
+The server logs warnings on startup:
+- `WARNING: Knowledge base is empty` - Run indexer first
+- `WARNING: Ollama not responding` - Start Ollama with `ollama serve`
 
-- **AI Agent Patterns** - 3P pattern (Perceive/Plan/Perform)
-- **RAG Architecture** - Retrieval pipelines, chunking, embeddings
-- **MLOps Principles** - Model lifecycle, monitoring, deployment
-- **Vector Databases** - Comparison, selection criteria
+## Development
+
+### Run tests
+
+```bash
+npm test
+```
+
+### Build
+
+```bash
+npm run build
+```
 
 ## References
 

@@ -7,7 +7,7 @@ import { existsSync } from "fs";
 import pdf from "pdf-parse";
 
 import { VectorStore } from "../src/db/vector-store.js";
-import { OpenAIEmbeddingProvider } from "../src/embeddings/provider.js";
+import { OllamaEmbeddingProvider } from "../src/embeddings/provider.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -100,7 +100,7 @@ async function main(): Promise<void> {
 
   store.initialize();
 
-  const embeddings = OpenAIEmbeddingProvider.create();
+  const embeddings = OllamaEmbeddingProvider.create();
 
   console.log("Clearing existing data...");
   store.clear();

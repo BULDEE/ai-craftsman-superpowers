@@ -2,14 +2,22 @@ export interface EmbeddingProvider {
   embed(text: string): Promise<number[]>;
   embedBatch(texts: string[]): Promise<number[][]>;
   readonly dimensions: number;
+  readonly baseUrl: string;
 }
 
 interface OllamaEmbeddingResponse {
   embedding: number[];
 }
 
+const MODEL_DIMENSIONS: Record<string, number> = {
+  "nomic-embed-text": 768,
+  "mxbai-embed-large": 1024,
+  "all-minilm": 384,
+  "snowflake-arctic-embed": 1024,
+};
+
 export class OllamaEmbeddingProvider implements EmbeddingProvider {
-  private readonly baseUrl: string;
+  readonly baseUrl: string;
   private readonly model: string;
   readonly dimensions: number;
 
@@ -20,11 +28,14 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
   }
 
   static create(
-    model: string = "nomic-embed-text",
-    baseUrl: string = "http://localhost:11434"
+    model?: string,
+    baseUrl?: string
   ): OllamaEmbeddingProvider {
-    const dimensions = MODEL_DIMENSIONS[model] ?? 768;
-    return new OllamaEmbeddingProvider(baseUrl, model, dimensions);
+    const resolvedModel = model ?? process.env.OLLAMA_EMBED_MODEL ?? "nomic-embed-text";
+    const resolvedBaseUrl = baseUrl ?? process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
+    const dimensions = MODEL_DIMENSIONS[resolvedModel] ?? 768;
+
+    return new OllamaEmbeddingProvider(resolvedBaseUrl, resolvedModel, dimensions);
   }
 
   async embed(text: string): Promise<number[]> {
@@ -47,22 +58,9 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
   }
 
   async embedBatch(texts: string[]): Promise<number[][]> {
-    const results: number[][] = [];
-
-    for (const text of texts) {
-      const embedding = await this.embed(text);
-      results.push(embedding);
-    }
-
+    const results = await Promise.all(
+      texts.map((text) => this.embed(text))
+    );
     return results;
   }
 }
-
-const MODEL_DIMENSIONS: Record<string, number> = {
-  "nomic-embed-text": 768,
-  "mxbai-embed-large": 1024,
-  "all-minilm": 384,
-  "snowflake-arctic-embed": 1024,
-};
-
-export { OllamaEmbeddingProvider as OpenAIEmbeddingProvider };
