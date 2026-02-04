@@ -1,23 +1,9 @@
 ---
 name: mlops
-description: |
-  Audit ML projects for production readiness.
-  Use when reviewing ML pipelines, deployments, or infrastructure.
-
-  ACTIVATES AUTOMATICALLY when detecting: "MLOps", "ML pipeline",
-  "model deployment", "ML infrastructure", "model monitoring"
-model: opus
-context: fork
-agent: Explore
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-  - Task
-  - AskUserQuestion
+description: Audit ML projects for production readiness. Use when reviewing ML pipelines, deployments, or infrastructure against MLOps best practices.
 ---
 
-# MLOps Skill - ML Production Readiness Audit
+# /craftsman:mlops - ML Production Readiness Audit
 
 Audit ML projects against production best practices.
 

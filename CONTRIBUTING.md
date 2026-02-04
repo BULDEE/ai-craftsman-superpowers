@@ -37,36 +37,44 @@ We welcome feature requests! Please include:
 
 ## Development Standards
 
-### Skill Development
+### Command Development
 
-When creating or modifying skills:
+When creating or modifying commands:
 
 ```yaml
 ---
-name: skill-name
-description: |
-  Clear description of what the skill does.
-  Include activation triggers.
-
-  ACTIVATES AUTOMATICALLY when detecting: "keyword1", "keyword2"
-model: sonnet  # haiku | sonnet | opus
-allowed-tools:
-  - Read
-  - Glob
-  # Only tools actually needed
+name: command-name
+description: Clear, concise description of what the command does (shown in skill list).
 ---
 
-# Skill Title
+# /craftsman:command-name - Title
 
 Clear instructions for Claude.
+
+## Process
+
+### Phase 1: [Name]
+...
+
+### Phase 2: [Name]
+...
+
+## Output Format
+...
+
+## Bias Protection
+...
 ```
 
-**Checklist for new skills:**
-- [ ] Clear `description` with activation triggers
-- [ ] Appropriate `model` tier (see ADR-001)
-- [ ] Minimal `allowed-tools` (principle of least privilege)
-- [ ] Example in `/examples/{skill-name}/`
-- [ ] Tests in `/tests/skills/`
+**Checklist for new commands:**
+- [ ] Clear `name` and `description` in frontmatter
+- [ ] Structured process with clear phases
+- [ ] Output format examples
+- [ ] Bias protection section
+- [ ] Example in `/examples/{command-name}/`
+- [ ] Tests in `/tests/commands/`
+
+See [ADR-0007](docs/adr/0007-commands-over-skills.md) for the rationale behind the commands structure.
 
 ### Code Standards
 
@@ -117,20 +125,19 @@ Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 # Run test suite
 ./tests/run-tests.sh
 
-# Test specific skill
-./tests/run-tests.sh --skill design
+# Test specific command
+./tests/run-tests.sh --command design
 ```
 
 ## Project Structure
 
 ```
 ai-craftsman-superpowers/
-├── plugins/craftsman/          # Main plugin
-│   ├── .claude-plugin/         # Plugin manifest
-│   ├── skills/                 # All skills
-│   ├── hooks/                  # Automated hooks
-│   ├── agents/                 # Specialized agents
-│   └── knowledge/              # Knowledge base
+├── .claude-plugin/             # Plugin manifest
+├── commands/                   # User-invocable commands (20 *.md files)
+├── agents/                     # Specialized reviewers (5)
+├── hooks/                      # Automated validation scripts
+├── knowledge/                  # Patterns & principles
 ├── examples/                   # Usage examples
 ├── tests/                      # Test suite
 ├── docs/

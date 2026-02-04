@@ -1,22 +1,9 @@
 ---
 name: usecase
-description: |
-  Scaffold Use Case with Command/Handler pattern for Symfony/PHP.
-  Use when implementing application layer use cases.
-
-  ACTIVATES AUTOMATICALLY when detecting: "use case", "command handler",
-  "application service", "CQRS", PHP/Symfony context
-model: sonnet
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - Bash
+description: Scaffold Use Case with Command/Handler pattern for Symfony/PHP. Use when implementing application layer use cases following CQRS principles.
 ---
 
-# UseCase Skill - Command/Handler Scaffolding (Symfony)
+# /craftsman:usecase - Command/Handler Scaffolding (Symfony)
 
 Scaffold a complete Use Case with Command, Handler, and Tests following CQRS principles.
 

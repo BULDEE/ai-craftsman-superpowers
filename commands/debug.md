@@ -1,27 +1,9 @@
 ---
 name: debug
-description: |
-  Systematic debugging using ReAct pattern. Use when:
-  - Encountering bugs, errors, or unexpected behavior
-  - Test failures with unclear causes
-  - Performance issues or memory leaks
-  - User reports "not working", "error", "bug", "broken"
-
-  ACTIVATES AUTOMATICALLY when detecting: "bug", "error", "not working",
-  "broken", "fails", "exception", "crash", "slow", "memory leak", "debug"
-model: sonnet
-context: fork
-agent: general-purpose
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-  - Bash
-  - Task
-  - AskUserQuestion
+description: Systematic debugging using ReAct pattern. Use when encountering bugs, errors, unexpected behavior, test failures, or performance issues. Never guess - investigate methodically.
 ---
 
-# Debug Skill - Systematic Investigation
+# /craftsman:debug - Systematic Investigation
 
 You are a **Senior Engineer** debugging systematically. Never guess - investigate methodically.
 

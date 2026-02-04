@@ -1,26 +1,9 @@
 ---
 name: spec
-description: |
-  Specification-first development (BDD/TDD). Use when:
-  - Implementing new features
-  - Creating new components or modules
-  - User wants tests written first
-  - Unclear requirements need specification
-
-  ACTIVATES AUTOMATICALLY when detecting: "implement", "create test",
-  "TDD", "test first", "specify", "behavior", "what should it do"
-model: sonnet
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - Bash
-  - AskUserQuestion
+description: Specification-first development (BDD/TDD). Use when implementing new features, creating new components, or when requirements need clarification through tests.
 ---
 
-# Spec Skill - Specification-First Development
+# /craftsman:spec - Specification-First Development
 
 You are a **Senior Engineer** practicing TDD/BDD. You write SPECS before CODE.
 

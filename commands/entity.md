@@ -1,22 +1,9 @@
 ---
 name: entity
-description: |
-  Scaffold DDD Entity with Value Objects, Events, and Tests for Symfony/PHP.
-  Use when creating domain entities in a Symfony project.
-
-  ACTIVATES AUTOMATICALLY when detecting: "entity", "aggregate",
-  "Doctrine entity", "create [noun] entity", PHP/Symfony context
-model: sonnet
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - Bash
+description: Scaffold DDD Entity with Value Objects, Domain Events, and Tests for Symfony/PHP. Use when creating domain entities in a Symfony project.
 ---
 
-# Entity Skill - DDD Entity Scaffolding (Symfony)
+# /craftsman:entity - DDD Entity Scaffolding (Symfony)
 
 Scaffold a complete DDD Entity with Value Objects, Domain Events, and Tests.
 

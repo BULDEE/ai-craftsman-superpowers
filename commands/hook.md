@@ -1,22 +1,9 @@
 ---
 name: hook
-description: |
-  Scaffold React custom hook with TanStack Query integration.
-  Use when creating data fetching or state management hooks.
-
-  ACTIVATES AUTOMATICALLY when detecting: "hook", "useQuery", "useMutation",
-  "custom hook", "TanStack Query", "data fetching"
-model: sonnet
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - Bash
+description: Scaffold React custom hook with TanStack Query integration. Use when creating data fetching or state management hooks.
 ---
 
-# Hook Skill - Custom Hook Scaffolding with TanStack Query
+# /craftsman:hook - Custom Hook Scaffolding with TanStack Query
 
 Scaffold custom React hooks for data fetching using TanStack Query.
 

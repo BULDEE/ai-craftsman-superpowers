@@ -1,23 +1,9 @@
 ---
 name: rag
-description: |
-  Design RAG (Retrieval-Augmented Generation) pipelines.
-  Use when building knowledge bases, document Q&A, or semantic search.
-
-  ACTIVATES AUTOMATICALLY when detecting: "RAG", "retrieval", "embeddings",
-  "vector database", "semantic search", "knowledge base", "document Q&A"
-model: opus
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - Task
-  - AskUserQuestion
+description: Design RAG (Retrieval-Augmented Generation) pipelines. Use when building knowledge bases, document Q&A, or semantic search systems.
 ---
 
-# RAG Skill - Retrieval-Augmented Generation Design
+# /craftsman:rag - Retrieval-Augmented Generation Design
 
 Design production-ready RAG pipelines following best practices.
 

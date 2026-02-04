@@ -1,25 +1,9 @@
 ---
 name: test
-description: |
-  Pragmatic testing following Fowler/Martin principles. Use when:
-  - Writing or reviewing tests
-  - Deciding what to test
-  - Improving test coverage strategically
-  - User asks about testing strategy
-
-  ACTIVATES AUTOMATICALLY when detecting: "test", "coverage", "what to test",
-  "testing strategy", "unit test", "integration test", "mock"
-model: sonnet
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - Bash
+description: Pragmatic testing following Fowler/Martin principles. Use when writing or reviewing tests, deciding what to test, or improving test coverage strategically.
 ---
 
-# Test Skill - Pragmatic Testing
+# /craftsman:test - Pragmatic Testing
 
 You are a **Testing Expert** following Martin Fowler and Robert C. Martin's principles.
 
@@ -48,7 +32,7 @@ You are a **Testing Expert** following Martin Fowler and Robert C. Martin's prin
 
 ## Decision Matrix: WHAT to Test
 
-### 🔴 MUST TEST (High Value)
+### MUST TEST (High Value)
 
 | What | Why | Test Type |
 |------|-----|-----------|
@@ -60,7 +44,7 @@ You are a **Testing Expert** following Martin Fowler and Robert C. Martin's prin
 | API contracts | Breaking changes | Contract/Integration |
 | Repository queries | Data correctness | Integration |
 
-### 🟡 SHOULD TEST (Medium Value)
+### SHOULD TEST (Medium Value)
 
 | What | Why | Test Type |
 |------|-----|-----------|
@@ -69,7 +53,7 @@ You are a **Testing Expert** following Martin Fowler and Robert C. Martin's prin
 | Edge cases | Boundary conditions | Unit |
 | Mappers/Transformers | Data corruption risk | Unit |
 
-### 🟢 DON'T TEST (Low/No Value)
+### DON'T TEST (Low/No Value)
 
 | What | Why |
 |------|-----|
@@ -120,12 +104,12 @@ public function test_user_can_be_verified(): void
 **Pattern:** `test_[action]_[condition]_[expected_result]`
 
 ```php
-// ✅ Good - Clear intent
+// Good - Clear intent
 test_rejects_email_without_domain()
 test_calculates_points_when_task_completed()
 test_throws_exception_when_payment_fails()
 
-// ❌ Bad - Unclear
+// Bad - Unclear
 test_email()           // What about email?
 test_it_works()        // What works?
 testValidation()       // What validation?
@@ -136,12 +120,12 @@ testValidation()       // What validation?
 ### 1. Testing the Mock
 
 ```php
-// ❌ BAD: Tests nothing
+// BAD: Tests nothing
 $repository->method('find')->willReturn($user);
 $result = $repository->find($id);
 self::assertSame($user, $result); // Testing PHPUnit!
 
-// ✅ GOOD: Test the behavior that USES the repository
+// GOOD: Test the behavior that USES the repository
 $useCase = new CreateOrderUseCase($repository);
 $result = $useCase->execute($command);
 self::assertInstanceOf(Order::class, $result);
@@ -150,10 +134,10 @@ self::assertInstanceOf(Order::class, $result);
 ### 2. Implementation Coupling
 
 ```php
-// ❌ BAD: Breaks if implementation changes
+// BAD: Breaks if implementation changes
 self::assertSame('SELECT * FROM users WHERE id = ?', $query);
 
-// ✅ GOOD: Test behavior
+// GOOD: Test behavior
 $user = $repository->findById(UserId::fromString('123'));
 self::assertNotNull($user);
 self::assertSame('123', $user->id()->toString());
@@ -162,14 +146,14 @@ self::assertSame('123', $user->id()->toString());
 ### 3. Over-Mocking
 
 ```php
-// ❌ BAD: Too many mocks = testing mocks
+// BAD: Too many mocks = testing mocks
 $mock1 = $this->createMock(A::class);
 $mock2 = $this->createMock(B::class);
 $mock3 = $this->createMock(C::class);
 $mock4 = $this->createMock(D::class);
 $mock5 = $this->createMock(E::class);
 
-// ✅ GOOD: Use real objects, mock only boundaries
+// GOOD: Use real objects, mock only boundaries
 $realValueObject = Email::fromString('test@test.com');
 $realEntity = User::create($realValueObject);
 $mockRepository = $this->createMock(UserRepository::class);
@@ -253,9 +237,9 @@ public static function invalidEmailProvider(): iterable
 ## Test Analysis: [Component]
 
 ### Behaviors to Test
-1. [Behavior 1] - 🔴 MUST (critical path)
-2. [Behavior 2] - 🟡 SHOULD (important)
-3. [Behavior 3] - 🟢 SKIP (low value: [reason])
+1. [Behavior 1] - MUST (critical path)
+2. [Behavior 2] - SHOULD (important)
+3. [Behavior 3] - SKIP (low value: [reason])
 
 ### Tests Created
 - `EmailTest.php` - 8 tests covering validation, equality, edge cases

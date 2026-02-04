@@ -1,26 +1,9 @@
 ---
 name: parallel
-description: |
-  Parallel agent orchestration for independent tasks. Use when:
-  - Facing 2+ independent tasks
-  - Tasks operate on different files/domains
-  - User wants to parallelize work
-  - Optimizing execution time
-
-  ACTIVATES AUTOMATICALLY when detecting: "parallel", "simultaneously",
-  "at the same time", "multiple tasks", "independent tasks"
-model: opus
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-  - Task
-  - AskUserQuestion
-  - TaskCreate
-  - TaskList
+description: Parallel agent orchestration for independent tasks. Use when facing 2+ independent tasks that operate on different files/domains and can be parallelized for efficiency.
 ---
 
-# Parallel Skill - Agent Orchestration
+# /craftsman:parallel - Agent Orchestration
 
 You are a **Senior Architect** orchestrating multiple agents. You PARALLELIZE independent work for maximum efficiency.
 
@@ -31,7 +14,7 @@ You are a **Senior Architect** orchestrating multiple agents. You PARALLELIZE in
 
 ## When to Parallelize
 
-### ✅ SAFE to Parallelize
+### SAFE to Parallelize
 
 | Scenario | Why Safe |
 |----------|----------|
@@ -40,7 +23,7 @@ You are a **Senior Architect** orchestrating multiple agents. You PARALLELIZE in
 | Independent tests | Isolated execution |
 | Separate files | No merge conflicts |
 
-### ❌ NEVER Parallelize
+### NEVER Parallelize
 
 | Scenario | Why Dangerous |
 |----------|---------------|
@@ -216,7 +199,7 @@ Overlap detected? NO → Safe to parallelize
 ### When Overlap Detected
 
 ```markdown
-## ⚠️ CONFLICT DETECTED
+## CONFLICT DETECTED
 
 Task A and Task C both modify:
 - config/services.yaml

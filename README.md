@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
 [![Version](https://img.shields.io/badge/Version-1.0.0-blue)](CHANGELOG.md)
-[![Skills](https://img.shields.io/badge/Skills-19-orange)]()
+[![Commands](https://img.shields.io/badge/Commands-20-orange)]()
 [![Agents](https://img.shields.io/badge/Agents-5-red)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -87,60 +87,56 @@ I need to migrate our API to microservices.
 
 See [`/examples`](examples/) for detailed usage examples with expected outputs.
 
-## Skills
+## Commands
+
+All commands are explicitly invoked with `/craftsman:command-name`. See [ADR-0007](docs/adr/0007-commands-over-skills.md) for the rationale.
 
 ### Core Methodology
 
-| Skill | Model | Purpose | Auto-triggers |
-|-------|-------|---------|---------------|
-| `/craftsman:design` | Sonnet | DDD design with challenge phases | "create", "design", "entity" |
-| `/craftsman:debug` | Sonnet | Systematic debugging (ReAct) | "bug", "error", "broken" |
-| `/craftsman:plan` | Opus | Structured planning & execution | "plan", "migrate", "roadmap" |
-| `/craftsman:challenge` | Opus | Architecture review | "review", "feedback" |
-| `/craftsman:verify` | Haiku | Evidence-based verification | "verify", "is it done" |
-| `/craftsman:spec` | Sonnet | Specification-first (TDD/BDD) | "spec", "test first" |
-| `/craftsman:refactor` | Sonnet | Systematic refactoring | "refactor", "clean up" |
-| `/craftsman:test` | Sonnet | Pragmatic testing (Fowler/Martin) | "test strategy" |
-| `/craftsman:git` | Haiku | Safe git workflow | "commit", "branch", "PR" |
-| `/craftsman:parallel` | Opus | Parallel agent orchestration | "parallel tasks" |
+| Command | Purpose |
+|---------|---------|
+| `/craftsman:design` | DDD design with challenge phases (Understand → Challenge → Recommend → Implement) |
+| `/craftsman:debug` | Systematic debugging using ReAct pattern |
+| `/craftsman:plan` | Structured planning & execution with checkpoints |
+| `/craftsman:challenge` | Senior architecture review and code challenge |
+| `/craftsman:verify` | Evidence-based verification before completion claims |
+| `/craftsman:spec` | Specification-first development (TDD/BDD) |
+| `/craftsman:refactor` | Systematic refactoring with behavior preservation |
+| `/craftsman:test` | Pragmatic testing following Fowler/Martin principles |
+| `/craftsman:git` | Safe git workflow with destructive command protection |
+| `/craftsman:parallel` | Parallel agent orchestration for independent tasks |
 
-### Model Tiering Strategy
+### Symfony/PHP Scaffolding
 
-- **Haiku**: Fast, simple tasks (verification, git commands)
-- **Sonnet**: Balanced tasks (design, testing, refactoring)
-- **Opus**: Complex, critical tasks (architecture review, planning)
+| Command | Purpose |
+|---------|---------|
+| `/craftsman:entity` | Scaffold DDD entity with Value Objects, Events, Tests |
+| `/craftsman:usecase` | Scaffold use case with Command/Handler pattern |
 
-See [ADR-001: Model Tiering](docs/adr/001-model-tiering.md) for rationale.
+### React/TypeScript Scaffolding
 
-### Symfony/PHP
-
-| Skill | Model | Purpose |
-|-------|-------|---------|
-| `/craftsman:entity` | Sonnet | Scaffold DDD entity with VO, events, tests |
-| `/craftsman:usecase` | Sonnet | Scaffold use case with command/handler |
-
-### React/TypeScript
-
-| Skill | Model | Purpose |
-|-------|-------|---------|
-| `/craftsman:component` | Sonnet | Scaffold React component |
-| `/craftsman:hook` | Sonnet | Scaffold TanStack Query hook |
+| Command | Purpose |
+|---------|---------|
+| `/craftsman:component` | Scaffold React component with TypeScript, tests, Storybook |
+| `/craftsman:hook` | Scaffold TanStack Query hook with tests |
 
 ### AI/ML Engineering
 
-| Skill | Model | Purpose |
-|-------|-------|---------|
-| `/craftsman:rag` | Opus | Design RAG pipelines |
-| `/craftsman:mlops` | Opus | Audit ML projects |
-| `/craftsman:agent-design` | Opus | Design AI agents (3P pattern) |
+| Command | Purpose |
+|---------|---------|
+| `/craftsman:rag` | Design RAG pipelines (ingestion, retrieval, generation) |
+| `/craftsman:mlops` | Audit ML projects for production readiness |
+| `/craftsman:agent-design` | Design AI agents using 3P pattern (Perceive/Plan/Perform) |
 
-### Quality Assurance
+### Utilities
 
-| Skill | Model | Purpose |
-|-------|-------|---------|
-| `/craftsman:source-verify` | Sonnet | Verify AI capabilities against official docs |
+| Command | Purpose |
+|---------|---------|
+| `/craftsman:source-verify` | Verify AI capabilities against official documentation |
+| `/craftsman:agent-create` | Interactively create bounded context agents |
+| `/craftsman:scaffold` | Analyze code and generate context agents |
 
-> **Why source-verify?** AI tools evolve rapidly. This skill ensures claims about capabilities are verified against official documentation before being stated as facts. See [ADR-004](docs/adr/004-official-documentation-verification.md).
+> **Why source-verify?** AI tools evolve rapidly. This command ensures claims about capabilities are verified against official documentation before being stated as facts. See [ADR-004](docs/adr/004-official-documentation-verification.md).
 
 ## Features
 
@@ -253,6 +249,7 @@ See [`/docs/adr`](docs/adr/) for Architecture Decision Records:
 - [ADR-002: Context Fork Strategy](docs/adr/002-context-fork-strategy.md)
 - [ADR-003: Progressive Disclosure](docs/adr/003-progressive-disclosure.md)
 - [ADR-0002: Ollama over OpenAI](docs/adr/0002-ollama-over-openai.md)
+- [ADR-0007: Commands over Skills](docs/adr/0007-commands-over-skills.md)
 
 ## Examples
 
@@ -271,7 +268,7 @@ See [`/examples`](examples/) for detailed usage examples:
 ai-craftsman-superpowers/
 ├── .claude-plugin/              # Plugin manifest
 │   └── plugin.json
-├── skills/                      # All skills (18 SKILL.md files)
+├── commands/                    # User-invocable commands (20 *.md files)
 ├── agents/                      # Specialized reviewers (5)
 ├── hooks/                       # Automated validation
 │   ├── hooks.json
@@ -347,7 +344,8 @@ grep -r "curl\|wget\|fetch\|http" hooks/
 
 - **Hooks are warnings only** — They never block operations, only inform
 - **No auto-commit** — All git operations require explicit user action
-- **Skills are opinionated** — Follows DDD/Clean Architecture strictly
+- **Commands are opinionated** — Follows DDD/Clean Architecture strictly
+- **Explicit invocation** — Commands are deliberately invoked, not auto-triggered
 
 ### Current Constraints
 

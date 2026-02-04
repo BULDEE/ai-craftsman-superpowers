@@ -1,22 +1,9 @@
 ---
 name: component
-description: |
-  Scaffold React component with TypeScript, tests, and Storybook.
-  Use when creating React/TypeScript components.
-
-  ACTIVATES AUTOMATICALLY when detecting: "component", "React",
-  "create component", "UI component", TypeScript/React context
-model: sonnet
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - Bash
+description: Scaffold React component with TypeScript, tests, and Storybook. Use when creating React/TypeScript components.
 ---
 
-# Component Skill - React Component Scaffolding
+# /craftsman:component - React Component Scaffolding
 
 Scaffold a complete React component with TypeScript, tests, and optional Storybook.
 

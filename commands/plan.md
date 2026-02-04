@@ -1,31 +1,9 @@
 ---
 name: plan
-description: |
-  Structured planning and execution for multi-step tasks. Use when:
-  - Starting a feature requiring multiple steps
-  - Migrating or refactoring large codebases
-  - User asks for a "plan", "roadmap", or "how to implement"
-  - Task complexity exceeds a single change
-
-  ACTIVATES AUTOMATICALLY when detecting: "plan", "how should I",
-  "steps to", "migrate", "roadmap", "strategy", "break down"
-model: opus
-context: fork
-agent: Plan
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - Task
-  - AskUserQuestion
-  - TaskCreate
-  - TaskUpdate
-  - TaskList
+description: Structured planning and execution for multi-step tasks. Use when starting features requiring multiple steps, migrating or refactoring large codebases, or when task complexity exceeds a single change.
 ---
 
-# Plan Skill - Structured Planning & Execution
+# /craftsman:plan - Structured Planning & Execution
 
 You are a **Senior Architect**. You PLAN before you CODE. You EXECUTE with checkpoints.
 
@@ -162,7 +140,7 @@ When user says "execute" or confirms the plan:
 ## Executing Batch 1
 
 ### TASK-001: Create UserId Value Object
-**Status:** 🔄 In Progress
+**Status:** In Progress
 
 [Execute task]
 
@@ -173,7 +151,7 @@ When user says "execute" or confirms the plan:
 ---
 
 ### TASK-002: Create User Entity
-**Status:** 🔄 In Progress
+**Status:** In Progress
 
 [Execute task]
 

@@ -6,9 +6,9 @@ The **ai-craftsman-superpowers** plugin is designed with security as a priority.
 
 ## What This Plugin Does
 
-### Skills (18 total)
+### Commands (20 total)
 
-Skills are **prompt templates** that guide Claude's behavior. They:
+Commands are **prompt templates** that guide Claude's behavior. They:
 
 - ✅ Read files to understand context
 - ✅ Write/edit code files when instructed
@@ -84,8 +84,8 @@ We will respond within 48 hours and work with you on disclosure.
 
 | Version | Date | Auditor | Notes |
 |---------|------|---------|-------|
-| 2.0.0 | 2025-02-03 | Internal | Initial security review |
-| 2.1.0 | 2025-02-04 | Internal | Hooks hardened, paths secured |
+| 1.0.0 | 2025-02-03 | Internal | Initial security review |
+| 1.1.0 | 2025-02-04 | Internal | Skills migrated to commands, hooks hardened |
 
 ## Third-Party Dependencies
 
@@ -119,6 +119,6 @@ grep -r "curl\|wget\|fetch\|http" hooks/
 
 | Version | Supported |
 |---------|-----------|
-| 2.1.x | ✅ |
-| 2.0.x | ✅ |
-| < 2.0 | ❌ |
+| 1.1.x | ✅ |
+| 1.0.x | ✅ |
+| < 1.0 | ❌ |

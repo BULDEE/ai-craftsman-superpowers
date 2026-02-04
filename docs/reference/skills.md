@@ -1,6 +1,8 @@
-# Skills Reference
+# Commands Reference
 
-Complete reference for all available skills.
+Complete reference for all available commands.
+
+> **Note:** As of v1.1.0, all user-invocable workflows are now in `commands/` instead of `skills/`. See [ADR-0007](../adr/0007-commands-over-skills.md) for rationale.
 
 ## Core Pack (Always Enabled)
 

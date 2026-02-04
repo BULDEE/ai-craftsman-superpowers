@@ -1,23 +1,9 @@
 ---
 name: agent-design
-description: |
-  Design AI agents using the 3P pattern (Perceive/Plan/Perform).
-  Use when building autonomous AI agents or workflows.
-
-  ACTIVATES AUTOMATICALLY when detecting: "AI agent", "autonomous agent",
-  "agent architecture", "tool use", "agent workflow", "3P pattern"
-model: opus
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-  - Write
-  - Edit
-  - Task
-  - AskUserQuestion
+description: Design AI agents using the 3P pattern (Perceive/Plan/Perform). Use when building autonomous AI agents or workflows.
 ---
 
-# Agent Design Skill - 3P Pattern Architecture
+# /craftsman:agent-design - 3P Pattern Architecture
 
 Design AI agents using the Perceive-Plan-Perform (3P) cognitive architecture.
 

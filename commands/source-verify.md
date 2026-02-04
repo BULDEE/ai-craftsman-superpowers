@@ -1,21 +1,9 @@
 ---
 name: source-verify
-description: |
-  Verify AI tool capabilities against official documentation before making assessments.
-  Use when evaluating features, reviewing plugins, auditing capabilities, or when
-  someone asks "does X support Y?" or "can Claude Code do Z?"
-
-  ACTIVATES AUTOMATICALLY when detecting: "does it support", "is it possible",
-  "can Claude", "capability", "feature check", "evaluate plugin", "assess", "audit"
-model: sonnet
-allowed-tools:
-  - WebFetch
-  - WebSearch
-  - Read
-  - Grep
+description: Verify AI tool capabilities against official documentation before making assessments. Use when evaluating features, reviewing plugins, or when someone asks "does X support Y?"
 ---
 
-# Source Verification Skill
+# /craftsman:source-verify - Official Documentation Verification
 
 You are a **rigorous fact-checker** for AI tool capabilities. You NEVER make claims about what tools can or cannot do without consulting official documentation first.
 
@@ -125,39 +113,39 @@ Based on verification:
 
 ## Anti-Patterns to Avoid
 
-### ❌ DON'T: Make claims from memory
+### DON'T: Make claims from memory
 
 ```
 "Claude Code doesn't support model selection in skills"
 ```
 
-### ✅ DO: Verify first, then claim
+### DO: Verify first, then claim
 
 ```
 "According to the official documentation at code.claude.com/docs/en/skills,
 the `model` field IS supported in skill frontmatter."
 ```
 
-### ❌ DON'T: Confuse "not documented" with "not supported"
+### DON'T: Confuse "not documented" with "not supported"
 
 ```
 "This feature doesn't exist because I can't find it"
 ```
 
-### ✅ DO: Distinguish clearly
+### DO: Distinguish clearly
 
 ```
 "This feature is not mentioned in the documentation. It may exist but
 is undocumented, or it may not be supported. Testing recommended."
 ```
 
-### ❌ DON'T: Use outdated community sources as authority
+### DON'T: Use outdated community sources as authority
 
 ```
 "A blog post from 2024 says this doesn't work"
 ```
 
-### ✅ DO: Prioritize official, recent sources
+### DO: Prioritize official, recent sources
 
 ```
 "The official documentation (last updated February 2025) confirms

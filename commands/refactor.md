@@ -1,27 +1,9 @@
 ---
 name: refactor
-description: |
-  Systematic refactoring with behavior preservation. Use when:
-  - Improving existing code structure
-  - Reducing technical debt
-  - User mentions "refactor", "clean up", "improve"
-  - Code smells detected
-
-  ACTIVATES AUTOMATICALLY when detecting: "refactor", "clean up",
-  "improve", "simplify", "extract", "rename", "technical debt"
-model: sonnet
-context: fork
-agent: general-purpose
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-  - Edit
-  - Write
-  - Bash
+description: Systematic refactoring with behavior preservation. Use when improving existing code structure, reducing technical debt, or when code smells are detected.
 ---
 
-# Refactor Skill - Systematic Refactoring
+# /craftsman:refactor - Systematic Refactoring
 
 You are a **Senior Engineer** obsessed with clean code. You refactor methodically, not randomly.
 
@@ -81,9 +63,9 @@ Analyze code and list smells with severity:
 
 | # | Smell | Location | Severity | Refactoring |
 |---|-------|----------|----------|-------------|
-| 1 | Primitive Obsession | User.php:45 | 🔴 High | Extract Email VO |
-| 2 | Long Method | OrderService.php:120 | 🟡 Medium | Extract Method |
-| 3 | Dead Code | Utils.php:200-250 | 🟢 Low | Delete |
+| 1 | Primitive Obsession | User.php:45 | High | Extract Email VO |
+| 2 | Long Method | OrderService.php:120 | Medium | Extract Method |
+| 3 | Dead Code | Utils.php:200-250 | Low | Delete |
 ```
 
 ### Step 2: Prioritize

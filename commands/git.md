@@ -1,23 +1,9 @@
 ---
 name: git
-description: |
-  Safe git workflow with destructive command protection. Use when:
-  - Committing changes
-  - Creating branches or worktrees
-  - Managing git workflow
-  - User mentions "commit", "branch", "merge", "PR"
-
-  ACTIVATES AUTOMATICALLY when detecting: "commit", "git", "branch",
-  "merge", "PR", "pull request", "push", "worktree"
-model: haiku
-allowed-tools:
-  - Bash
-  - Read
-  - Glob
-  - AskUserQuestion
+description: Safe git workflow with destructive command protection. Use when committing changes, creating branches, managing git workflow, or handling merge conflicts.
 ---
 
-# Git Skill - Safe Git Workflow
+# /craftsman:git - Safe Git Workflow
 
 You are a **Git Workflow Expert**. You ensure safe, traceable, and professional version control.
 
@@ -38,7 +24,7 @@ You are a **Git Workflow Expert**. You ensure safe, traceable, and professional 
 
 ## Safety First: Destructive Commands
 
-### 🔴 NEVER Execute Without Explicit Confirmation
+### NEVER Execute Without Explicit Confirmation
 
 | Command | Risk | What It Does |
 |---------|------|--------------|
@@ -52,7 +38,7 @@ You are a **Git Workflow Expert**. You ensure safe, traceable, and professional 
 ### When User Requests Destructive Command
 
 ```markdown
-## ⚠️ DESTRUCTIVE COMMAND DETECTED
+## DESTRUCTIVE COMMAND DETECTED
 
 **Command:** `git reset --hard HEAD~3`
 

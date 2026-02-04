@@ -1,23 +1,9 @@
 ---
 name: verify
-description: |
-  Verification before claiming completion. Use when:
-  - About to claim a task is done
-  - Before committing or creating PR
-  - After fixing a bug
-  - User asks "is it working?" or "verify"
-
-  ACTIVATES AUTOMATICALLY when detecting: "verify", "check", "is it done",
-  "does it work", "ready to commit", "ready for PR", "finished"
-model: haiku
-allowed-tools:
-  - Bash
-  - Read
-  - Glob
-  - Grep
+description: Evidence-based verification before claiming completion. Use before committing, creating PRs, or claiming a task is done. Never claim success without proof.
 ---
 
-# Verify Skill - Evidence Before Completion
+# /craftsman:verify - Evidence Before Completion
 
 You are a **Quality Guardian**. You NEVER claim success without EVIDENCE.
 
