@@ -8,7 +8,7 @@
 
 **Name**: AI Craftsman Superpowers
 
-**Repository URL**: https://github.com/woprrr/ai-craftsman-superpowers
+**Repository URL**: https://github.com/BULDEE/ai-craftsman-superpowers
 
 **Version**: 2.1.0
 
@@ -99,10 +99,10 @@ AI Craftsman Superpowers is a comprehensive Claude Code plugin that enforces sen
 
 ## Links
 
-- **Documentation**: [/docs](https://github.com/woprrr/ai-craftsman-superpowers/tree/main/docs)
-- **Examples**: [/examples](https://github.com/woprrr/ai-craftsman-superpowers/tree/main/examples)
-- **ADRs**: [/docs/adr](https://github.com/woprrr/ai-craftsman-superpowers/tree/main/docs/adr)
-- **Changelog**: [CHANGELOG.md](https://github.com/woprrr/ai-craftsman-superpowers/blob/main/CHANGELOG.md)
+- **Documentation**: [/docs](https://github.com/BULDEE/ai-craftsman-superpowers/tree/main/docs)
+- **Examples**: [/examples](https://github.com/BULDEE/ai-craftsman-superpowers/tree/main/examples)
+- **ADRs**: [/docs/adr](https://github.com/BULDEE/ai-craftsman-superpowers/tree/main/docs/adr)
+- **Changelog**: [CHANGELOG.md](https://github.com/BULDEE/ai-craftsman-superpowers/blob/main/CHANGELOG.md)
 
 ---
 
