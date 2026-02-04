@@ -1,8 +1,24 @@
 # AI Craftsman Superpowers
 
+<div align="center">
+
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Claude Code](https://img.shields.io/badge/Claude%20Code-v1.0.33+-green.svg)](https://code.claude.com)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
+[![Version](https://img.shields.io/badge/Version-2.1.0-blue)](CHANGELOG.md)
+[![Skills](https://img.shields.io/badge/Skills-18-orange)]()
+[![Agents](https://img.shields.io/badge/Agents-5-red)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
+**Transform Claude into a disciplined Senior Software Craftsman**
+
+[Installation](#installation) •
+[Skills](#skills) •
+[Security](#security) •
+[Contributing](#contributing)
+
+</div>
+
+---
 
 > Senior craftsman methodology for Claude Code. DDD, Clean Architecture, TDD.
 
@@ -245,16 +261,21 @@ See [`/examples`](examples/) for detailed usage examples:
 
 ```
 ai-craftsman-superpowers/
-├── plugins/craftsman/           # Main plugin
-│   ├── .claude-plugin/          # Plugin manifest
-│   ├── skills/                  # All skills (SKILL.md)
-│   ├── agents/                  # Specialized reviewers
-│   ├── hooks/                   # Automated validation
-│   └── knowledge/               # Patterns & principles
+├── .claude-plugin/              # Plugin manifest
+│   └── plugin.json
+├── skills/                      # All skills (18 SKILL.md files)
+├── agents/                      # Specialized reviewers (5)
+├── hooks/                       # Automated validation
+│   ├── hooks.json
+│   ├── bias-detector.sh
+│   └── post-write-check.sh
+├── knowledge/                   # Patterns & principles
 ├── examples/                    # Usage examples
 ├── tests/                       # Test suite
 ├── docs/
 │   └── adr/                     # Architecture decisions
+├── SECURITY.md                  # Security documentation
+├── CHANGELOG.md                 # Version history
 ├── CONTRIBUTING.md
 └── LICENSE                      # Apache 2.0
 ```
@@ -279,6 +300,58 @@ ai-craftsman-superpowers/
 | 100% test coverage | Critical paths covered (80%) |
 | Pure DDD everywhere | DDD for complex domains only |
 | Always abstract | Concrete first, abstract when needed |
+
+## Security
+
+This plugin prioritizes transparency and safety:
+
+| Component | Behavior | Modifies Files? |
+|-----------|----------|-----------------|
+| Skills | Prompt templates | Only when instructed |
+| Agents | Code reviewers | Never |
+| Hooks | Validation scripts | Never (read-only) |
+
+**All hooks exit 0** — They warn but never block your workflow.
+
+See [SECURITY.md](./SECURITY.md) for full security documentation.
+
+### Pre-Installation Verification
+
+Verify the plugin before installing:
+
+```bash
+# Clone and inspect
+git clone https://github.com/BULDEE/ai-craftsman-superpowers.git
+cd ai-craftsman-superpowers
+
+# Review hooks (the only executable code)
+cat hooks/bias-detector.sh
+cat hooks/post-write-check.sh
+
+# Verify no network calls
+grep -r "curl\|wget\|fetch\|http" hooks/
+# Should return nothing
+```
+
+## Known Limitations
+
+### By Design
+
+- **Hooks are warnings only** — They never block operations, only inform
+- **No auto-commit** — All git operations require explicit user action
+- **Skills are opinionated** — Follows DDD/Clean Architecture strictly
+
+### Current Constraints
+
+- **PHP/TypeScript focus** — Other languages have basic support only
+- **RAG requires Ollama** — No cloud embedding providers supported
+- **English/French only** — Bias detection patterns in EN/FR
+
+### Not Supported
+
+- ❌ Auto-fixing violations (by design, for safety)
+- ❌ CI/CD integration (use native tools instead)
+- ❌ IDE plugins (Claude Code CLI only)
 
 ## Contributing
 

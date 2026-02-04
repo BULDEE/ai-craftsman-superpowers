@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2025-02-04
+
+### Changed
+
+- **Repository Restructure**: Moved plugin content to root for Anthropic marketplace compatibility
+  - `skills/`, `agents/`, `hooks/`, `knowledge/` now at repository root
+  - Removed nested `plugins/craftsman/` structure
+- **Hook Security**: Updated paths to use `$CLAUDE_PLUGIN_DIR` for portability
+- **Hook Scripts**: Added `set -euo pipefail` and security headers
+- **plugin.json**: Added `engines`, `categories`, `bugs` fields for marketplace
+
+### Added
+
+- **SECURITY.md**: Comprehensive security documentation for marketplace review
+- **README Sections**: Added "Security", "Known Limitations", "Pre-Installation Verification"
+
+### Fixed
+
+- **License Consistency**: Aligned plugin.json license with Apache-2.0 (was MIT)
+
 ## [2.1.0] - 2025-02-04
 
 ### Added

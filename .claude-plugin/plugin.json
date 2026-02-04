@@ -1,0 +1,43 @@
+{
+  "name": "craftsman",
+  "description": "Senior craftsman methodology for AI-assisted development. DDD, Clean Architecture, TDD, and systematic workflows that transform Claude into a disciplined software engineer.",
+  "version": "2.1.0",
+  "author": {
+    "name": "Alexandre Mallet",
+    "email": "contact@woprrr.dev",
+    "url": "https://github.com/BULDEE"
+  },
+  "homepage": "https://github.com/BULDEE/ai-craftsman-superpowers",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BULDEE/ai-craftsman-superpowers.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BULDEE/ai-craftsman-superpowers/issues"
+  },
+  "license": "Apache-2.0",
+  "keywords": [
+    "ddd",
+    "domain-driven-design",
+    "clean-architecture",
+    "tdd",
+    "craftsman",
+    "software-engineering",
+    "code-quality",
+    "symfony",
+    "react",
+    "typescript",
+    "php",
+    "testing",
+    "refactoring",
+    "methodology"
+  ],
+  "engines": {
+    "claude-code": ">=1.0.33"
+  },
+  "categories": [
+    "methodology",
+    "code-quality",
+    "testing"
+  ]
+}

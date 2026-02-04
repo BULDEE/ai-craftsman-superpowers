@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '🔍 Checking rules before write...'"
+            "command": "echo '🔍 Validating against craftsman rules...'"
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./hooks/post-write-check.sh"
+            "command": "bash \"$CLAUDE_PLUGIN_DIR/hooks/post-write-check.sh\""
           }
         ]
       }
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./hooks/bias-detector.sh"
+            "command": "bash \"$CLAUDE_PLUGIN_DIR/hooks/bias-detector.sh\""
           }
         ]
       }
