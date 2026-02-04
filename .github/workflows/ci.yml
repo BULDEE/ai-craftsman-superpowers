@@ -38,8 +38,8 @@ jobs:
 
           # List of critical JSON files
           JSON_FILES=(
-            "plugins/craftsman/hooks/hooks.json"
-            "plugins/craftsman/.claude-plugin/plugin.json"
+            "hooks/hooks.json"
+            ".claude-plugin/plugin.json"
             ".claude-plugin/marketplace.json"
           )
 
@@ -81,7 +81,7 @@ jobs:
           VALID_HOOK_EVENTS = ["PreToolUse", "PostToolUse", "UserPromptSubmit", "Notification", "Stop"]
           VALID_HOOK_TYPES = ["command"]
 
-          with open("plugins/craftsman/hooks/hooks.json") as f:
+          with open("hooks/hooks.json") as f:
               data = json.load(f)
 
           errors = []
@@ -141,7 +141,7 @@ jobs:
 
           REQUIRED_FIELDS = ["name", "description", "version"]
 
-          with open("plugins/craftsman/.claude-plugin/plugin.json") as f:
+          with open(".claude-plugin/plugin.json") as f:
               data = json.load(f)
 
           errors = []
@@ -181,8 +181,8 @@ jobs:
           echo "Checking shell script syntax..."
 
           SCRIPTS=(
-            "plugins/craftsman/hooks/post-write-check.sh"
-            "plugins/craftsman/hooks/bias-detector.sh"
+            "hooks/post-write-check.sh"
+            "hooks/bias-detector.sh"
             "tests/run-tests.sh"
           )
 
@@ -209,8 +209,8 @@ jobs:
           echo "Checking script permissions..."
 
           SCRIPTS=(
-            "plugins/craftsman/hooks/post-write-check.sh"
-            "plugins/craftsman/hooks/bias-detector.sh"
+            "hooks/post-write-check.sh"
+            "hooks/bias-detector.sh"
             "tests/run-tests.sh"
           )
 
@@ -236,8 +236,8 @@ jobs:
           echo "Running ShellCheck..."
 
           SCRIPTS=(
-            "plugins/craftsman/hooks/post-write-check.sh"
-            "plugins/craftsman/hooks/bias-detector.sh"
+            "hooks/post-write-check.sh"
+            "hooks/bias-detector.sh"
             "tests/run-tests.sh"
           )
 
@@ -269,7 +269,7 @@ jobs:
         run: |
           echo "Validating SKILL.md files..."
 
-          SKILLS_DIR="plugins/craftsman/skills"
+          SKILLS_DIR="skills"
           FAILED=0
 
           for skill_dir in "$SKILLS_DIR"/*; do
@@ -350,7 +350,7 @@ jobs:
         run: |
           echo "Validating knowledge base..."
 
-          KNOWLEDGE_DIR="plugins/craftsman/knowledge"
+          KNOWLEDGE_DIR="knowledge"
           FAILED=0
 
           # Check directory exists
@@ -419,7 +419,7 @@ jobs:
         run: |
           echo "Validating agent definitions..."
 
-          AGENTS_DIR="plugins/craftsman/agents"
+          AGENTS_DIR="agents"
           FAILED=0
 
           if [ ! -d "$AGENTS_DIR" ]; then

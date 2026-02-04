@@ -13,8 +13,8 @@ NC='\033[0m' # No Color
 # Directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
-PLUGIN_DIR="$ROOT_DIR/plugins/craftsman"
-SKILLS_DIR="$PLUGIN_DIR/skills"
+PLUGIN_DIR="$ROOT_DIR"
+SKILLS_DIR="$ROOT_DIR/skills"
 
 # Counters
 TESTS_PASSED=0

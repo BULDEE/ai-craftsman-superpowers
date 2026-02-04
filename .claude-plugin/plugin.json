@@ -8,10 +8,7 @@
     "url": "https://github.com/BULDEE"
   },
   "homepage": "https://github.com/BULDEE/ai-craftsman-superpowers",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/BULDEE/ai-craftsman-superpowers.git"
-  },
+  "repository": "https://github.com/BULDEE/ai-craftsman-superpowers",
   "bugs": {
     "url": "https://github.com/BULDEE/ai-craftsman-superpowers/issues"
   },
