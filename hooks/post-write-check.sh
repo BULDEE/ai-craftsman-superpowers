@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Post-Write Validation Hook for Claude Code
-# Validates written files against craftsman coding standards.
+# Post-Write/Edit Validation Hook for Claude Code
+# Validates written or edited files against craftsman coding standards.
 #
+# TRIGGERS: PostToolUse for Write and Edit tools
 # SECURITY: This script only READS the specified file and outputs warnings.
 #           It does NOT modify files, execute code, or access network.
 # =============================================================================

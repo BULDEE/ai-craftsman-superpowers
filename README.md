@@ -4,8 +4,8 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
-[![Version](https://img.shields.io/badge/Version-2.1.0-blue)](CHANGELOG.md)
-[![Skills](https://img.shields.io/badge/Skills-18-orange)]()
+[![Version](https://img.shields.io/badge/Version-2.2.0-blue)](CHANGELOG.md)
+[![Skills](https://img.shields.io/badge/Skills-19-orange)]()
 [![Agents](https://img.shields.io/badge/Agents-5-red)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -134,6 +134,14 @@ See [ADR-001: Model Tiering](docs/adr/001-model-tiering.md) for rationale.
 | `/craftsman:mlops` | Opus | Audit ML projects |
 | `/craftsman:agent-design` | Opus | Design AI agents (3P pattern) |
 
+### Quality Assurance
+
+| Skill | Model | Purpose |
+|-------|-------|---------|
+| `/craftsman:source-verify` | Sonnet | Verify AI capabilities against official docs |
+
+> **Why source-verify?** AI tools evolve rapidly. This skill ensures claims about capabilities are verified against official documentation before being stated as facts. See [ADR-004](docs/adr/004-official-documentation-verification.md).
+
 ## Features
 
 ### Bias Protection (Active by Default)
@@ -148,7 +156,7 @@ Hooks automatically detect and warn about cognitive biases:
 
 ### Code Rule Enforcement
 
-Post-write hooks validate your code automatically:
+Post-write/edit hooks validate your code automatically (triggers on both `Write` and `Edit` tools):
 
 **PHP:**
 - `declare(strict_types=1)` required

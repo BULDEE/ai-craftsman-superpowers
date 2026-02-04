@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2025-02-04
+
+### Added
+
+- **New Skill: `/craftsman:source-verify`**: Verify AI tool capabilities against official documentation
+  - Mandatory verification protocol before making capability assessments
+  - Quick reference URLs for all Claude Code documentation
+  - Anti-patterns for avoiding false claims
+  - Bias protection for confirmation, anchoring, and authority biases
+- **ADR-004: Official Documentation Verification**: Decision record requiring source verification
+  - Establishes mandatory consultation of official docs before assessments
+  - Provides verification checklist for capability claims
+  - Documents the February 2025 incident as motivation
+
+### Fixed
+
+- **PostToolUse Hook Matcher**: Changed from `Write` to `Write|Edit` to validate all file modifications
+  - Previously only Write tool was validated, missing 50% of file changes
+  - Edit tool modifications now trigger the same validation rules
+
+### Changed
+
+- **post-write-check.sh**: Updated header to reflect Write|Edit support
+  - Script now explicitly documents PostToolUse trigger for both tools
+
 ## [2.1.1] - 2025-02-04
 
 ### Changed
