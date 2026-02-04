@@ -79,6 +79,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Links
 
-- [GitHub Repository](https://github.com/woprrr/ai-craftsman-superpowers)
-- [Documentation](https://github.com/woprrr/ai-craftsman-superpowers/tree/main/docs)
-- [Issue Tracker](https://github.com/woprrr/ai-craftsman-superpowers/issues)
+- [GitHub Repository](https://github.com/BULDEE/ai-craftsman-superpowers)
+- [Documentation](https://github.com/BULDEE/ai-craftsman-superpowers/tree/main/docs)
+- [Issue Tracker](https://github.com/BULDEE/ai-craftsman-superpowers/issues)

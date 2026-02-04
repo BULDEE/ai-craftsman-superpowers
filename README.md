@@ -19,10 +19,10 @@ Transform Claude Code into a disciplined software engineer with battle-tested me
 
 ```bash
 # Step 1: Add the marketplace
-/plugin marketplace add woprrr/ai-craftsman-superpowers
+/plugin marketplace add BULDEE/ai-craftsman-superpowers
 
 # Step 2: Install the plugin
-/plugin install craftsman@woprrr-ai-craftsman-superpowers
+/plugin install craftsman@BULDEE-ai-craftsman-superpowers
 
 # Step 3: Restart Claude Code
 exit
@@ -33,7 +33,7 @@ claude
 
 ```bash
 # If you cloned the repo locally
-git clone https://github.com/woprrr/ai-craftsman-superpowers.git
+git clone https://github.com/BULDEE/ai-craftsman-superpowers.git
 /plugin install craftsman@/path/to/ai-craftsman-superpowers
 ```
 
@@ -281,8 +281,8 @@ exit
 claude
 
 # Reinstall plugin
-/plugin uninstall craftsman@woprrr-ai-craftsman-superpowers
-/plugin install craftsman@woprrr-ai-craftsman-superpowers
+/plugin uninstall craftsman@BULDEE-ai-craftsman-superpowers
+/plugin install craftsman@BULDEE-ai-craftsman-superpowers
 ```
 
 ### Check for errors
@@ -308,8 +308,8 @@ Apache License 2.0 - See [LICENSE](LICENSE)
 
 ## Support
 
-- Issues: [GitHub Issues](https://github.com/woprrr/ai-craftsman-superpowers/issues)
-- Discussions: [GitHub Discussions](https://github.com/woprrr/ai-craftsman-superpowers/discussions)
+- Issues: [GitHub Issues](https://github.com/BULDEE/ai-craftsman-superpowers/issues)
+- Discussions: [GitHub Discussions](https://github.com/BULDEE/ai-craftsman-superpowers/discussions)
 - Documentation: [Claude Code Plugins](https://code.claude.com/docs/en/plugins)
 
 ## Sponsors
@@ -321,7 +321,7 @@ This project is proudly sponsored by:
 | **[BULDEE](https://buldee.com)** | Building the future of AI-assisted development |
 | **[Time Hacking Limited](https://thelabio.com)** | Maximizing developer productivity |
 
-Interested in sponsoring? [Contact us](https://github.com/woprrr/ai-craftsman-superpowers/discussions)
+Interested in sponsoring? [Contact us](https://github.com/BULDEE/ai-craftsman-superpowers/discussions)
 
 ## Acknowledgments
 

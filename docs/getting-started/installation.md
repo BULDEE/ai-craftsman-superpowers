@@ -10,7 +10,7 @@
 
 ```bash
 # 1. Install the plugin
-claude plugins install git@github.com:woprrr/ai-craftsman-superpowers.git
+claude plugins install git@github.com:BULDEE/ai-craftsman-superpowers.git
 
 # 2. Restart Claude Code
 # Close and reopen your terminal
@@ -26,7 +26,7 @@ If you prefer manual setup:
 
 ```bash
 # Clone the repository
-git clone git@github.com:woprrr/ai-craftsman-superpowers.git ~/.claude/plugins/ai-craftsman-superpowers
+git clone git@github.com:BULDEE/ai-craftsman-superpowers.git ~/.claude/plugins/ai-craftsman-superpowers
 
 # Install MCP server dependencies
 cd ~/.claude/plugins/ai-craftsman-superpowers/ai-pack/mcp/knowledge-rag
@@ -84,7 +84,7 @@ claude plugins list
 
 # Reinstall if needed
 claude plugins uninstall ai-craftsman-superpowers
-claude plugins install git@github.com:woprrr/ai-craftsman-superpowers.git
+claude plugins install git@github.com:BULDEE/ai-craftsman-superpowers.git
 ```
 
 ### MCP server not connecting

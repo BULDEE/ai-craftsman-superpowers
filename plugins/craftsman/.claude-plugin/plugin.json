@@ -6,18 +6,8 @@
     "name": "Alexandre Mallet",
     "url": "https://github.com/woprrr"
   },
-  "sponsors": [
-    {
-      "name": "BULDEE",
-      "url": "https://buldee.com"
-    },
-    {
-      "name": "Time Hacking Limited",
-      "url": "https://thelabio.com"
-    }
-  ],
-  "homepage": "https://github.com/woprrr/ai-craftsman-superpowers",
-  "repository": "https://github.com/woprrr/ai-craftsman-superpowers",
+  "homepage": "https://github.com/BULDEE/ai-craftsman-superpowers",
+  "repository": "https://github.com/BULDEE/ai-craftsman-superpowers",
   "license": "MIT",
   "keywords": [
     "ddd",
