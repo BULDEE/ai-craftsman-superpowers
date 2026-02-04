@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PLUGIN_DIR/hooks/post-write-check.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-write-check.sh\""
           }
         ]
       }
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PLUGIN_DIR/hooks/bias-detector.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/bias-detector.sh\""
           }
         ]
       }
