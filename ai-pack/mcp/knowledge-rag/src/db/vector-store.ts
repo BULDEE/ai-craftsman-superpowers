@@ -6,10 +6,20 @@ import { existsSync, mkdirSync } from "fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const PLUGIN_NAME = "ai-craftsman-superpowers";
+const PROJECT_KNOWLEDGE_PATH = `.claude/${PLUGIN_NAME}/knowledge`;
+const PROJECT_INDEX_PATH = `.claude/${PLUGIN_NAME}/knowledge/.index`;
+
+export interface KnowledgeLocation {
+  readonly type: "project" | "global";
+  readonly knowledgeDir: string;
+  readonly dbPath: string;
+}
+
 /**
  * Find project root by looking for package.json
  */
-function findProjectRoot(): string {
+function findPluginRoot(): string {
   let dir = __dirname;
   for (let i = 0; i < 10; i++) {
     if (existsSync(join(dir, "package.json"))) {
@@ -17,7 +27,41 @@ function findProjectRoot(): string {
     }
     dir = dirname(dir);
   }
-  throw new Error("Could not find project root (package.json)");
+  throw new Error("Could not find plugin root (package.json)");
+}
+
+/**
+ * Detect knowledge location - project-specific or global
+ */
+function detectKnowledgeLocation(cwd: string): KnowledgeLocation {
+  const projectKnowledgeDir = join(cwd, PROJECT_KNOWLEDGE_PATH);
+  const projectIndexDir = join(cwd, PROJECT_INDEX_PATH);
+
+  // Check if project has its own knowledge folder
+  if (existsSync(projectKnowledgeDir)) {
+    if (!existsSync(projectIndexDir)) {
+      mkdirSync(projectIndexDir, { recursive: true });
+    }
+    return {
+      type: "project",
+      knowledgeDir: projectKnowledgeDir,
+      dbPath: join(projectIndexDir, "knowledge.db"),
+    };
+  }
+
+  // Fallback to global plugin knowledge
+  const pluginRoot = findPluginRoot();
+  const globalDataDir = join(pluginRoot, "data");
+
+  if (!existsSync(globalDataDir)) {
+    mkdirSync(globalDataDir, { recursive: true });
+  }
+
+  return {
+    type: "global",
+    knowledgeDir: join(pluginRoot, "../../knowledge"),
+    dbPath: join(globalDataDir, "knowledge.db"),
+  };
 }
 
 export interface Chunk {
@@ -47,26 +91,28 @@ interface ChunkWithEmbedding extends Chunk {
 export class VectorStore {
   private readonly db: Database.Database;
   private readonly dimensions: number;
+  private readonly location: KnowledgeLocation;
   private embeddingsCache: Map<number, number[]> | null = null;
 
-  private constructor(db: Database.Database, dimensions: number) {
+  private constructor(db: Database.Database, dimensions: number, location: KnowledgeLocation) {
     this.db = db;
     this.dimensions = dimensions;
+    this.location = location;
   }
 
-  static create(dbPath?: string, dimensions: number = 768): VectorStore {
-    const projectRoot = findProjectRoot();
-    const dataDir = join(projectRoot, "data");
+  static create(cwd?: string, dbPath?: string, dimensions: number = 768): VectorStore {
+    const workingDir = cwd ?? process.cwd();
+    const location = detectKnowledgeLocation(workingDir);
 
-    // Ensure data directory exists
-    if (!existsSync(dataDir)) {
-      mkdirSync(dataDir, { recursive: true });
-    }
-
-    const path = dbPath ?? join(dataDir, "knowledge.db");
+    const path = dbPath ?? location.dbPath;
     const db = new Database(path);
     db.pragma("journal_mode = WAL");
-    return new VectorStore(db, dimensions);
+
+    return new VectorStore(db, dimensions, location);
+  }
+
+  getLocation(): KnowledgeLocation {
+    return this.location;
   }
 
   initialize(): void {

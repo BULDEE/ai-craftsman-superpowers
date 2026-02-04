@@ -418,32 +418,76 @@ embeddings = OpenAIEmbeddings(
 
 > **Our recommendation:** Start with Ollama for privacy and cost. Use OpenAI only if you need faster initial setup or higher embedding quality for production.
 
-## Connecting to Plugin Knowledge Base
+## Knowledge Base Locations
 
-The plugin's knowledge base is located at:
+The MCP server supports two knowledge base modes:
 
-```
-plugins/craftsman/knowledge/
-├── canonical/           # Golden standard examples
-├── anti-patterns/       # What to avoid
-├── patterns.md          # Design patterns
-├── principles.md        # SOLID, DDD, etc.
-├── event-driven.md      # Event sourcing
-├── microservices-patterns.md
-└── stack-specifics.md   # PHP/TS rules
-```
+### 1. Project-Specific Knowledge (Recommended)
 
-### Index Plugin Knowledge
+Create a knowledge base specific to your project:
 
 ```bash
-# Point RAG to plugin knowledge
-DOCS_DIR = "/path/to/ai-craftsman-superpowers/plugins/craftsman/knowledge"
+# In your project root
+mkdir -p .claude/ai-craftsman-superpowers/knowledge
 
-# Rebuild index
-python scripts/local-rag.py --rebuild
+# Add project-specific documents
+cp specs.pdf architecture.md .claude/ai-craftsman-superpowers/knowledge/
 ```
 
-### Use with MCP Server
+**Structure:**
+
+```
+your-project/
+├── .claude/
+│   └── ai-craftsman-superpowers/
+│       └── knowledge/              # Your documents
+│           ├── specs.pdf
+│           ├── architecture.md
+│           └── .index/             # Auto-generated (gitignore)
+│               └── knowledge.db
+├── src/
+└── ...
+```
+
+**Index project knowledge:**
+
+```bash
+# From your project directory
+cd /path/to/your-project
+npx tsx /path/to/ai-pack/mcp/knowledge-rag/scripts/index-pdfs.ts
+
+# Output:
+# Mode: PROJECT knowledge base
+# Source directory: /path/to/your-project/.claude/ai-craftsman-superpowers/knowledge
+# Database: /path/to/your-project/.claude/ai-craftsman-superpowers/knowledge/.index/knowledge.db
+```
+
+**Add to `.gitignore`:**
+
+```
+.claude/ai-craftsman-superpowers/knowledge/.index/
+```
+
+### 2. Global Plugin Knowledge (Fallback)
+
+When no project knowledge exists, the MCP uses the plugin's global knowledge:
+
+```
+ai-pack/knowledge/
+├── agent-3p-pattern.md
+├── mlops-principles.md
+├── rag-architecture.md
+└── vector-databases.md
+```
+
+### Detection Priority
+
+1. **Project** - `.claude/ai-craftsman-superpowers/knowledge/` in cwd
+2. **Global** - `ai-pack/knowledge/` in plugin installation
+
+See [ADR-0006: Project-Specific Knowledge](../adr/0006-project-specific-knowledge.md) for rationale.
+
+## Using the MCP Server
 
 The `ai-pack/mcp/knowledge-rag` MCP server provides RAG over the knowledge base:
 
@@ -456,13 +500,14 @@ npm install
 # Build
 npm run build
 
-# Index (uses Ollama by default, or OPENAI_API_KEY if set)
-npm run index
+# Index global knowledge
+npm run index:ollama
 
-# Add to Claude Code MCP config
+# Run tests
+npm run test
 ```
 
-See [ai-pack/mcp/knowledge-rag/README.md](../../ai-pack/mcp/knowledge-rag/README.md) for MCP integration.
+See [ai-pack/mcp/knowledge-rag/README.md](../../ai-pack/mcp/knowledge-rag/README.md) for full MCP integration.
 
 ## References
 

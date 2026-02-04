@@ -3,6 +3,7 @@
 import { readdir, readFile, stat } from "fs/promises";
 import { join, basename, dirname, extname } from "path";
 import { fileURLToPath } from "url";
+import { existsSync } from "fs";
 import pdf from "pdf-parse";
 
 import { VectorStore } from "../src/db/vector-store.js";
@@ -10,6 +11,8 @@ import { OpenAIEmbeddingProvider } from "../src/embeddings/provider.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+const PLUGIN_NAME = "ai-craftsman-superpowers";
 
 interface ChunkResult {
   readonly content: string;
@@ -19,8 +22,6 @@ interface ChunkResult {
 
 const CHUNK_SIZE = 500;
 const CHUNK_OVERLAP = 100;
-// Default to knowledge directory in ai-pack (relative to scripts/)
-const DEFAULT_SOURCE_DIR = join(__dirname, "../../../knowledge");
 
 async function checkOllamaRunning(): Promise<boolean> {
   try {
@@ -50,8 +51,8 @@ function printSetupInstructions(): void {
 }
 
 async function main(): Promise<void> {
-  const sourceDir = process.argv[2] ?? DEFAULT_SOURCE_DIR;
   const provider = process.env.EMBEDDING_PROVIDER ?? "ollama";
+  const cwd = process.cwd();
 
   // Check Ollama is running for ollama provider
   if (provider === "ollama") {
@@ -62,16 +63,41 @@ async function main(): Promise<void> {
     }
   }
 
+  // Create store with auto-detection (project vs global)
+  const store = VectorStore.create(cwd);
+  const location = store.getLocation();
+
+  // Allow override via CLI argument
+  const sourceDir = process.argv[2] ?? location.knowledgeDir;
+
+  // Validate source directory exists
+  if (!existsSync(sourceDir)) {
+    console.error("=".repeat(60));
+    console.error("ERROR: Knowledge directory not found");
+    console.error("=".repeat(60));
+    console.error(`\nExpected: ${sourceDir}\n`);
+    if (location.type === "project") {
+      console.error(`Create the folder and add your documents:`);
+      console.error(`  mkdir -p .claude/${PLUGIN_NAME}/knowledge`);
+      console.error(`  cp your-docs.pdf .claude/${PLUGIN_NAME}/knowledge/\n`);
+    } else {
+      console.error(`Add documents to the global knowledge folder:`);
+      console.error(`  ${location.knowledgeDir}\n`);
+    }
+    process.exit(1);
+  }
+
   console.log("=".repeat(60));
   console.log("Knowledge Base Indexer");
   console.log("=".repeat(60));
+  console.log(`Mode: ${location.type.toUpperCase()} knowledge base`);
   console.log(`Embedding provider: ${provider}`);
   console.log(`Source directory: ${sourceDir}`);
+  console.log(`Database: ${location.dbPath}`);
   console.log(`Chunk size: ${CHUNK_SIZE} chars`);
   console.log(`Chunk overlap: ${CHUNK_OVERLAP} chars`);
   console.log("");
 
-  const store = VectorStore.create();
   store.initialize();
 
   const embeddings = OpenAIEmbeddingProvider.create();

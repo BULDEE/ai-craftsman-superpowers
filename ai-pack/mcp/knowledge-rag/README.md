@@ -4,6 +4,13 @@ MCP server for RAG (Retrieval-Augmented Generation) over local AI/Architecture k
 
 > **Recommendation:** Use Ollama for embeddings (local, free, private). OpenAI API is supported but not recommended for privacy-sensitive projects.
 
+## Features
+
+- **Project-specific knowledge** - Auto-detects `.claude/ai-craftsman-superpowers/knowledge/` in your project
+- **Global fallback** - Uses plugin's global knowledge base if no project knowledge exists
+- **Multi-format support** - PDF, Markdown, and TXT files
+- **Local embeddings** - Ollama for 100% private, offline operation
+
 ## Quick Start
 
 ### Prerequisites
@@ -37,6 +44,52 @@ npm run build
 npm run index:ollama
 ```
 
+## Project-Specific Knowledge
+
+Create a knowledge base specific to your project:
+
+```bash
+# In your project root
+mkdir -p .claude/ai-craftsman-superpowers/knowledge
+
+# Add your documents
+cp specs.pdf architecture.md .claude/ai-craftsman-superpowers/knowledge/
+
+# Index (run from your project directory)
+cd /path/to/your/project
+npx tsx /path/to/ai-pack/mcp/knowledge-rag/scripts/index-pdfs.ts
+```
+
+### Structure
+
+```
+your-project/
+├── .claude/
+│   └── ai-craftsman-superpowers/
+│       └── knowledge/              # Your documents here
+│           ├── specs.pdf
+│           ├── architecture.md
+│           └── .index/             # Auto-generated (gitignore this)
+│               └── knowledge.db
+├── src/
+└── ...
+```
+
+### .gitignore
+
+Add to your project's `.gitignore`:
+
+```
+.claude/ai-craftsman-superpowers/knowledge/.index/
+```
+
+## Knowledge Detection Priority
+
+1. **Project** - `.claude/ai-craftsman-superpowers/knowledge/` in current working directory
+2. **Global** - `ai-pack/knowledge/` in the plugin installation
+
+The MCP server automatically uses project knowledge when available.
+
 ## Embedding Options
 
 | Option | Command | Privacy | Cost |
@@ -49,17 +102,6 @@ npm run index:ollama
 ```bash
 export OPENAI_API_KEY=sk-...
 npm run index:openai
-```
-
-## Custom Knowledge Sources
-
-By default, the indexer uses `ai-pack/knowledge/` directory. To index custom files:
-
-```bash
-# Index PDFs from custom directory
-npm run index:ollama /path/to/your/documents
-
-# Supports: .pdf, .md, .txt files
 ```
 
 ## MCP Tools
@@ -117,23 +159,27 @@ OPENAI_EMBED_MODEL=text-embedding-3-small
 
 ```
 ai-pack/
-├── knowledge/               # Source documents (.md, .pdf, .txt)
+├── knowledge/                      # Global knowledge (plugin default)
 │   ├── agent-3p-pattern.md
 │   ├── mlops-principles.md
-│   ├── rag-architecture.md
-│   └── vector-databases.md
+│   └── ...
 │
 └── mcp/knowledge-rag/
     ├── src/
-    │   ├── index.ts         # MCP server entry
-    │   ├── db/              # SQLite vector store
-    │   ├── embeddings/      # Ollama/OpenAI providers
-    │   └── tools/           # search_knowledge, list_sources
+    │   ├── index.ts                # MCP server entry
+    │   ├── db/vector-store.ts      # SQLite + auto-detection
+    │   ├── embeddings/             # Ollama/OpenAI providers
+    │   └── tools/                  # search_knowledge, list_sources
     ├── scripts/
-    │   └── index-pdfs.ts    # Indexing script
-    ├── data/
-    │   └── knowledge.db     # SQLite database (auto-created)
-    └── dist/                # Compiled JavaScript
+    │   └── index-pdfs.ts           # Indexing script
+    └── data/
+        └── knowledge.db            # Global database
+
+your-project/
+└── .claude/ai-craftsman-superpowers/
+    └── knowledge/                  # Project-specific knowledge
+        ├── your-docs.pdf
+        └── .index/knowledge.db     # Project database
 ```
 
 ## Troubleshooting
@@ -167,12 +213,20 @@ echo $OPENAI_API_KEY
 ### Database issues
 
 ```bash
-# Reset database
+# Reset global database
 rm data/knowledge.db*
 npm run index:ollama
+
+# Reset project database
+rm .claude/ai-craftsman-superpowers/knowledge/.index/knowledge.db*
+# Then re-index
 ```
 
-## Topics Covered
+### Project knowledge not detected
+
+Ensure you're running Claude Code from the project root where `.claude/ai-craftsman-superpowers/knowledge/` exists.
+
+## Topics Covered (Global)
 
 The default knowledge base includes:
 

@@ -25,7 +25,14 @@ async function main(): Promise<void> {
     }
   );
 
-  const store = VectorStore.create();
+  const cwd = process.cwd();
+  const store = VectorStore.create(cwd);
+  const location = store.getLocation();
+
+  // Log which knowledge base is being used (visible in debug logs)
+  console.error(`[knowledge-rag] Using ${location.type} knowledge base`);
+  console.error(`[knowledge-rag] DB: ${location.dbPath}`);
+
   const embeddings = OpenAIEmbeddingProvider.create();
   const searchTool = SearchKnowledgeTool.create(store, embeddings);
   const listTool = ListSourcesTool.create(store);
