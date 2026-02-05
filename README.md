@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
-[![Version](https://img.shields.io/badge/Version-1.0.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-1.1.0-blue)](CHANGELOG.md)
 [![Commands](https://img.shields.io/badge/Commands-20-orange)]()
 [![Agents](https://img.shields.io/badge/Agents-5-red)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -380,6 +380,26 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 - Translations
 
 ## Troubleshooting
+
+### Commands not appearing in autocompletion
+
+**Symptom:** `/cra<TAB>` doesn't suggest craftsman commands, but they work when typed fully.
+
+**Cause:** Version mismatch between `plugin.json` and `marketplace.json` prevents cache updates.
+
+**Fix:**
+```bash
+# Force update the plugin
+claude plugin update craftsman@ai-craftsman-superpowers
+
+# If still not working, clear cache and reinstall
+rm -rf ~/.claude/plugins/cache/ai-craftsman-superpowers
+claude plugin install craftsman@ai-craftsman-superpowers
+
+# Restart Claude Code
+exit
+claude
+```
 
 ### Skills not loading
 

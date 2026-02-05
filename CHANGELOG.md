@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-02-05
+
+### Fixed
+
+- **Version synchronization** - `plugin.json` and `marketplace.json` now share the same version number. This fixes an issue where Claude Code cache wouldn't update because version mismatch between the two files.
+
+### Changed
+
+- Commands frontmatter simplified (removed `name:` field) - Claude Code auto-generates it during installation
+
+---
+
 ## [1.0.0] - 2025-02-04
 
 ### Added
