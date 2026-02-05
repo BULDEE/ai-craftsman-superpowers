@@ -439,6 +439,7 @@ Apache License 2.0 - See [LICENSE](LICENSE)
 
 ## Support
 
+- Discord: [Join our community](https://discord.gg/eBpgHAGu)
 - Issues: [GitHub Issues](https://github.com/BULDEE/ai-craftsman-superpowers/issues)
 - Discussions: [GitHub Discussions](https://github.com/BULDEE/ai-craftsman-superpowers/discussions)
 - Documentation: [Claude Code Plugins](https://code.claude.com/docs/en/plugins)
