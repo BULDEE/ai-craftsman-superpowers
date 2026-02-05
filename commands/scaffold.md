@@ -1,5 +1,4 @@
 ---
-name: scaffold
 description: Analyze existing code and generate a context agent. Usage /craftsman:scaffold <path>
 ---
 

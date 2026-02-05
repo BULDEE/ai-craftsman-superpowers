@@ -1,5 +1,4 @@
 ---
-name: mlops
 description: Audit ML projects for production readiness. Use when reviewing ML pipelines, deployments, or infrastructure against MLOps best practices.
 ---
 

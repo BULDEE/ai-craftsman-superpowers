@@ -1,5 +1,4 @@
 ---
-name: design
 description: Senior Domain-Driven Design methodology. Use for creating entities, value objects, aggregates, or designing domain models. Follows a 4-phase process (Understand, Challenge, Recommend, Implement).
 ---
 

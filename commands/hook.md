@@ -1,5 +1,4 @@
 ---
-name: hook
 description: Scaffold React custom hook with TanStack Query integration. Use when creating data fetching or state management hooks.
 ---
 

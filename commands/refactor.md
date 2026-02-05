@@ -1,5 +1,4 @@
 ---
-name: refactor
 description: Systematic refactoring with behavior preservation. Use when improving existing code structure, reducing technical debt, or when code smells are detected.
 ---
 

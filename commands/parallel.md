@@ -1,5 +1,4 @@
 ---
-name: parallel
 description: Parallel agent orchestration for independent tasks. Use when facing 2+ independent tasks that operate on different files/domains and can be parallelized for efficiency.
 ---
 

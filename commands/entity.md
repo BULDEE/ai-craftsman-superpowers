@@ -1,5 +1,4 @@
 ---
-name: entity
 description: Scaffold DDD Entity with Value Objects, Domain Events, and Tests for Symfony/PHP. Use when creating domain entities in a Symfony project.
 ---
 

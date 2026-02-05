@@ -1,5 +1,4 @@
 ---
-name: usecase
 description: Scaffold Use Case with Command/Handler pattern for Symfony/PHP. Use when implementing application layer use cases following CQRS principles.
 ---
 

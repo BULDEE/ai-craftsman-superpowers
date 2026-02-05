@@ -1,5 +1,4 @@
 ---
-name: component
 description: Scaffold React component with TypeScript, tests, and Storybook. Use when creating React/TypeScript components.
 ---
 
