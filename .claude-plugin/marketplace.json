@@ -10,7 +10,7 @@
     {
       "name": "craftsman",
       "description": "Core craftsman methodology - DDD design, systematic debugging, structured planning, architecture review, and safe git workflows.",
-      "version": "2.1.0",
+      "version": "1.1.0",
       "author": {
         "name": "Alexandre Mallet",
         "email": "alexandre.mallet@buldee.com"
