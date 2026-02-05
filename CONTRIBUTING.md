@@ -149,7 +149,6 @@ ai-craftsman-superpowers/
 
 - **Questions**: Open a [Discussion](https://github.com/BULDEE/ai-craftsman-superpowers/discussions)
 - **Bugs**: Open an [Issue](https://github.com/BULDEE/ai-craftsman-superpowers/issues)
-- **Chat**: [Discord community](https://discord.gg/your-link)
 
 ## Recognition
 
