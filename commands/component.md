@@ -6,6 +6,42 @@ description: Scaffold React component with TypeScript, tests, and Storybook. Use
 
 Scaffold a complete React component with TypeScript, tests, and optional Storybook.
 
+## Pack Requirement Check
+
+**This command requires the React Pack to be enabled.**
+
+First, check if the pack is activated:
+
+```bash
+grep "react:" ~/.claude/.craft-config.yml 2>/dev/null | grep "true"
+```
+
+### If React Pack is NOT enabled:
+
+Display this message and STOP:
+
+```
+React Pack Required
+
+This command is part of the React Pack which is not currently enabled.
+
+To enable it:
+1. Run /craftsman:setup
+2. Select "React Pack" when prompted
+3. Try this command again
+
+Alternatively, you can use /craftsman:design for general component design
+guidance that works with any technology stack.
+```
+
+**Do NOT proceed with scaffolding if the pack is not enabled.**
+
+### If React Pack IS enabled:
+
+Continue with the scaffolding process below.
+
+---
+
 ## Generated Structure
 
 ```

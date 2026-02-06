@@ -6,6 +6,42 @@ description: Scaffold DDD Entity with Value Objects, Domain Events, and Tests fo
 
 Scaffold a complete DDD Entity with Value Objects, Domain Events, and Tests.
 
+## Pack Requirement Check
+
+**This command requires the Symfony Pack to be enabled.**
+
+First, check if the pack is activated:
+
+```bash
+grep "symfony:" ~/.claude/.craft-config.yml 2>/dev/null | grep "true"
+```
+
+### If Symfony Pack is NOT enabled:
+
+Display this message and STOP:
+
+```
+Symfony Pack Required
+
+This command is part of the Symfony Pack which is not currently enabled.
+
+To enable it:
+1. Run /craftsman:setup
+2. Select "Symfony Pack" when prompted
+3. Try this command again
+
+Alternatively, you can use /craftsman:design for general DDD guidance
+that works with any technology stack.
+```
+
+**Do NOT proceed with scaffolding if the pack is not enabled.**
+
+### If Symfony Pack IS enabled:
+
+Continue with the scaffolding process below.
+
+---
+
 ## Prerequisites
 
 Verify Symfony/PHP project:

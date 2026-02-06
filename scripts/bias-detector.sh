@@ -12,12 +12,15 @@ if [ -z "$PROMPT" ]; then
 fi
 
 # Acceleration bias patterns (rushing to code without thinking)
+# Bilingual FR/EN patterns to support both languages
 ACCELERATION_PATTERNS="(vite|rapide|rapidement|pas le temps|no time|just do it|code direct|skip|quick|hurry|asap|urgent)"
 
 # Scope creep patterns (adding features beyond scope)
+# Bilingual FR/EN patterns to support both languages
 SCOPE_CREEP_PATTERNS="(et aussi|tant qu'on y est|ajoutons|en plus|while we're at it|also add|let's also|and also)"
 
 # Over-optimization patterns (premature abstraction)
+# Bilingual FR/EN patterns to support both languages
 OVER_OPT_PATTERNS="(abstraire|généraliser|generalize|abstract|make it configurable|future-proof)"
 
 # Check for acceleration bias

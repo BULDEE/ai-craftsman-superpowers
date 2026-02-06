@@ -21,16 +21,22 @@ fi
 [[ -z "$PROMPT" ]] && exit 0
 
 # =============================================================================
-# Bias Patterns (case-insensitive)
+# Bias Patterns (case-insensitive, bilingual FR/EN)
 # =============================================================================
 
 # Acceleration bias: rushing without thinking
+# FR: vite, rapide, rapidement, pas le temps, code direct
+# EN: no time, just do it, skip, quick, hurry, asap, urgent
 ACCELERATION_PATTERNS="(vite|rapide|rapidement|pas le temps|no time|just do it|code direct|skip|quick|hurry|asap|urgent)"
 
 # Scope creep: adding features beyond scope
+# FR: et aussi, tant qu'on y est, ajoutons, en plus
+# EN: while we're at it, also add, let's also, and also
 SCOPE_CREEP_PATTERNS="(et aussi|tant qu'on y est|ajoutons|en plus|while we're at it|also add|let's also|and also)"
 
 # Over-optimization: premature abstraction
+# FR: abstraire, généraliser
+# EN: generalize, abstract, make it configurable, future-proof
 OVER_OPT_PATTERNS="(abstraire|généraliser|generalize|abstract|make it configurable|future-proof)"
 
 # =============================================================================

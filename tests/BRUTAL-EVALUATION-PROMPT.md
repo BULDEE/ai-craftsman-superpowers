@@ -1,28 +1,28 @@
-# Prompt d'Évaluation Brutale - AI-Craftsman-Superpowers
+# Brutal Evaluation Prompt - AI-Craftsman-Superpowers
 
-## Instructions pour l'évaluateur
+## Instructions for the Evaluator
 
-Tu es un **Senior Staff Engineer cynique avec 20 ans d'expérience** qui a vu passer des dizaines de "frameworks révolutionnaires" qui n'ont jamais tenu leurs promesses. Tu évalues le plugin `ai-craftsman-superpowers` avec un scepticisme maximal.
+You are a **cynical Senior Staff Engineer with 20 years of experience** who has seen dozens of "revolutionary frameworks" that never delivered on their promises. You evaluate the `ai-craftsman-superpowers` plugin with maximum skepticism.
 
-**Ton job**: Trouver TOUTES les failles, incohérences, bullshit marketing, et limitations réelles. Pas de complaisance. Pas de politesse. Juste la vérité brutale.
+**Your job**: Find ALL flaws, inconsistencies, marketing bullshit, and real limitations. No complacency. No politeness. Just the brutal truth.
 
 ---
 
-## PHASE 1: Smoke Test (Les skills fonctionnent-ils ?)
+## PHASE 1: Smoke Test (Do the skills work?)
 
-Exécute chaque skill et note les échecs:
+Execute each skill and note failures:
 
 ```
 TEST 1.1: /design
 > /design
-Je veux créer un système de notifications push pour une app mobile.
+I want to create a push notification system for a mobile app.
 
-ÉVALUER:
-- [ ] Pose-t-il les questions AVANT de coder ? (Phase 1: Comprendre)
-- [ ] Propose-t-il des alternatives ? (Phase 2: Challenger)
-- [ ] Les trade-offs sont-ils explicites ?
-- [ ] Attend-il confirmation avant de coder ?
-- [ ] Le code généré respecte-t-il les patterns DDD annoncés ?
+EVALUATE:
+- [ ] Does it ask questions BEFORE coding? (Phase 1: Understand)
+- [ ] Does it propose alternatives? (Phase 2: Challenge)
+- [ ] Are trade-offs explicit?
+- [ ] Does it wait for confirmation before coding?
+- [ ] Does the generated code respect the announced DDD patterns?
 
 VERDICT: PASS / FAIL / PARTIAL
 NOTES: _______________
@@ -31,15 +31,15 @@ NOTES: _______________
 ```
 TEST 1.2: /debug
 > /debug
-J'ai une fuite mémoire dans mon application Node.js.
-Le heap augmente de 50MB toutes les heures.
-Pas de message d'erreur.
+I have a memory leak in my Node.js application.
+The heap increases by 50MB every hour.
+No error messages.
 
-ÉVALUER:
-- [ ] Suit-il le pattern ReAct ? (Hypothèse → Action → Observation)
-- [ ] Pose-t-il des questions de diagnostic ?
-- [ ] Évite-t-il de proposer des fixes sans investigation ?
-- [ ] Identifie-t-il une root cause avant de suggérer ?
+EVALUATE:
+- [ ] Does it follow the ReAct pattern? (Hypothesis → Action → Observation)
+- [ ] Does it ask diagnostic questions?
+- [ ] Does it avoid proposing fixes without investigation?
+- [ ] Does it identify a root cause before suggesting?
 
 VERDICT: PASS / FAIL / PARTIAL
 NOTES: _______________
@@ -48,14 +48,14 @@ NOTES: _______________
 ```
 TEST 1.3: /plan
 > /plan
-Je dois migrer une API REST monolithique vers des microservices.
-L'API a 45 endpoints, 3 bases de données, et 200k utilisateurs actifs.
+I need to migrate a monolithic REST API to microservices.
+The API has 45 endpoints, 3 databases, and 200k active users.
 
-ÉVALUER:
-- [ ] Les tâches sont-elles < 5 min chacune ?
-- [ ] Les dépendances sont-elles identifiées ?
-- [ ] Les risques sont-ils documentés ?
-- [ ] Le plan est-il réaliste ou bullshit générique ?
+EVALUATE:
+- [ ] Are tasks < 5 min each?
+- [ ] Are dependencies identified?
+- [ ] Are risks documented?
+- [ ] Is the plan realistic or generic bullshit?
 
 VERDICT: PASS / FAIL / PARTIAL
 NOTES: _______________
@@ -63,12 +63,12 @@ NOTES: _______________
 
 ```
 TEST 1.4: /plan --execute
-> /plan --execute [utiliser le plan précédent]
+> /plan --execute [use the previous plan]
 
-ÉVALUER:
-- [ ] Exécute-t-il par batch avec checkpoints ?
-- [ ] Demande-t-il validation entre les batches ?
-- [ ] Gère-t-il les erreurs proprement ?
+EVALUATE:
+- [ ] Does it execute in batches with checkpoints?
+- [ ] Does it ask for validation between batches?
+- [ ] Does it handle errors properly?
 
 VERDICT: PASS / FAIL / PARTIAL
 NOTES: _______________
@@ -77,16 +77,16 @@ NOTES: _______________
 ```
 TEST 1.5: /challenge
 > /challenge
-[Fournir un code volontairement mauvais avec:]
-- Import Infrastructure dans Domain
-- God class de 500 lignes
-- Setters publics partout
-- Aucun test
+[Provide intentionally bad code with:]
+- Infrastructure import in Domain
+- God class of 500 lines
+- Public setters everywhere
+- No tests
 
-ÉVALUER:
-- [ ] Détecte-t-il TOUS les problèmes ?
-- [ ] Les catégorise-t-il correctement (BLOCKING/MUST FIX/IMPROVE) ?
-- [ ] Le verdict est-il approprié ?
+EVALUATE:
+- [ ] Does it detect ALL problems?
+- [ ] Does it categorize them correctly (BLOCKING/MUST FIX/IMPROVE)?
+- [ ] Is the verdict appropriate?
 
 VERDICT: PASS / FAIL / PARTIAL
 NOTES: _______________
@@ -95,12 +95,12 @@ NOTES: _______________
 ```
 TEST 1.6: /verify
 > /verify
-[Après avoir "fixé" quelque chose]
+[After "fixing" something]
 
-ÉVALUER:
-- [ ] Exécute-t-il réellement les commandes de vérification ?
-- [ ] Montre-t-il l'output réel (pas "les tests devraient passer") ?
-- [ ] Refuse-t-il de confirmer sans evidence ?
+EVALUATE:
+- [ ] Does it actually execute verification commands?
+- [ ] Does it show real output (not "tests should pass")?
+- [ ] Does it refuse to confirm without evidence?
 
 VERDICT: PASS / FAIL / PARTIAL
 NOTES: _______________
@@ -109,16 +109,16 @@ NOTES: _______________
 ```
 TEST 1.7: /parallel
 > /parallel
-J'ai 4 tâches:
-1. Refactorer UserService
-2. Ajouter des tests à OrderService
-3. Migrer la config de YAML à ENV
-4. Mettre à jour les dépendances npm
+I have 4 tasks:
+1. Refactor UserService
+2. Add tests to OrderService
+3. Migrate config from YAML to ENV
+4. Update npm dependencies
 
-ÉVALUER:
-- [ ] Analyse-t-il correctement les dépendances ?
-- [ ] Identifie-t-il ce qui peut être parallélisé ?
-- [ ] Dispatche-t-il réellement des agents en parallèle ?
+EVALUATE:
+- [ ] Does it correctly analyze dependencies?
+- [ ] Does it identify what can be parallelized?
+- [ ] Does it actually dispatch agents in parallel?
 
 VERDICT: PASS / FAIL / PARTIAL
 NOTES: _______________
@@ -127,12 +127,12 @@ NOTES: _______________
 ```
 TEST 1.8: /git worktree
 > /git worktree
-Je veux travailler sur feature/payment-v2 en isolation.
+I want to work on feature/payment-v2 in isolation.
 
-ÉVALUER:
-- [ ] Propose-t-il un emplacement intelligent ?
-- [ ] Vérifie-t-il les préconditions (uncommitted changes, etc.) ?
-- [ ] Crée-t-il réellement le worktree ?
+EVALUATE:
+- [ ] Does it propose a smart location?
+- [ ] Does it check preconditions (uncommitted changes, etc.)?
+- [ ] Does it actually create the worktree?
 
 VERDICT: PASS / FAIL / PARTIAL
 NOTES: _______________
@@ -140,32 +140,32 @@ NOTES: _______________
 
 ---
 
-## PHASE 2: Stress Tests (Les limites)
+## PHASE 2: Stress Tests (The limits)
 
 ```
-TEST 2.1: CONTRADICTION VOLONTAIRE
+TEST 2.1: DELIBERATE CONTRADICTION
 > /design
-Crée-moi une entité User avec des setters publics pour tous les champs.
-Je veux pouvoir modifier l'email directement.
+Create a User entity with public setters for all fields.
+I want to be able to modify the email directly.
 
-ÉVALUER:
-- [ ] Résiste-t-il à la demande anti-pattern ?
-- [ ] Explique-t-il pourquoi c'est problématique ?
-- [ ] Propose-t-il une alternative ?
-- [ ] Cède-t-il trop facilement ?
+EVALUATE:
+- [ ] Does it resist the anti-pattern request?
+- [ ] Does it explain why it's problematic?
+- [ ] Does it propose an alternative?
+- [ ] Does it give in too easily?
 
 VERDICT: _______________
 ```
 
 ```
-TEST 2.2: DEMANDE VAGUE
+TEST 2.2: VAGUE REQUEST
 > /design
-J'ai besoin d'un truc pour gérer les users.
+I need something to manage users.
 
-ÉVALUER:
-- [ ] Demande-t-il des clarifications ?
-- [ ] Refuse-t-il de coder sans contexte ?
-- [ ] Ou génère-t-il du code générique inutile ?
+EVALUATE:
+- [ ] Does it ask for clarifications?
+- [ ] Does it refuse to code without context?
+- [ ] Or does it generate useless generic code?
 
 VERDICT: _______________
 ```
@@ -173,178 +173,178 @@ VERDICT: _______________
 ```
 TEST 2.3: SCOPE CREEP
 > /design
-[Commencer avec une demande simple, puis ajouter:]
-"Et tant qu'on y est, ajoute aussi la gestion des rôles"
-"Et les permissions"
-"Et l'audit log"
-"Et le multi-tenant"
+[Start with a simple request, then add:]
+"And while we're at it, add role management"
+"And permissions"
+"And audit log"
+"And multi-tenant"
 
-ÉVALUER:
-- [ ] Détecte-t-il le scope creep ?
-- [ ] Met-il en garde (bias protection) ?
-- [ ] Ou accepte-t-il tout sans broncher ?
-
-VERDICT: _______________
-```
-
-```
-TEST 2.4: ACCÉLÉRATION DANGEREUSE
-> Implémente vite un système de paiement, j'ai pas le temps pour le design.
-
-ÉVALUER:
-- [ ] Résiste-t-il à la pression ?
-- [ ] Insiste-t-il sur le process /design ?
-- [ ] Ou code-t-il à l'aveugle ?
+EVALUATE:
+- [ ] Does it detect scope creep?
+- [ ] Does it warn (bias protection)?
+- [ ] Or does it accept everything without pushback?
 
 VERDICT: _______________
 ```
 
 ```
-TEST 2.5: FAUSSE EXPERTISE
+TEST 2.4: DANGEROUS ACCELERATION
+> Implement a payment system quickly, I don't have time for design.
+
+EVALUATE:
+- [ ] Does it resist pressure?
+- [ ] Does it insist on the /design process?
+- [ ] Or does it code blindly?
+
+VERDICT: _______________
+```
+
+```
+TEST 2.5: FALSE EXPERTISE
 > /debug
-Mon API est lente. Fix ça.
-[Sans donner aucune métrique, aucun contexte]
+My API is slow. Fix it.
+[Without giving any metrics, any context]
 
-ÉVALUER:
-- [ ] Demande-t-il des métriques ?
-- [ ] Refuse-t-il de "fixer" sans diagnostic ?
-- [ ] Ou propose-t-il des optimisations génériques au hasard ?
+EVALUATE:
+- [ ] Does it ask for metrics?
+- [ ] Does it refuse to "fix" without diagnosis?
+- [ ] Or does it propose generic random optimizations?
 
 VERDICT: _______________
 ```
 
 ---
 
-## PHASE 3: Cohérence Inter-Skills
+## PHASE 3: Inter-Skills Coherence
 
 ```
-TEST 3.1: WORKFLOW COMPLET
-Exécuter le workflow complet sur un cas réel:
+TEST 3.1: COMPLETE WORKFLOW
+Execute the complete workflow on a real case:
 /plan → /design → /spec → [implement] → /challenge → /verify → /git
 
-ÉVALUER:
-- [ ] Les skills se complètent-ils ?
-- [ ] Y a-t-il des contradictions entre skills ?
-- [ ] Le handoff est-il fluide ?
-- [ ] Le résultat final est-il cohérent ?
+EVALUATE:
+- [ ] Do the skills complement each other?
+- [ ] Are there contradictions between skills?
+- [ ] Is the handoff smooth?
+- [ ] Is the final result coherent?
 
 NOTES: _______________
 ```
 
 ```
 TEST 3.2: KNOWLEDGE BASE
-Vérifier que les skills utilisent réellement la knowledge base:
+Verify that skills actually use the knowledge base:
 
-> Montre-moi un exemple d'Entity selon les patterns du projet
+> Show me an example of an Entity according to project patterns
 
-ÉVALUER:
-- [ ] Référence-t-il knowledge/patterns.md ?
-- [ ] Le code suit-il les exemples canoniques ?
-- [ ] Ou génère-t-il du code générique ?
+EVALUATE:
+- [ ] Does it reference knowledge/patterns.md?
+- [ ] Does the code follow canonical examples?
+- [ ] Or does it generate generic code?
 
 NOTES: _______________
 ```
 
 ---
 
-## PHASE 4: Comparaison Honnête
+## PHASE 4: Honest Comparison
 
-### vs Vanilla Claude (sans plugin)
+### vs Vanilla Claude (without plugin)
 
-Poser la même question avec et sans le plugin:
+Ask the same question with and without the plugin:
 
 ```
-QUESTION: "Crée-moi une entité Order pour un e-commerce"
+QUESTION: "Create an Order entity for e-commerce"
 
-SANS PLUGIN:
-- Temps de réponse: ___
-- Qualité du code: ___
-- Questions posées: ___
-- Patterns respectés: ___
+WITHOUT PLUGIN:
+- Response time: ___
+- Code quality: ___
+- Questions asked: ___
+- Patterns respected: ___
 
-AVEC PLUGIN:
-- Temps de réponse: ___
-- Qualité du code: ___
-- Questions posées: ___
-- Patterns respectés: ___
+WITH PLUGIN:
+- Response time: ___
+- Code quality: ___
+- Questions asked: ___
+- Patterns respected: ___
 
-DIFFÉRENCE RÉELLE: _______________
+REAL DIFFERENCE: _______________
 ```
 
 ### vs GitHub Copilot / Cursor
 
 ```
-MÊME TÂCHE AVEC COPILOT:
-- Résultat: ___
-- Différence notable: ___
+SAME TASK WITH COPILOT:
+- Result: ___
+- Notable difference: ___
 
-LE PLUGIN APPORTE-T-IL VRAIMENT PLUS ? OUI / NON / MARGINAL
+DOES THE PLUGIN REALLY BRING MORE? YES / NO / MARGINAL
 ```
 
 ---
 
-## PHASE 5: Questions Assassines
+## PHASE 5: Killer Questions
 
-Réponds honnêtement:
+Answer honestly:
 
-1. **Le plugin résout-il un vrai problème ou crée-t-il de la complexité artificielle ?**
+1. **Does the plugin solve a real problem or create artificial complexity?**
 
-2. **Un junior serait-il VRAIMENT plus productif avec ce plugin ou juste plus confus ?**
+2. **Would a junior REALLY be more productive with this plugin or just more confused?**
 
-3. **Les skills sont-ils utilisables en conditions réelles (deadline, pression) ou trop lourds ?**
+3. **Are the skills usable in real conditions (deadline, pressure) or too heavy?**
 
-4. **La "protection contre les biais" fonctionne-t-elle vraiment ou est-ce du theatre ?**
+4. **Does "bias protection" really work or is it theater?**
 
-5. **Le ROI est-il positif ? (Temps d'apprentissage vs temps gagné)**
+5. **Is the ROI positive? (Learning time vs time saved)**
 
-6. **Qu'est-ce qui manque cruellement ?**
+6. **What is critically missing?**
 
-7. **Qu'est-ce qui est superflu et devrait être supprimé ?**
+7. **What is superfluous and should be removed?**
 
-8. **Le plugin survivrait-il à une semaine d'utilisation intensive ou serait-il abandonné ?**
+8. **Would the plugin survive a week of intensive use or would it be abandoned?**
 
 ---
 
-## PHASE 6: Verdict Final
+## PHASE 6: Final Verdict
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    VERDICT BRUTAL                                │
+│                    BRUTAL VERDICT                               │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│   SCORE GLOBAL: ___/100                                         │
-│                                                                  │
-│   FORCES RÉELLES (pas le marketing):                            │
+│                                                                 │
+│   GLOBAL SCORE: ___/100                                         │
+│                                                                 │
+│   REAL STRENGTHS (not marketing):                               │
 │   1. _______________                                            │
 │   2. _______________                                            │
 │   3. _______________                                            │
-│                                                                  │
-│   FAIBLESSES CRITIQUES:                                         │
+│                                                                 │
+│   CRITICAL WEAKNESSES:                                          │
 │   1. _______________                                            │
 │   2. _______________                                            │
 │   3. _______________                                            │
-│                                                                  │
-│   BULLSHIT DÉTECTÉ:                                             │
-│   - _______________                                              │
-│                                                                  │
-│   RECOMMANDATION:                                               │
-│   [ ] Utiliser tel quel                                         │
-│   [ ] Utiliser avec réserves                                    │
-│   [ ] Refaire significativement                                 │
-│   [ ] Abandonner                                                │
-│                                                                  │
+│                                                                 │
+│   BULLSHIT DETECTED:                                            │
+│   - _______________                                             │
+│                                                                 │
+│   RECOMMENDATION:                                               │
+│   [ ] Use as-is                                                 │
+│   [ ] Use with reservations                                     │
+│   [ ] Significantly redo                                        │
+│   [ ] Abandon                                                   │
+│                                                                 │
 │   JUSTIFICATION:                                                │
 │   _______________________________________________               │
 │   _______________________________________________               │
-│                                                                  │
+│                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## ANNEXE: Code de Test Volontairement Mauvais
+## APPENDIX: Intentionally Bad Test Code
 
-Utiliser ce code pour tester `/challenge`:
+Use this code to test `/challenge`:
 
 ```php
 <?php
@@ -506,17 +506,17 @@ class UserService
 }
 ```
 
-**Ce code contient volontairement:**
-- God class (8 dépendances, 7 méthodes, trop de responsabilités)
-- SQL Injection (2 endroits)
-- Password en clair
-- Anemic domain (setters partout)
-- Pas de final class
-- Pas de strict_types
-- Logique métier dans le service (pas dans l'entity)
-- Pas de Value Objects (email = string)
-- Pas de tests
-- Exception générique
-- Infrastructure dans Application layer
+**This code intentionally contains:**
+- God class (8 dependencies, 7 methods, too many responsibilities)
+- SQL Injection (2 places)
+- Plain text password
+- Anemic domain (setters everywhere)
+- No final class
+- No strict_types
+- Business logic in service (not in entity)
+- No Value Objects (email = string)
+- No tests
+- Generic Exception
+- Infrastructure in Application layer
 
-**/challenge DOIT détecter au minimum 10 de ces problèmes.**
+**/challenge MUST detect at least 10 of these problems.**

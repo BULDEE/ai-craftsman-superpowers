@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2025-02-06
+
+### Added
+
+- **`/craftsman:setup` command** - Interactive setup wizard that was documented but never implemented. Creates `~/.claude/.craft-config.yml` with user profile, bias protection, and pack selection.
+- **DISC mini-assessment** - 4-question quick test for users who don't know their DISC profile. Options: "Je connais mon DISC", "Mini-test (4 questions)", or "Passer".
+
+### Fixed
+
+- **Setup wizard implementation** - The wizard specification existed in `setup/wizard.md` but was never converted to an invocable command. Now properly available as `/craftsman:setup`.
+- **First-run detection** - `session-init` now checks if `~/.claude/.craft-config.yml` exists and displays appropriate warnings if setup hasn't been completed.
+- **Pack activation gating** - Pack-specific commands (`entity`, `usecase`, `component`, `hook`) now verify that their respective pack is enabled before proceeding. Previously all commands were available regardless of configuration.
+
+### Changed
+
+- **session-init** - Now displays different content based on configuration state (setup required vs configured)
+- **Pack commands** - Added requirement check at the beginning of `entity.md`, `usecase.md`, `component.md`, and `hook.md`
+
+---
+
 ## [1.1.0] - 2025-02-05
 
 ### Fixed
