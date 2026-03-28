@@ -4,8 +4,8 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
-[![Version](https://img.shields.io/badge/Version-1.1.0-blue)](CHANGELOG.md)
-[![Commands](https://img.shields.io/badge/Commands-20-orange)]()
+[![Version](https://img.shields.io/badge/Version-1.2.0-blue)](CHANGELOG.md)
+[![Commands](https://img.shields.io/badge/Commands-21-orange)]()
 [![Agents](https://img.shields.io/badge/Agents-5-red)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -135,6 +135,7 @@ All commands are explicitly invoked with `/craftsman:command-name`. See [ADR-000
 | `/craftsman:source-verify` | Verify AI capabilities against official documentation |
 | `/craftsman:agent-create` | Interactively create bounded context agents |
 | `/craftsman:scaffold` | Analyze code and generate context agents |
+| `/craftsman:metrics` | Display quality metrics dashboard (violations, trends, sessions) |
 
 > **Why source-verify?** AI tools evolve rapidly. This command ensures claims about capabilities are verified against official documentation before being stated as facts. See [ADR-004](docs/adr/004-official-documentation-verification.md).
 
@@ -150,20 +151,33 @@ Hooks automatically detect and warn about cognitive biases:
 | **Scope Creep** | "et aussi", "while we're at it" | STOP - Is this in scope? |
 | **Over-Optimization** | "abstraire", "generalize" | STOP - YAGNI |
 
-### Code Rule Enforcement
+### Code Rule Enforcement (v1.2.0)
 
-Post-write/edit hooks validate your code automatically (triggers on both `Write` and `Edit` tools):
+Hooks validate your code automatically with **3-level analysis**:
 
-**PHP:**
-- `declare(strict_types=1)` required
-- `final class` on all classes
-- No public setters
-- No `new DateTime()` direct usage
+**Level 1 — Fast Regex (<50ms):** Runs on every write/edit.
 
-**TypeScript:**
-- No `any` types
-- Named exports only
-- No non-null assertions (`!`)
+| Rule | Language | Check |
+|------|----------|-------|
+| PHP001 | PHP | `declare(strict_types=1)` required |
+| PHP002 | PHP | `final class` on all classes |
+| PHP003 | PHP | No public setters |
+| PHP004 | PHP | No `new DateTime()` direct usage |
+| PHP005 | PHP | No empty catch blocks |
+| TS001 | TypeScript | No `any` types |
+| TS002 | TypeScript | Named exports only |
+| TS003 | TypeScript | No non-null assertions (`!`) |
+| LAYER001 | PHP | Domain cannot import Infrastructure |
+| LAYER002 | PHP | Domain cannot import Presentation |
+| LAYER003 | PHP | Application cannot import Presentation |
+
+**Level 2 — Static Analysis (<2s):** PHPStan, ESLint (when installed). Graceful degradation if tools are absent.
+
+**Level 3 — Architecture (<2s):** Deptrac, dependency-cruiser (when installed).
+
+**Suppressing rules:** Add `// craftsman-ignore: RULE_ID` inline to suppress a specific rule.
+
+Violations are **blocking** (exit 2) — Claude must fix the code before proceeding. All violations are recorded in a local SQLite database for trend tracking via `/craftsman:metrics`.
 
 ## Advanced: Knowledge Base RAG (Optional)
 
@@ -268,17 +282,30 @@ See [`/examples`](examples/) for detailed usage examples:
 ai-craftsman-superpowers/
 ├── .claude-plugin/              # Plugin manifest
 │   └── plugin.json
-├── commands/                    # User-invocable commands (20 *.md files)
+├── commands/                    # User-invocable commands (21 *.md files)
 ├── agents/                      # Specialized reviewers (5)
 ├── hooks/                       # Automated validation
-│   ├── hooks.json
-│   ├── bias-detector.sh
-│   └── post-write-check.sh
+│   ├── hooks.json               # Hook event configuration
+│   ├── lib/                     # Shared hook libraries
+│   │   ├── metrics-db.sh        # SQLite metrics helper
+│   │   └── static-analysis.sh   # PHPStan/ESLint wrappers
+│   ├── bias-detector.sh         # UserPromptSubmit: cognitive bias detection
+│   ├── pre-write-check.sh       # PreToolUse: layer validation before write
+│   ├── post-write-check.sh      # PostToolUse: code rule enforcement after write
+│   └── session-metrics.sh       # SessionEnd: session summary
 ├── knowledge/                   # Patterns & principles
 ├── examples/                    # Usage examples
 ├── tests/                       # Test suite
+│   ├── hooks/                   # Hook behavioral tests
+│   │   ├── fixtures/            # PHP/TS test fixtures
+│   │   └── test-hooks.sh        # Automated hook tests
+│   └── run-tests.sh             # Main test runner
 ├── docs/
-│   └── adr/                     # Architecture decisions
+│   ├── adr/                     # Architecture decisions
+│   ├── getting-started/         # Installation & first steps
+│   ├── guides/                  # Level-based guides
+│   ├── reference/               # Skills, agents, hooks reference
+│   └── philosophy/              # Why & manifesto
 ├── SECURITY.md                  # Security documentation
 ├── CHANGELOG.md                 # Version history
 ├── CONTRIBUTING.md
@@ -316,7 +343,7 @@ This plugin prioritizes transparency and safety:
 | Agents | Code reviewers | Never |
 | Hooks | Validation scripts | Never (read-only) |
 
-**All hooks exit 0** — They warn but never block your workflow.
+**Hooks use exit codes** — Bias detection warns (exit 0). Code rule violations **block** (exit 2) to enforce quality standards. See [Hooks Reference](docs/reference/hooks.md).
 
 See [SECURITY.md](./SECURITY.md) for full security documentation.
 
@@ -332,17 +359,19 @@ cd ai-craftsman-superpowers
 # Review hooks (the only executable code)
 cat hooks/bias-detector.sh
 cat hooks/post-write-check.sh
+cat hooks/pre-write-check.sh
+cat hooks/session-metrics.sh
 
 # Verify no network calls
 grep -r "curl\|wget\|fetch\|http" hooks/
-# Should return nothing
+# Should return nothing (hooks are 100% local)
 ```
 
 ## Known Limitations
 
 ### By Design
 
-- **Hooks are warnings only** — They never block operations, only inform
+- **Hooks block on violations** — Code rule violations are blocking (exit 2); bias detection is warning-only (exit 0)
 - **No auto-commit** — All git operations require explicit user action
 - **Commands are opinionated** — Follows DDD/Clean Architecture strictly
 - **Explicit invocation** — Commands are deliberately invoked, not auto-triggered

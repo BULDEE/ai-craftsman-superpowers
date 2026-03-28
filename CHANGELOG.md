@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-03-28
+
+### Added
+
+- **3-level code validation** — Hooks now enforce code rules with progressive analysis: regex (<50ms), static analysis (<2s), and architecture validation (<2s). Rules: PHP001-005, TS001-003, LAYER001-003.
+- **Blocking hooks (exit 2)** — Critical violations now **block** Claude from proceeding. Code must be fixed before continuing. Warnings remain non-blocking.
+- **Pre-write validation** — New PreToolUse hook (`pre-write-check.sh`) validates layer imports BEFORE file write, preventing architecture violations at the source.
+- **Session metrics** — New SessionEnd hook (`session-metrics.sh`) records session summary (blocked/warned counts) to local SQLite database.
+- **`/craftsman:metrics` command** — Quality dashboard showing violations by rule, daily trends (14 days), and session history. Queries local SQLite database.
+- **`craftsman-ignore` syntax** — Suppress specific rules per-line or per-file with `// craftsman-ignore: RULE_ID` comments. Suppressed violations are still tracked in metrics.
+- **Metrics database** — SQLite database at `${CLAUDE_PLUGIN_DATA}/metrics.db` records all violations with project hash (privacy), rule, severity, and blocked/ignored status.
+- **Static analysis wrappers** — `hooks/lib/static-analysis.sh` wraps PHPStan, ESLint, deptrac, and dependency-cruiser with graceful degradation (returns empty if tools not installed).
+- **Hook test suite** — `tests/hooks/test-hooks.sh` with 12 behavioral tests covering all rules and edge cases.
+
+### Changed
+
+- **post-write-check.sh** — Complete rewrite from warning-only (exit 0) to blocking (exit 2) with JSON structured output, craftsman-ignore support, metrics recording, and static analysis integration.
+- **hooks.json** — Now registers 4 event hooks: PreToolUse, PostToolUse, UserPromptSubmit, SessionEnd.
+
+### Removed
+
+- **Duplicate scripts** — Removed `scripts/bias-detector.sh` and `scripts/post-write-check.sh` (canonical copies live in `hooks/`).
+
+---
+
 ## [1.1.1] - 2025-02-06
 
 ### Added

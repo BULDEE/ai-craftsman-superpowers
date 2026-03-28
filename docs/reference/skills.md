@@ -331,3 +331,5 @@ Check security, tests, and style.
 | `/craftsman:source-verify` | AI | Verify AI capabilities |
 | `/craftsman:scaffold` | Utility | Generate context agent |
 | `/craftsman:agent-create` | Utility | Create bounded agent |
+| `/craftsman:metrics` | Utility | Quality metrics dashboard |
+| `/craftsman:setup` | Utility | Interactive setup wizard |
