@@ -261,6 +261,26 @@ else
     log_fail "relaxed should not block TS001" "returned blocking"
 fi
 
+# WARN rules never block, even in strict
+cat > "$TEST_DIR/.craft-config.yml" <<'YAML'
+strictness: strict
+YAML
+
+if ! config_should_block "WARN-PHP001"; then
+    log_pass "strict: WARN-PHP001 does NOT block (warnings never block)"
+else
+    log_fail "strict: WARN-PHP001 should NOT block" ""
+fi
+
+if ! config_should_block "PHP005"; then
+    log_pass "strict: PHP005 does NOT block (warnings never block)"
+else
+    log_fail "strict: PHP005 should NOT block" ""
+fi
+
+rm -f "$TEST_DIR/.craft-config.yml"
+unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+
 # =============================================================================
 # Cleanup
 # =============================================================================
