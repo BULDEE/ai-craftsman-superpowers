@@ -20,6 +20,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
 source "${SCRIPT_DIR}/lib/static-analysis.sh"
 source "${SCRIPT_DIR}/lib/config.sh"
+source "${SCRIPT_DIR}/lib/rules-engine.sh"
+rules_init "$PWD" "${HOME}/.claude"
 
 # Session state for correction learning
 SESSION_STATE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
@@ -184,22 +186,40 @@ file_has_ignore() {
     return 1
 }
 
-add_critical() {
+add_violation() {
     local rule="$1"
     local message="$2"
+    local file_path="${3:-$FILE_PATH}"
     local ignored=0
 
+    # Check rules engine severity
+    local severity
+    severity=$(rules_severity_for_file "$file_path" "$rule")
+
+    # If ignored by rules engine, skip entirely
+    if [[ "$severity" == "ignore" ]]; then
+        return
+    fi
+
+    # Check craftsman-ignore in file
     if file_has_ignore "$rule"; then
         ignored=1
     fi
 
     if [[ $ignored -eq 0 ]]; then
-        CRITICAL_VIOLATIONS="${CRITICAL_VIOLATIONS}${rule}: ${message}\n"
-        ((CRITICAL_COUNT++)) || true
+        if [[ "$severity" == "block" ]]; then
+            CRITICAL_VIOLATIONS="${CRITICAL_VIOLATIONS}${rule}: ${message}\n"
+            ((CRITICAL_COUNT++)) || true
+        else
+            WARNING_VIOLATIONS="${WARNING_VIOLATIONS}${rule}: ${message}\n"
+            ((WARNING_COUNT++)) || true
+        fi
     fi
 
-    # Always record in metrics (even if ignored)
-    metrics_record_violation "$rule" "$FILE_PATTERN" "critical" $((1 - ignored)) "$ignored" 2>/dev/null || true
+    # Always record in metrics
+    local metric_severity="critical"
+    [[ "$severity" == "warn" ]] && metric_severity="warning"
+    metrics_record_violation "$rule" "$FILE_PATTERN" "$metric_severity" $((1 - ignored)) "$ignored" 2>/dev/null || true
 }
 
 add_warning() {
@@ -218,14 +238,14 @@ validate_php_regex() {
 
     # PHP001: declare(strict_types=1) required
     if ! grep -q "declare(strict_types=1)" "$file" 2>/dev/null; then
-        add_critical "PHP001" "Missing declare(strict_types=1)"
+        add_violation "PHP001" "Missing declare(strict_types=1)"
     fi
 
     # PHP002: Classes must be final (except interface/trait/abstract)
     if grep -q "^class " "$file" 2>/dev/null; then
         if ! grep -q "final class" "$file" 2>/dev/null; then
             if ! grep -qE "(interface |trait |abstract class )" "$file" 2>/dev/null; then
-                add_critical "PHP002" "Class should be final"
+                add_violation "PHP002" "Class should be final"
             fi
         fi
     fi
@@ -234,7 +254,7 @@ validate_php_regex() {
     while IFS= read -r line; do
         if echo "$line" | grep -qE "public function set[A-Z]" 2>/dev/null; then
             if ! line_has_ignore "$line" "no-setter"; then
-                add_critical "PHP003" "Public setter found — use behavioral methods"
+                add_violation "PHP003" "Public setter found — use behavioral methods"
             else
                 metrics_record_violation "PHP003" "$FILE_PATTERN" "critical" 0 1 2>/dev/null || true
             fi
@@ -243,7 +263,7 @@ validate_php_regex() {
 
     # PHP004: No new DateTime()
     if grep -q "new DateTime()" "$file" 2>/dev/null || grep -q "new \\\\DateTime()" "$file" 2>/dev/null; then
-        add_critical "PHP004" "new DateTime() found — inject Clock instead"
+        add_violation "PHP004" "new DateTime() found — inject Clock instead"
     fi
 
     # PHP005: No empty catch blocks
@@ -264,7 +284,7 @@ validate_typescript_regex() {
     while IFS= read -r line; do
         if echo "$line" | grep -qE ": any[^a-zA-Z]|<any>|: any$" 2>/dev/null; then
             if ! line_has_ignore "$line" "no-any"; then
-                add_critical "TS001" "'any' type found — use proper types or 'unknown'"
+                add_violation "TS001" "'any' type found — use proper types or 'unknown'"
             else
                 metrics_record_violation "TS001" "$FILE_PATTERN" "critical" 0 1 2>/dev/null || true
             fi
@@ -273,12 +293,12 @@ validate_typescript_regex() {
 
     # TS002: No default exports
     if grep -q "export default" "$file" 2>/dev/null; then
-        add_critical "TS002" "Default export found — use named exports"
+        add_violation "TS002" "Default export found — use named exports"
     fi
 
     # TS003: No non-null assertion (!) — exclude != and !==
     if grep -qE "[a-zA-Z0-9_\)]+\![^=\.]" "$file" 2>/dev/null; then
-        add_critical "TS003" "Non-null assertion (!) found — handle null explicitly"
+        add_violation "TS003" "Non-null assertion (!) found — handle null explicitly"
     fi
 
     # WARN-TS001: Max 3 parameters
@@ -363,24 +383,24 @@ validate_layer_regex() {
     # Domain must not import Infrastructure
     if [[ "$is_domain" == true ]] && [[ "$EXT" == "php" ]]; then
         if grep -qE "use\s+App\\\\Infrastructure" "$file" 2>/dev/null; then
-            add_critical "LAYER001" "Domain imports Infrastructure — DDD layer violation"
+            add_violation "LAYER001" "Domain imports Infrastructure — DDD layer violation"
         fi
         if grep -qE "use\s+App\\\\Presentation" "$file" 2>/dev/null; then
-            add_critical "LAYER002" "Domain imports Presentation — DDD layer violation"
+            add_violation "LAYER002" "Domain imports Presentation — DDD layer violation"
         fi
     fi
 
     # Application must not import Presentation
     if [[ "$is_application" == true ]] && [[ "$EXT" == "php" ]]; then
         if grep -qE "use\s+App\\\\Presentation" "$file" 2>/dev/null; then
-            add_critical "LAYER003" "Application imports Presentation — DDD layer violation"
+            add_violation "LAYER003" "Application imports Presentation — DDD layer violation"
         fi
     fi
 
     # TypeScript: domain must not import infrastructure
     if [[ "$is_domain_ts" == true ]] && [[ "$EXT" == "ts" || "$EXT" == "tsx" ]]; then
         if grep -qE "from\s+['\"].*infrastructure" "$file" 2>/dev/null; then
-            add_critical "LAYER001" "domain imports infrastructure — layer violation"
+            add_violation "LAYER001" "domain imports infrastructure — layer violation"
         fi
     fi
 }
@@ -407,6 +427,37 @@ case "$EXT" in
         ;;
 esac
 
+# =============================================================================
+# Custom Rules Validation (from .craft-config.yml rules section)
+# =============================================================================
+_validate_custom_rules() {
+    local file="$1"
+    local ext="${file##*.}"
+    local language=""
+    case "$ext" in
+        php) language="php" ;;
+        ts|tsx) language="typescript" ;;
+        js|jsx) language="javascript" ;;
+        *) return ;;
+    esac
+
+    local custom_rules
+    custom_rules=$(rules_custom_list "$language")
+    [[ -z "$custom_rules" ]] && return
+
+    while IFS= read -r rule_id; do
+        [[ -z "$rule_id" ]] && continue
+        local pattern msg
+        pattern=$(rules_pattern "$rule_id")
+        msg=$(rules_message "$rule_id")
+        [[ -z "$pattern" ]] && continue
+        if grep -qE "$pattern" "$file" 2>/dev/null; then
+            add_violation "$rule_id" "$msg" "$file"
+        fi
+    done <<< "$custom_rules"
+}
+_validate_custom_rules "$FILE_PATH"
+
 # Check for corrections (violation fixed since last block)
 _check_corrections "$FILE_PATH"
 
@@ -415,58 +466,40 @@ _check_corrections "$FILE_PATH"
 # =============================================================================
 
 if [[ $CRITICAL_COUNT -gt 0 ]]; then
-    # Check if ANY critical violation should actually block based on config
-    local_should_block=false
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        local_rule="${line%%:*}"
-        if config_should_block "$local_rule"; then
-            local_should_block=true
-            break
-        fi
-    done <<< "$(echo -e "$CRITICAL_VIOLATIONS")"
+    # Rules engine already routed block vs warn — CRITICAL_VIOLATIONS only contains blocking rules
+    _write_session_state "$FILE_PATH"
 
-    if [[ "$local_should_block" == true ]]; then
-        # Write session state for correction learning (includes cross-file pattern tracking)
-        _write_session_state "$FILE_PATH"
-
-        # Check for cross-file patterns and append actionable suggestion
-        PATTERN_SUGGESTIONS=$(_detect_cross_file_patterns 2>/dev/null) || true
-        local pattern_msg=""
-        if [[ -n "$PATTERN_SUGGESTIONS" ]]; then
-            while IFS= read -r ps_line; do
-                [[ -z "$ps_line" ]] && continue
-                if [[ "$ps_line" == PATTERN:* ]]; then
-                    local ps_rule ps_count
-                    ps_rule=$(echo "$ps_line" | cut -d: -f2)
-                    ps_count=$(echo "$ps_line" | cut -d: -f3)
-                    pattern_msg="${pattern_msg}PROJECT-WIDE PATTERN: ${ps_rule} found in ${ps_count} — consider a project-wide fix or global craftsman-ignore.\n"
-                elif [[ "$ps_line" == DIR_PATTERN:* ]]; then
-                    local ps_rule ps_dir ps_count
-                    ps_rule=$(echo "$ps_line" | cut -d: -f2)
-                    ps_dir=$(echo "$ps_line" | cut -d: -f3)
-                    ps_count=$(echo "$ps_line" | cut -d: -f4)
-                    pattern_msg="${pattern_msg}DIRECTORY PATTERN: ${ps_rule} in ${ps_dir}/ (${ps_count}) — apply fix directory-wide.\n"
-                fi
-            done <<< "$PATTERN_SUGGESTIONS"
-        fi
-
-        jq -n --arg violations "$(echo -e "$CRITICAL_VIOLATIONS")" \
-               --arg count "$CRITICAL_COUNT" \
-               --arg patterns "$(echo -e "$pattern_msg")" \
-        '{
-            hookSpecificOutput: {
-                hookEventName: "PostToolUse",
-                additionalContext: ("BLOCKED: " + $count + " critical violation(s):\n" + $violations + "\nFix these before proceeding. Use // craftsman-ignore: <rule> to suppress if justified." + (if $patterns != "" then "\n" + $patterns else "" end))
-            }
-        }'
-        exit 2
-    else
-        # Downgrade to warnings
-        WARNING_VIOLATIONS="${CRITICAL_VIOLATIONS}${WARNING_VIOLATIONS}"
-        WARNING_COUNT=$((WARNING_COUNT + CRITICAL_COUNT))
-        CRITICAL_COUNT=0
+    # Check for cross-file patterns and append actionable suggestion
+    PATTERN_SUGGESTIONS=$(_detect_cross_file_patterns 2>/dev/null) || true
+    local pattern_msg=""
+    if [[ -n "$PATTERN_SUGGESTIONS" ]]; then
+        while IFS= read -r ps_line; do
+            [[ -z "$ps_line" ]] && continue
+            if [[ "$ps_line" == PATTERN:* ]]; then
+                local ps_rule ps_count
+                ps_rule=$(echo "$ps_line" | cut -d: -f2)
+                ps_count=$(echo "$ps_line" | cut -d: -f3)
+                pattern_msg="${pattern_msg}PROJECT-WIDE PATTERN: ${ps_rule} found in ${ps_count} — consider a project-wide fix or global craftsman-ignore.\n"
+            elif [[ "$ps_line" == DIR_PATTERN:* ]]; then
+                local ps_rule ps_dir ps_count
+                ps_rule=$(echo "$ps_line" | cut -d: -f2)
+                ps_dir=$(echo "$ps_line" | cut -d: -f3)
+                ps_count=$(echo "$ps_line" | cut -d: -f4)
+                pattern_msg="${pattern_msg}DIRECTORY PATTERN: ${ps_rule} in ${ps_dir}/ (${ps_count}) — apply fix directory-wide.\n"
+            fi
+        done <<< "$PATTERN_SUGGESTIONS"
     fi
+
+    jq -n --arg violations "$(echo -e "$CRITICAL_VIOLATIONS")" \
+           --arg count "$CRITICAL_COUNT" \
+           --arg patterns "$(echo -e "$pattern_msg")" \
+    '{
+        hookSpecificOutput: {
+            hookEventName: "PostToolUse",
+            additionalContext: ("BLOCKED: " + $count + " critical violation(s):\n" + $violations + "\nFix these before proceeding. Use // craftsman-ignore: <rule> to suppress if justified." + (if $patterns != "" then "\n" + $patterns else "" end))
+        }
+    }'
+    exit 2
 fi
 
 if [[ $WARNING_COUNT -gt 0 ]]; then
