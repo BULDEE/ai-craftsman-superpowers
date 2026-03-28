@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '🔍 Validating against craftsman rules...'"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-write-check.sh\""
           }
         ]
       }
@@ -28,6 +28,16 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/bias-detector.sh\""
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-metrics.sh\""
           }
         ]
       }

@@ -177,7 +177,7 @@ test_hooks() {
     fi
 
     # Test 3: Hook scripts exist
-    local scripts=("post-write-check.sh" "bias-detector.sh")
+    local scripts=("post-write-check.sh" "bias-detector.sh" "pre-write-check.sh" "session-metrics.sh")
     for script in "${scripts[@]}"; do
         if [[ -f "$PLUGIN_DIR/hooks/$script" ]]; then
             log_pass "Script exists: $script"
@@ -326,6 +326,24 @@ test_adrs() {
     done
 }
 
+# Test: Hook behavior (functional tests)
+test_hook_behavior() {
+    echo ""
+    log_info "Testing hook behavior (functional)"
+
+    local hook_test="$SCRIPT_DIR/hooks/test-hooks.sh"
+
+    if [[ -f "$hook_test" ]]; then
+        if bash "$hook_test" > /dev/null 2>&1; then
+            log_pass "Hook behavior tests pass"
+        else
+            log_fail "Hook behavior tests failed — run tests/hooks/test-hooks.sh for details"
+        fi
+    else
+        log_skip "Hook behavior tests (tests/hooks/test-hooks.sh not found)"
+    fi
+}
+
 # Main test runner
 main() {
     echo "=================================================="
@@ -400,6 +418,8 @@ main() {
         test_knowledge_base
         test_examples
         test_adrs
+
+        test_hook_behavior
     fi
 
     # Summary
