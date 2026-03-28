@@ -110,6 +110,207 @@ backend/src/Infrastructure/Persistence/{{CONTEXT}}/
 {{#each REPOSITORIES}}
 ├── Doctrine{{NAME}}Repository.php
 {{/each}}
+backend/src/Infrastructure/ApiPlatform/State/
+├── {{AGGREGATE_ROOT}}StateProvider.php
+├── Create{{AGGREGATE_ROOT}}Processor.php
+```
+
+## API Platform 4 Integration
+
+### State Providers (Read operations)
+
+State Providers replace DataProviders from API Platform v2/v3. They decouple read logic from Doctrine and allow any persistence backend.
+
+```php
+<?php
+declare(strict_types=1);
+
+namespace App\Infrastructure\ApiPlatform\State;
+
+use ApiPlatform\Metadata\CollectionOperationInterface;
+use ApiPlatform\Metadata\Operation;
+use ApiPlatform\State\Pagination\Pagination;
+use ApiPlatform\State\ProviderInterface;
+use App\Domain\Repository\{{AGGREGATE_ROOT}}RepositoryInterface;
+use App\Domain\ValueObject\{{AGGREGATE_ROOT}}Id;
+
+final class {{AGGREGATE_ROOT}}StateProvider implements ProviderInterface
+{
+    public function __construct(
+        private readonly {{AGGREGATE_ROOT}}RepositoryInterface $repository,
+        private readonly Pagination $pagination,
+    ) {}
+
+    public function provide(Operation $operation, array $uriVariables = [], array $context = []): object|array|null
+    {
+        if ($operation instanceof CollectionOperationInterface) {
+            [$page, $offset, $limit] = $this->pagination->getPagination($operation, $context);
+
+            // Repository MUST return a PaginatorInterface implementation for hydra:totalItems
+            return $this->repository->findPaginated($page, $limit);
+        }
+
+        return $this->repository->findById(
+            {{AGGREGATE_ROOT}}Id::fromString($uriVariables['id'])
+        );
+    }
+}
+```
+
+### State Processors (Write operations)
+
+State Processors handle POST/PUT/PATCH/DELETE. Wire them to your Command Bus to keep API Platform as a thin adapter over your application layer.
+
+```php
+<?php
+declare(strict_types=1);
+
+namespace App\Infrastructure\ApiPlatform\State;
+
+use ApiPlatform\Metadata\Operation;
+use ApiPlatform\State\ProcessorInterface;
+use App\Application\UseCase\Create{{AGGREGATE_ROOT}}\Create{{AGGREGATE_ROOT}}Command;
+use App\Domain\ValueObject\{{AGGREGATE_ROOT}}Id;
+use App\Infrastructure\ApiPlatform\Resource\{{AGGREGATE_ROOT}}Resource;
+use App\Shared\Application\CommandBusInterface;
+
+final class Create{{AGGREGATE_ROOT}}Processor implements ProcessorInterface
+{
+    public function __construct(
+        private readonly CommandBusInterface $commandBus,
+        private readonly {{AGGREGATE_ROOT}}RepositoryInterface $repository,
+    ) {}
+
+    public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): {{AGGREGATE_ROOT}}Resource
+    {
+        $id = {{AGGREGATE_ROOT}}Id::generate();
+
+        $this->commandBus->dispatch(
+            Create{{AGGREGATE_ROOT}}Command::fromApiResource($data, $id)
+        );
+
+        // Return the resource for 201 response with body
+        return {{AGGREGATE_ROOT}}Resource::fromDomain(
+            $this->repository->findById($id)
+        );
+    }
+}
+```
+
+### Resource Declaration
+
+```php
+<?php
+declare(strict_types=1);
+
+namespace App\Infrastructure\ApiPlatform\Resource;
+
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Post;
+use App\Infrastructure\ApiPlatform\State\{{AGGREGATE_ROOT}}StateProvider;
+use App\Infrastructure\ApiPlatform\State\Create{{AGGREGATE_ROOT}}Processor;
+
+#[ApiResource(
+    operations: [
+        new GetCollection(provider: {{AGGREGATE_ROOT}}StateProvider::class),
+        new Get(provider: {{AGGREGATE_ROOT}}StateProvider::class),
+        new Post(processor: Create{{AGGREGATE_ROOT}}Processor::class),
+    ]
+)]
+final class {{AGGREGATE_ROOT}}Resource
+{
+    public function __construct(
+        public readonly string $id,
+        {{#each API_FIELDS}}
+        public readonly {{TYPE}} ${{NAME}},
+        {{/each}}
+    ) {}
+}
+```
+
+## Symfony Messenger
+
+### Async Command Handler
+
+```php
+<?php
+declare(strict_types=1);
+
+namespace App\Application\UseCase\Create{{AGGREGATE_ROOT}};
+
+use App\Domain\Entity\{{AGGREGATE_ROOT}};
+use App\Domain\Repository\{{AGGREGATE_ROOT}}RepositoryInterface;
+use App\Domain\ValueObject\{{AGGREGATE_ROOT}}Id;
+use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\MessageBusInterface;
+
+#[AsMessageHandler]
+final class Create{{AGGREGATE_ROOT}}Handler
+{
+    public function __construct(
+        private readonly {{AGGREGATE_ROOT}}RepositoryInterface $repository,
+        private readonly MessageBusInterface $eventBus,
+    ) {}
+
+    public function __invoke(Create{{AGGREGATE_ROOT}}Command $command): void
+    {
+        $entity = {{AGGREGATE_ROOT}}::create(
+            {{AGGREGATE_ROOT}}Id::generate(),
+            // map $command fields to Value Objects
+        );
+
+        $this->repository->save($entity);
+
+        foreach ($entity->releaseEvents() as $event) {
+            $this->eventBus->dispatch($event);
+        }
+    }
+}
+```
+
+### Messenger Transport Configuration
+
+```yaml
+# config/packages/messenger.yaml
+framework:
+    messenger:
+        transports:
+            async:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                retry_strategy:
+                    max_retries: 3
+                    delay: 1000
+                    multiplier: 2
+
+        routing:
+            'App\Application\UseCase\': async
+```
+
+### Scheduler Patterns (Symfony 7.4+)
+
+```php
+<?php
+declare(strict_types=1);
+
+namespace App\Infrastructure\Scheduler;
+
+use Symfony\Component\Scheduler\Attribute\AsSchedule;
+use Symfony\Component\Scheduler\RecurringMessage;
+use Symfony\Component\Scheduler\Schedule;
+use Symfony\Component\Scheduler\ScheduleProviderInterface;
+
+#[AsSchedule('default')]
+final class AppScheduleProvider implements ScheduleProviderInterface
+{
+    public function getSchedule(): Schedule
+    {
+        return (new Schedule())
+            ->add(RecurringMessage::every('1 hour', new CleanExpiredTokensCommand()))
+            ->add(RecurringMessage::cron('0 2 * * *', new GenerateDailyReportCommand()));
+    }
+}
 ```
 
 ## API Endpoints
