@@ -33,24 +33,29 @@
   "userConfig": {
     "strictness": {
       "type": "string",
+      "title": "Strictness Level",
       "description": "Enforcement level: strict (block violations), moderate (block critical only), relaxed (warn only)",
       "default": "strict"
     },
     "stack": {
       "type": "string",
+      "title": "Tech Stack",
       "description": "Your tech stack: symfony (PHP only), react (TS only), fullstack (both), other (minimal rules)",
       "default": "fullstack"
     },
     "sentry_org": {
       "type": "string",
+      "title": "Sentry Organization",
       "description": "Sentry organization slug for error context injection"
     },
     "sentry_project": {
       "type": "string",
+      "title": "Sentry Project",
       "description": "Sentry project slug to query errors from"
     },
     "sentry_token": {
       "type": "string",
+      "title": "Sentry Token",
       "description": "Sentry auth token (stored securely in keychain)",
       "sensitive": true
     }
