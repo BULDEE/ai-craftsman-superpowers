@@ -1,0 +1,28 @@
+# Security Audit Team Template
+# Use for pre-release security audits, compliance checks, or incident response.
+# Trigger: /craftsman:team create → select "security-audit"
+
+name: security-audit
+description: Security audit team — penetration testing + code review
+trigger: "Use for pre-release security audits, compliance checks, or incident response"
+
+agents:
+  - agent: security-pentester
+    role: lead
+    focus: "OWASP top 10, authentication, authorization, data exposure"
+
+  - agent: architecture-reviewer
+    role: member
+    focus: "Multi-tenancy isolation, data flow, trust boundaries"
+
+  - agent: ai-reviewer
+    role: member
+    focus: "Prompt injection, RAG security, LLM data leakage"
+    condition: "Only if AI/ML code detected (presence of LangChain, OpenAI, pgvector, etc.)"
+
+workflow:
+  type: sequential
+  steps:
+    - security-pentester      # Full scan first
+    - architecture-reviewer   # Architecture-level security
+    - ai-reviewer             # AI-specific (conditional — skip if no AI/ML code)
