@@ -337,12 +337,17 @@ rules_init() {
     _RULES_PROJECT_DIR="$project_dir"
     _RULES_STRICTNESS="strict"  # default
 
-    # 1. Load global config if exists
+    # 0. Check CLAUDE_PLUGIN_OPTION_strictness env var (lower priority than config files)
+    if [[ -n "${CLAUDE_PLUGIN_OPTION_strictness:-}" ]]; then
+        _RULES_STRICTNESS="$CLAUDE_PLUGIN_OPTION_strictness"
+    fi
+
+    # 1. Load global config if exists (overrides env var)
     if [[ -n "$global_dir" ]] && [[ -f "$global_dir/.craft-config.yml" ]]; then
         _rules_parse_config "$global_dir/.craft-config.yml" "global"
     fi
 
-    # 2. Load project config, deep merge over global
+    # 2. Load project config, deep merge over global (highest priority)
     if [[ -f "$project_dir/.craft-config.yml" ]]; then
         _rules_parse_config "$project_dir/.craft-config.yml" "project"
     fi
