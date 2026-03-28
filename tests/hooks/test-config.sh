@@ -25,8 +25,8 @@ ORIGINAL_PWD="$PWD"
 cd "$TEST_DIR"
 
 # Clean env before each test section
-unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
-unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
 # =============================================================================
 # 1. Default values (no config, no env vars)
@@ -36,8 +36,8 @@ echo "=== Default Values ==="
 
 # Ensure no config file and no env vars
 rm -f "$TEST_DIR/.craft-config.yml"
-unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
-unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
 result=$(config_strictness)
 if [[ "$result" == "strict" ]]; then
@@ -54,32 +54,32 @@ else
 fi
 
 # =============================================================================
-# 2. CLAUDE_USER_CONFIG env var overrides defaults
+# 2. CLAUDE_PLUGIN_OPTION env var overrides defaults
 # =============================================================================
 echo ""
 echo "=== Env Var Overrides ==="
 
 rm -f "$TEST_DIR/.craft-config.yml"
 
-export CLAUDE_USER_CONFIG_strictness="relaxed"
-export CLAUDE_USER_CONFIG_stack="react"
+export CLAUDE_PLUGIN_OPTION_strictness="relaxed"
+export CLAUDE_PLUGIN_OPTION_stack="react"
 
 result=$(config_strictness)
 if [[ "$result" == "relaxed" ]]; then
-    log_pass "CLAUDE_USER_CONFIG_strictness=relaxed overrides default"
+    log_pass "CLAUDE_PLUGIN_OPTION_strictness=relaxed overrides default"
 else
     log_fail "Env var strictness override" "got '$result', expected 'relaxed'"
 fi
 
 result=$(config_stack)
 if [[ "$result" == "react" ]]; then
-    log_pass "CLAUDE_USER_CONFIG_stack=react overrides default"
+    log_pass "CLAUDE_PLUGIN_OPTION_stack=react overrides default"
 else
     log_fail "Env var stack override" "got '$result', expected 'react'"
 fi
 
-unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
-unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
 # =============================================================================
 # 3. .craft-config.yml overrides env var (highest priority)
@@ -87,8 +87,8 @@ unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
 echo ""
 echo "=== .craft-config.yml Overrides Env Var ==="
 
-export CLAUDE_USER_CONFIG_strictness="relaxed"
-export CLAUDE_USER_CONFIG_stack="react"
+export CLAUDE_PLUGIN_OPTION_strictness="relaxed"
+export CLAUDE_PLUGIN_OPTION_stack="react"
 
 cat > "$TEST_DIR/.craft-config.yml" <<'YAML'
 strictness: moderate
@@ -110,8 +110,8 @@ else
 fi
 
 rm -f "$TEST_DIR/.craft-config.yml"
-unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
-unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
 # =============================================================================
 # 4. Stack helpers
@@ -120,8 +120,8 @@ echo ""
 echo "=== Stack Helpers ==="
 
 # stack=react: php disabled, ts enabled
-export CLAUDE_USER_CONFIG_stack="react"
-unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+export CLAUDE_PLUGIN_OPTION_stack="react"
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 rm -f "$TEST_DIR/.craft-config.yml"
 
 if ! config_php_enabled; then
@@ -137,7 +137,7 @@ else
 fi
 
 # stack=symfony: php enabled, ts disabled
-export CLAUDE_USER_CONFIG_stack="symfony"
+export CLAUDE_PLUGIN_OPTION_stack="symfony"
 
 if config_php_enabled; then
     log_pass "config_php_enabled returns true for stack=symfony"
@@ -152,7 +152,7 @@ else
 fi
 
 # stack=fullstack: both enabled
-export CLAUDE_USER_CONFIG_stack="fullstack"
+export CLAUDE_PLUGIN_OPTION_stack="fullstack"
 
 if config_php_enabled; then
     log_pass "config_php_enabled returns true for stack=fullstack"
@@ -167,7 +167,7 @@ else
 fi
 
 # stack=other: both disabled
-export CLAUDE_USER_CONFIG_stack="other"
+export CLAUDE_PLUGIN_OPTION_stack="other"
 
 if ! config_php_enabled; then
     log_pass "config_php_enabled returns false for stack=other"
@@ -181,7 +181,7 @@ else
     log_fail "config_ts_enabled should return false for other" "returned true"
 fi
 
-unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
 # =============================================================================
 # 5. Blocking behavior (config_should_block)
@@ -192,8 +192,8 @@ echo "=== Blocking Behavior ==="
 rm -f "$TEST_DIR/.craft-config.yml"
 
 # strict: always block
-export CLAUDE_USER_CONFIG_strictness="strict"
-unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+export CLAUDE_PLUGIN_OPTION_strictness="strict"
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
 if config_should_block "PHP001"; then
     log_pass "strict: blocks PHP001"
@@ -214,7 +214,7 @@ else
 fi
 
 # moderate: only LAYER* rules block
-export CLAUDE_USER_CONFIG_strictness="moderate"
+export CLAUDE_PLUGIN_OPTION_strictness="moderate"
 
 if config_should_block "LAYER001"; then
     log_pass "moderate: blocks LAYER001"
@@ -241,7 +241,7 @@ else
 fi
 
 # relaxed: nothing blocks
-export CLAUDE_USER_CONFIG_strictness="relaxed"
+export CLAUDE_PLUGIN_OPTION_strictness="relaxed"
 
 if ! config_should_block "PHP001"; then
     log_pass "relaxed: does NOT block PHP001"
@@ -279,14 +279,62 @@ else
 fi
 
 rm -f "$TEST_DIR/.craft-config.yml"
-unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+
+# =============================================================================
+# 6. Stop review enabled (config_stop_review_enabled)
+# =============================================================================
+echo ""
+echo "=== Stop Review Enabled ==="
+
+rm -f "$TEST_DIR/.craft-config.yml"
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
+
+# strict: stop review enabled
+export CLAUDE_PLUGIN_OPTION_strictness="strict"
+
+if config_stop_review_enabled; then
+    log_pass "strict: stop review enabled"
+else
+    log_fail "strict: stop review should be enabled" "returned false"
+fi
+
+# moderate: stop review disabled
+export CLAUDE_PLUGIN_OPTION_strictness="moderate"
+
+if ! config_stop_review_enabled; then
+    log_pass "moderate: stop review disabled"
+else
+    log_fail "moderate: stop review should be disabled" "returned true"
+fi
+
+# relaxed: stop review disabled
+export CLAUDE_PLUGIN_OPTION_strictness="relaxed"
+
+if ! config_stop_review_enabled; then
+    log_pass "relaxed: stop review disabled"
+else
+    log_fail "relaxed: stop review should be disabled" "returned true"
+fi
+
+# default (no env var): strict → enabled
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+
+if config_stop_review_enabled; then
+    log_pass "default (strict): stop review enabled"
+else
+    log_fail "default should enable stop review" "returned false"
+fi
+
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 
 # =============================================================================
 # Cleanup
 # =============================================================================
 cd "$ORIGINAL_PWD"
-unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
-unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 rm -rf "$TEST_DIR"
 
 echo ""
