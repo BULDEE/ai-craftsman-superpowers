@@ -466,6 +466,101 @@ else
 fi
 
 # =============================================================================
+# Agent Hook Schema Tests
+# =============================================================================
+echo ""
+echo "=== Agent Hook Schema Tests ==="
+
+HOOKS_FILE="$ROOT_DIR/hooks/hooks.json"
+
+# Test: hooks.json has PostToolUse agent hook
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+hooks = d['hooks']['PostToolUse'][0]['hooks']
+agent = [h for h in hooks if h.get('type') == 'agent']
+assert len(agent) == 1, 'Expected 1 agent hook'
+assert 'prompt' in agent[0], 'Missing prompt'
+assert 'model' in agent[0], 'Missing model'
+assert 'timeout' in agent[0], 'Missing timeout'
+assert agent[0]['model'] == 'haiku', 'Wrong model'
+" 2>/dev/null; then
+    log_pass "PostToolUse agent hook: valid schema (type, prompt, model, timeout)"
+else
+    log_fail "PostToolUse agent hook schema" "missing or invalid"
+fi
+
+# Test: PostToolUse agent prompt contains ARGUMENTS
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+hooks = d['hooks']['PostToolUse'][0]['hooks']
+agent = [h for h in hooks if h.get('type') == 'agent'][0]
+assert '\$ARGUMENTS' in agent['prompt'], 'Missing \$ARGUMENTS'
+" 2>/dev/null; then
+    log_pass "PostToolUse agent prompt contains \$ARGUMENTS"
+else
+    log_fail "PostToolUse agent prompt" "missing \$ARGUMENTS"
+fi
+
+# Test: InstructionsLoaded agent hook
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+hooks = d['hooks']['InstructionsLoaded'][0]['hooks']
+agent = [h for h in hooks if h.get('type') == 'agent']
+assert len(agent) == 1
+assert agent[0]['model'] == 'haiku'
+assert agent[0]['timeout'] == 15
+" 2>/dev/null; then
+    log_pass "InstructionsLoaded agent hook: valid schema (haiku, 15s timeout)"
+else
+    log_fail "InstructionsLoaded agent hook schema" "missing or invalid"
+fi
+
+# Test: Stop agent hook
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+hooks = d['hooks']['Stop'][0]['hooks']
+agent = [h for h in hooks if h.get('type') == 'agent']
+assert len(agent) == 1
+assert agent[0]['model'] == 'haiku'
+assert agent[0]['timeout'] == 30
+" 2>/dev/null; then
+    log_pass "Stop agent hook: valid schema (haiku, 30s timeout)"
+else
+    log_fail "Stop agent hook schema" "missing or invalid"
+fi
+
+# Test: Stop agent prompt contains strictness gate
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+hooks = d['hooks']['Stop'][0]['hooks']
+agent = [h for h in hooks if h.get('type') == 'agent'][0]
+assert 'CLAUDE_PLUGIN_OPTION_strictness' in agent['prompt']
+" 2>/dev/null; then
+    log_pass "Stop agent prompt contains strictness gate"
+else
+    log_fail "Stop agent prompt" "missing CLAUDE_PLUGIN_OPTION_strictness gate"
+fi
+
+# Test: Existing command hooks still present
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+hooks = d['hooks']['PostToolUse'][0]['hooks']
+cmd = [h for h in hooks if h.get('type') == 'command']
+assert len(cmd) == 1, 'Command hook missing'
+assert 'post-write-check.sh' in cmd[0]['command']
+" 2>/dev/null; then
+    log_pass "PostToolUse command hook preserved alongside agent hook"
+else
+    log_fail "PostToolUse command hook" "missing or modified"
+fi
+
+# =============================================================================
 # Cleanup & Summary
 # =============================================================================
 rm -rf "$CLAUDE_PLUGIN_DATA"
