@@ -1,5 +1,6 @@
 ---
 description: Evidence-based verification before claiming completion. Use before committing, creating PRs, or claiming a task is done. Never claim success without proof.
+effort: quick
 ---
 
 # /craftsman:verify - Evidence Before Completion

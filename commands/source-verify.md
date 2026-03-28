@@ -1,5 +1,6 @@
 ---
 description: Verify AI tool capabilities against official documentation before making assessments. Use when evaluating features, reviewing plugins, or when someone asks "does X support Y?"
+effort: quick
 ---
 
 # /craftsman:source-verify - Official Documentation Verification

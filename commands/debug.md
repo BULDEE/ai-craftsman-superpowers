@@ -1,5 +1,6 @@
 ---
 description: Systematic debugging using ReAct pattern. Use when encountering bugs, errors, unexpected behavior, test failures, or performance issues. Never guess - investigate methodically.
+effort: medium
 ---
 
 # /craftsman:debug - Systematic Investigation

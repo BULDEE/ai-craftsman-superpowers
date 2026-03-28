@@ -1,5 +1,6 @@
 ---
 description: Structured planning and execution for multi-step tasks. Use when starting features requiring multiple steps, migrating or refactoring large codebases, or when task complexity exceeds a single change.
+effort: heavy
 ---
 
 # /craftsman:plan - Structured Planning & Execution
