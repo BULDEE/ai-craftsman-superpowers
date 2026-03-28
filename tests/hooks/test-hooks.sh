@@ -561,6 +561,56 @@ else
 fi
 
 # =============================================================================
+# Correction Learning Tests
+# =============================================================================
+echo ""
+echo "=== Correction Learning Tests ==="
+
+source "$ROOT_DIR/hooks/lib/metrics-db.sh"
+metrics_init 2>/dev/null || true
+
+# Test: corrections table exists after init
+if sqlite3 "$METRICS_DB" ".tables" 2>/dev/null | grep -q "corrections"; then
+    log_pass "corrections table created by metrics_init"
+else
+    log_fail "corrections table" "not created"
+fi
+
+# Test: metrics_record_correction writes to DB
+metrics_record_correction "PHP002" "src/Domain/**/*.php" "fixed" "removed public setter" 2>/dev/null
+CORR_COUNT=$(sqlite3 "$METRICS_DB" "SELECT COUNT(*) FROM corrections;" 2>/dev/null || echo 0)
+if [[ "$CORR_COUNT" -ge 1 ]]; then
+    log_pass "metrics_record_correction writes to corrections table"
+else
+    log_fail "metrics_record_correction" "no rows inserted"
+fi
+
+# Test: metrics_record_correction stores correct action
+ACTION=$(sqlite3 "$METRICS_DB" "SELECT action FROM corrections ORDER BY id DESC LIMIT 1;" 2>/dev/null)
+if [[ "$ACTION" == "fixed" ]]; then
+    log_pass "metrics_record_correction stores action='fixed'"
+else
+    log_fail "correction action" "got '$ACTION', expected 'fixed'"
+fi
+
+# Test: metrics_record_correction handles 'ignored' action
+metrics_record_correction "TS003" "src/**/*.ts" "ignored" "craftsman-ignore added" 2>/dev/null
+ACTION=$(sqlite3 "$METRICS_DB" "SELECT action FROM corrections WHERE rule='TS003' LIMIT 1;" 2>/dev/null)
+if [[ "$ACTION" == "ignored" ]]; then
+    log_pass "metrics_record_correction stores action='ignored'"
+else
+    log_fail "correction ignored action" "got '$ACTION'"
+fi
+
+# Test: metrics_corrections_30d returns summary
+SUMMARY=$(metrics_corrections_30d 2>/dev/null)
+if echo "$SUMMARY" | grep -q "PHP002"; then
+    log_pass "metrics_corrections_30d includes PHP002 in summary"
+else
+    log_fail "metrics_corrections_30d" "missing PHP002"
+fi
+
+# =============================================================================
 # Cleanup & Summary
 # =============================================================================
 rm -rf "$CLAUDE_PLUGIN_DATA"
