@@ -62,7 +62,7 @@ if [[ "$EXT" == "php" ]] && config_php_enabled; then
         add_issue "PHP003" "Public setter found"
     fi
 
-    if grep -q "new DateTime()" "$FILE_PATH" 2>/dev/null; then
+    if grep -qE "new \\\\?DateTime\(\)" "$FILE_PATH" 2>/dev/null; then
         add_issue "PHP004" "new DateTime() found"
     fi
 
@@ -104,7 +104,7 @@ fi
 
 # Output only if issues found
 if [[ $ISSUE_COUNT -gt 0 ]]; then
-    rel_path="${FILE_PATH#$PWD/}"
+    rel_path="${FILE_PATH#"$PWD"/}"
     jq -n --arg fp "$rel_path" --arg issues "$(echo -e "$ISSUES")" --arg count "$ISSUE_COUNT" '{
         systemMessage: ("FileChanged: " + $fp + " — " + $count + " issue(s) detected:\n" + $issues + "Not blocking — use Write/Edit for enforcement.")
     }'
