@@ -166,6 +166,306 @@ else
 fi
 
 # =============================================================================
+# Post-Write Hook — Config-Aware Tests
+# =============================================================================
+echo ""
+echo "=== Post-Write Hook — Config-Aware Tests ==="
+
+# Test: stack=react skips PHP rules
+export CLAUDE_USER_CONFIG_stack="react"
+unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "stack=react skips PHP rules (exit 0 on PHP file)"
+else
+    log_fail "stack=react should skip PHP rules" "got exit $exit_code"
+fi
+unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+
+# Test: stack=symfony skips TS rules
+export CLAUDE_USER_CONFIG_stack="symfony"
+result=$(run_post_hook "$FIXTURES_DIR/invalid-any.ts")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "stack=symfony skips TS rules (exit 0 on TS file)"
+else
+    log_fail "stack=symfony should skip TS rules" "got exit $exit_code"
+fi
+unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+
+# Test: strictness=relaxed warns instead of blocking
+export CLAUDE_USER_CONFIG_strictness="relaxed"
+result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "strictness=relaxed warns PHP001 (exit 0)"
+else
+    log_fail "strictness=relaxed should warn not block" "got exit $exit_code"
+fi
+unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+
+# Test: strictness=moderate blocks LAYER but warns PHP001
+export CLAUDE_USER_CONFIG_strictness="moderate"
+result=$(run_post_hook "$FIXTURES_DIR/invalid-layer-violation.php")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "2" ]] && echo "$output" | grep -q "LAYER"; then
+    log_pass "strictness=moderate blocks LAYER violations (exit 2)"
+else
+    log_fail "strictness=moderate should block LAYER" "exit=$exit_code"
+fi
+
+result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "strictness=moderate warns PHP001 (exit 0)"
+else
+    log_fail "strictness=moderate should warn PHP001" "got exit $exit_code"
+fi
+unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+
+# Test: default behavior unchanged (strict + fullstack)
+result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "2" ]]; then
+    log_pass "Default behavior: PHP001 still blocks (backward compatible)"
+else
+    log_fail "Default behavior should block PHP001" "got exit $exit_code"
+fi
+
+# =============================================================================
+# Pre-Write Hook — Config-Aware Tests
+# =============================================================================
+echo ""
+echo "=== Pre-Write Hook — Config-Aware Tests ==="
+
+# Test: stack=react skips PHP layer checks
+export CLAUDE_USER_CONFIG_stack="react"
+result=$(run_pre_hook "src/Domain/Service/UserService.php" "<?php\nuse App\\\\Infrastructure\\\\Persistence\\\\Repo;\nfinal class UserService {}")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "Pre-write: stack=react skips PHP layer checks (exit 0)"
+else
+    log_fail "Pre-write: stack=react should skip PHP" "got exit $exit_code"
+fi
+unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+
+# Test: strictness=relaxed warns instead of blocking layer violations
+export CLAUDE_USER_CONFIG_strictness="relaxed"
+result=$(run_pre_hook "src/Domain/Service/UserService.php" "<?php\nuse App\\\\Infrastructure\\\\Persistence\\\\Repo;\nfinal class UserService {}")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "Pre-write: strictness=relaxed warns layer violation (exit 0)"
+else
+    log_fail "Pre-write: strictness=relaxed should warn" "got exit $exit_code"
+fi
+unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+
+# Test: default still blocks
+result=$(run_pre_hook "src/Domain/Service/UserService.php" "<?php\nuse App\\\\Infrastructure\\\\Persistence\\\\Repo;\nfinal class UserService {}")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "2" ]]; then
+    log_pass "Pre-write: default still blocks layer violations (backward compatible)"
+else
+    log_fail "Pre-write: default should block" "got exit $exit_code"
+fi
+
+# =============================================================================
+# SessionStart Hook Tests
+# =============================================================================
+echo ""
+echo "=== SessionStart Hook Tests ==="
+
+run_session_start() {
+    local output
+    output=$(echo '{}' | bash "$ROOT_DIR/hooks/session-start.sh" 2>/dev/null)
+    local exit_code=$?
+    echo "$exit_code|$output"
+}
+
+ORIGINAL_PWD="$PWD"
+SESSION_TEST_DIR="/tmp/craftsman-session-tests-$$"
+mkdir -p "$SESSION_TEST_DIR"
+cd "$SESSION_TEST_DIR"
+
+# Clean env for session tests
+unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+
+# Test: Outputs valid JSON
+result=$(run_session_start)
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | jq . >/dev/null 2>&1; then
+    log_pass "SessionStart outputs valid JSON (exit 0)"
+else
+    log_fail "SessionStart should output valid JSON" "exit=$exit_code"
+fi
+
+# Test: Detects symfony (composer.json only)
+rm -f package.json
+echo '{}' > composer.json
+result=$(run_session_start)
+output="${result#*|}"
+if echo "$output" | grep -qi "symfony\|Stack: symfony"; then
+    log_pass "SessionStart detects composer.json project"
+else
+    log_fail "SessionStart should detect symfony" "$output"
+fi
+rm -f composer.json
+
+# Test: Detects react (package.json only)
+rm -f composer.json
+echo '{}' > package.json
+result=$(run_session_start)
+output="${result#*|}"
+if echo "$output" | grep -qi "react\|Stack: react"; then
+    log_pass "SessionStart detects package.json project"
+else
+    log_fail "SessionStart should detect react" "$output"
+fi
+rm -f package.json
+
+# Test: Detects fullstack (both)
+echo '{}' > composer.json
+echo '{}' > package.json
+result=$(run_session_start)
+output="${result#*|}"
+if echo "$output" | grep -q "fullstack"; then
+    log_pass "SessionStart detects fullstack project"
+else
+    log_fail "SessionStart should detect fullstack" "$output"
+fi
+rm -f composer.json package.json
+
+# Test: Suggests setup when no .craft-config.yml
+result=$(run_session_start)
+output="${result#*|}"
+if echo "$output" | grep -q "craft-config\|setup"; then
+    log_pass "SessionStart suggests /craftsman:setup when no config"
+else
+    log_fail "SessionStart should suggest setup" "$output"
+fi
+
+# Test: No setup suggestion when .craft-config.yml exists
+cat > "$SESSION_TEST_DIR/.craft-config.yml" <<'YAML'
+strictness: strict
+stack: fullstack
+YAML
+result=$(run_session_start)
+output="${result#*|}"
+if ! echo "$output" | grep -q "setup"; then
+    log_pass "SessionStart silent about setup when config exists"
+else
+    log_fail "SessionStart should not suggest setup" "$output"
+fi
+rm -f .craft-config.yml
+
+# Test: Always exits 0
+result=$(run_session_start)
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "SessionStart always exits 0 (non-blocking)"
+else
+    log_fail "SessionStart should always exit 0" "got exit $exit_code"
+fi
+
+cd "$ORIGINAL_PWD"
+rm -rf "$SESSION_TEST_DIR"
+
+# =============================================================================
+# FileChanged Hook Tests
+# =============================================================================
+echo ""
+echo "=== FileChanged Hook Tests ==="
+
+run_file_changed() {
+    local file_path="$1"
+    local output
+    output=$(jq -n --arg fp "$file_path" '{"file_path":$fp}' | bash "$ROOT_DIR/hooks/file-changed.sh" 2>/dev/null)
+    local exit_code=$?
+    echo "$exit_code|$output"
+}
+
+# Clear env
+unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+
+# Test: Ignores non-PHP/TS files
+result=$(run_file_changed "$ROOT_DIR/tests/run-tests.sh")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
+    log_pass "FileChanged ignores non-PHP/TS files (silent exit 0)"
+else
+    log_fail "FileChanged should ignore non-source files" "exit=$exit_code output=$output"
+fi
+
+# Test: Detects PHP violations (non-blocking)
+result=$(run_file_changed "$FIXTURES_DIR/invalid-no-strict.php")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | grep -q "PHP001"; then
+    log_pass "FileChanged detects PHP001 (non-blocking, exit 0)"
+else
+    log_fail "FileChanged should detect PHP001" "exit=$exit_code"
+fi
+
+# Test: Detects TS violations (non-blocking)
+result=$(run_file_changed "$FIXTURES_DIR/invalid-any.ts")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | grep -q "TS001"; then
+    log_pass "FileChanged detects TS001 (non-blocking, exit 0)"
+else
+    log_fail "FileChanged should detect TS001" "exit=$exit_code"
+fi
+
+# Test: Silent when file is clean
+result=$(run_file_changed "$FIXTURES_DIR/valid-entity.php")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
+    log_pass "FileChanged silent on clean file"
+else
+    log_fail "FileChanged should be silent on clean file" "output=$output"
+fi
+
+# Test: Respects stack config
+export CLAUDE_USER_CONFIG_stack="react"
+result=$(run_file_changed "$FIXTURES_DIR/invalid-no-strict.php")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
+    log_pass "FileChanged respects stack=react (skips PHP)"
+else
+    log_fail "FileChanged should skip PHP for stack=react" "output=$output"
+fi
+unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+
+# Test: Respects stack config (skips TS when stack=symfony)
+export CLAUDE_USER_CONFIG_stack="symfony"
+result=$(run_file_changed "$FIXTURES_DIR/invalid-any.ts")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
+    log_pass "FileChanged respects stack=symfony (skips TS)"
+else
+    log_fail "FileChanged should skip TS for stack=symfony" "output=$output"
+fi
+unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+
+# Test: Always non-blocking (exit 0)
+result=$(run_file_changed "$FIXTURES_DIR/invalid-layer-violation.php")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "FileChanged always exits 0 (even on LAYER violations)"
+else
+    log_fail "FileChanged should always exit 0" "got exit $exit_code"
+fi
+
+# =============================================================================
 # Cleanup & Summary
 # =============================================================================
 rm -rf "$CLAUDE_PLUGIN_DATA"
