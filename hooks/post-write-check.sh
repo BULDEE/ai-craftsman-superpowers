@@ -19,6 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Load helpers
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
 source "${SCRIPT_DIR}/lib/static-analysis.sh"
+source "${SCRIPT_DIR}/lib/config.sh"
 
 # Init metrics DB (creates tables if needed, idempotent)
 metrics_init 2>/dev/null || true
@@ -230,14 +231,18 @@ validate_layer_regex() {
 
 case "$EXT" in
     php)
-        validate_php_regex "$FILE_PATH"
-        validate_layer_regex "$FILE_PATH"
-        validate_static_analysis "$FILE_PATH"
+        if config_php_enabled; then
+            validate_php_regex "$FILE_PATH"
+            validate_layer_regex "$FILE_PATH"
+            validate_static_analysis "$FILE_PATH"
+        fi
         ;;
     ts|tsx)
-        validate_typescript_regex "$FILE_PATH"
-        validate_layer_regex "$FILE_PATH"
-        validate_static_analysis "$FILE_PATH"
+        if config_ts_enabled; then
+            validate_typescript_regex "$FILE_PATH"
+            validate_layer_regex "$FILE_PATH"
+            validate_static_analysis "$FILE_PATH"
+        fi
         ;;
 esac
 
@@ -246,15 +251,33 @@ esac
 # =============================================================================
 
 if [[ $CRITICAL_COUNT -gt 0 ]]; then
-    jq -n --arg violations "$(echo -e "$CRITICAL_VIOLATIONS")" \
-           --arg count "$CRITICAL_COUNT" \
-    '{
-        hookSpecificOutput: {
-            hookEventName: "PostToolUse",
-            additionalContext: ("BLOCKED: " + $count + " critical violation(s):\n" + $violations + "\nFix these before proceeding. Use // craftsman-ignore: <rule> to suppress if justified.")
-        }
-    }'
-    exit 2
+    # Check if ANY critical violation should actually block based on config
+    local_should_block=false
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        local_rule="${line%%:*}"
+        if config_should_block "$local_rule"; then
+            local_should_block=true
+            break
+        fi
+    done <<< "$(echo -e "$CRITICAL_VIOLATIONS")"
+
+    if [[ "$local_should_block" == true ]]; then
+        jq -n --arg violations "$(echo -e "$CRITICAL_VIOLATIONS")" \
+               --arg count "$CRITICAL_COUNT" \
+        '{
+            hookSpecificOutput: {
+                hookEventName: "PostToolUse",
+                additionalContext: ("BLOCKED: " + $count + " critical violation(s):\n" + $violations + "\nFix these before proceeding. Use // craftsman-ignore: <rule> to suppress if justified.")
+            }
+        }'
+        exit 2
+    else
+        # Downgrade to warnings
+        WARNING_VIOLATIONS="${CRITICAL_VIOLATIONS}${WARNING_VIOLATIONS}"
+        WARNING_COUNT=$((WARNING_COUNT + CRITICAL_COUNT))
+        CRITICAL_COUNT=0
+    fi
 fi
 
 if [[ $WARNING_COUNT -gt 0 ]]; then
