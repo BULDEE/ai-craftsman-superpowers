@@ -21,6 +21,81 @@ source "${SCRIPT_DIR}/lib/metrics-db.sh"
 source "${SCRIPT_DIR}/lib/static-analysis.sh"
 source "${SCRIPT_DIR}/lib/config.sh"
 
+# Session state for correction learning
+SESSION_STATE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
+
+_write_session_state() {
+    local file="$1"
+    local file_pattern
+    file_pattern=$(metrics_file_pattern "$file")
+    mkdir -p "$(dirname "$SESSION_STATE")"
+
+    # Collect current blocked rules for this file
+    local rules_json="["
+    local first=true
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        local r="${line%%:*}"
+        if [[ "$first" == true ]]; then
+            rules_json="${rules_json}\"${r}\""
+            first=false
+        else
+            rules_json="${rules_json},\"${r}\""
+        fi
+    done <<< "$(echo -e "$CRITICAL_VIOLATIONS")"
+    rules_json="${rules_json}]"
+
+    # Merge into existing session state
+    if [[ -f "$SESSION_STATE" ]]; then
+        python3 -c "
+import json
+with open('$SESSION_STATE') as f:
+    state = json.load(f)
+bv = state.get('blocked_violations', {})
+bv['''$file_pattern'''] = $rules_json
+state['blocked_violations'] = bv
+with open('$SESSION_STATE', 'w') as f:
+    json.dump(state, f)
+" 2>/dev/null || true
+    else
+        python3 -c "
+import json
+state = {'blocked_violations': {'''$file_pattern''': $rules_json}}
+with open('$SESSION_STATE', 'w') as f:
+    json.dump(state, f)
+" 2>/dev/null || true
+    fi
+}
+
+_check_corrections() {
+    local file="$1"
+    local file_pattern
+    file_pattern=$(metrics_file_pattern "$file")
+
+    [[ ! -f "$SESSION_STATE" ]] && return
+
+    local prev_rules
+    prev_rules=$(python3 -c "
+import json
+with open('$SESSION_STATE') as f:
+    state = json.load(f)
+rules = state.get('blocked_violations', {}).get('''$file_pattern''', [])
+print(' '.join(rules))
+" 2>/dev/null) || return
+
+    [[ -z "$prev_rules" ]] && return
+
+    for prev_rule in $prev_rules; do
+        if echo -e "$CRITICAL_VIOLATIONS" | grep -q "^${prev_rule}:"; then
+            : # Still violated, do nothing
+        elif file_has_ignore "$prev_rule" 2>/dev/null; then
+            metrics_record_correction "$prev_rule" "$file_pattern" "ignored" "craftsman-ignore added" 2>/dev/null || true
+        else
+            metrics_record_correction "$prev_rule" "$file_pattern" "fixed" "" 2>/dev/null || true
+        fi
+    done
+}
+
 # Init metrics DB (creates tables if needed, idempotent)
 metrics_init 2>/dev/null || true
 
@@ -246,6 +321,9 @@ case "$EXT" in
         ;;
 esac
 
+# Check for corrections (violation fixed since last block)
+_check_corrections "$FILE_PATH"
+
 # =============================================================================
 # Output Decision
 # =============================================================================
@@ -263,6 +341,8 @@ if [[ $CRITICAL_COUNT -gt 0 ]]; then
     done <<< "$(echo -e "$CRITICAL_VIOLATIONS")"
 
     if [[ "$local_should_block" == true ]]; then
+        # Write session state for correction learning
+        _write_session_state "$FILE_PATH"
         jq -n --arg violations "$(echo -e "$CRITICAL_VIOLATIONS")" \
                --arg count "$CRITICAL_COUNT" \
         '{

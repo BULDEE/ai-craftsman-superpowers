@@ -611,6 +611,47 @@ else
 fi
 
 # =============================================================================
+# Session State & Correction Detection Tests
+# =============================================================================
+echo ""
+echo "=== Session State & Correction Detection Tests ==="
+
+SESSION_STATE="${CLAUDE_PLUGIN_DATA}/session-state.json"
+
+# Test: Session state file created when violation blocks
+rm -f "$SESSION_STATE"
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
+result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "2" ]] && [[ -f "$SESSION_STATE" ]]; then
+    log_pass "Session state file created on block"
+else
+    log_fail "Session state file" "exit=$exit_code, file exists=$(test -f "$SESSION_STATE" && echo yes || echo no)"
+fi
+
+# Test: Session state contains the blocked rule
+if [[ -f "$SESSION_STATE" ]] && python3 -c "
+import json
+d = json.load(open('$SESSION_STATE'))
+bv = d.get('blocked_violations', {})
+found = any('PHP001' in rules for rules in bv.values())
+assert found, 'PHP001 not in blocked_violations'
+" 2>/dev/null; then
+    log_pass "Session state records PHP001 for blocked file"
+else
+    log_fail "Session state content" "PHP001 not recorded"
+fi
+
+# Test: Session state cleared at SessionEnd
+echo '{"session_duration_seconds": 10}' | bash "$ROOT_DIR/hooks/session-metrics.sh" 2>/dev/null
+if [[ ! -f "$SESSION_STATE" ]]; then
+    log_pass "Session state cleared at SessionEnd"
+else
+    log_fail "Session state should be cleared at SessionEnd" "file still exists"
+fi
+
+# =============================================================================
 # Cleanup & Summary
 # =============================================================================
 rm -rf "$CLAUDE_PLUGIN_DATA"
