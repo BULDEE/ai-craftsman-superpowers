@@ -1,6 +1,7 @@
 ---
 name: metrics
 description: Display quality metrics for the current project. Shows violations, trends, and session history from local SQLite database.
+effort: quick
 ---
 
 # /craftsman:metrics — Quality Metrics Dashboard
@@ -23,7 +24,11 @@ Read the metrics database:
 
 !`sqlite3 -header -column "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db" "SELECT date(timestamp) as day, COUNT(*) as sessions, SUM(violations_blocked) as blocked, SUM(violations_warned) as warned FROM sessions WHERE project_hash='$(echo -n $PWD | shasum -a 256 | cut -d' ' -f1)' AND timestamp > datetime('now','-14 days') GROUP BY day ORDER BY day DESC;" 2>/dev/null || echo "No session data yet."`
 
-### Step 4: Present Report
+### Step 4: Load Corrections Summary
+
+!`sqlite3 -header -column "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db" "SELECT rule, action, COUNT(*) as count FROM corrections WHERE project_hash='$(echo -n $PWD | shasum -a 256 | cut -d' ' -f1)' AND timestamp > datetime('now','-30 days') GROUP BY rule, action ORDER BY count DESC LIMIT 10;" 2>/dev/null || echo "No correction data yet"`
+
+### Step 5: Present Report
 
 Format the data as a clear report:
 

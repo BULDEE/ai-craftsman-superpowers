@@ -1,5 +1,6 @@
 ---
 description: Senior architecture review and code challenge. Use when reviewing code or PRs for quality, auditing architecture decisions, or responding to code review comments.
+effort: medium
 ---
 
 # /craftsman:challenge - Senior Architecture Review
@@ -52,6 +53,10 @@ Create tickets for later:
 - Unclear aggregate boundaries
 - Tests testing implementation, not behavior
 - Naming not reflecting domain language
+
+## Violation History
+
+!`sqlite3 "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db" "SELECT rule, COUNT(*) as count FROM violations WHERE project_hash='$(echo -n $PWD | shasum -a 256 | cut -d' ' -f1)' AND timestamp > datetime('now', '-7 days') GROUP BY rule ORDER BY count DESC LIMIT 5;" 2>/dev/null || echo "No violations tracked yet"`
 
 ### Review Process
 
@@ -112,6 +117,24 @@ After review, ask thought-provoking questions:
 2. "What happens if [edge case]?"
 3. "How would this change if [future requirement]?"
 4. "What's the performance implication of this approach?"
+
+### Deep Review Mode (for complex PRs)
+
+For PRs touching 5+ files or 3+ bounded contexts, use **parallel reviewer agents**:
+
+1. **Spawn specialized reviewers** using the Agent tool:
+   - Architecture reviewer: checks layer violations, aggregate boundaries
+   - Security reviewer: checks OWASP top 10, input validation
+   - Performance reviewer: checks N+1 queries, memory leaks
+
+2. **Each reviewer** gets:
+   - The list of changed files
+   - Access to Read/Grep/Glob tools
+   - Specific review checklist for their domain
+
+3. **Aggregate results** from all reviewers into a single review report
+
+Use the Agent tool with `subagent_type` matching the reviewer specialty when available.
 
 ---
 

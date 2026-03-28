@@ -1,5 +1,6 @@
 ---
 description: Analyze existing code and generate a context agent. Usage /craftsman:scaffold <path>
+effort: heavy
 ---
 
 # /craftsman:scaffold - Intelligent Agent Generation

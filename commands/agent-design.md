@@ -1,5 +1,6 @@
 ---
 description: Design AI agents using the 3P pattern (Perceive/Plan/Perform). Use when building autonomous AI agents or workflows.
+effort: heavy
 ---
 
 # /craftsman:agent-design - 3P Pattern Architecture

@@ -1,5 +1,6 @@
 ---
 description: Audit ML projects for production readiness. Use when reviewing ML pipelines, deployments, or infrastructure against MLOps best practices.
+effort: heavy
 ---
 
 # /craftsman:mlops - ML Production Readiness Audit
