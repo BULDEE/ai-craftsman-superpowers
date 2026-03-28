@@ -561,6 +561,62 @@ else
 fi
 
 # =============================================================================
+# Channel Lifecycle Tests
+# =============================================================================
+echo ""
+echo "=== Channel Lifecycle Tests ==="
+
+source "$ROOT_DIR/hooks/lib/channels.sh" 2>/dev/null
+
+# Test: channel_available "sentry" returns false when not configured
+unset CLAUDE_PLUGIN_OPTION_sentry_org 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_sentry_project 2>/dev/null || true
+if ! channel_available "sentry"; then
+    log_pass "channel_available 'sentry' false when not configured"
+else
+    log_fail "channel_available should be false" "returned true"
+fi
+
+# Test: channel_available "sentry" returns true when configured
+export CLAUDE_PLUGIN_OPTION_sentry_org="test-org"
+export CLAUDE_PLUGIN_OPTION_sentry_project="test-project"
+if channel_available "sentry"; then
+    log_pass "channel_available 'sentry' true when configured"
+else
+    log_fail "channel_available should be true" "returned false"
+fi
+
+# Test: channel_available "unknown" returns false
+if ! channel_available "unknown"; then
+    log_pass "channel_available 'unknown' returns false"
+else
+    log_fail "channel_available 'unknown'" "returned true"
+fi
+
+# Test: channel_status_summary empty when no channels
+unset CLAUDE_PLUGIN_OPTION_sentry_org 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_sentry_project 2>/dev/null || true
+result=$(channel_status_summary)
+if [[ -z "$(echo "$result" | tr -d ' ')" ]]; then
+    log_pass "channel_status_summary empty when no channels active"
+else
+    log_fail "channel_status_summary should be empty" "got '$result'"
+fi
+
+# Test: channel_status_summary shows sentry when configured
+export CLAUDE_PLUGIN_OPTION_sentry_org="test-org"
+export CLAUDE_PLUGIN_OPTION_sentry_project="test-project"
+result=$(channel_status_summary)
+if echo "$result" | grep -q "sentry:enabled"; then
+    log_pass "channel_status_summary shows 'sentry:enabled'"
+else
+    log_fail "channel_status_summary" "got '$result', expected 'sentry:enabled'"
+fi
+
+unset CLAUDE_PLUGIN_OPTION_sentry_org 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_sentry_project 2>/dev/null || true
+
+# =============================================================================
 # Correction Learning Tests
 # =============================================================================
 echo ""
