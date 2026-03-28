@@ -4,11 +4,12 @@ description: |
   React/TypeScript specialist for reviewing frontend applications.
   Use when reviewing React components, hooks, or TypeScript code.
 model: sonnet
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-max-turns: 15
+effort: high
+memory: project
+tools: Read, Glob, Grep, Bash
+maxTurns: 15
+skills:
+  - craftsman:challenge
 ---
 
 # React Reviewer Agent
