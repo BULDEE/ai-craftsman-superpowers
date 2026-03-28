@@ -444,6 +444,18 @@ else
 fi
 unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
 
+# Test: Respects stack config (skips TS when stack=symfony)
+export CLAUDE_USER_CONFIG_stack="symfony"
+result=$(run_file_changed "$FIXTURES_DIR/invalid-any.ts")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
+    log_pass "FileChanged respects stack=symfony (skips TS)"
+else
+    log_fail "FileChanged should skip TS for stack=symfony" "output=$output"
+fi
+unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+
 # Test: Always non-blocking (exit 0)
 result=$(run_file_changed "$FIXTURES_DIR/invalid-layer-violation.php")
 exit_code="${result%%|*}"
