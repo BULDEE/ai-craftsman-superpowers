@@ -90,9 +90,18 @@ fi
 # =============================================================================
 
 if [[ $VIOLATION_COUNT -gt 0 ]]; then
-    first_rule=$(echo -e "$VIOLATIONS" | head -1 | cut -d: -f1)
+    # Check if ANY violation should block (iterate all, not just first)
+    local_should_block=false
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        rule="${line%%:*}"
+        if config_should_block "$rule"; then
+            local_should_block=true
+            break
+        fi
+    done <<< "$(echo -e "$VIOLATIONS")"
 
-    if config_should_block "$first_rule"; then
+    if [[ "$local_should_block" == true ]]; then
         jq -n --arg v "$(echo -e "$VIOLATIONS")" \
                --arg c "$VIOLATION_COUNT" \
         '{
