@@ -173,6 +173,36 @@ final class CreateUserHandler
 
 ---
 
+## MapRequestPayload (Symfony 6.3+)
+
+```php
+#[Route('/api/users', methods: ['POST'])]
+public function create(
+    #[MapRequestPayload] CreateUserInput $input,
+): JsonResponse {
+    $this->commandBus->dispatch(CreateUserCommand::fromInput($input));
+    return new JsonResponse(null, Response::HTTP_CREATED);
+}
+```
+
+---
+
+## API Platform Input DTOs
+
+```php
+#[ApiResource(
+    operations: [
+        new Post(
+            input: CreateUserInput::class,
+            processor: CreateUserProcessor::class,
+        ),
+    ]
+)]
+final class UserResource { }
+```
+
+---
+
 ## Symfony Scheduler (7.4+)
 
 ```php

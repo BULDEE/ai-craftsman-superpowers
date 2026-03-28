@@ -146,6 +146,7 @@ final class {{AGGREGATE_ROOT}}StateProvider implements ProviderInterface
         if ($operation instanceof CollectionOperationInterface) {
             [$page, $offset, $limit] = $this->pagination->getPagination($operation, $context);
 
+            // Repository MUST return a PaginatorInterface implementation for hydra:totalItems
             return $this->repository->findPaginated($page, $limit);
         }
 
@@ -169,18 +170,28 @@ namespace App\Infrastructure\ApiPlatform\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Application\UseCase\Create{{AGGREGATE_ROOT}}\Create{{AGGREGATE_ROOT}}Command;
+use App\Domain\ValueObject\{{AGGREGATE_ROOT}}Id;
+use App\Infrastructure\ApiPlatform\Resource\{{AGGREGATE_ROOT}}Resource;
 use App\Shared\Application\CommandBusInterface;
 
 final class Create{{AGGREGATE_ROOT}}Processor implements ProcessorInterface
 {
     public function __construct(
         private readonly CommandBusInterface $commandBus,
+        private readonly {{AGGREGATE_ROOT}}RepositoryInterface $repository,
     ) {}
 
-    public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): void
+    public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): {{AGGREGATE_ROOT}}Resource
     {
+        $id = {{AGGREGATE_ROOT}}Id::generate();
+
         $this->commandBus->dispatch(
-            Create{{AGGREGATE_ROOT}}Command::fromApiResource($data)
+            Create{{AGGREGATE_ROOT}}Command::fromApiResource($data, $id)
+        );
+
+        // Return the resource for 201 response with body
+        return {{AGGREGATE_ROOT}}Resource::fromDomain(
+            $this->repository->findById($id)
         );
     }
 }
@@ -274,7 +285,7 @@ framework:
                     multiplier: 2
 
         routing:
-            'App\Application\UseCase\**\*Command': async
+            'App\Application\UseCase\': async
 ```
 
 ### Scheduler Patterns (Symfony 7.4+)
