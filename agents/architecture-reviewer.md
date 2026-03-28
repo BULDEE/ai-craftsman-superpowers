@@ -4,11 +4,12 @@ description: |
   Senior architect for reviewing code against Clean Architecture and DDD principles.
   Use when reviewing PRs, auditing architecture, or validating design decisions.
 model: sonnet
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-max-turns: 15
+effort: high
+memory: project
+tools: Read, Glob, Grep, Bash
+maxTurns: 15
+skills:
+  - craftsman:challenge
 ---
 
 # Architecture Reviewer Agent

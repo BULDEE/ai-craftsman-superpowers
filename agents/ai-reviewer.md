@@ -4,11 +4,12 @@ description: |
   AI/ML specialist for reviewing AI applications, RAG pipelines, and agent code.
   Use when reviewing ML models, embeddings, vector databases, or AI agent implementations.
 model: sonnet
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-max-turns: 15
+effort: high
+memory: project
+tools: Read, Glob, Grep, Bash
+maxTurns: 15
+skills:
+  - craftsman:rag
 ---
 
 # AI/ML Reviewer Agent
