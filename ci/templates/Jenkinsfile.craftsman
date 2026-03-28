@@ -17,10 +17,31 @@ pipeline {
     }
 
     stages {
+        stage('Setup') {
+            steps {
+                script {
+                    if (fileExists('composer.json')) {
+                        sh 'composer install --no-interaction --prefer-dist'
+                    }
+                    if (fileExists('package.json')) {
+                        sh 'npm ci'
+                    }
+                }
+            }
+        }
+
         stage('Craftsman Quality Gate') {
             steps {
                 sh 'chmod +x ci/craftsman-ci.sh'
-                sh 'bash ci/craftsman-ci.sh ci --provider generic'
+                sh 'bash ci/craftsman-ci.sh --format json > craftsman-report.json || true'
+                script {
+                    def report = readJSON file: 'craftsman-report.json'
+                    echo "Scanned ${report.summary.files_scanned} files: ${report.summary.violations} violations, ${report.summary.warnings} warnings"
+
+                    if (report.summary.violations > 0) {
+                        error "Craftsman found ${report.summary.violations} violation(s). Fix before merging."
+                    }
+                }
             }
         }
     }
