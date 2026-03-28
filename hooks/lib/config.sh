@@ -79,24 +79,18 @@ config_ts_enabled() {
 
 config_should_block() {
     local rule="$1"
+
+    # Warnings never block regardless of strictness
+    case "$rule" in
+        WARN*|PHP005) return 1 ;;
+    esac
+
     local strictness
     strictness=$(config_strictness)
-
     case "$strictness" in
-        strict)
-            return 0
-            ;;
-        moderate)
-            if [[ "$rule" == LAYER* ]]; then
-                return 0
-            fi
-            return 1
-            ;;
-        relaxed)
-            return 1
-            ;;
-        *)
-            return 0
-            ;;
+        strict)   return 0 ;;
+        moderate) [[ "$rule" == LAYER* ]] && return 0; return 1 ;;
+        relaxed)  return 1 ;;
+        *)        return 0 ;;
     esac
 }
