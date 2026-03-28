@@ -132,9 +132,17 @@ When user says "execute" or confirms the plan:
 
 ### Execution Process
 
-1. **Use TaskCreate** to create all tasks in the task system
-2. **Execute in batches** of 3-5 tasks
-3. **Checkpoint after each batch**
+1. **Create tasks** using TaskCreate for each plan item:
+   - Set status to "pending" initially
+   - Include dependencies in the task description
+   - Use consistent naming: "TASK-001: [description]"
+
+2. **Update tasks** using TaskUpdate as you progress:
+   - Set to "in_progress" when starting
+   - Set to "completed" when done with evidence
+   - Set to "blocked" if encountering issues
+
+3. **Check progress** using TaskList between batches
 
 ```markdown
 ## Executing Batch 1
@@ -194,7 +202,15 @@ Tasks identified as parallelizable:
 **Dispatching 2 agents in parallel...**
 ```
 
-Then use multiple Task tool calls in a SINGLE message to dispatch agents.
+### Phase 4: Agent Dispatch
+
+**Use the Agent tool to dispatch real subagents:**
+
+For each parallelizable task group, use the Agent tool with:
+- `description`: Task summary
+- `prompt`: Full task specification with scope, constraints, and done criteria
+- `isolation: "worktree"` for file-modifying tasks
+- Launch ALL independent agents in a SINGLE message for true parallel execution
 
 ---
 
