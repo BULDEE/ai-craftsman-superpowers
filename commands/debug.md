@@ -77,6 +77,22 @@ Execute investigation cycles:
 
 Repeat until root cause is **confirmed with evidence**.
 
+### Web Research (when stuck)
+
+If after 2 investigation cycles the root cause is unclear:
+
+1. **Search** for the error message or symptom:
+   - Use WebSearch with the exact error message
+   - Filter results for: Stack Overflow, GitHub Issues, official docs
+
+2. **Fetch** relevant documentation:
+   - Use WebFetch on library docs for the specific API/method involved
+   - Check changelogs for recent breaking changes
+
+3. **Cross-reference** findings with local code:
+   - Compare documentation behavior vs observed behavior
+   - Check dependency versions: `composer show | grep <package>` or `npm list <package>`
+
 ### Phase 4: Root Cause Identification
 
 ```markdown
