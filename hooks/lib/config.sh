@@ -3,7 +3,7 @@
 # Config Resolution Library
 # Resolves configuration from multiple sources with priority:
 #   1. .craft-config.yml in $PWD (highest)
-#   2. CLAUDE_USER_CONFIG_* env vars
+#   2. CLAUDE_PLUGIN_OPTION_* env vars
 #   3. Hardcoded defaults (lowest)
 #
 # Usage:
@@ -32,8 +32,8 @@ config_strictness() {
         return 0
     fi
 
-    if [[ -n "${CLAUDE_USER_CONFIG_strictness:-}" ]]; then
-        echo "$CLAUDE_USER_CONFIG_strictness"
+    if [[ -n "${CLAUDE_PLUGIN_OPTION_strictness:-}" ]]; then
+        echo "$CLAUDE_PLUGIN_OPTION_strictness"
         return 0
     fi
 
@@ -51,8 +51,8 @@ config_stack() {
         return 0
     fi
 
-    if [[ -n "${CLAUDE_USER_CONFIG_stack:-}" ]]; then
-        echo "$CLAUDE_USER_CONFIG_stack"
+    if [[ -n "${CLAUDE_PLUGIN_OPTION_stack:-}" ]]; then
+        echo "$CLAUDE_PLUGIN_OPTION_stack"
         return 0
     fi
 
