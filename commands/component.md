@@ -8,6 +8,14 @@ effort: medium
 
 # /craftsman:component - React Component Scaffolding
 
+## Project Context
+
+!`cat .craft-config.yml 2>/dev/null || echo "No config found. Run /craftsman:setup first."`
+
+## Stack Detection
+
+!`[[ -f composer.json ]] && echo "PHP/Symfony detected" || echo "No PHP"; [[ -f package.json ]] && echo "Node/React detected" || echo "No Node"`
+
 Scaffold a complete React component with TypeScript, tests, and optional Storybook.
 
 ## Pack Requirement Check
