@@ -26,7 +26,9 @@
     "refactoring",
     "methodology",
     "quality-metrics",
-    "static-analysis"
+    "static-analysis",
+    "sentry",
+    "channels"
   ],
   "userConfig": {
     "strictness": {
@@ -38,6 +40,30 @@
       "type": "string",
       "description": "Your tech stack: symfony (PHP only), react (TS only), fullstack (both), other (minimal rules)",
       "default": "fullstack"
+    },
+    "sentry_org": {
+      "type": "string",
+      "description": "Sentry organization slug for error context injection"
+    },
+    "sentry_project": {
+      "type": "string",
+      "description": "Sentry project slug to query errors from"
+    },
+    "sentry_token": {
+      "type": "string",
+      "description": "Sentry auth token (stored securely in keychain)",
+      "sensitive": true
+    }
+  },
+  "channels": [
+    {
+      "server": "sentry"
+    }
+  ],
+  "mcpServers": {
+    "sentry": {
+      "type": "http",
+      "url": "https://mcp.sentry.dev/mcp"
     }
   }
 }
