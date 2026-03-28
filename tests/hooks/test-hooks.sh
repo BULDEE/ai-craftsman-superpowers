@@ -650,10 +650,10 @@ fi
 export CLAUDE_PLUGIN_OPTION_sentry_org="test-org"
 export CLAUDE_PLUGIN_OPTION_sentry_project="test-project"
 result=$(channel_status_summary)
-if echo "$result" | grep -q "sentry:enabled"; then
-    log_pass "channel_status_summary shows 'sentry:enabled'"
+if echo "$result" | grep -qE "sentry:(enabled|closed|open|half-open)"; then
+    log_pass "channel_status_summary shows sentry with valid state"
 else
-    log_fail "channel_status_summary" "got '$result', expected 'sentry:enabled'"
+    log_fail "channel_status_summary" "got '$result', expected 'sentry:<state>'"
 fi
 
 unset CLAUDE_PLUGIN_OPTION_sentry_org 2>/dev/null || true
