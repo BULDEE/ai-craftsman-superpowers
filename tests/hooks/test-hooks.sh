@@ -166,6 +166,75 @@ else
 fi
 
 # =============================================================================
+# Post-Write Hook — Config-Aware Tests
+# =============================================================================
+echo ""
+echo "=== Post-Write Hook — Config-Aware Tests ==="
+
+# Test: stack=react skips PHP rules
+export CLAUDE_USER_CONFIG_stack="react"
+unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "stack=react skips PHP rules (exit 0 on PHP file)"
+else
+    log_fail "stack=react should skip PHP rules" "got exit $exit_code"
+fi
+unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+
+# Test: stack=symfony skips TS rules
+export CLAUDE_USER_CONFIG_stack="symfony"
+result=$(run_post_hook "$FIXTURES_DIR/invalid-any.ts")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "stack=symfony skips TS rules (exit 0 on TS file)"
+else
+    log_fail "stack=symfony should skip TS rules" "got exit $exit_code"
+fi
+unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+
+# Test: strictness=relaxed warns instead of blocking
+export CLAUDE_USER_CONFIG_strictness="relaxed"
+result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "strictness=relaxed warns PHP001 (exit 0)"
+else
+    log_fail "strictness=relaxed should warn not block" "got exit $exit_code"
+fi
+unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+
+# Test: strictness=moderate blocks LAYER but warns PHP001
+export CLAUDE_USER_CONFIG_strictness="moderate"
+result=$(run_post_hook "$FIXTURES_DIR/invalid-layer-violation.php")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "2" ]] && echo "$output" | grep -q "LAYER"; then
+    log_pass "strictness=moderate blocks LAYER violations (exit 2)"
+else
+    log_fail "strictness=moderate should block LAYER" "exit=$exit_code"
+fi
+
+result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "strictness=moderate warns PHP001 (exit 0)"
+else
+    log_fail "strictness=moderate should warn PHP001" "got exit $exit_code"
+fi
+unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+
+# Test: default behavior unchanged (strict + fullstack)
+result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "2" ]]; then
+    log_pass "Default behavior: PHP001 still blocks (backward compatible)"
+else
+    log_fail "Default behavior should block PHP001" "got exit $exit_code"
+fi
+
+# =============================================================================
 # Cleanup & Summary
 # =============================================================================
 rm -rf "$CLAUDE_PLUGIN_DATA"
