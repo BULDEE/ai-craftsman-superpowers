@@ -282,6 +282,54 @@ rm -f "$TEST_DIR/.craft-config.yml"
 unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 
 # =============================================================================
+# 6. Stop review enabled (config_stop_review_enabled)
+# =============================================================================
+echo ""
+echo "=== Stop Review Enabled ==="
+
+rm -f "$TEST_DIR/.craft-config.yml"
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
+
+# strict: stop review enabled
+export CLAUDE_PLUGIN_OPTION_strictness="strict"
+
+if config_stop_review_enabled; then
+    log_pass "strict: stop review enabled"
+else
+    log_fail "strict: stop review should be enabled" "returned false"
+fi
+
+# moderate: stop review disabled
+export CLAUDE_PLUGIN_OPTION_strictness="moderate"
+
+if ! config_stop_review_enabled; then
+    log_pass "moderate: stop review disabled"
+else
+    log_fail "moderate: stop review should be disabled" "returned true"
+fi
+
+# relaxed: stop review disabled
+export CLAUDE_PLUGIN_OPTION_strictness="relaxed"
+
+if ! config_stop_review_enabled; then
+    log_pass "relaxed: stop review disabled"
+else
+    log_fail "relaxed: stop review should be disabled" "returned true"
+fi
+
+# default (no env var): strict → enabled
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+
+if config_stop_review_enabled; then
+    log_pass "default (strict): stop review enabled"
+else
+    log_fail "default should enable stop review" "returned false"
+fi
+
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+
+# =============================================================================
 # Cleanup
 # =============================================================================
 cd "$ORIGINAL_PWD"

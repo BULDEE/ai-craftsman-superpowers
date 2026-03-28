@@ -94,3 +94,9 @@ config_should_block() {
         *)        return 0 ;;
     esac
 }
+
+config_stop_review_enabled() {
+    local strictness
+    strictness=$(config_strictness)
+    [[ "$strictness" == "strict" ]]
+}
