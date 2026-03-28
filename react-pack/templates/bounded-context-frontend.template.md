@@ -254,6 +254,17 @@ export function TabPanel({ id, children }: TabPanelProps) {
 
 ### Render Props (Modern — with useSuspenseQuery)
 
+> **Important:** `useSuspenseQuery` throws on error. Always wrap usage in an `<ErrorBoundary>` alongside `<Suspense>`:
+> ```tsx
+> <ErrorBoundary fallback={<ErrorMessage />}>
+>   <Suspense fallback={<Skeleton />}>
+>     <DataLoader queryKey={[...]} queryFn={...}>
+>       {data => <Component data={data} />}
+>     </DataLoader>
+>   </Suspense>
+> </ErrorBoundary>
+> ```
+
 ```tsx
 import { useSuspenseQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';

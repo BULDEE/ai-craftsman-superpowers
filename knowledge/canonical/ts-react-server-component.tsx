@@ -23,11 +23,17 @@ interface User {
 }
 
 async function fetchUser(userId: string): Promise<User> {
-  const response = await fetch(`/api/users/${userId}`, { cache: 'no-store' });
+  // Note: Caching strategy is framework-specific.
+  // Next.js: { cache: 'no-store' } or { next: { revalidate: 60 } }
+  // Remix: Use loader with headers
+  // Generic React: Use HTTP cache headers on the API
+  const response = await fetch(`/api/users/${userId}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch user: ${response.status}`);
   }
-  return response.json() as Promise<User>;
+  // Production: validate with zod schema — UserSchema.parse(data)
+  const data: unknown = await response.json();
+  return data as User;
 }
 
 // Server Component — async, no hooks, no client state
@@ -59,8 +65,15 @@ function UserActivitySkeleton() {
   return <div aria-busy="true" aria-label="Loading activity..." />;
 }
 
+interface ActivityItem {
+  readonly id: string;
+  readonly label: string;
+}
+
 async function UserActivity({ userId }: { readonly userId: string }) {
   // Independent fetch — will stream separately from UserProfile
-  const activity = await fetch(`/api/users/${userId}/activity`).then(r => r.json());
-  return <ul>{activity.map((item: { id: string; label: string }) => <li key={item.id}>{item.label}</li>)}</ul>;
+  const response = await fetch(`/api/users/${userId}/activity`);
+  // Production: validate with zod schema
+  const activity = (await response.json()) as readonly ActivityItem[];
+  return <ul>{activity.map(item => <li key={item.id}>{item.label}</li>)}</ul>;
 }

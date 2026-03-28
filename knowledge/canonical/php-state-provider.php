@@ -37,6 +37,7 @@ final class UserStateProvider implements ProviderInterface
         if ($operation instanceof CollectionOperationInterface) {
             [$page, $offset, $limit] = $this->pagination->getPagination($operation, $context);
 
+            // Repository MUST return a PaginatorInterface implementation for hydra:totalItems
             return $this->repository->findPaginated($page, $limit);
         }
 
