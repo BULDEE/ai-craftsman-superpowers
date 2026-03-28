@@ -235,6 +235,43 @@ else
 fi
 
 # =============================================================================
+# Pre-Write Hook — Config-Aware Tests
+# =============================================================================
+echo ""
+echo "=== Pre-Write Hook — Config-Aware Tests ==="
+
+# Test: stack=react skips PHP layer checks
+export CLAUDE_USER_CONFIG_stack="react"
+result=$(run_pre_hook "src/Domain/Service/UserService.php" "<?php\nuse App\\\\Infrastructure\\\\Persistence\\\\Repo;\nfinal class UserService {}")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "Pre-write: stack=react skips PHP layer checks (exit 0)"
+else
+    log_fail "Pre-write: stack=react should skip PHP" "got exit $exit_code"
+fi
+unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+
+# Test: strictness=relaxed warns instead of blocking layer violations
+export CLAUDE_USER_CONFIG_strictness="relaxed"
+result=$(run_pre_hook "src/Domain/Service/UserService.php" "<?php\nuse App\\\\Infrastructure\\\\Persistence\\\\Repo;\nfinal class UserService {}")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "Pre-write: strictness=relaxed warns layer violation (exit 0)"
+else
+    log_fail "Pre-write: strictness=relaxed should warn" "got exit $exit_code"
+fi
+unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+
+# Test: default still blocks
+result=$(run_pre_hook "src/Domain/Service/UserService.php" "<?php\nuse App\\\\Infrastructure\\\\Persistence\\\\Repo;\nfinal class UserService {}")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "2" ]]; then
+    log_pass "Pre-write: default still blocks layer violations (backward compatible)"
+else
+    log_fail "Pre-write: default should block" "got exit $exit_code"
+fi
+
+# =============================================================================
 # Cleanup & Summary
 # =============================================================================
 rm -rf "$CLAUDE_PLUGIN_DATA"
