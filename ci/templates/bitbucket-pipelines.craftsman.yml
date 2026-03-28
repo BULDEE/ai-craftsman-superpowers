@@ -1,0 +1,28 @@
+# =============================================================================
+# Craftsman Quality Gate — Bitbucket Pipelines template
+#
+# If you already have bitbucket-pipelines.yml, merge this step into your
+# existing pipeline definition.
+#
+# Required variables (set in Repository settings > Pipelines > Variables):
+#   BITBUCKET_TOKEN  — App password or OAuth token for PR comments and reports
+# =============================================================================
+
+pipelines:
+  pull-requests:
+    '**':
+      - step:
+          name: Craftsman Quality Gate
+          image: python:3.12-slim
+          script:
+            - chmod +x ci/craftsman-ci.sh
+            - bash ci/craftsman-ci.sh ci --provider bitbucket
+
+  branches:
+    main:
+      - step:
+          name: Craftsman Quality Gate
+          image: python:3.12-slim
+          script:
+            - chmod +x ci/craftsman-ci.sh
+            - bash ci/craftsman-ci.sh ci --provider bitbucket
