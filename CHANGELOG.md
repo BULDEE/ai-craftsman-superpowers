@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-03-28
+
+### Added
+
+- **Teams system** — Agent team orchestration with `/craftsman:team` (create, context, list):
+  - 3 built-in templates: `code-review`, `feature`, `security-audit`
+  - Interactive team builder with questionnaire or template selection
+  - Codebase analysis for optimal team composition
+- **CI export** — `/craftsman:ci` skill + standalone `craftsman-ci.sh` CLI:
+  - Same regex rules as hooks (PHP001-005, TS001-003, LAYER001-003)
+  - JSON + text output formats for CI/CD integration
+  - GitHub Actions workflow template (`craftsman-quality-gate.yml`)
+  - 36 CLI tests, 0 failures
+- **Onboarding** — `/craftsman:start` for first-time users:
+  - Auto-detect stack, scan codebase, suggest top 5 skills
+  - Quick reference card with all commands
+- **Pre-push verification** — `pre-push-verify.sh` blocks `git push` if `/craftsman:verify` not run
+- **Workflow enforcement** — `bias-detector.sh` warns when domain modeling without `/craftsman:design`
+- **TeammateIdle + TaskCompleted hooks** — New hook events in hooks.json
+- **4 canonical examples** — API Platform 4 State Provider, Messenger handler, React Server Component, Compound Component
+- **3 anti-patterns** — sync-in-async (Messenger), barrel imports, inline components
+
+### Changed
+
+- **Hooks enriched** — Structured PHPStan/ESLint/deptrac parsing with error-to-code mapping (PHPSTAN001-003, ESLINT001)
+- **Correction Learning v2** — Cross-file pattern detection: project-wide and directory-level suggestions when same rule violated in 3+ files
+- **craftsman-ignore multi-rules** — `// craftsman-ignore: PHP001, TS001, LAYER001` on single line
+- **Session metrics** — Now tracks agent invocations, team type, and completed tasks
+- **All 22 skills enriched** — `paths` field (7 skills), `effort` field (all 22), `!command` injections for runtime context
+- **Scaffolders** (entity, usecase, component, hook) — Worktree isolation recommendation
+- **/craftsman:plan** — TaskCreate/TaskUpdate integration + Agent tool dispatch for parallel execution
+- **/craftsman:verify** — Auto-detection + real execution of tests/lint/typecheck + session state `verified=true`
+- **/craftsman:debug** — WebSearch/WebFetch auto-research after 2 inconclusive investigation cycles
+- **/craftsman:challenge** — Deep Review Mode with parallel reviewer agents for complex PRs
+- **/craftsman:parallel** — Real Agent tool spawn with `isolation: "worktree"` and `run_in_background: true`
+- **/craftsman:setup** — Auto-detection of stack + analysis tools check + pack auto-selection
+- **/craftsman:metrics** — Correction trends, quality score (100-based), agent/team usage stats
+- **Symfony pack** — API Platform 4 (State Provider/Processor), Messenger async handlers, Scheduler 7.4+, MapRequestPayload
+- **React pack** — React 19 Server Components, useOptimistic, useTransition, Compound Components, Render Props with useSuspenseQuery
+- **knowledge/stack-specifics.md** — 6 new sections (API Platform 4, Messenger, Scheduler, React 19, Composition)
+
+### Fixed
+
+- **8 factual inaccuracies** in packs — Messenger routing glob, Processor return type, Next.js cache leak, unsafe type cast, untyped activity fetch, missing ErrorBoundary note, pagination type, missing patterns
+
+---
+
 ## [1.5.0] - 2026-03-28
 
 ### Added
