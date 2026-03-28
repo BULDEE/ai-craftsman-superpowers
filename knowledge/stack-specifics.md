@@ -424,3 +424,120 @@ should_create_user_when_valid_data
 | Pagination | Large datasets |
 | Transactions | Multi-step operations |
 | Read replicas | Heavy read loads |
+
+---
+
+## API Platform 4 (Symfony)
+
+> Verified against official docs: https://api-platform.com/docs/core/state-providers/,
+> https://api-platform.com/docs/core/state-processors/, https://api-platform.com/docs/core/dto/,
+> https://api-platform.com/docs/core/pagination/
+
+### Interface Signatures (exact — AP4)
+
+```php
+// ProviderInterface — ApiPlatform\State\ProviderInterface
+public function provide(Operation $operation, array $uriVariables = [], array $context = []): object|array|null;
+
+// ProcessorInterface — ApiPlatform\State\ProcessorInterface
+// Generic hint: @implements ProcessorInterface<T, T|void>
+public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed;
+```
+
+### Key Namespaces
+
+| Symbol | Namespace |
+|--------|-----------|
+| `ProviderInterface` | `ApiPlatform\State\ProviderInterface` |
+| `ProcessorInterface` | `ApiPlatform\State\ProcessorInterface` |
+| `Operation` | `ApiPlatform\Metadata\Operation` |
+| `CollectionOperationInterface` | `ApiPlatform\Metadata\CollectionOperationInterface` |
+| `DeleteOperationInterface` | `ApiPlatform\Metadata\DeleteOperationInterface` |
+| `ArrayPaginator` | `ApiPlatform\State\Pagination\ArrayPaginator` |
+| `TraversablePaginator` | `ApiPlatform\State\Pagination\TraversablePaginator` |
+| `PaginatorInterface` | `ApiPlatform\State\Pagination\PaginatorInterface` |
+| `PartialPaginatorInterface` | `ApiPlatform\State\Pagination\PartialPaginatorInterface` |
+| `#[Map]` attribute | `Symfony\Component\ObjectMapper\Attribute\Map` |
+| `Options` (Doctrine) | `ApiPlatform\Doctrine\Orm\State\Options` |
+
+### DTO-First Pattern (recommended in AP4)
+
+AP4 recommends using API Resources (DTOs) separate from Doctrine entities:
+
+```php
+#[ApiResource(
+    stateOptions: new Options(entityClass: BookEntity::class),
+    operations: [
+        new Get(provider: BookProvider::class),
+        new GetCollection(output: BookCollection::class),
+        new Post(input: CreateBook::class, processor: BookProcessor::class),
+        new Patch(input: UpdateBook::class, processor: BookProcessor::class),
+    ],
+)]
+#[Map(source: BookEntity::class)]
+final class Book { /* DTO fields */ }
+```
+
+Input DTO (write):
+```php
+#[Map(target: BookEntity::class)]
+final class CreateBook
+{
+    #[Map(target: 'title')]
+    public string $name;
+}
+```
+
+Output DTO (read, collection):
+```php
+#[Map(source: BookEntity::class)]
+final class BookCollection
+{
+    #[Map(source: 'title')]
+    public string $name;
+}
+```
+
+### State Provider: Collection vs Item
+
+Use `CollectionOperationInterface` to branch — **still valid in AP4**:
+
+```php
+use ApiPlatform\Metadata\CollectionOperationInterface;
+
+public function provide(Operation $operation, array $uriVariables = [], array $context = []): object|array|null
+{
+    if ($operation instanceof CollectionOperationInterface) {
+        return $this->repository->findAll();
+    }
+    return $this->repository->findById($uriVariables['id']);
+}
+```
+
+### Built-in Service IDs (Symfony autowire)
+
+```php
+#[Autowire(service: 'api_platform.doctrine.orm.state.item_provider')]
+#[Autowire(service: 'api_platform.doctrine.orm.state.persist_processor')]
+#[Autowire(service: 'api_platform.doctrine.orm.state.remove_processor')]
+```
+
+### Pagination — Custom State Providers
+
+For custom providers, return an instance of `PaginatorInterface` or `PartialPaginatorInterface`,
+not a plain array, to get Hydra pagination links (first/last/next/prev):
+
+```php
+use ApiPlatform\State\Pagination\ArrayPaginator;
+
+// ArrayPaginator(iterable $results, int $firstResult, int $maxResults, int $totalItems)
+return new ArrayPaginator($items, $offset, $limit, $total);
+```
+
+### Never
+
+| Don't | Why | Do Instead |
+|-------|-----|------------|
+| Doctrine entity directly as `#[ApiResource]` | Couples persistence to API surface | Separate DTO Resource class |
+| Return plain `array` for collections in custom providers | Breaks pagination/Hydra response | Return `PaginatorInterface` implementation |
+| `input:` at `#[ApiResource]` level | Not how AP4 DTOs work | Declare `input:` on each operation |
