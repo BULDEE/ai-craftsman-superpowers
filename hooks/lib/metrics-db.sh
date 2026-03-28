@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS violations (
     project_hash TEXT NOT NULL,
     rule TEXT NOT NULL,
     file_pattern TEXT NOT NULL,
-    severity TEXT NOT NULL CHECK (severity IN ('critical', 'warning')),
+    severity TEXT NOT NULL CHECK (severity IN ('critical', 'warning', 'info')),
     blocked BOOLEAN NOT NULL DEFAULT 0,
     ignored BOOLEAN NOT NULL DEFAULT 0
 );
@@ -41,6 +41,30 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE INDEX IF NOT EXISTS idx_violations_project ON violations(project_hash, timestamp);
 CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_hash, timestamp);
 SQL
+
+    # Migration v1.2.1: widen severity CHECK to include 'info'
+    # SQLite CHECK constraints are immutable on existing tables.
+    # If the old table exists without 'info', recreate it preserving data.
+    local has_info
+    has_info=$(sqlite3 "$METRICS_DB" "SELECT sql FROM sqlite_master WHERE name='violations';" 2>/dev/null)
+    if [[ -n "$has_info" ]] && ! echo "$has_info" | grep -q "'info'"; then
+        sqlite3 "$METRICS_DB" <<'MIGRATE'
+ALTER TABLE violations RENAME TO violations_old;
+CREATE TABLE violations (
+    id INTEGER PRIMARY KEY,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    project_hash TEXT NOT NULL,
+    rule TEXT NOT NULL,
+    file_pattern TEXT NOT NULL,
+    severity TEXT NOT NULL CHECK (severity IN ('critical', 'warning', 'info')),
+    blocked BOOLEAN NOT NULL DEFAULT 0,
+    ignored BOOLEAN NOT NULL DEFAULT 0
+);
+INSERT INTO violations SELECT * FROM violations_old;
+DROP TABLE violations_old;
+CREATE INDEX IF NOT EXISTS idx_violations_project ON violations(project_hash, timestamp);
+MIGRATE
+    fi
 }
 
 metrics_project_hash() {

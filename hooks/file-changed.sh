@@ -39,7 +39,7 @@ add_issue() {
     local message="$2"
     ISSUES="${ISSUES}${rule}: ${message}\n"
     ((ISSUE_COUNT++)) || true
-    metrics_record_violation "$rule" "$FILE_PATTERN" "warning" 0 0 2>/dev/null || true
+    metrics_record_violation "$rule" "$FILE_PATTERN" "info" 0 0 2>/dev/null || true
 }
 
 # Level 1: Regex checks (<50ms, same rules as post-write-check)
