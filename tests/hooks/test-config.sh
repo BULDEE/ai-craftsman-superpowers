@@ -54,7 +54,7 @@ else
 fi
 
 # =============================================================================
-# 2. CLAUDE_USER_CONFIG env var overrides defaults
+# 2. CLAUDE_PLUGIN_OPTION env var overrides defaults
 # =============================================================================
 echo ""
 echo "=== Env Var Overrides ==="
