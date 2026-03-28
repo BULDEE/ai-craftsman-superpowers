@@ -118,6 +118,24 @@ After review, ask thought-provoking questions:
 3. "How would this change if [future requirement]?"
 4. "What's the performance implication of this approach?"
 
+### Deep Review Mode (for complex PRs)
+
+For PRs touching 5+ files or 3+ bounded contexts, use **parallel reviewer agents**:
+
+1. **Spawn specialized reviewers** using the Agent tool:
+   - Architecture reviewer: checks layer violations, aggregate boundaries
+   - Security reviewer: checks OWASP top 10, input validation
+   - Performance reviewer: checks N+1 queries, memory leaks
+
+2. **Each reviewer** gets:
+   - The list of changed files
+   - Access to Read/Grep/Glob tools
+   - Specific review checklist for their domain
+
+3. **Aggregate results** from all reviewers into a single review report
+
+Use the Agent tool with `subagent_type` matching the reviewer specialty when available.
+
 ---
 
 ## Mode 2: Respond to Review
