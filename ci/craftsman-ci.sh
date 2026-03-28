@@ -13,7 +13,7 @@
 # =============================================================================
 set -o pipefail
 
-VERSION="2.0.0"
+VERSION="2.1.0"
 
 # =============================================================================
 # Defaults
@@ -66,6 +66,20 @@ EOF
     esac
 done
 
+# =============================================================================
+# Rules engine integration (optional — plugin context only)
+# =============================================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLUGIN_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Source rules engine if available (plugin context)
+if [[ -f "$PLUGIN_ROOT/hooks/lib/rules-engine.sh" ]]; then
+    source "$PLUGIN_ROOT/hooks/lib/rules-engine.sh"
+    RULES_ENGINE_AVAILABLE=true
+else
+    RULES_ENGINE_AVAILABLE=false
+fi
+
 # Default scan path
 if [[ ${#SCAN_PATHS[@]} -eq 0 ]]; then
     SCAN_PATHS=("src/")
@@ -81,26 +95,62 @@ _parse_yml_value() {
 }
 
 _resolve_config() {
-    local config_path=""
+    if [[ "$RULES_ENGINE_AVAILABLE" == true ]]; then
+        # Use rules engine for config resolution (plugin context)
+        local project_dir="$PWD"
+        local global_dir="${HOME:-}"
 
-    if [[ -n "$CONFIG_FILE" ]]; then
-        config_path="$CONFIG_FILE"
-    elif [[ -f "$PWD/.craft-config.yml" ]]; then
-        config_path="$PWD/.craft-config.yml"
+        rules_init "$project_dir" "$global_dir"
+
+        # If --config was passed explicitly, feed it to the rules engine
+        # (rules_init only looks for .craft-config.yml by convention name)
+        if [[ -n "$CONFIG_FILE" && -f "$CONFIG_FILE" ]]; then
+            _rules_parse_config "$CONFIG_FILE" "project"
+        fi
+
+        # Sync STRICTNESS from engine
+        STRICTNESS="$_RULES_STRICTNESS"
+
+        # Stack: rules engine doesn't manage stack, so parse it ourselves
+        local config_path=""
+        if [[ -n "$CONFIG_FILE" ]]; then
+            config_path="$CONFIG_FILE"
+        elif [[ -f "$PWD/.craft-config.yml" ]]; then
+            config_path="$PWD/.craft-config.yml"
+        fi
+
+        if [[ -n "$config_path" && -f "$config_path" ]]; then
+            local yml_stack
+            yml_stack=$(_parse_yml_value "stack" "$config_path")
+            [[ -n "$yml_stack" ]] && STACK="$yml_stack"
+        fi
+
+        # Env var overrides
+        [[ -n "${CLAUDE_PLUGIN_OPTION_strictness:-}" ]] && STRICTNESS="$CLAUDE_PLUGIN_OPTION_strictness"
+        [[ -n "${CLAUDE_PLUGIN_OPTION_stack:-}" ]] && STACK="$CLAUDE_PLUGIN_OPTION_stack"
+    else
+        # Standalone mode: self-contained config parsing
+        local config_path=""
+
+        if [[ -n "$CONFIG_FILE" ]]; then
+            config_path="$CONFIG_FILE"
+        elif [[ -f "$PWD/.craft-config.yml" ]]; then
+            config_path="$PWD/.craft-config.yml"
+        fi
+
+        if [[ -n "$config_path" && -f "$config_path" ]]; then
+            local yml_strictness yml_stack
+            yml_strictness=$(_parse_yml_value "strictness" "$config_path")
+            yml_stack=$(_parse_yml_value "stack" "$config_path")
+
+            [[ -n "$yml_strictness" ]] && STRICTNESS="$yml_strictness"
+            [[ -n "$yml_stack" ]] && STACK="$yml_stack"
+        fi
+
+        # Env var overrides (same as hooks)
+        [[ -n "${CLAUDE_PLUGIN_OPTION_strictness:-}" ]] && STRICTNESS="$CLAUDE_PLUGIN_OPTION_strictness"
+        [[ -n "${CLAUDE_PLUGIN_OPTION_stack:-}" ]] && STACK="$CLAUDE_PLUGIN_OPTION_stack"
     fi
-
-    if [[ -n "$config_path" && -f "$config_path" ]]; then
-        local yml_strictness yml_stack
-        yml_strictness=$(_parse_yml_value "strictness" "$config_path")
-        yml_stack=$(_parse_yml_value "stack" "$config_path")
-
-        [[ -n "$yml_strictness" ]] && STRICTNESS="$yml_strictness"
-        [[ -n "$yml_stack" ]] && STACK="$yml_stack"
-    fi
-
-    # Env var overrides (same as hooks)
-    [[ -n "${CLAUDE_PLUGIN_OPTION_strictness:-}" ]] && STRICTNESS="$CLAUDE_PLUGIN_OPTION_strictness"
-    [[ -n "${CLAUDE_PLUGIN_OPTION_stack:-}" ]] && STACK="$CLAUDE_PLUGIN_OPTION_stack"
 }
 
 _php_enabled() {
@@ -119,15 +169,22 @@ _ts_enabled() {
 
 _should_block() {
     local rule="$1"
-    case "$rule" in
-        WARN*|PHP005) return 1 ;;
-    esac
-    case "$STRICTNESS" in
-        strict)   return 0 ;;
-        moderate) [[ "$rule" == LAYER* ]] && return 0; return 1 ;;
-        relaxed)  return 1 ;;
-        *)        return 0 ;;
-    esac
+    if [[ "$RULES_ENGINE_AVAILABLE" == true ]]; then
+        local sev
+        sev=$(rules_severity "$rule")
+        [[ "$sev" == "block" ]]
+    else
+        # Standalone fallback logic
+        case "$rule" in
+            WARN*|PHP005) return 1 ;;
+        esac
+        case "$STRICTNESS" in
+            strict)   return 0 ;;
+            moderate) [[ "$rule" == LAYER* ]] && return 0; return 1 ;;
+            relaxed)  return 1 ;;
+            *)        return 0 ;;
+        esac
+    fi
 }
 
 # =============================================================================
@@ -355,6 +412,33 @@ scan_file() {
             return 0
             ;;
     esac
+
+    # Custom rules from rules engine (plugin context only)
+    if [[ "$RULES_ENGINE_AVAILABLE" == true ]]; then
+        local language=""
+        case "$ext" in
+            php) language="php" ;;
+            ts|tsx) language="typescript" ;;
+        esac
+        if [[ -n "$language" ]]; then
+            local custom_rules
+            custom_rules=$(rules_custom_list "$language")
+            while IFS= read -r rule_id; do
+                [[ -z "$rule_id" ]] && continue
+                local pattern msg ln_num=0
+                pattern=$(rules_pattern "$rule_id")
+                msg=$(rules_message "$rule_id")
+                [[ -z "$pattern" ]] && continue
+                while IFS= read -r fline; do
+                    ln_num=$((ln_num + 1))
+                    if echo "$fline" | grep -qE "$pattern" 2>/dev/null; then
+                        _add_violation "$file" "$ln_num" "$rule_id" "$msg"
+                        break
+                    fi
+                done < "$file"
+            done <<< "$custom_rules"
+        fi
+    fi
 
     FILES_SCANNED=$((FILES_SCANNED + 1))
 }
