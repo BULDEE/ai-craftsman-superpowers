@@ -529,11 +529,36 @@ hooks = d['hooks']['InstructionsLoaded'][0]['hooks']
 agent = [h for h in hooks if h.get('type') == 'agent']
 assert len(agent) == 1
 assert agent[0]['model'] == 'haiku'
-assert agent[0]['timeout'] == 15
+assert agent[0]['timeout'] == 20
 " 2>/dev/null; then
-    log_pass "InstructionsLoaded agent hook: valid schema (haiku, 15s timeout)"
+    log_pass "InstructionsLoaded agent hook: valid schema (haiku, 20s timeout)"
 else
     log_fail "InstructionsLoaded agent hook schema" "missing or invalid"
+fi
+
+# Test: InstructionsLoaded prompt contains correction trends query
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+prompt = d['hooks']['InstructionsLoaded'][0]['hooks'][0]['prompt']
+assert 'corrections' in prompt.lower(), 'Missing corrections reference'
+assert 'sqlite3' in prompt, 'Missing sqlite3 query'
+" 2>/dev/null; then
+    log_pass "InstructionsLoaded prompt contains correction trends query"
+else
+    log_fail "InstructionsLoaded corrections" "missing sqlite3 or corrections reference"
+fi
+
+# Test: InstructionsLoaded prompt contains channel status check
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+prompt = d['hooks']['InstructionsLoaded'][0]['hooks'][0]['prompt']
+assert 'channel_status_summary' in prompt, 'Missing channel_status_summary'
+" 2>/dev/null; then
+    log_pass "InstructionsLoaded prompt contains channel_status_summary"
+else
+    log_fail "InstructionsLoaded channel status" "missing channel_status_summary"
 fi
 
 # Test: Stop agent hook
