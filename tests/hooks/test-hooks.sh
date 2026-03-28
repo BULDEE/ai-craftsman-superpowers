@@ -375,6 +375,85 @@ cd "$ORIGINAL_PWD"
 rm -rf "$SESSION_TEST_DIR"
 
 # =============================================================================
+# FileChanged Hook Tests
+# =============================================================================
+echo ""
+echo "=== FileChanged Hook Tests ==="
+
+run_file_changed() {
+    local file_path="$1"
+    local output
+    output=$(jq -n --arg fp "$file_path" '{"file_path":$fp}' | bash "$ROOT_DIR/hooks/file-changed.sh" 2>/dev/null)
+    local exit_code=$?
+    echo "$exit_code|$output"
+}
+
+# Clear env
+unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+
+# Test: Ignores non-PHP/TS files
+result=$(run_file_changed "$ROOT_DIR/tests/run-tests.sh")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
+    log_pass "FileChanged ignores non-PHP/TS files (silent exit 0)"
+else
+    log_fail "FileChanged should ignore non-source files" "exit=$exit_code output=$output"
+fi
+
+# Test: Detects PHP violations (non-blocking)
+result=$(run_file_changed "$FIXTURES_DIR/invalid-no-strict.php")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | grep -q "PHP001"; then
+    log_pass "FileChanged detects PHP001 (non-blocking, exit 0)"
+else
+    log_fail "FileChanged should detect PHP001" "exit=$exit_code"
+fi
+
+# Test: Detects TS violations (non-blocking)
+result=$(run_file_changed "$FIXTURES_DIR/invalid-any.ts")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | grep -q "TS001"; then
+    log_pass "FileChanged detects TS001 (non-blocking, exit 0)"
+else
+    log_fail "FileChanged should detect TS001" "exit=$exit_code"
+fi
+
+# Test: Silent when file is clean
+result=$(run_file_changed "$FIXTURES_DIR/valid-entity.php")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
+    log_pass "FileChanged silent on clean file"
+else
+    log_fail "FileChanged should be silent on clean file" "output=$output"
+fi
+
+# Test: Respects stack config
+export CLAUDE_USER_CONFIG_stack="react"
+result=$(run_file_changed "$FIXTURES_DIR/invalid-no-strict.php")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
+    log_pass "FileChanged respects stack=react (skips PHP)"
+else
+    log_fail "FileChanged should skip PHP for stack=react" "output=$output"
+fi
+unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+
+# Test: Always non-blocking (exit 0)
+result=$(run_file_changed "$FIXTURES_DIR/invalid-layer-violation.php")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "FileChanged always exits 0 (even on LAYER violations)"
+else
+    log_fail "FileChanged should always exit 0" "got exit $exit_code"
+fi
+
+# =============================================================================
 # Cleanup & Summary
 # =============================================================================
 rm -rf "$CLAUDE_PLUGIN_DATA"
