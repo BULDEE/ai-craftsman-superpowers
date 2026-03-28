@@ -2,7 +2,7 @@
 
 Welcome! This guide will walk you through your first interactions with AI Craftsman Superpowers.
 
-## Your First Skill: /design
+## Your First Command: /craftsman:design
 
 Let's design a simple domain entity.
 
@@ -13,10 +13,10 @@ cd ~/your-project
 claude
 ```
 
-### 2. Invoke the design skill
+### 2. Invoke the design command
 
 ```
-> /design
+> /craftsman:design
 
 I need to create a User entity for a registration system.
 Users have email, password hash, and registration date.
@@ -57,12 +57,12 @@ Generates:
 - tests/Unit/Domain/User/UserTest.php
 ```
 
-## Your Second Skill: /debug
+## Your Second Command: /craftsman:debug
 
 Something not working? Use systematic debugging.
 
 ```
-> /debug
+> /craftsman:debug
 
 The user registration is throwing a 500 error.
 The error log shows "Integrity constraint violation".
@@ -79,12 +79,12 @@ CONCLUSION: Missing email uniqueness validation
 RECOMMENDED FIX: Add email existence check in RegisterUserUseCase
 ```
 
-## Your Third Skill: /test
+## Your Third Command: /craftsman:test
 
 Need to add tests?
 
 ```
-> /test
+> /craftsman:test
 
 I need tests for the User entity we just created.
 Focus on the registration behavior.
@@ -105,18 +105,22 @@ GENERATED:
   - test_emits_user_registered_event()
 ```
 
-## Quick Reference: Core Skills
+## Quick Reference: Core Commands
 
-| Skill | Use When |
-|-------|----------|
-| `/design` | Creating new entities, VOs, aggregates |
-| `/debug` | Investigating bugs or errors |
-| `/test` | Adding or improving tests |
-| `/refactor` | Improving existing code |
-| `/plan` | Planning multi-step tasks |
-| `/challenge` | Reviewing architecture decisions |
-| `/spec` | Writing specifications |
-| `/git` | Git operations |
+All commands use the `/craftsman:` prefix. See the full [Commands Reference](../reference/skills.md) for all 22 commands.
+
+| Command | Use When |
+|---------|----------|
+| `/craftsman:design` | Creating new entities, VOs, aggregates |
+| `/craftsman:debug` | Investigating bugs or errors |
+| `/craftsman:test` | Adding or improving tests |
+| `/craftsman:refactor` | Improving existing code |
+| `/craftsman:plan` | Planning multi-step tasks |
+| `/craftsman:challenge` | Reviewing architecture decisions |
+| `/craftsman:spec` | Writing specifications (TDD/BDD) |
+| `/craftsman:git` | Safe git operations |
+| `/craftsman:verify` | Evidence-based verification |
+| `/craftsman:metrics` | View quality dashboard |
 
 ## Pro Tips
 
@@ -126,12 +130,12 @@ Don't give all details upfront. Let the skill's process discover what's needed.
 
 ```
 # Too much upfront
-> /design Create a User entity with id (UUID), email (Email VO),
+> /craftsman:design Create a User entity with id (UUID), email (Email VO),
   passwordHash (string), createdAt (DateTimeImmutable),
   updatedAt (DateTimeImmutable), with UserRegistered event...
 
 # Better - let the process work
-> /design I need a User entity for registration
+> /craftsman:design I need a User entity for registration
 ```
 
 ### 2. Use bias protection
@@ -147,13 +151,13 @@ Before adding a setter, let's consider:
 - Should this be a behavioral method instead?"
 ```
 
-### 3. Chain skills naturally
+### 3. Chain commands naturally
 
 ```
-> /design    # Design the entity
-> /test      # Add tests for it
-> /debug     # Fix any issues
-> /refactor  # Clean up if needed
+> /craftsman:design    # Design the entity
+> /craftsman:test      # Add tests for it
+> /craftsman:debug     # Fix any issues
+> /craftsman:refactor  # Clean up if needed
 ```
 
 ## Next Steps

@@ -17,7 +17,7 @@ Welcome to your journey as an AI-Augmented Craftsman. This guide assumes basic p
 
 ---
 
-## Lesson 1: The /design Skill
+## Lesson 1: The /craftsman:design Command
 
 ### What is Domain-Driven Design?
 
@@ -42,7 +42,7 @@ claude
 ```
 
 ```
-> /design
+> /craftsman:design
 
 I'm building a simple blog system.
 I need to represent a BlogPost that can be published or draft.
@@ -83,7 +83,7 @@ I need to represent a BlogPost that can be published or draft.
 
 ---
 
-## Lesson 2: The /debug Skill
+## Lesson 2: The /craftsman:debug Command
 
 ### Systematic Debugging
 
@@ -100,7 +100,7 @@ Craftsmen debug by:
 ### Your First Debug Session
 
 ```
-> /debug
+> /craftsman:debug
 
 Users can't log in. The login form submits but nothing happens.
 No errors in browser console.
@@ -138,7 +138,7 @@ FIX: Add default value or make nullable
 
 ---
 
-## Lesson 3: The /test Skill
+## Lesson 3: The /craftsman:test Command
 
 ### Why Test?
 
@@ -150,7 +150,7 @@ Tests aren't just about catching bugs. They:
 ### Your First Test Session
 
 ```
-> /test
+> /craftsman:test
 
 I need tests for the BlogPost entity.
 Focus on the publish behavior.
@@ -216,41 +216,41 @@ Real work combines skills in a natural flow:
    > What do I need to build?
 
 2. DESIGN THE SOLUTION
-   > /design - Model the domain
+   > /craftsman:design - Model the domain
 
 3. WRITE TESTS FIRST
-   > /test - Define expected behavior
+   > /craftsman:test - Define expected behavior
 
 4. IMPLEMENT
    > Write code to pass tests
 
 5. DEBUG IF NEEDED
-   > /debug - Systematic investigation
+   > /craftsman:debug - Systematic investigation
 
 6. REFACTOR
-   > /refactor - Improve without changing behavior
+   > /craftsman:refactor - Improve without changing behavior
 
 7. REVIEW
-   > /challenge - Validate decisions
+   > /craftsman:challenge - Validate decisions
 ```
 
 ### Example: Adding Comments to BlogPost
 
 ```
 # 1. Design
-> /design
+> /craftsman:design
 Add comment functionality to BlogPost.
 Users can comment on published posts.
 
 # 2. Test
-> /test
+> /craftsman:test
 Tests for the new comment feature
 
 # 3. Implement
 [Write code to pass tests]
 
 # 4. Review
-> /challenge
+> /craftsman:challenge
 Review the comment implementation
 ```
 
@@ -261,7 +261,7 @@ Review the comment implementation
 ### Exercise 1: Design a Shopping Cart
 
 ```
-> /design
+> /craftsman:design
 Create a shopping cart that:
 - Can add/remove items
 - Calculates total
@@ -271,7 +271,7 @@ Create a shopping cart that:
 ### Exercise 2: Debug a Calculation
 
 ```
-> /debug
+> /craftsman:debug
 The cart total is sometimes wrong.
 It should include tax but sometimes doesn't.
 ```
@@ -279,7 +279,7 @@ It should include tax but sometimes doesn't.
 ### Exercise 3: Test Edge Cases
 
 ```
-> /test
+> /craftsman:test
 Tests for the shopping cart.
 Focus on edge cases: empty cart, max items, negative quantities.
 ```
@@ -290,9 +290,9 @@ Focus on edge cases: empty cart, max items, negative quantities.
 
 You're ready to move on when you can:
 
-- [ ] Use /design to create domain entities
+- [ ] Use /craftsman:design to create domain entities
 - [ ] Follow all 4 phases without skipping
-- [ ] Use /debug systematically
-- [ ] Write meaningful tests with /test
+- [ ] Use /craftsman:debug systematically
+- [ ] Write meaningful tests with /craftsman:test
 
 Continue to: [Intermediate Guide](./intermediate.md)

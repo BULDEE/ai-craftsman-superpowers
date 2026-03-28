@@ -134,9 +134,9 @@ Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 ```
 ai-craftsman-superpowers/
 ├── .claude-plugin/             # Plugin manifest
-├── commands/                   # User-invocable commands (20 *.md files)
-├── agents/                     # Specialized reviewers (5)
-├── hooks/                      # Automated validation scripts
+├── commands/                   # User-invocable commands (22 *.md files)
+├── agents/                     # Reviewers (5) + Craftsmen (7) = 12 agents
+├── hooks/                      # Automated validation (6 scripts + 4 agent hooks)
 ├── knowledge/                  # Patterns & principles
 ├── examples/                   # Usage examples
 ├── tests/                      # Test suite

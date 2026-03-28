@@ -1,10 +1,12 @@
 # Agents Reference
 
-Agents are specialized reviewers that audit code against standards.
+The plugin provides **12 agents** organized in two categories:
+- **5 Reviewers** — read-only analysis and code review
+- **7 Craftsmen** — implementation specialists with domain expertise
 
 ## How to Use Agents
 
-Agents are invoked automatically during code review or explicitly:
+**Reviewers** are invoked for code review:
 
 ```
 > Review this PR with the architecture-reviewer agent
@@ -12,9 +14,138 @@ Agents are invoked automatically during code review or explicitly:
 > Run ai-reviewer on the ML pipeline code
 ```
 
+**Craftsmen** are invoked for implementation tasks:
+
+```
+> Use backend-craftsman to implement this use case
+
+> Ask the architect to validate this design
+```
+
+**Agent Teams** (experimental, v1.5.0): Enable `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` to create multi-agent teams. The `team-lead` agent orchestrates other agents as teammates.
+
 ---
 
-## Core Pack
+## Craftsman Agents (v1.5.0)
+
+### team-lead
+
+**Model**: Opus | **Effort**: max | **Memory**: user | **Max Turns**: 50
+
+**Mission**: Orchestrator that delegates, challenges decisions, and validates deliverables. **Never codes directly.**
+
+**Skills**: plan, challenge, verify
+
+**Behavior**:
+- Decomposes complex tasks into subtasks for specialists
+- Challenges architectural decisions before implementation
+- Validates deliverables against specifications
+- Ensures conventional commits and test coverage
+
+---
+
+### backend-craftsman
+
+**Model**: Sonnet | **Effort**: high | **Memory**: project | **Max Turns**: 30
+
+**Mission**: PHP/Symfony implementation expert.
+
+**Skills**: entity, usecase, spec, test
+
+**Expertise**:
+- Symfony 7.4/8, API Platform 4, Doctrine ORM
+- DDD tactical patterns (Aggregates, Value Objects, Domain Events)
+- Messenger/Scheduler patterns
+- References: symfony.com/doc, api-platform.com/docs/symfony/
+
+**Mandatory Rules**: `strict_types`, `final` classes, private constructors, no setters, Clock abstraction.
+
+---
+
+### frontend-craftsman
+
+**Model**: Sonnet | **Effort**: high | **Memory**: project | **Max Turns**: 30
+
+**Mission**: React/TypeScript implementation expert.
+
+**Skills**: component, hook, spec, test
+
+**Expertise**:
+- React 19, TypeScript 5, Tailwind, shadcn/ui, TanStack Query
+- 65 Vercel React best practices (waterfalls, bundle, server, client, re-renders)
+- React 19 composition patterns (Server Components, Actions, use())
+
+**Mandatory Rules**: No `any`, `readonly` by default, branded types, named exports only.
+
+---
+
+### architect
+
+**Model**: Sonnet | **Effort**: high | **Memory**: project | **Max Turns**: 20
+
+**Mission**: DDD/Clean Architecture validation. **Read-only — cannot edit or write files.**
+
+**Skills**: design, challenge
+
+**Disallowed Tools**: Edit, Write
+
+**Validates**:
+- Strategic DDD (bounded contexts, context maps, ubiquitous language)
+- Tactical DDD (aggregates, entities, value objects, domain events)
+- Clean Architecture layer dependencies
+- CQRS and Event-Driven patterns
+
+---
+
+### ai-engineer
+
+**Model**: Sonnet | **Effort**: high | **Memory**: project | **Max Turns**: 30
+
+**Mission**: AI/ML implementation specialist.
+
+**Skills**: rag, agent-design, mlops
+
+**Expertise**:
+- RAG pipelines (chunking, embeddings, retrieval, generation)
+- LLM integration (Claude, OpenAI)
+- MCP server design and implementation
+- Agent patterns (3P: Perceive/Plan/Perform)
+
+---
+
+### ui-ux-director
+
+**Model**: Sonnet | **Effort**: high | **Memory**: project | **Max Turns**: 20
+
+**Mission**: UX quality and accessibility guardian.
+
+**Validates**:
+- WCAG 2.1 AA compliance (color contrast, keyboard nav, screen readers)
+- Design token systems (spacing, typography, colors)
+- Data visualization best practices
+- SaaS dashboard UX patterns
+
+---
+
+### doc-writer
+
+**Model**: Haiku (cost-optimized) | **Effort**: medium | **Memory**: project | **Max Turns**: 20
+
+**Mission**: Technical documentation specialist.
+
+**Produces**:
+- ADRs (Architecture Decision Records)
+- README and CHANGELOG entries
+- API documentation (OpenAPI)
+- Runbooks and operational guides
+
+**Verification**: Cross-references documentation against actual code to detect drift.
+
+---
+
+## Reviewer Agents
+
+### Core Pack
 
 ### architecture-reviewer
 
@@ -172,25 +303,44 @@ All agents produce reports with:
 3. **Positive patterns**: What was done well
 4. **Verdict**: APPROVE / REQUEST_CHANGES / BLOCK
 
+## Agent Configuration (Frontmatter)
+
+All agents are defined as `.md` files with YAML frontmatter. Supported fields:
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `name` | Agent identifier | `backend-craftsman` |
+| `description` | Purpose (used for selection) | `PHP/Symfony expert...` |
+| `model` | LLM model | `opus`, `sonnet`, `haiku` |
+| `effort` | Reasoning effort | `max`, `high`, `medium`, `low` |
+| `tools` | Allowed tools | `Read, Glob, Grep, Bash` |
+| `disallowedTools` | Blocked tools | `Edit, Write` |
+| `maxTurns` | Maximum conversation turns | `30` |
+| `skills` | Pre-loaded skills | `craftsman:entity, craftsman:spec` |
+| `memory` | Memory scope | `project`, `user` |
+
 ## Creating Custom Agents
 
-See [Master Guide](../guides/master.md) for creating your own agents.
+See [Master Guide](../guides/master.md) for creating your own agents, or use `/craftsman:agent-create` for interactive creation.
 
 Template:
 ```markdown
+---
+name: my-agent
+description: What this agent does
+model: sonnet
+effort: high
+tools: Read, Glob, Grep, Bash
+maxTurns: 20
+---
+
 # Agent: [Name]
 
 ## Mission
 [One sentence purpose]
 
-## Mindset
-[Key questions to ask]
-
 ## Checklist
 [What to verify]
-
-## Severity Levels
-[How to categorize]
 
 ## Report Format
 [Output template]

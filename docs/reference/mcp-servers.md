@@ -204,6 +204,51 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 
 ---
 
+## Sentry Channel (v1.4.0)
+
+**Purpose**: Inject error context from Sentry into conversations when editing files with known issues.
+
+**Type**: Channel (bound MCP server via `plugin.json`)
+
+### How It Works
+
+Sentry is configured as a **channel** in `plugin.json`:
+
+```json
+{
+  "channels": [{ "server": "sentry" }],
+  "mcpServers": {
+    "sentry": {
+      "type": "http",
+      "url": "https://mcp.sentry.dev/mcp"
+    }
+  }
+}
+```
+
+The PostToolUse agent hook automatically queries Sentry when you edit files, injecting relevant error context as `additionalContext`.
+
+### Configuration
+
+Configure via plugin settings (`userConfig` in `plugin.json`):
+
+| Setting | Description |
+|---------|-------------|
+| `sentry_org` | Sentry organization slug |
+| `sentry_project` | Sentry project slug |
+| `sentry_token` | Auth token (stored securely, `sensitive: true`) |
+
+### Channel Lifecycle
+
+The `hooks/lib/channels.sh` library provides:
+
+- `channel_available()` — checks if a channel's MCP server is reachable
+- `channel_status_summary()` — returns active channel status for InstructionsLoaded hook
+
+Channels degrade gracefully: if Sentry is not configured or unreachable, the agent hook returns empty context silently.
+
+---
+
 ## Creating Custom MCP Servers
 
 ### Template

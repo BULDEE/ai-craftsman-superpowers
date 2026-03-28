@@ -91,21 +91,40 @@ This plugin encodes these practices into repeatable skills.
 - **Canonical**: Golden examples to follow
 - **Anti-patterns**: What NOT to do
 
-### 4. Agents
+### 4. Agents (12 total)
 
-**What**: Specialized reviewers that audit code against standards.
+**What**: Specialized AI agents — 5 reviewers (read-only analysis) and 7 craftsmen (implementation).
 
-**Available Agents**:
-- `architecture-reviewer` - Clean Architecture compliance
-- `symfony-reviewer` - Symfony/DDD best practices
-- `react-reviewer` - React patterns and hooks
-- `ai-reviewer` - RAG/MLOps/Agent best practices
+**Reviewers** (code analysis):
+- `architecture-reviewer` — Clean Architecture compliance
+- `symfony-reviewer` — Symfony/DDD best practices
+- `security-pentester` — Security vulnerability detection
+- `react-reviewer` — React patterns and hooks
+- `ai-reviewer` — RAG/MLOps/Agent best practices
 
-### 5. MCP Servers
+**Craftsmen** (implementation, v1.5.0):
+- `team-lead` — Orchestrator (Opus, never codes)
+- `backend-craftsman` — PHP/Symfony expert
+- `frontend-craftsman` — React/TS expert (65 Vercel best practices)
+- `architect` — DDD validation (read-only)
+- `ai-engineer` — RAG, LLM, MCP design
+- `ui-ux-director` — UX, WCAG 2.1 AA
+- `doc-writer` — Technical documentation (Haiku, cost-optimized)
+
+### 5. Hooks (8 events)
+
+**What**: Automated validation running at key lifecycle events.
+
+**Command hooks** (shell scripts): validate code rules, detect biases, record metrics.
+**Agent hooks** (Haiku model): semantic DDD analysis, Sentry error context, project structure analysis, final architecture review.
+
+See [Hooks Reference](../reference/hooks.md) for details.
+
+### 6. MCP Servers & Channels
 
 **What**: External services that extend Claude's capabilities.
 
-**Current**: `knowledge-rag` - Semantic search over indexed PDFs
+**knowledge-rag** (optional) — Semantic search over indexed PDFs:
 
 ```
 User: "What are the MLOps principles?"
@@ -116,6 +135,8 @@ MCP Server: Returns relevant chunks from indexed PDFs
        ↓
 Claude: Answers with grounded, accurate information
 ```
+
+**Sentry** (channel, v1.4.0) — Error context injection from Sentry when editing files with known issues. Configured via `plugin.json` channels.
 
 ## The Bias Protection System
 

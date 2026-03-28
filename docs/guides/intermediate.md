@@ -156,7 +156,7 @@ Returns relevant chunks from microservices documentation.
 ### Knowledge-Informed Design
 
 ```
-> /design
+> /craftsman:design
 
 Create an order processing system.
 Use the saga pattern from my knowledge base.
@@ -175,12 +175,12 @@ Claude will:
 
 ```
 # Step 1: Design
-> /design
+> /craftsman:design
 Create a payment processing aggregate.
 It handles payments with retry logic.
 
 # Step 2: Test-first
-> /test
+> /craftsman:test
 Write tests for the payment processing.
 Include happy path, failures, and retries.
 
@@ -188,7 +188,7 @@ Include happy path, failures, and retries.
 [Claude generates implementation to pass tests]
 
 # Step 4: Review
-> /challenge
+> /craftsman:challenge
 Review the payment processing implementation.
 ```
 
@@ -196,12 +196,12 @@ Review the payment processing implementation.
 
 ```
 # Found a bug
-> /debug
+> /craftsman:debug
 Payments sometimes fail silently.
 No error logged, but payment not recorded.
 
 # After fixing, improve the code
-> /refactor
+> /craftsman:refactor
 Refactor the payment error handling.
 Make it clearer and more testable.
 ```
@@ -210,12 +210,12 @@ Make it clearer and more testable.
 
 ```
 # Write specification
-> /spec
+> /craftsman:spec
 Specify the order fulfillment workflow.
 Include all states and transitions.
 
 # Plan implementation
-> /plan
+> /craftsman:plan
 Plan the implementation of order fulfillment.
 Break it into manageable tasks.
 
@@ -233,12 +233,12 @@ Full workflow for a new domain area:
 
 ```
 # 1. Define the context
-> /design
+> /craftsman:design
 Define a Shipping bounded context.
 It handles delivery scheduling and tracking.
 
 # 2. Identify aggregates
-> /design
+> /craftsman:design
 What aggregates do we need for Shipping?
 Consider: Shipment, Route, Carrier.
 
@@ -257,7 +257,7 @@ CreateShipment use case.
 UpdateShipmentStatus use case.
 
 # 5. Review architecture
-> /challenge
+> /craftsman:challenge
 Review the Shipping bounded context.
 Check aggregate boundaries and dependencies.
 ```
@@ -269,27 +269,27 @@ Check aggregate boundaries and dependencies.
 > What does the user need?
 
 # 2. Challenge assumptions
-> /challenge
+> /craftsman:challenge
 Is this the right feature to build?
 What are the alternatives?
 
 # 3. Design solution
-> /design
+> /craftsman:design
 [Design the feature]
 
 # 4. Write specification
-> /spec
+> /craftsman:spec
 [Formalize the requirements]
 
 # 5. Plan implementation
-> /plan
+> /craftsman:plan
 [Break into tasks]
 
 # 6. Implement with TDD
-> /test + implement
+> /craftsman:test + implement (TDD cycle)
 
 # 7. Review before merge
-> /challenge
+> /craftsman:challenge
 ```
 
 ---
@@ -304,7 +304,7 @@ What are the alternatives?
 Subscription with: plan, status, billing cycle, next billing date.
 
 # Write comprehensive tests
-> /test
+> /craftsman:test
 
 # Create use cases
 > /craftsman:usecase
@@ -331,7 +331,7 @@ SubscriptionForm - create/edit subscription
 # Use CQRS pattern
 > Search my knowledge for CQRS
 
-> /design
+> /craftsman:design
 Apply CQRS to the subscription system.
 Separate read and write models.
 ```
