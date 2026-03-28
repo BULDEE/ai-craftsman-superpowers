@@ -1,48 +1,93 @@
 <?php
 
 /**
- * CANONICAL EXAMPLE: API Platform 4 State Provider (v1.0)
+ * CANONICAL EXAMPLE: API Platform State Provider Pattern (v1.0)
  *
- * This is THE reference for State Providers in API Platform 4.
- * Replaces the DataProvider pattern from API Platform v2/v3.
+ * This is THE reference for custom API Platform state providers and processors.
+ * Source: https://symfony.com/doc/current/the-fast-track/en/26-api.html
  *
  * Key characteristics:
- * - Implements ProviderInterface (MUST)
+ * - Implement ProviderInterface for reads (MUST)
+ * - Implement ProcessorInterface for writes (MUST)
  * - final class (MUST)
- * - Handles both collection and item operations
- * - Delegates to domain repository (Clean Architecture)
- * - Uses domain Value Objects for ID conversion
+ * - Use Query Extension pattern for filtering (SHOULD)
+ * - Delegate business logic to use cases or domain (MUST)
  */
 
 declare(strict_types=1);
 
-namespace App\Infrastructure\ApiPlatform\State;
+namespace App\Infrastructure\ApiPlatform;
 
-use ApiPlatform\Metadata\CollectionOperationInterface;
+use ApiPlatform\Doctrine\Orm\Extension\QueryCollectionExtensionInterface;
+use ApiPlatform\Doctrine\Orm\Extension\QueryItemExtensionInterface;
+use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
-use ApiPlatform\State\Pagination\Pagination;
-use ApiPlatform\State\ProviderInterface;
-use App\Domain\Repository\UserRepositoryInterface;
-use App\Domain\ValueObject\UserId;
+use App\Domain\Entity\Post;
+use Doctrine\ORM\QueryBuilder;
 
-final class UserStateProvider implements ProviderInterface
+// ============================================================
+// CANONICAL EXAMPLE: Query Extension (v1.0)
+// Restricts which items are exposed via the API.
+// ============================================================
+
+final class FilterPublishedPostQueryExtension implements
+    QueryCollectionExtensionInterface,
+    QueryItemExtensionInterface
 {
-    public function __construct(
-        private readonly UserRepositoryInterface $repository,
-        private readonly Pagination $pagination,
-    ) {}
+    public function applyToCollection(
+        QueryBuilder $queryBuilder,
+        QueryNameGeneratorInterface $queryNameGenerator,
+        string $resourceClass,
+        ?Operation $operation = null,
+        array $context = [],
+    ): void {
+        $this->applyFilter($queryBuilder, $resourceClass);
+    }
 
-    public function provide(Operation $operation, array $uriVariables = [], array $context = []): object|array|null
+    public function applyToItem(
+        QueryBuilder $queryBuilder,
+        QueryNameGeneratorInterface $queryNameGenerator,
+        string $resourceClass,
+        array $identifiers,
+        ?Operation $operation = null,
+        array $context = [],
+    ): void {
+        $this->applyFilter($queryBuilder, $resourceClass);
+    }
+
+    private function applyFilter(QueryBuilder $queryBuilder, string $resourceClass): void
     {
-        if ($operation instanceof CollectionOperationInterface) {
-            [$page, $offset, $limit] = $this->pagination->getPagination($operation, $context);
-
-            // Repository MUST return a PaginatorInterface implementation for hydra:totalItems
-            return $this->repository->findPaginated($page, $limit);
+        if (Post::class !== $resourceClass) {
+            return;
         }
 
-        return $this->repository->findById(
-            UserId::fromString($uriVariables['id'])
-        );
+        $rootAlias = $queryBuilder->getRootAliases()[0];
+        $queryBuilder->andWhere(sprintf("%s.status = 'published'", $rootAlias));
     }
 }
+
+// ============================================================
+// CANONICAL EXAMPLE: Entity with API Resource (v1.0)
+// ============================================================
+// use ApiPlatform\Metadata\ApiResource;
+// use ApiPlatform\Metadata\Get;
+// use ApiPlatform\Metadata\GetCollection;
+// use Symfony\Component\Serializer\Attribute\Groups;
+//
+// #[ORM\Entity]
+// #[ApiResource(
+//     operations: [
+//         new Get(normalizationContext: ['groups' => 'post:item']),
+//         new GetCollection(normalizationContext: ['groups' => 'post:list']),
+//     ],
+//     order: ['createdAt' => 'DESC'],
+//     paginationEnabled: true,
+// )]
+// final class Post
+// {
+//     #[Groups(['post:list', 'post:item'])]
+//     private ?int $id = null;
+//
+//     #[Groups(['post:list', 'post:item'])]
+//     private string $title;
+// }

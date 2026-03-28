@@ -1,61 +1,57 @@
-# Anti-Pattern: Synchronous Work in Async Handlers
+# Anti-Pattern: Sync Expectations in Async Handlers
 
-## Problem
+Source: https://symfony.com/doc/current/messenger.html
 
-Performing synchronous I/O (HTTP calls, file operations) directly inside Messenger handlers kills worker throughput and prevents independent retry per channel.
+## What it is
 
-## Bad
+Treating `$bus->dispatch()` as a synchronous call that returns the handler's result.
 
-```php
-#[AsMessageHandler]
-final class SendNotificationHandler
-{
-    public function __invoke(SendNotification $command): void
-    {
-        // BAD: synchronous HTTP call blocks the worker
-        $this->httpClient->request('POST', 'https://api.slack.com/...', [...]);
-        $this->httpClient->request('POST', 'https://api.sendgrid.com/...', [...]);
-    }
-}
-```
+## Why it's wrong
 
-## Good
+`MessageBusInterface::dispatch()` always returns an `Envelope`, not the handler's return value. When a transport is configured, the handler runs in a worker process — `dispatch()` returns immediately with no result. Attempting to read the handler output from `dispatch()` silently fails or causes errors.
+
+## The Anti-Pattern
 
 ```php
-#[AsMessageHandler]
-final class SendNotificationHandler
-{
-    public function __construct(
-        private readonly MessageBusInterface $bus,
-    ) {}
-
-    public function __invoke(SendNotification $command): void
-    {
-        // GOOD: dispatch sub-messages for each channel
-        $this->bus->dispatch(new SendSlackNotification($command->message));
-        $this->bus->dispatch(new SendEmailNotification($command->message));
-    }
-}
-
-#[AsMessageHandler]
-final class SendSlackNotificationHandler
-{
-    public function __invoke(SendSlackNotification $command): void
-    {
-        // Each channel handled independently — can retry without affecting others
-        $this->httpClient->request('POST', 'https://api.slack.com/...', [...]);
-    }
-}
+// WRONG — dispatch() does not return handler output
+$response = $bus->dispatch(new CreateOrderCommand($data));
+return new JsonResponse(['orderId' => $response->id]); // Fatal: Envelope has no ->id
 ```
 
-## Why It Matters
+## The Correct Pattern
 
-- Messenger workers process one message at a time per worker process
-- Synchronous I/O blocks the entire worker for its full duration
-- A Slack API timeout (30s) blocks email delivery too
-- Sub-messages allow independent retry policies and dead-letter queues per channel
-- Worker scaling is much more effective when handlers are lightweight
+For async use cases, the controller must accept eventual consistency:
 
-## Rule
+```php
+// CORRECT — fire and return 202 Accepted
+$bus->dispatch(new CreateOrderCommand($data));
+return new JsonResponse([], Response::HTTP_ACCEPTED);
+```
 
-> Each handler should do one thing. Use sub-messages to fan out work across channels.
+For sync use cases that need a return value, use a **Query bus** (sync transport) and retrieve results via a repository, not via dispatch return:
+
+```php
+// CORRECT — query via repository after synchronous dispatch
+$bus->dispatch(new CreateOrderCommand($data));
+$order = $this->orderRepository->findLastByUser($userId);
+return new JsonResponse(['orderId' => $order->id()->toString()]);
+```
+
+Or use a dedicated sync transport:
+
+```yaml
+# config/packages/messenger.yaml
+framework:
+    messenger:
+        transports:
+            sync: 'sync://'
+        routing:
+            'App\Application\Query\*': sync
+            'App\Application\UseCase\*': async
+```
+
+## Signals to detect this
+
+- `$bus->dispatch(...)->getMessage()->someProperty`
+- Handler method has non-void return type AND is routed to async transport
+- Controller expects handler result immediately after dispatch

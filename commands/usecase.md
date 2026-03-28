@@ -221,23 +221,43 @@ final class {UseCaseName}HandlerTest extends TestCase
 
 ## Symfony Messenger Integration
 
+Use `#[AsMessageHandler]` attribute — no manual service tagging needed.
+Source: https://symfony.com/doc/current/messenger.html
+
 ```php
-// config/services.yaml
-services:
-    App\Application\UseCase\{UseCaseName}\{UseCaseName}Handler:
-        tags: [messenger.message_handler]
+// Handler is auto-discovered via #[AsMessageHandler] — no services.yaml tag needed
+use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+
+#[AsMessageHandler]
+final readonly class {UseCaseName}Handler
+{
+    public function __invoke({UseCaseName}Command $command): void
+    {
+        // ...
+    }
+}
 ```
 
 ```php
-// Usage in Controller
+// Usage in Controller — dispatch() returns Envelope, not the handler return value
+use Symfony\Component\Messenger\MessageBusInterface;
+
 public function __invoke(
     {UseCaseName}Command $command,
     MessageBusInterface $bus,
 ): Response {
-    $response = $bus->dispatch($command);
+    $bus->dispatch($command);
 
-    return new JsonResponse(['id' => $response->id]);
+    return new JsonResponse([], Response::HTTP_ACCEPTED);
 }
+```
+
+```yaml
+# config/packages/messenger.yaml — routing with wildcard at end of namespace prefix
+framework:
+    messenger:
+        routing:
+            'App\Application\UseCase\*': async
 ```
 
 ## Rules Enforced

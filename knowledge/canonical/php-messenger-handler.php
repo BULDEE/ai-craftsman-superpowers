@@ -1,49 +1,95 @@
 <?php
 
 /**
- * CANONICAL EXAMPLE: Symfony Messenger Handler (v1.0)
+ * CANONICAL EXAMPLE: Symfony Messenger Handler Pattern (v1.0)
  *
- * This is THE reference for Messenger handlers following CQRS + DDD.
+ * This is THE reference for async message handlers.
+ * Source: https://symfony.com/doc/current/messenger.html
  *
  * Key characteristics:
- * - #[AsMessageHandler] attribute (MUST in Symfony 6.2+)
- * - final class (MUST)
- * - __invoke() method (MUST for single-message handlers)
- * - Domain objects created via factory methods
- * - Repository for persistence
- * - Domain events released and dispatched after save
+ * - #[AsMessageHandler] attribute (MUST) — replaces manual services.yaml tag
+ * - final readonly class (MUST)
+ * - Single __invoke() method typed to the message (MUST)
+ * - No return value for async handlers (SHOULD) — dispatch() returns Envelope, not handler result
+ * - MessageBusInterface for dispatching (MUST)
  */
 
 declare(strict_types=1);
 
-namespace App\Application\UseCase\CreateUser;
+namespace App\Application\UseCase\SendNotification;
 
-use App\Domain\Entity\User;
 use App\Domain\Repository\UserRepositoryInterface;
-use App\Domain\ValueObject\Email;
 use App\Domain\ValueObject\UserId;
+use App\Infrastructure\Notification\NotificationSenderInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
-use Symfony\Component\Messenger\MessageBusInterface;
 
-#[AsMessageHandler]
-final class CreateUserHandler
+// ============================================================
+// CANONICAL EXAMPLE: Message (Command/Event) (v1.0)
+// ============================================================
+
+final readonly class SendNotificationCommand
 {
     public function __construct(
-        private readonly UserRepositoryInterface $repository,
-        private readonly MessageBusInterface $eventBus,
+        public string $userId,
+        public string $message,
+    ) {}
+}
+
+// ============================================================
+// CANONICAL EXAMPLE: Message Handler (v1.0)
+// ============================================================
+
+#[AsMessageHandler]
+final readonly class SendNotificationHandler
+{
+    public function __construct(
+        private UserRepositoryInterface $userRepository,
+        private NotificationSenderInterface $notificationSender,
     ) {}
 
-    public function __invoke(CreateUserCommand $command): void
+    public function __invoke(SendNotificationCommand $command): void
     {
-        $user = User::create(
-            UserId::generate(),
-            Email::fromString($command->email),
-        );
+        $userId = UserId::fromString($command->userId);
 
-        $this->repository->save($user);
+        $user = $this->userRepository->findById($userId)
+            ?? throw new UserNotFoundException($userId);
 
-        foreach ($user->releaseEvents() as $event) {
-            $this->eventBus->dispatch($event);
-        }
+        $this->notificationSender->send($user->email(), $command->message);
     }
 }
+
+// ============================================================
+// CANONICAL EXAMPLE: Dispatching from Controller (v1.0)
+// ============================================================
+// dispatch() returns Envelope — NOT the handler's return value.
+// For async transports, the handler runs in a worker process.
+//
+// use Symfony\Component\Messenger\MessageBusInterface;
+//
+// public function notify(
+//     string $userId,
+//     MessageBusInterface $bus,
+// ): Response {
+//     $bus->dispatch(new SendNotificationCommand($userId, 'Welcome!'));
+//     return new JsonResponse([], Response::HTTP_ACCEPTED);
+// }
+
+// ============================================================
+// CANONICAL EXAMPLE: Messenger YAML config (v1.0)
+// ============================================================
+// config/packages/messenger.yaml
+//
+// framework:
+//     messenger:
+//         transports:
+//             async:
+//                 dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+//                 retry_strategy:
+//                     max_retries: 3
+//                     delay: 1000        # ms before first retry
+//                     multiplier: 2      # 1s, 2s, 4s, ...
+//                     max_delay: 0       # 0 = no cap
+//                     jitter: 0.1        # randomness to prevent thundering herd
+//         routing:
+//             # Wildcard MUST be at the END of the namespace prefix
+//             'App\Application\UseCase\*': async

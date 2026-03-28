@@ -54,6 +54,91 @@ final readonly class Email
 
 ---
 
+## Symfony Messenger
+
+Source: https://symfony.com/doc/current/messenger.html
+
+### Handler declaration
+
+```php
+// Auto-discovered — no services.yaml tag needed
+#[AsMessageHandler]
+final readonly class CreateOrderHandler
+{
+    public function __invoke(CreateOrderCommand $command): void { }
+}
+```
+
+### Routing (YAML)
+
+```yaml
+# Wildcard MUST be at the END of the namespace prefix
+framework:
+    messenger:
+        routing:
+            'App\Application\UseCase\*': async
+            'App\Application\Query\*': sync
+```
+
+### Retry strategy keys
+
+```yaml
+retry_strategy:
+    max_retries: 3
+    delay: 1000       # ms before first retry
+    multiplier: 2     # 1s → 2s → 4s
+    max_delay: 0      # 0 = no cap
+    jitter: 0.1       # randomness factor (0–1.0)
+```
+
+### Never
+
+| Don't | Why |
+|-------|-----|
+| `tags: [messenger.message_handler]` | Replaced by `#[AsMessageHandler]` attribute |
+| Read return value of `dispatch()` | Returns `Envelope`, not handler output |
+| Non-void handler return with async transport | Result is never accessible to caller |
+
+---
+
+## Symfony Scheduler
+
+Source: https://symfony.com/doc/current/scheduler.html
+
+```php
+#[AsSchedule('default')]  // 'default' is the default; transport: scheduler_default
+final class MyScheduleProvider implements ScheduleProviderInterface
+{
+    public function getSchedule(): Schedule
+    {
+        return $this->schedule ??= (new Schedule())
+            ->with(
+                RecurringMessage::cron('0 8 * * 1', new WeeklyReportMessage()),
+                RecurringMessage::every('1 hour', new SyncInventoryMessage()),
+            );
+    }
+}
+```
+
+### RecurringMessage signatures
+
+```php
+RecurringMessage::cron(string $spec, object $message, ?\DateTimeZone $tz = null): self
+RecurringMessage::every(string|int|\DateInterval $freq, object $message, ?\DateTimeImmutable $from = null, ?string $until = null): self
+```
+
+### Cron shorthand aliases
+
+`@daily`, `@weekly`, `@monthly`, `@hourly` — all valid in `cron()` spec.
+
+### Consume
+
+```bash
+php bin/console messenger:consume scheduler_default
+```
+
+---
+
 ## TypeScript (React)
 
 ### Always
