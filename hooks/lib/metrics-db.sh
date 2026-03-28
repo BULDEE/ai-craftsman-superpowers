@@ -50,7 +50,7 @@ metrics_project_hash() {
 metrics_file_pattern() {
     local file="$1"
     local rel_path="${file#$PWD/}"
-    echo "$rel_path" | sed -E 's|/[^/]+\.(php|ts|tsx)$|/**/*.\1|'
+    echo "$rel_path" | sed -E 's/\/[^\/]+\.(php|ts|tsx)$/\/**\/*.\1/'
 }
 
 metrics_record_violation() {
