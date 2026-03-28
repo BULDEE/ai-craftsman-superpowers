@@ -5,6 +5,64 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-03-28
+
+### Added
+
+- **7 craftsman agents** — New specialized agents for full-stack implementation:
+  - `team-lead` (Opus, max effort) — orchestrator, delegates, challenges, never codes
+  - `backend-craftsman` (Sonnet) — PHP/Symfony expert with Symfony.com + API Platform refs
+  - `frontend-craftsman` (Sonnet) — React/TS expert with 65 Vercel best practices rules
+  - `architect` (Sonnet, read-only) — DDD/Clean Architecture validation, disallowedTools: Edit,Write
+  - `ai-engineer` (Sonnet) — RAG, LLM, MCP server, agent design
+  - `ui-ux-director` (Sonnet) — UX, WCAG 2.1 AA, design tokens, data visualization
+  - `doc-writer` (Haiku, cost-optimized) — ADRs, README, CHANGELOG, runbooks
+- **Agent Teams support** — `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` enabled in settings. Team launch prompt prepared at `.claude/team-prompts/v2-implementation.md`.
+
+### Changed
+
+- **5 existing reviewers enriched** — All reviewers now have `memory: project` (cross-session learning), `effort: high`, `skills` preload, and `maxTurns` (camelCase per official Claude Code docs). Fields migrated from legacy `allowed-tools`/`max-turns` to official `tools`/`maxTurns`.
+
+---
+
+## [1.4.0] - 2026-03-28
+
+### Added
+
+- **Sentry Channel integration** — Sentry MCP server bound via `channels` in plugin.json. PostToolUse agent hook queries Sentry for errors related to edited files.
+- **Channel lifecycle library** — `hooks/lib/channels.sh` provides `channel_available()` and `channel_status_summary()` for gating channel usage.
+- **Sentry configuration** — `sentry_org`, `sentry_project`, `sentry_token` (sensitive: true) in userConfig.
+- **Corrections reporting** — InstructionsLoaded agent hook queries 30-day correction trends and suggests strictness adjustments.
+- **Channel status** — InstructionsLoaded agent reports active channels at session start.
+
+### Changed
+
+- **config.sh** — Added `_config_resolve()` generic helper. All config functions now use it.
+- **hooks.json** — Now has 8 events, 6 command hooks, 4 agent hooks (PostToolUse DDD + Sentry, InstructionsLoaded, Stop).
+
+---
+
+## [1.3.0] - 2026-03-28
+
+### Added
+
+- **Semantic Intelligence** — 3 agent hooks for semantic analysis beyond regex:
+  - PostToolUse DDD verifier (Haiku) — checks layer violations, aggregate boundaries, value objects, naming
+  - InstructionsLoaded project analyzer (Haiku) — builds architectural context map at session start
+  - Stop final reviewer (Haiku) — validates architecture before session end (strict mode only)
+- **Correction Learning System** — Detects when user fixes Claude-generated code, records patterns in metrics.db corrections table, injects trends into InstructionsLoaded.
+- **Environment variable fix** — All hooks now use `CLAUDE_PLUGIN_DATA` with proper fallback.
+
+---
+
+## [1.2.1] - 2026-03-28
+
+### Fixed
+
+- **Metrics DB migration** — Added 'info' severity to violations CHECK constraint. Auto-migrates existing tables.
+
+---
+
 ## [1.2.0] - 2026-03-28
 
 ### Added
