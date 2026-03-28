@@ -48,22 +48,21 @@ _write_session_state() {
     # Merge into existing session state
     if [[ -f "$SESSION_STATE" ]]; then
         python3 -c "
-import json
-with open('$SESSION_STATE') as f:
+import json, sys
+sf, fp, rj = sys.argv[1], sys.argv[2], json.loads(sys.argv[3])
+with open(sf) as f:
     state = json.load(f)
-bv = state.get('blocked_violations', {})
-bv['''$file_pattern'''] = $rules_json
-state['blocked_violations'] = bv
-with open('$SESSION_STATE', 'w') as f:
+state.setdefault('blocked_violations', {})[fp] = rj
+with open(sf, 'w') as f:
     json.dump(state, f)
-" 2>/dev/null || true
+" "$SESSION_STATE" "$file_pattern" "$rules_json" 2>/dev/null || true
     else
         python3 -c "
-import json
-state = {'blocked_violations': {'''$file_pattern''': $rules_json}}
-with open('$SESSION_STATE', 'w') as f:
-    json.dump(state, f)
-" 2>/dev/null || true
+import json, sys
+sf, fp, rj = sys.argv[1], sys.argv[2], json.loads(sys.argv[3])
+with open(sf, 'w') as f:
+    json.dump({'blocked_violations': {fp: rj}}, f)
+" "$SESSION_STATE" "$file_pattern" "$rules_json" 2>/dev/null || true
     fi
 }
 
@@ -76,12 +75,12 @@ _check_corrections() {
 
     local prev_rules
     prev_rules=$(python3 -c "
-import json
-with open('$SESSION_STATE') as f:
+import json, sys
+with open(sys.argv[1]) as f:
     state = json.load(f)
-rules = state.get('blocked_violations', {}).get('''$file_pattern''', [])
+rules = state.get('blocked_violations', {}).get(sys.argv[2], [])
 print(' '.join(rules))
-" 2>/dev/null) || return
+" "$SESSION_STATE" "$file_pattern" 2>/dev/null) || return
 
     [[ -z "$prev_rules" ]] && return
 

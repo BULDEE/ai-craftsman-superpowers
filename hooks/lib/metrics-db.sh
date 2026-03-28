@@ -128,7 +128,7 @@ metrics_trend() {
 metrics_record_correction() {
     local rule="${1//\'/''}"
     local file_pattern="${2//\'/''}"
-    local action="$3"
+    local action="${3//\'/''}"
     local context="${4:-}"
     context="${context//\'/''}"
     local project_hash
