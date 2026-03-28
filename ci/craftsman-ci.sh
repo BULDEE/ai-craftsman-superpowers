@@ -25,6 +25,89 @@ STRICTNESS="strict"
 STACK="fullstack"
 
 # =============================================================================
+# Subcommand routing (must come before general argument parsing)
+# =============================================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ "${1:-}" == "ci" ]]; then
+    shift
+    # Parse ci-specific args
+    CI_PROVIDER=""
+    CI_CONFIG=""
+    CI_SCAN_PATHS=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --provider) CI_PROVIDER="$2"; shift 2 ;;
+            --config)   CI_CONFIG="$2"; shift 2 ;;
+            *)          CI_SCAN_PATHS+=("$1"); shift ;;
+        esac
+    done
+
+    source "${SCRIPT_DIR}/adapters/adapter.sh"
+    # adapter_load sources the provider file but runs in a subshell when
+    # captured via $(...), so we call it twice: once to get the name, then
+    # source the provider file directly in the current shell.
+    CI_PROVIDER=$(adapter_load "${CI_PROVIDER:-}")
+    adapter_load "${CI_PROVIDER}" >/dev/null
+    echo "craftsman-ci v${VERSION} — CI mode (${CI_PROVIDER})" >&2
+
+    # Build args for adapter_run
+    CI_RUN_ARGS=()
+    [[ -n "$CI_CONFIG" ]] && CI_RUN_ARGS+=(--config "$CI_CONFIG")
+    CI_RUN_ARGS+=("${CI_SCAN_PATHS[@]}")
+
+    local_report="/tmp/craftsman-report-$$.json"
+    adapter_run "$local_report" "${CI_RUN_ARGS[@]}"
+
+    adapter_annotate "$local_report"
+    adapter_comment "$local_report"
+    adapter_exit "$local_report"
+    exit_code=$?
+    rm -f "$local_report"
+    exit "$exit_code"
+fi
+
+if [[ "${1:-}" == "init" ]]; then
+    shift
+    INIT_PROVIDER="github"
+    if [[ "${1:-}" == "--provider" ]]; then
+        INIT_PROVIDER="${2:-github}"
+    fi
+
+    TEMPLATE_DIR="${SCRIPT_DIR}/templates"
+    case "$INIT_PROVIDER" in
+        github)
+            mkdir -p .github/workflows
+            cp "$TEMPLATE_DIR/craftsman-quality-gate.yml" .github/workflows/craftsman-quality-gate.yml
+            echo "Created .github/workflows/craftsman-quality-gate.yml"
+            ;;
+        gitlab)
+            cp "$TEMPLATE_DIR/.gitlab-ci.craftsman.yml" .gitlab-ci.craftsman.yml
+            echo "Created .gitlab-ci.craftsman.yml"
+            echo "Include in your .gitlab-ci.yml: include: '.gitlab-ci.craftsman.yml'"
+            ;;
+        bitbucket)
+            if [[ -f "bitbucket-pipelines.yml" ]]; then
+                echo "bitbucket-pipelines.yml already exists. Merge manually from:"
+                echo "  $TEMPLATE_DIR/bitbucket-pipelines.craftsman.yml"
+            else
+                cp "$TEMPLATE_DIR/bitbucket-pipelines.craftsman.yml" bitbucket-pipelines.yml
+                echo "Created bitbucket-pipelines.yml"
+            fi
+            ;;
+        jenkins)
+            cp "$TEMPLATE_DIR/Jenkinsfile.craftsman" Jenkinsfile.craftsman
+            echo "Created Jenkinsfile.craftsman"
+            ;;
+        *)
+            echo "Unknown provider: $INIT_PROVIDER. Use: github, gitlab, bitbucket, jenkins" >&2
+            exit 2
+            ;;
+    esac
+    exit 0
+fi
+
+# =============================================================================
 # Argument parsing
 # =============================================================================
 while [[ $# -gt 0 ]]; do
@@ -41,11 +124,19 @@ while [[ $# -gt 0 ]]; do
             cat <<EOF
 craftsman-ci v${VERSION} — Craftsman Quality Gate
 
-Usage: craftsman-ci [--format json|text] [--config FILE] [paths...]
+Usage:
+  craftsman-ci [--format json|text] [--config FILE] [paths...]
+  craftsman-ci ci [--provider github|gitlab|bitbucket|generic] [--config FILE] [paths...]
+  craftsman-ci init [--provider github|gitlab|bitbucket|jenkins]
+
+Subcommands:
+  ci        Run full CI adapter lifecycle (scan, annotate, comment, exit)
+  init      Generate CI template for the specified provider
 
 Options:
   --format json|text    Output format (default: text)
   --config FILE         Path to .craft-config.yml (default: auto-detect)
+  --provider PROVIDER   CI provider (ci: auto-detect, init: github)
   paths...              Paths to scan (default: src/)
 
 Exit codes:
@@ -69,7 +160,6 @@ done
 # =============================================================================
 # Rules engine integration (optional — plugin context only)
 # =============================================================================
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Source rules engine if available (plugin context)

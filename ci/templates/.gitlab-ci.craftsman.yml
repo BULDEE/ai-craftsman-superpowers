@@ -1,0 +1,28 @@
+# =============================================================================
+# Craftsman Quality Gate — GitLab CI template
+#
+# Include in your .gitlab-ci.yml:
+#   include: '.gitlab-ci.craftsman.yml'
+#
+# Required variables (set in CI/CD settings or pass via pipeline):
+#   GITLAB_TOKEN  — API token for MR comments (CI_JOB_TOKEN works for same-project)
+# =============================================================================
+
+craftsman-quality-gate:
+  stage: test
+  image: python:3.12-slim
+  variables:
+    CRAFTSMAN_PATH: "ci/craftsman-ci.sh"
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - chmod +x "$CRAFTSMAN_PATH"
+    - bash "$CRAFTSMAN_PATH" ci --provider gitlab
+  artifacts:
+    reports:
+      codequality: gl-code-quality-report.json
+    when: always
+  allow_failure:
+    exit_codes:
+      - 1

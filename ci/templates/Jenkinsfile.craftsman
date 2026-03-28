@@ -1,0 +1,36 @@
+// =============================================================================
+// Craftsman Quality Gate — Jenkins Pipeline template
+//
+// Usage:
+//   1. Copy this file as 'Jenkinsfile' or load it via shared library
+//   2. Adjust agent/docker image as needed
+//
+// The generic adapter writes annotations to stdout and a markdown comment
+// to craftsman-comment.md for downstream consumption.
+// =============================================================================
+
+pipeline {
+    agent {
+        docker {
+            image 'python:3.12-slim'
+        }
+    }
+
+    stages {
+        stage('Craftsman Quality Gate') {
+            steps {
+                sh 'chmod +x ci/craftsman-ci.sh'
+                sh 'bash ci/craftsman-ci.sh ci --provider generic'
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'craftsman-report.json,craftsman-comment.md', allowEmptyArchive: true
+        }
+        failure {
+            echo 'Craftsman Quality Gate failed — check violations in the console output or craftsman-comment.md'
+        }
+    }
+}
