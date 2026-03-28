@@ -2,7 +2,7 @@
 # This file is copied to ~/.claude/.craft-config.yml on first run
 # Users can customize it freely
 
-version: "1.0"
+version: "2.1"
 
 # User profile (configured by setup wizard)
 profile:
@@ -23,24 +23,28 @@ stack:
   node_version: "22"
   react_version: "19"
 
-# Enforcement rules (applied by skills)
+# Rule overrides (per-rule severity: block, warn, ignore)
+# Builtin rules: PHP001-005, TS001-003, LAYER001-003, WARN-PHP001, WARN-TS001
+# Custom rules use long form with pattern, message, severity, languages
 rules:
-  php:
-    final_classes: true
-    private_constructors: true
-    no_setters: true
-    strict_types: true
-    no_datetime_direct: true
-    no_empty_catch: true
-  typescript:
-    no_any: true
-    readonly_default: true
-    branded_types: true
-    named_exports: true
-    no_non_null_assertion: true
-  git:
-    conventional_commits: true
-    no_ai_attribution: true
+  # Examples (uncomment to customize):
+  # PHP001: block         # declare(strict_types=1) required
+  # PHP002: warn          # downgrade final class to warning
+  # TS001: ignore         # disable no-any check
+  #
+  # CUSTOM001:
+  #   pattern: "dd\\("
+  #   message: "No dd() in production code"
+  #   severity: block
+  #   languages: [php]
+
+# Channel configuration (Sentry, etc.)
+channels:
+  sentry:
+    circuit_threshold: 3       # failures before circuit opens
+    circuit_cooldown: 300      # seconds in open state
+    cache_ttl: 3600            # cache TTL in seconds
+    cache_max_entries: 200     # max cached items
 
 # Quality gates (commands to run)
 quality:
