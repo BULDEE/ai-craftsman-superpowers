@@ -46,14 +46,16 @@ WARNING_COUNT=0
 line_has_ignore() {
     local line="$1"
     local rule="$2"
-    echo "$line" | grep -q "craftsman-ignore:.*${rule}" && return 0
-    echo "$line" | grep -q "craftsman-ignore" && return 0
+    # Exact rule match (with possible spaces around it)
+    echo "$line" | grep -qE "craftsman-ignore:\s*${rule}(\s|$|,)" && return 0
+    # Blanket ignore (no specific rule)
+    echo "$line" | grep -qE "craftsman-ignore\s*$" && return 0
     return 1
 }
 
 file_has_ignore() {
     local rule="$1"
-    grep -q "craftsman-ignore:.*${rule}" "$FILE_PATH" 2>/dev/null && return 0
+    grep -qE "craftsman-ignore:\s*${rule}(\s|$|,)" "$FILE_PATH" 2>/dev/null && return 0
     return 1
 }
 

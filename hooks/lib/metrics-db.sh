@@ -54,8 +54,8 @@ metrics_file_pattern() {
 }
 
 metrics_record_violation() {
-    local rule="$1"
-    local file_pattern="$2"
+    local rule="${1//\'/''}"
+    local file_pattern="${2//\'/''}"
     local severity="$3"
     local blocked="${4:-0}"
     local ignored="${5:-0}"
@@ -66,8 +66,8 @@ metrics_record_violation() {
 
 metrics_record_session() {
     local duration="$1"
-    local skills="$2"
-    local agents="$3"
+    local skills="${2//\'/''}"
+    local agents="${3//\'/''}"
     local blocked="$4"
     local warned="$5"
     local project_hash
