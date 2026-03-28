@@ -139,6 +139,20 @@ php bin/console messenger:consume scheduler_default
 
 ---
 
+## MapRequestPayload (Symfony 6.3+)
+
+```php
+#[Route('/api/users', methods: ['POST'])]
+public function create(
+    #[MapRequestPayload] CreateUserInput $input,
+): JsonResponse {
+    $this->commandBus->dispatch(CreateUserCommand::fromInput($input));
+    return new JsonResponse(null, Response::HTTP_CREATED);
+}
+```
+
+---
+
 ## TypeScript (React)
 
 ### Always
@@ -178,135 +192,138 @@ interface User {
 
 ---
 
----
+## React 19 — New Hooks (verified)
 
-## API Platform 4 (Symfony)
+Sources:
+- https://react.dev/reference/react/use
+- https://react.dev/reference/react/useOptimistic
+- https://react.dev/reference/react/useTransition
+- https://react.dev/reference/rsc/use-server
 
-### State Providers (Read)
+### `use(resource)` — replaces `useContext`, reads Promises
 
-```php
-// Replaces DataProvider from v2/v3
-final class UserStateProvider implements ProviderInterface
-{
-    public function provide(Operation $operation, array $uriVariables = [], array $context = []): object|array|null
-    {
-        if ($operation instanceof CollectionOperationInterface) {
-            [$page, , $limit] = $this->pagination->getPagination($operation, $context);
-            return $this->repository->findPaginated($page, $limit);
-        }
-        return $this->repository->findById(UserId::fromString($uriVariables['id']));
-    }
+```typescript
+import { use } from 'react';
+
+// Read context — preferred over useContext() in React 19
+// Advantage: works inside conditionals and loops
+const theme = use(ThemeContext);
+
+// Read a Promise passed from a Server Component
+// Must be wrapped in <Suspense> (loading) and <ErrorBoundary> (errors)
+const user = use(userPromise);
+```
+
+TypeScript signature: `function use<T>(resource: Promise<T> | Context<T>): T`
+
+Constraints:
+- Cannot be called in `try-catch` blocks
+- Cannot be called in event handlers
+- Create Promises in Server Components and pass to Client Components — Client-side Promises recreate on every render
+
+### `useOptimistic` — optimistic UI updates
+
+```typescript
+import { useOptimistic } from 'react';
+
+// Signature: useOptimistic(state, reducer?)
+// Returns: [optimisticState, setOptimistic]
+// Source: https://react.dev/reference/react/useOptimistic
+
+const [optimisticItems, addOptimisticItem] = useOptimistic(
+  items,
+  (currentItems, newItem: Item) => [...currentItems, newItem],
+);
+
+// MUST be called inside a Transition or Server Action
+startTransition(async () => {
+  addOptimisticItem(newItem);      // Immediate UI update
+  await serverApi.save(newItem);   // Real update — reverts if it fails
+});
+```
+
+Constraints:
+- `setOptimistic` MUST be called inside `startTransition` or a form action
+- Calling outside a Transition produces a warning and the update reverts immediately
+- Optimistic state is temporary — automatically converges to real state after the action completes
+
+### `useTransition` — non-urgent state updates
+
+```typescript
+import { useTransition } from 'react';
+
+// Returns: [isPending, startTransition]
+// isPending: boolean — true while the transition is processing
+// Source: https://react.dev/reference/react/useTransition
+
+const [isPending, startTransition] = useTransition();
+
+startTransition(async () => {
+  await updateServer(newValue);
+  // State updates after await need another startTransition:
+  startTransition(() => setState(result));
+});
+```
+
+Constraints:
+- Cannot use with controlled inputs (`<input value={...}>`)
+- `setTimeout` inside `startTransition` is NOT marked as a Transition — wrap the callback inside `startTransition` after the `await`
+- Prefer `useTransition` over manual `useState` loading flags (Vercel rule 6.11)
+
+### `useActionState` — form actions with state (React 19)
+
+```typescript
+import { useActionState } from 'react';
+
+// Handles Server Action return values and pending state
+// Source: https://react.dev/reference/rsc/use-server
+
+async function submitForm(prevState: FormState, formData: FormData): Promise<FormState> {
+  'use server';
+  const name = formData.get('name');
+  if (typeof name !== 'string') return { error: 'Name is required' };
+  await userApi.updateName(name);
+  return { success: true };
+}
+
+// In Client Component:
+const [state, action, isPending] = useActionState(submitForm, { success: false });
+
+return (
+  <form action={action}>
+    <input name="name" />
+    {state.error && <p>{state.error}</p>}
+    <button disabled={isPending}>Save</button>
+  </form>
+);
+```
+
+### `<form action={fn}>` — React 19 Server Actions in forms
+
+This is **real React 19**, not a Next.js-only feature.
+
+```typescript
+// Progressive enhancement: works before JavaScript loads
+// Automatic FormData as first argument
+// Automatic Transition wrapping
+
+async function createUser(formData: FormData): Promise<void> {
+  'use server';
+  // Validate and authorize — treat all arguments as untrusted
+  const email = formData.get('email');
+  if (typeof email !== 'string') return;
+  await userApi.create({ email });
+}
+
+export function CreateUserForm(): ReactNode {
+  return (
+    <form action={createUser}>
+      <input type="email" name="email" />
+      <button type="submit">Create</button>
+    </form>
+  );
 }
 ```
-
-### State Processors (Write)
-
-```php
-// Replaces DataPersister from v2/v3
-final class CreateUserProcessor implements ProcessorInterface
-{
-    public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): void
-    {
-        $this->commandBus->dispatch(CreateUserCommand::fromApiResource($data));
-    }
-}
-```
-
-### Resource Declaration
-
-```php
-#[ApiResource(operations: [
-    new GetCollection(provider: UserStateProvider::class),
-    new Get(provider: UserStateProvider::class),
-    new Post(processor: CreateUserProcessor::class),
-])]
-final class UserResource { /* DTOs, not entities */ }
-```
-
-| Rule | Reason |
-|------|--------|
-| Providers/Processors are final | All classes MUST be final |
-| Resources are DTOs, not Doctrine entities | Clean Architecture: domain decoupled from HTTP layer |
-| Command Bus in Processors | Application layer owns use cases |
-
----
-
-## Symfony Messenger
-
-### Handler Pattern
-
-```php
-#[AsMessageHandler]
-final class CreateUserHandler
-{
-    public function __invoke(CreateUserCommand $command): void
-    {
-        $user = User::create(UserId::generate(), Email::fromString($command->email));
-        $this->repository->save($user);
-        foreach ($user->releaseEvents() as $event) {
-            $this->eventBus->dispatch($event);
-        }
-    }
-}
-```
-
-| Rule | Reason |
-|------|--------|
-| One `__invoke` per handler | Single Responsibility |
-| Release domain events after save | Transactional consistency |
-| No direct HTTP calls in handlers | Use sub-messages for fan-out |
-
----
-
-## MapRequestPayload (Symfony 6.3+)
-
-```php
-#[Route('/api/users', methods: ['POST'])]
-public function create(
-    #[MapRequestPayload] CreateUserInput $input,
-): JsonResponse {
-    $this->commandBus->dispatch(CreateUserCommand::fromInput($input));
-    return new JsonResponse(null, Response::HTTP_CREATED);
-}
-```
-
----
-
-## API Platform Input DTOs
-
-```php
-#[ApiResource(
-    operations: [
-        new Post(
-            input: CreateUserInput::class,
-            processor: CreateUserProcessor::class,
-        ),
-    ]
-)]
-final class UserResource { }
-```
-
----
-
-## Symfony Scheduler (7.4+)
-
-```php
-#[AsSchedule('default')]
-final class AppScheduleProvider implements ScheduleProviderInterface
-{
-    public function getSchedule(): Schedule
-    {
-        return (new Schedule())
-            ->add(RecurringMessage::every('1 hour', new CleanExpiredTokensCommand()))
-            ->add(RecurringMessage::cron('0 2 * * *', new GenerateDailyReportCommand()));
-    }
-}
-```
-
-| Rule | Reason |
-|------|--------|
-| Scheduled tasks dispatch Commands | Handlers reusable from CLI and Scheduler |
-| Use `RecurringMessage::cron()` for complex schedules | More expressive than `every()` |
 
 ---
 
@@ -364,66 +381,6 @@ function DataLoader<T>({ queryKey, queryFn, children }: DataLoaderProps<T>) {
 | Context type includes `null` | Forces explicit error on misuse |
 | Internal `useXxx` hook guards context access | Consumers never handle `null` manually |
 | Compound component sub-parts exported as named exports | No default exports (TS rule ts-004) |
-
----
-
-## Testing
-
-### Structure
-
-```php
-// PHP - Arrange-Act-Assert
-public function test_should_reject_invalid_email(): void
-{
-    // Arrange
-    $invalidEmail = 'not-an-email';
-
-    // Act & Assert
-    $this->expectException(InvalidEmail::class);
-    Email::create($invalidEmail);
-}
-```
-
-```typescript
-// TypeScript - Describe-It
-describe('Email', () => {
-  it('should reject invalid email', () => {
-    expect(() => createEmail('invalid')).toThrow();
-  });
-});
-```
-
-### Naming Convention
-
-```
-test_should_<expected_behavior>_when_<condition>
-should_return_error_when_email_invalid
-should_create_user_when_valid_data
-```
-
----
-
-## Security Essentials
-
-| Risk | Prevention |
-|------|------------|
-| SQL Injection | Parameterized queries (Doctrine handles) |
-| XSS | Output encoding, CSP headers |
-| CSRF | Token validation (Symfony handles) |
-| Auth bypass | Server-side permission check |
-| Sensitive data | Encrypt at rest, HTTPS |
-
----
-
-## Database
-
-| Pattern | When |
-|---------|------|
-| Eager loading | Prevent N+1 |
-| Indexes | Frequently queried columns |
-| Pagination | Large datasets |
-| Transactions | Multi-step operations |
-| Read replicas | Heavy read loads |
 
 ---
 
@@ -541,3 +498,203 @@ return new ArrayPaginator($items, $offset, $limit, $total);
 | Doctrine entity directly as `#[ApiResource]` | Couples persistence to API surface | Separate DTO Resource class |
 | Return plain `array` for collections in custom providers | Breaks pagination/Hydra response | Return `PaginatorInterface` implementation |
 | `input:` at `#[ApiResource]` level | Not how AP4 DTOs work | Declare `input:` on each operation |
+
+---
+
+## Vercel React Best Practices (verified)
+
+Source: https://github.com/vercel-labs/agent-skills/blob/main/skills/react-best-practices/AGENTS.md
+(40+ rules across 8 categories — full list at source. Top 10 most impactful below.)
+
+### 1. Avoid Barrel File Imports (CRITICAL — 200–800ms cost)
+
+Import directly from source files. Barrel files force loading all re-exported modules.
+
+```typescript
+// BAD
+import { Button, Input } from '@/components/ui';
+// GOOD
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+```
+
+See: `knowledge/anti-patterns/barrel-imports.md`
+
+### 2. Strategic Suspense Boundaries (CRITICAL)
+
+Use `<Suspense>` to show the wrapper UI faster while data loads, instead of awaiting everything before returning JSX.
+
+```tsx
+// BAD — blocks entire page on slow data
+export async function Page(): Promise<ReactNode> {
+  const [user, activities] = await Promise.all([getUser(), getActivities()]);
+  return <Layout><UserCard user={user} /><Feed items={activities} /></Layout>;
+}
+
+// GOOD — layout renders immediately, data streams in
+export async function Page(): Promise<ReactNode> {
+  return (
+    <Layout>
+      <Suspense fallback={<Skeleton />}><UserCard /></Suspense>
+      <Suspense fallback={<Skeleton />}><Feed /></Suspense>
+    </Layout>
+  );
+}
+```
+
+### 3. Promise.all() for Independent Operations (CRITICAL)
+
+Never await independent async operations sequentially.
+
+```typescript
+// BAD — sequential (slow)
+const user = await getUser(id);
+const posts = await getPosts(id);
+
+// GOOD — parallel
+const [user, posts] = await Promise.all([getUser(id), getPosts(id)]);
+```
+
+### 4. Do Not Define Components Inside Components (MEDIUM)
+
+Inline components remount on every parent render, destroying state.
+See: `knowledge/anti-patterns/inline-components.md`
+
+### 5. Use Transitions for Non-Urgent Updates (MEDIUM)
+
+Prefer `useTransition` over manual `useState` loading flags.
+
+```typescript
+// BAD
+const [isLoading, setIsLoading] = useState(false);
+const handleClick = async () => { setIsLoading(true); await action(); setIsLoading(false); };
+
+// GOOD
+const [isPending, startTransition] = useTransition();
+const handleClick = () => startTransition(async () => { await action(); });
+```
+
+### 6. Per-Request Deduplication with React.cache() (HIGH)
+
+Deduplicate identical async operations within a single request in Server Components.
+
+```typescript
+import { cache } from 'react';
+
+const getUser = cache(async (id: UserId): Promise<User> => {
+  return db.users.findById(id);
+});
+// Multiple components can call getUser(id) — only one DB query per request
+```
+
+### 7. Authenticate Server Actions Like API Routes (HIGH)
+
+Every Server Action is a public endpoint. Always verify auth and authorization inside.
+
+```typescript
+async function deletePost(postId: string): Promise<void> {
+  'use server';
+  const session = await getServerSession();
+  if (!session) throw new Error('Unauthorized');
+  const post = await db.posts.findById(postId);
+  if (post.authorId !== session.userId) throw new Error('Forbidden');
+  await db.posts.delete(postId);
+}
+```
+
+### 8. Minimize Serialization at RSC Boundaries (HIGH)
+
+Pass only fields the client component actually uses across the Server/Client boundary.
+
+```typescript
+// BAD — entire user object serialized (including sensitive fields)
+<ClientCard user={user} />
+
+// GOOD — only needed fields
+<ClientCard name={user.name} avatarUrl={user.avatarUrl} />
+```
+
+### 9. Calculate Derived State During Rendering (MEDIUM)
+
+Compute values from current props/state during render — never store them in state or update them in effects.
+
+```typescript
+// BAD
+const [fullName, setFullName] = useState('');
+useEffect(() => { setFullName(`${firstName} ${lastName}`); }, [firstName, lastName]);
+
+// GOOD
+const fullName = `${firstName} ${lastName}`; // Computed during render
+```
+
+### 10. Use Explicit Conditional Rendering — Ternary Over && (MEDIUM)
+
+`&&` renders falsy values like `0` and `NaN`. Always use ternary for safety.
+
+```tsx
+// BAD — renders "0" when count is 0
+{count && <Badge>{count}</Badge>}
+
+// GOOD
+{count > 0 ? <Badge>{count}</Badge> : null}
+```
+
+---
+
+## Testing
+
+### Structure
+
+```php
+// PHP - Arrange-Act-Assert
+public function test_should_reject_invalid_email(): void
+{
+    // Arrange
+    $invalidEmail = 'not-an-email';
+
+    // Act & Assert
+    $this->expectException(InvalidEmail::class);
+    Email::create($invalidEmail);
+}
+```
+
+```typescript
+// TypeScript - Describe-It
+describe('Email', () => {
+  it('should reject invalid email', () => {
+    expect(() => createEmail('invalid')).toThrow();
+  });
+});
+```
+
+### Naming Convention
+
+```
+test_should_<expected_behavior>_when_<condition>
+should_return_error_when_email_invalid
+should_create_user_when_valid_data
+```
+
+---
+
+## Security Essentials
+
+| Risk | Prevention |
+|------|------------|
+| SQL Injection | Parameterized queries (Doctrine handles) |
+| XSS | Output encoding, CSP headers |
+| CSRF | Token validation (Symfony handles) |
+| Auth bypass | Server-side permission check |
+| Sensitive data | Encrypt at rest, HTTPS |
+
+---
+
+## Database
+
+| Pattern | When |
+|---------|------|
+| Eager loading | Prevent N+1 |
+| Indexes | Frequently queried columns |
+| Pagination | Large datasets |
+| Transactions | Multi-step operations |
+| Read replicas | Heavy read loads |

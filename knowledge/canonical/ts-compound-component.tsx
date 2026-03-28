@@ -1,100 +1,197 @@
-// CANONICAL EXAMPLE: Compound Component pattern (React 19) (v1.0)
-//
-// This is THE reference for Compound Components.
-// Uses React 19's `use(Context)` hook instead of useContext.
-//
-// Key characteristics:
-// - Context with null-check guard (MUST)
-// - useXxx() hook for context access — throws if used outside provider (MUST)
-// - readonly properties on all interfaces (MUST per TS rules)
-// - Named exports only (MUST per TS rules)
-// - No default exports (MUST per TS rules)
-// - "use client" only if interactivity needed
-'use client';
+/**
+ * CANONICAL EXAMPLE: Compound Component Pattern (v1.0)
+ *
+ * Source: https://react.dev/reference/react/use (use() for context)
+ *         https://react.dev/reference/react/createContext
+ *
+ * Key characteristics:
+ * - createContext + use(Context) — React 19 modern pattern
+ * - use(Context) preferred over useContext(): works in conditionals/loops
+ * - Named exports only (no default export)
+ * - readonly props throughout
+ * - No any types
+ * - Sub-components access shared state via context, not prop drilling
+ */
 
-import { createContext, use, useState, type ReactNode } from 'react';
+import { createContext, use, useState, useCallback } from 'react';
+import type { ReactNode } from 'react';
 
-// --- Types ---
+// ============================================================
+// Context Definition
+// Source: https://react.dev/reference/react/use
+// use(Context) is the React 19 replacement for useContext().
+// It works inside conditionals and loops unlike useContext().
+// ============================================================
 
-interface AccordionContextType {
-  readonly openItems: ReadonlySet<string>;
+interface AccordionContextValue {
+  readonly openItemId: string | null;
   readonly toggle: (id: string) => void;
 }
 
-interface AccordionProps {
-  readonly children: ReactNode;
-  readonly allowMultiple?: boolean;
-}
+// null default means "not inside a provider" — caught at runtime
+const AccordionContext = createContext<AccordionContextValue | null>(null);
 
-interface AccordionItemProps {
-  readonly id: string;
-  readonly title: string;
-  readonly children: ReactNode;
-}
-
-// --- Context ---
-
-const AccordionContext = createContext<AccordionContextType | null>(null);
-
-// Internal hook — throws on misuse, removes null-check boilerplate from consumers
-function useAccordion(): AccordionContextType {
+// Helper to enforce provider requirement
+function useAccordionContext(): AccordionContextValue {
+  // use() can be called inside conditionals/loops — unlike useContext()
   const context = use(AccordionContext);
   if (context === null) {
-    throw new Error('AccordionItem must be used within an Accordion');
+    throw new Error('useAccordionContext must be used within <Accordion>');
   }
   return context;
 }
 
-// --- Components ---
+// ============================================================
+// Root Component
+// ============================================================
 
-export function Accordion({ children, allowMultiple = false }: AccordionProps) {
-  const [openItems, setOpenItems] = useState<ReadonlySet<string>>(new Set());
+interface AccordionProps {
+  readonly children: ReactNode;
+  readonly defaultOpenId?: string;
+  readonly className?: string;
+}
 
-  function toggle(id: string) {
-    setOpenItems(prev => {
-      // allowMultiple=false → clear all others first
-      const next = new Set(allowMultiple ? prev : []);
-      if (prev.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }
+export function Accordion({
+  children,
+  defaultOpenId = null,
+  className,
+}: AccordionProps): ReactNode {
+  const [openItemId, setOpenItemId] = useState<string | null>(defaultOpenId);
+
+  const toggle = useCallback((id: string) => {
+    setOpenItemId((current) => (current === id ? null : id));
+  }, []);
 
   return (
-    <AccordionContext value={{ openItems, toggle }}>
-      <div role="tablist">{children}</div>
+    <AccordionContext value={{ openItemId, toggle }}>
+      <div className={className}>{children}</div>
     </AccordionContext>
   );
 }
 
-export function AccordionItem({ id, title, children }: AccordionItemProps) {
-  const { openItems, toggle } = useAccordion();
-  const isOpen = openItems.has(id);
+// ============================================================
+// Item Component
+// ============================================================
 
+interface AccordionItemProps {
+  readonly id: string;
+  readonly children: ReactNode;
+  readonly className?: string;
+}
+
+export function AccordionItem({
+  id,
+  children,
+  className,
+}: AccordionItemProps): ReactNode {
   return (
-    <div>
-      <button
-        role="tab"
-        aria-expanded={isOpen}
-        onClick={() => toggle(id)}
-      >
-        {title}
-      </button>
-      {isOpen && (
-        <div role="tabpanel">
-          {children}
-        </div>
-      )}
+    <div className={`border-b ${className ?? ''}`} data-item-id={id}>
+      {children}
     </div>
   );
 }
 
-// --- Usage example (comment only, not exported) ---
-//
-// <Accordion allowMultiple>
-//   <AccordionItem id="shipping" title="Shipping">...</AccordionItem>
-//   <AccordionItem id="returns" title="Returns">...</AccordionItem>
-// </Accordion>
+// ============================================================
+// Trigger Component — reads context, NOT passed as prop
+// ============================================================
+
+interface AccordionTriggerProps {
+  readonly itemId: string;
+  readonly children: ReactNode;
+  readonly className?: string;
+}
+
+export function AccordionTrigger({
+  itemId,
+  children,
+  className,
+}: AccordionTriggerProps): ReactNode {
+  const { openItemId, toggle } = useAccordionContext();
+  const isOpen = openItemId === itemId;
+
+  return (
+    <button
+      type="button"
+      onClick={() => toggle(itemId)}
+      aria-expanded={isOpen}
+      className={`flex w-full items-center justify-between py-4 font-medium ${className ?? ''}`}
+    >
+      {children}
+      <ChevronIcon isOpen={isOpen} />
+    </button>
+  );
+}
+
+// ============================================================
+// Content Component — conditionally rendered
+// ============================================================
+
+interface AccordionContentProps {
+  readonly itemId: string;
+  readonly children: ReactNode;
+  readonly className?: string;
+}
+
+export function AccordionContent({
+  itemId,
+  children,
+  className,
+}: AccordionContentProps): ReactNode {
+  // use(Context) CAN be called inside conditionals — but the hook itself
+  // must be called unconditionally. The conditional is on the result.
+  const { openItemId } = useAccordionContext();
+  const isOpen = openItemId === itemId;
+
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <div
+      role="region"
+      className={`pb-4 text-sm ${className ?? ''}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ============================================================
+// Usage Example
+// ============================================================
+
+/*
+  // Clean, readable — no prop drilling
+  <Accordion defaultOpenId="item-1">
+    <AccordionItem id="item-1">
+      <AccordionTrigger itemId="item-1">What is React?</AccordionTrigger>
+      <AccordionContent itemId="item-1">
+        React is a library for building user interfaces.
+      </AccordionContent>
+    </AccordionItem>
+
+    <AccordionItem id="item-2">
+      <AccordionTrigger itemId="item-2">What is TypeScript?</AccordionTrigger>
+      <AccordionContent itemId="item-2">
+        TypeScript is a typed superset of JavaScript.
+      </AccordionContent>
+    </AccordionItem>
+  </Accordion>
+*/
+
+// ============================================================
+// Internal helpers (not exported)
+// ============================================================
+
+function ChevronIcon({ isOpen }: { readonly isOpen: boolean }): ReactNode {
+  return (
+    <svg
+      className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  );
+}

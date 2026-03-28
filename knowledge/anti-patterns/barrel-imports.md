@@ -1,46 +1,54 @@
-# Anti-Pattern: Barrel Imports (index.ts re-exports)
+# Anti-Pattern: Barrel File Imports
+
+Source: https://github.com/vercel-labs/agent-skills/blob/main/skills/react-best-practices/AGENTS.md (Rule 2.1)
 
 ## Problem
 
-Barrel files (`index.ts`) that re-export from many modules prevent tree-shaking and increase bundle size. Every import from a barrel may pull all exports into the bundle, even unused ones.
-
-## Bad
+Barrel files (`index.ts` that re-export everything from a module) force the bundler to load **all** modules in the barrel, even when only one is used. This costs 200–800ms on initial load and significantly inflates bundle size.
 
 ```typescript
-// src/components/index.ts — barrel file
-export { Button } from './Button/Button';
-export { Card } from './Card/Card';
-export { Modal } from './Modal/Modal';
-export { Table } from './Table/Table';
-// ... 50 more components
-
-// Usage — may import ALL components even if only Button is needed
-import { Button } from '@/components';
+// ❌ BAD — forces loading of ALL exports from the barrel
+import { Button, Card, Input, Table, Modal } from '@/components/ui';
+import { formatDate, formatMoney, formatUser } from '@/domain/utils';
 ```
 
-## Good
+Even if only `Button` is used, the bundler must evaluate every file re-exported through `@/components/ui/index.ts`.
+
+## Root Cause
+
+Tree-shaking is unreliable with barrel files because:
+- Side effects in any barrel module disable tree-shaking for the entire barrel
+- Dynamic re-exports cannot be statically analyzed
+- The bundler must speculatively load all modules to resolve the barrel
+
+## Solution
+
+Import directly from the source file.
 
 ```typescript
-// Direct imports — bundler only includes what is referenced
-import { Button } from '@/components/Button/Button';
-import { Card } from '@/components/Card/Card';
+// ✅ GOOD — only the Button module is loaded
+import { Button } from '@/components/ui/button';
+import { formatDate } from '@/domain/utils/formatDate';
 ```
 
-## Why It Matters
+## When Barrels Are Acceptable
 
-- Barrel files defeat tree-shaking in many bundlers (especially CommonJS output)
-- Every `import { X } from '@/barrel'` may force evaluation of all exports
-- Circular dependency risk increases as barrel files grow
-- Build times increase proportionally with barrel size
-- Initial page load grows silently as teams add to the barrel
+Barrels are acceptable only for **public package APIs** — the top-level `index.ts` of a published npm package that consumers import. They are NOT acceptable inside an application codebase.
 
-## Exceptions
+## Detection
 
-Barrel files are acceptable for:
-- Public package APIs (when you control what consumers import)
-- Small, stable groups (3-5 exports max)
-- When your bundler (e.g. Vite with ESM) guarantees tree-shaking
+```bash
+# Find barrel files
+find src -name "index.ts" -exec grep -l "^export \* from" {} \;
 
-## Rule
+# Find imports using barrels
+grep -r "from '@/components/ui'" src --include="*.tsx"
+```
 
-> Prefer direct imports. Only use barrels for deliberate public API surfaces, never as a convenience layer.
+## Impact
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Initial bundle parse | +200–800ms | baseline |
+| Unused modules loaded | many | 0 |
+| Tree-shaking effectiveness | poor | full |

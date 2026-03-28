@@ -1,59 +1,83 @@
-# Anti-Pattern: Inline Component Definitions
+# Anti-Pattern: Inline / Nested Component Definitions
+
+Source: https://github.com/vercel-labs/agent-skills/blob/main/skills/react-best-practices/AGENTS.md (Rule 5.4)
 
 ## Problem
 
-Defining components inside other components causes re-creation on every render. React uses reference equality to decide if a component type changed — a new function reference means React unmounts the old subtree and mounts a fresh one, losing all child state.
-
-## Bad
+Defining a component inside another component causes React to treat it as a **new component type on every render**. This forces full unmount+remount instead of re-render, destroying state and breaking animations.
 
 ```tsx
-function ParentComponent({ items }: { readonly items: readonly Item[] }) {
-  // BAD: ItemRow is a new function on every render
-  // → React sees a different component type each time
-  // → All list items unmount and remount
-  // → Any state inside ItemRow is destroyed
-  const ItemRow = ({ item }: { readonly item: Item }) => (
-    <tr><td>{item.name}</td><td>{item.value}</td></tr>
-  );
+// ❌ BAD — ListItem is recreated on every render of List
+function List({ items }: { readonly items: readonly string[] }): ReactNode {
+  // This function is a NEW reference every render
+  function ListItem({ text }: { readonly text: string }): ReactNode {
+    const [hovered, setHovered] = useState(false); // State lost on every List render
+    return (
+      <li onMouseEnter={() => setHovered(true)} className={hovered ? 'bg-muted' : ''}>
+        {text}
+      </li>
+    );
+  }
 
   return (
-    <table>
-      <tbody>
-        {items.map(item => <ItemRow key={item.id} item={item} />)}
-      </tbody>
-    </table>
+    <ul>
+      {items.map((item) => (
+        <ListItem key={item} text={item} />
+      ))}
+    </ul>
   );
 }
 ```
 
-## Good
+## Why It Breaks
+
+React identifies components by their **reference**. On every `List` render, `ListItem` is a new function reference. React sees an unknown component type, unmounts the old one, and mounts a fresh one — losing all internal state.
+
+## Solution
+
+Define all components **at module level** and pass data as props.
 
 ```tsx
-// GOOD: Defined at module scope — stable reference across renders
-function ItemRow({ item }: { readonly item: Item }) {
-  return <tr><td>{item.name}</td><td>{item.value}</td></tr>;
+// ✅ GOOD — ListItem is defined once, at module level
+interface ListItemProps {
+  readonly text: string;
 }
 
-function ParentComponent({ items }: { readonly items: readonly Item[] }) {
+function ListItem({ text }: ListItemProps): ReactNode {
+  const [hovered, setHovered] = useState(false); // State preserved correctly
   return (
-    <table>
-      <tbody>
-        {items.map(item => <ItemRow key={item.id} item={item} />)}
-      </tbody>
-    </table>
+    <li onMouseEnter={() => setHovered(true)} className={hovered ? 'bg-muted' : ''}>
+      {text}
+    </li>
+  );
+}
+
+function List({ items }: { readonly items: readonly string[] }): ReactNode {
+  return (
+    <ul>
+      {items.map((item) => (
+        <ListItem key={item} text={item} />
+      ))}
+    </ul>
   );
 }
 ```
 
-## Why It Matters
+## Symptoms
 
-- React uses reference equality (`===`) to check if the component type changed between renders
-- A new function reference → React treats it as a completely different component type
-- Result: full unmount + remount of the subtree on every parent render
-- All internal state of child components is destroyed (inputs reset, animations restart)
-- Performance degrades significantly with lists — O(n) unmounts per parent render
-- Difficult to debug: symptoms appear as "flickering" or "lost state"
+- Component state resets unexpectedly on parent re-render
+- Animations restart from beginning on each update
+- Focus is lost after every keystroke in an input inside the nested component
+- Performance profiler shows repeated mount/unmount cycles
 
-## Rule
+## Detection
 
-> Never define a component function inside another component. Move it to module scope or a separate file.
+```bash
+# Find function declarations or arrow functions inside component bodies
+# Look for `function` or `const X = (` inside another component function body
+grep -rn "function.*): ReactNode" src --include="*.tsx" -A 20 | grep -B 5 "function "
+```
+
+## Exception
+
+Render functions used as immediate JSX children (not assigned to a variable) are fine for simple cases, but prefer extraction to a named component for anything with state or complexity.
