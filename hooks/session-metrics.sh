@@ -10,6 +10,9 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
 
+# Session state for correction learning
+SESSION_STATE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
+
 metrics_init 2>/dev/null || true
 
 # Read session info from stdin
@@ -30,5 +33,8 @@ if [[ "$BLOCKED" -gt 0 || "$WARNED" -gt 0 ]]; then
         systemMessage: ("Session summary: " + $b + " violations blocked, " + $w + " warnings. Run /craftsman:metrics for details.")
     }'
 fi
+
+# Clear session state for correction learning
+rm -f "$SESSION_STATE"
 
 exit 0
