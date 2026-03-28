@@ -172,8 +172,8 @@ echo ""
 echo "=== Post-Write Hook — Config-Aware Tests ==="
 
 # Test: stack=react skips PHP rules
-export CLAUDE_USER_CONFIG_stack="react"
-unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+export CLAUDE_PLUGIN_OPTION_stack="react"
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
 exit_code="${result%%|*}"
 if [[ "$exit_code" == "0" ]]; then
@@ -181,10 +181,10 @@ if [[ "$exit_code" == "0" ]]; then
 else
     log_fail "stack=react should skip PHP rules" "got exit $exit_code"
 fi
-unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
 # Test: stack=symfony skips TS rules
-export CLAUDE_USER_CONFIG_stack="symfony"
+export CLAUDE_PLUGIN_OPTION_stack="symfony"
 result=$(run_post_hook "$FIXTURES_DIR/invalid-any.ts")
 exit_code="${result%%|*}"
 if [[ "$exit_code" == "0" ]]; then
@@ -192,10 +192,10 @@ if [[ "$exit_code" == "0" ]]; then
 else
     log_fail "stack=symfony should skip TS rules" "got exit $exit_code"
 fi
-unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
 # Test: strictness=relaxed warns instead of blocking
-export CLAUDE_USER_CONFIG_strictness="relaxed"
+export CLAUDE_PLUGIN_OPTION_strictness="relaxed"
 result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
 exit_code="${result%%|*}"
 if [[ "$exit_code" == "0" ]]; then
@@ -203,10 +203,10 @@ if [[ "$exit_code" == "0" ]]; then
 else
     log_fail "strictness=relaxed should warn not block" "got exit $exit_code"
 fi
-unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 
 # Test: strictness=moderate blocks LAYER but warns PHP001
-export CLAUDE_USER_CONFIG_strictness="moderate"
+export CLAUDE_PLUGIN_OPTION_strictness="moderate"
 result=$(run_post_hook "$FIXTURES_DIR/invalid-layer-violation.php")
 exit_code="${result%%|*}"
 output="${result#*|}"
@@ -223,7 +223,7 @@ if [[ "$exit_code" == "0" ]]; then
 else
     log_fail "strictness=moderate should warn PHP001" "got exit $exit_code"
 fi
-unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 
 # Test: default behavior unchanged (strict + fullstack)
 result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
@@ -241,7 +241,7 @@ echo ""
 echo "=== Pre-Write Hook — Config-Aware Tests ==="
 
 # Test: stack=react skips PHP layer checks
-export CLAUDE_USER_CONFIG_stack="react"
+export CLAUDE_PLUGIN_OPTION_stack="react"
 result=$(run_pre_hook "src/Domain/Service/UserService.php" "<?php\nuse App\\\\Infrastructure\\\\Persistence\\\\Repo;\nfinal class UserService {}")
 exit_code="${result%%|*}"
 if [[ "$exit_code" == "0" ]]; then
@@ -249,10 +249,10 @@ if [[ "$exit_code" == "0" ]]; then
 else
     log_fail "Pre-write: stack=react should skip PHP" "got exit $exit_code"
 fi
-unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
 # Test: strictness=relaxed warns instead of blocking layer violations
-export CLAUDE_USER_CONFIG_strictness="relaxed"
+export CLAUDE_PLUGIN_OPTION_strictness="relaxed"
 result=$(run_pre_hook "src/Domain/Service/UserService.php" "<?php\nuse App\\\\Infrastructure\\\\Persistence\\\\Repo;\nfinal class UserService {}")
 exit_code="${result%%|*}"
 if [[ "$exit_code" == "0" ]]; then
@@ -260,7 +260,7 @@ if [[ "$exit_code" == "0" ]]; then
 else
     log_fail "Pre-write: strictness=relaxed should warn" "got exit $exit_code"
 fi
-unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 
 # Test: default still blocks
 result=$(run_pre_hook "src/Domain/Service/UserService.php" "<?php\nuse App\\\\Infrastructure\\\\Persistence\\\\Repo;\nfinal class UserService {}")
@@ -290,8 +290,8 @@ mkdir -p "$SESSION_TEST_DIR"
 cd "$SESSION_TEST_DIR"
 
 # Clean env for session tests
-unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
-unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
 # Test: Outputs valid JSON
 result=$(run_session_start)
@@ -389,8 +389,8 @@ run_file_changed() {
 }
 
 # Clear env
-unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
-unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
 # Test: Ignores non-PHP/TS files
 result=$(run_file_changed "$ROOT_DIR/tests/run-tests.sh")
@@ -433,7 +433,7 @@ else
 fi
 
 # Test: Respects stack config
-export CLAUDE_USER_CONFIG_stack="react"
+export CLAUDE_PLUGIN_OPTION_stack="react"
 result=$(run_file_changed "$FIXTURES_DIR/invalid-no-strict.php")
 exit_code="${result%%|*}"
 output="${result#*|}"
@@ -442,10 +442,10 @@ if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
 else
     log_fail "FileChanged should skip PHP for stack=react" "output=$output"
 fi
-unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
 # Test: Respects stack config (skips TS when stack=symfony)
-export CLAUDE_USER_CONFIG_stack="symfony"
+export CLAUDE_PLUGIN_OPTION_stack="symfony"
 result=$(run_file_changed "$FIXTURES_DIR/invalid-any.ts")
 exit_code="${result%%|*}"
 output="${result#*|}"
@@ -454,7 +454,7 @@ if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
 else
     log_fail "FileChanged should skip TS for stack=symfony" "output=$output"
 fi
-unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
 # Test: Always non-blocking (exit 0)
 result=$(run_file_changed "$FIXTURES_DIR/invalid-layer-violation.php")
