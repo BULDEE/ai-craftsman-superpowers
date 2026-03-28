@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# =============================================================================
+# Metrics Database Helper
+# Shared by all hooks for recording violations and sessions.
+#
+# Usage:
+#   source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/metrics-db.sh"
+#   metrics_init
+#   metrics_record_violation "PHP001" "src/Domain/**/*.php" "critical" 1 0
+#   metrics_record_session 120 '["design","entity"]' '[]' 3 2
+# =============================================================================
+
+METRICS_DB_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
+METRICS_DB="${METRICS_DB_DIR}/metrics.db"
+
+metrics_init() {
+    mkdir -p "$METRICS_DB_DIR"
+    sqlite3 "$METRICS_DB" <<'SQL'
+CREATE TABLE IF NOT EXISTS violations (
+    id INTEGER PRIMARY KEY,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    project_hash TEXT NOT NULL,
+    rule TEXT NOT NULL,
+    file_pattern TEXT NOT NULL,
+    severity TEXT NOT NULL CHECK (severity IN ('critical', 'warning')),
+    blocked BOOLEAN NOT NULL DEFAULT 0,
+    ignored BOOLEAN NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id INTEGER PRIMARY KEY,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    project_hash TEXT NOT NULL,
+    duration_seconds INTEGER,
+    skills_used TEXT,
+    agents_spawned TEXT,
+    violations_blocked INTEGER DEFAULT 0,
+    violations_warned INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_violations_project ON violations(project_hash, timestamp);
+CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_hash, timestamp);
+SQL
+}
+
+metrics_project_hash() {
+    echo -n "$PWD" | shasum -a 256 | cut -d' ' -f1
+}
+
+metrics_file_pattern() {
+    local file="$1"
+    local rel_path="${file#$PWD/}"
+    echo "$rel_path" | sed -E 's|/[^/]+\.(php|ts|tsx)$|/**/*.\1|'
+}
+
+metrics_record_violation() {
+    local rule="$1"
+    local file_pattern="$2"
+    local severity="$3"
+    local blocked="${4:-0}"
+    local ignored="${5:-0}"
+    local project_hash
+    project_hash=$(metrics_project_hash)
+    sqlite3 "$METRICS_DB" "INSERT INTO violations (project_hash, rule, file_pattern, severity, blocked, ignored) VALUES ('$project_hash', '$rule', '$file_pattern', '$severity', $blocked, $ignored);"
+}
+
+metrics_record_session() {
+    local duration="$1"
+    local skills="$2"
+    local agents="$3"
+    local blocked="$4"
+    local warned="$5"
+    local project_hash
+    project_hash=$(metrics_project_hash)
+    sqlite3 "$METRICS_DB" "INSERT INTO sessions (project_hash, duration_seconds, skills_used, agents_spawned, violations_blocked, violations_warned) VALUES ('$project_hash', $duration, '$skills', '$agents', $blocked, $warned);"
+}
+
+metrics_violations_7d() {
+    local project_hash
+    project_hash=$(metrics_project_hash)
+    sqlite3 -header -column "$METRICS_DB" \
+        "SELECT rule, severity, COUNT(*) as count, SUM(blocked) as blocked, SUM(ignored) as ignored FROM violations WHERE project_hash='$project_hash' AND timestamp > datetime('now','-7 days') GROUP BY rule, severity ORDER BY count DESC;"
+}
+
+metrics_trend() {
+    local project_hash
+    project_hash=$(metrics_project_hash)
+    sqlite3 -header -column "$METRICS_DB" \
+        "SELECT date(timestamp) as day, COUNT(*) as violations, SUM(blocked) as blocked FROM violations WHERE project_hash='$project_hash' AND timestamp > datetime('now','-30 days') GROUP BY day ORDER BY day DESC LIMIT 14;"
+}
