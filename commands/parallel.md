@@ -104,9 +104,23 @@ All tasks can run simultaneously:
 - **Speedup: 55% faster**
 ```
 
-### Phase 4: Agent Dispatch
+### Phase 4: Agent Dispatch (Real Execution)
 
-**CRITICAL: To execute in parallel, call multiple Task tools in a SINGLE message.**
+**CRITICAL: Use the Agent tool to spawn real subagents.**
+
+For each task in the parallel group:
+
+```
+Agent tool call:
+  description: "Task A: [short description]"
+  prompt: "[Full task specification including scope, constraints, done criteria]"
+  isolation: "worktree"  (if modifying files)
+  run_in_background: true  (for true parallelism)
+```
+
+**Launch ALL independent agents in a SINGLE message** — this is how Claude Code achieves true parallel execution. Multiple Agent tool calls in one response = concurrent execution.
+
+After dispatch, you'll be notified when each agent completes. Use SendMessage to check on agents if needed.
 
 ```markdown
 ## Dispatching Agents
@@ -138,14 +152,7 @@ All tasks can run simultaneously:
 **Launching 4 agents...**
 ```
 
-Then use the Task tool 4 times in ONE response:
-
-```
-[Task tool call for Agent 1]
-[Task tool call for Agent 2]
-[Task tool call for Agent 3]
-[Task tool call for Agent 4]
-```
+Then use the Agent tool 4 times in ONE response — all 4 will execute concurrently.
 
 ### Phase 5: Result Aggregation
 
