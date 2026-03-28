@@ -21,10 +21,13 @@ _config_parse_yml_value() {
     grep -E "^${key}:" "$file" | head -1 | awk '{print $2}' | tr -d '"' | tr -d "'"
 }
 
-config_strictness() {
+_config_resolve() {
+    local key="$1"
+    local default="$2"
+
     local yml_value=""
     if [[ -f "$PWD/.craft-config.yml" ]]; then
-        yml_value=$(_config_parse_yml_value "strictness" "$PWD/.craft-config.yml")
+        yml_value=$(_config_parse_yml_value "$key" "$PWD/.craft-config.yml")
     fi
 
     if [[ -n "$yml_value" ]]; then
@@ -32,31 +35,21 @@ config_strictness() {
         return 0
     fi
 
-    if [[ -n "${CLAUDE_PLUGIN_OPTION_strictness:-}" ]]; then
-        echo "$CLAUDE_PLUGIN_OPTION_strictness"
+    local env_var="CLAUDE_PLUGIN_OPTION_${key}"
+    if [[ -n "${!env_var:-}" ]]; then
+        echo "${!env_var}"
         return 0
     fi
 
-    echo "strict"
+    echo "$default"
+}
+
+config_strictness() {
+    _config_resolve "strictness" "strict"
 }
 
 config_stack() {
-    local yml_value=""
-    if [[ -f "$PWD/.craft-config.yml" ]]; then
-        yml_value=$(_config_parse_yml_value "stack" "$PWD/.craft-config.yml")
-    fi
-
-    if [[ -n "$yml_value" ]]; then
-        echo "$yml_value"
-        return 0
-    fi
-
-    if [[ -n "${CLAUDE_PLUGIN_OPTION_stack:-}" ]]; then
-        echo "$CLAUDE_PLUGIN_OPTION_stack"
-        return 0
-    fi
-
-    echo "fullstack"
+    _config_resolve "stack" "fullstack"
 }
 
 config_php_enabled() {
@@ -99,4 +92,16 @@ config_stop_review_enabled() {
     local strictness
     strictness=$(config_strictness)
     [[ "$strictness" == "strict" ]]
+}
+
+config_sentry_org() {
+    _config_resolve "sentry_org" ""
+}
+
+config_sentry_project() {
+    _config_resolve "sentry_project" ""
+}
+
+config_sentry_enabled() {
+    [[ -n "$(config_sentry_org)" ]] && [[ -n "$(config_sentry_project)" ]]
 }

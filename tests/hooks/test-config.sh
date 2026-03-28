@@ -330,11 +330,109 @@ fi
 unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 
 # =============================================================================
+# 7. Sentry config (config_sentry_org, config_sentry_project, config_sentry_enabled)
+# =============================================================================
+echo ""
+echo "=== Sentry Config ==="
+
+rm -f "$TEST_DIR/.craft-config.yml"
+unset CLAUDE_PLUGIN_OPTION_sentry_org 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_sentry_project 2>/dev/null || true
+
+# Default: empty (opt-in)
+result=$(config_sentry_org)
+if [[ -z "$result" ]]; then
+    log_pass "Default sentry_org is empty"
+else
+    log_fail "Default sentry_org should be empty" "got '$result'"
+fi
+
+result=$(config_sentry_project)
+if [[ -z "$result" ]]; then
+    log_pass "Default sentry_project is empty"
+else
+    log_fail "Default sentry_project should be empty" "got '$result'"
+fi
+
+# Not enabled when both empty
+if ! config_sentry_enabled; then
+    log_pass "config_sentry_enabled returns false when both empty"
+else
+    log_fail "config_sentry_enabled should be false" "returned true"
+fi
+
+# Not enabled when only org set
+export CLAUDE_PLUGIN_OPTION_sentry_org="my-org"
+if ! config_sentry_enabled; then
+    log_pass "config_sentry_enabled returns false when only org set"
+else
+    log_fail "config_sentry_enabled should be false (no project)" "returned true"
+fi
+
+# Not enabled when only project set
+unset CLAUDE_PLUGIN_OPTION_sentry_org 2>/dev/null || true
+export CLAUDE_PLUGIN_OPTION_sentry_project="my-project"
+if ! config_sentry_enabled; then
+    log_pass "config_sentry_enabled returns false when only project set"
+else
+    log_fail "config_sentry_enabled should be false (no org)" "returned true"
+fi
+
+# Enabled when both set via env vars
+export CLAUDE_PLUGIN_OPTION_sentry_org="my-org"
+export CLAUDE_PLUGIN_OPTION_sentry_project="my-project"
+if config_sentry_enabled; then
+    log_pass "config_sentry_enabled returns true when both set"
+else
+    log_fail "config_sentry_enabled should be true" "returned false"
+fi
+
+result=$(config_sentry_org)
+if [[ "$result" == "my-org" ]]; then
+    log_pass "config_sentry_org reads env var"
+else
+    log_fail "config_sentry_org env var" "got '$result'"
+fi
+
+result=$(config_sentry_project)
+if [[ "$result" == "my-project" ]]; then
+    log_pass "config_sentry_project reads env var"
+else
+    log_fail "config_sentry_project env var" "got '$result'"
+fi
+
+# .craft-config.yml overrides env var
+cat > "$TEST_DIR/.craft-config.yml" <<'YAML'
+sentry_org: yml-org
+sentry_project: yml-project
+YAML
+
+result=$(config_sentry_org)
+if [[ "$result" == "yml-org" ]]; then
+    log_pass "config_sentry_org reads .craft-config.yml"
+else
+    log_fail "config_sentry_org yml override" "got '$result'"
+fi
+
+result=$(config_sentry_project)
+if [[ "$result" == "yml-project" ]]; then
+    log_pass "config_sentry_project reads .craft-config.yml"
+else
+    log_fail "config_sentry_project yml override" "got '$result'"
+fi
+
+rm -f "$TEST_DIR/.craft-config.yml"
+unset CLAUDE_PLUGIN_OPTION_sentry_org 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_sentry_project 2>/dev/null || true
+
+# =============================================================================
 # Cleanup
 # =============================================================================
 cd "$ORIGINAL_PWD"
 unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_sentry_org 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_sentry_project 2>/dev/null || true
 rm -rf "$TEST_DIR"
 
 echo ""
