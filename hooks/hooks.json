@@ -19,6 +19,15 @@
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-write-check.sh\""
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-push-verify.sh\""
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -94,6 +103,28 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-metrics.sh\""
+          }
+        ]
+      }
+    ],
+    "TeammateIdle": [
+      {
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "You are a work-queue advisor for the Craftsman plugin. A teammate is currently idle.\n\nThe tool input is: $ARGUMENTS\n\nAnalyze what the idle teammate could work on next:\n1. Run: bash -c 'cat \"${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json\" 2>/dev/null || echo \"{}\"'\n2. Check for pending patterns: look for 'patterns' key with 3+ file violations suggesting project-wide fixes.\n3. Run: git diff --name-only HEAD 2>/dev/null to see changed files.\n4. Suggest the next most impactful task based on:\n   - Unresolved cross-file violation patterns\n   - Changed files without tests\n   - Missing /craftsman:verify before any pending push\n\nReturn as additionalContext:\n- One line per suggestion: [IDLE] <action> — <reason>\n- Max 3 suggestions, max 150 chars each\n- If nothing pending, return empty additionalContext",
+            "model": "haiku",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'INPUT=$(cat); TASK=$(echo \"$INPUT\" | jq -r \".task_name // .tool_input.task_name // empty\" 2>/dev/null); SESSION_STATE=\"${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json\"; mkdir -p \"$(dirname \"$SESSION_STATE\")\"; if [[ -f \"$SESSION_STATE\" ]]; then python3 -c \"import json,sys,datetime; f=open(sys.argv[1]); s=json.load(f); f.close(); s.setdefault(\\\"completed_tasks\\\",[]).append({\\\"task\\\": sys.argv[2], \\\"timestamp\\\": datetime.datetime.utcnow().isoformat()}); open(sys.argv[1],\\\"w\\\").write(json.dumps(s))\" \"$SESSION_STATE\" \"${TASK:-unknown}\" 2>/dev/null || true; else python3 -c \"import json,sys,datetime; open(sys.argv[1],\\\"w\\\").write(json.dumps({\\\"completed_tasks\\\": [{\\\"task\\\": sys.argv[2], \\\"timestamp\\\": datetime.datetime.utcnow().isoformat()}]}))\" \"$SESSION_STATE\" \"${TASK:-unknown}\" 2>/dev/null || true; fi'"
           }
         ]
       }
