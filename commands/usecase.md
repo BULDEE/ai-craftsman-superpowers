@@ -8,6 +8,14 @@ effort: medium
 
 # /craftsman:usecase - Command/Handler Scaffolding (Symfony)
 
+## Project Context
+
+!`cat .craft-config.yml 2>/dev/null || echo "No config found. Run /craftsman:setup first."`
+
+## Stack Detection
+
+!`[[ -f composer.json ]] && echo "PHP/Symfony detected" || echo "No PHP"; [[ -f package.json ]] && echo "Node/React detected" || echo "No Node"`
+
 Scaffold a complete Use Case with Command, Handler, and Tests following CQRS principles.
 
 ## Pack Requirement Check

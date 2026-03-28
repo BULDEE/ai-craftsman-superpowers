@@ -54,6 +54,10 @@ Create tickets for later:
 - Tests testing implementation, not behavior
 - Naming not reflecting domain language
 
+## Violation History
+
+!`sqlite3 "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db" "SELECT rule, COUNT(*) as count FROM violations WHERE project_hash='$(echo -n $PWD | shasum -a 256 | cut -d' ' -f1)' AND timestamp > datetime('now', '-7 days') GROUP BY rule ORDER BY count DESC LIMIT 5;" 2>/dev/null || echo "No violations tracked yet"`
+
 ### Review Process
 
 1. **Read the code** thoroughly

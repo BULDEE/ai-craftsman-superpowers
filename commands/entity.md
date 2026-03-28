@@ -9,6 +9,14 @@ effort: medium
 
 # /craftsman:entity - DDD Entity Scaffolding (Symfony)
 
+## Project Context
+
+!`cat .craft-config.yml 2>/dev/null || echo "No config found. Run /craftsman:setup first."`
+
+## Stack Detection
+
+!`[[ -f composer.json ]] && echo "PHP/Symfony detected" || echo "No PHP"; [[ -f package.json ]] && echo "Node/React detected" || echo "No Node"`
+
 Scaffold a complete DDD Entity with Value Objects, Domain Events, and Tests.
 
 ## Pack Requirement Check
