@@ -8,11 +8,36 @@ You are the **AI Craftsman setup assistant**. Your role is to guide the user thr
 
 ## Pre-check
 
-First, check if configuration already exists:
+### Auto-Detection
 
-```bash
-cat ~/.claude/.craft-config.yml 2>/dev/null
-```
+Before anything else, detect the project stack and available tooling:
+
+!`{ [[ -f composer.json ]] && echo "PHP_DETECTED=true" || echo "PHP_DETECTED=false"; } ; { [[ -f package.json ]] && echo "NODE_DETECTED=true" || echo "NODE_DETECTED=false"; } ; { command -v phpstan >/dev/null 2>&1 && echo "PHPSTAN=available" || { [[ -f vendor/bin/phpstan ]] && echo "PHPSTAN=available" || echo "PHPSTAN=missing"; }; } ; { command -v npx >/dev/null 2>&1 && echo "NPX=available" || echo "NPX=missing"; } ; { [[ -f vendor/bin/deptrac ]] && echo "DEPTRAC=available" || echo "DEPTRAC=missing"; } 2>/dev/null || echo "Detection failed — continuing manually."`
+
+### Analysis Tools Check
+
+Based on detection results, suggest any missing quality tools before setup continues:
+
+- PHPStan missing → "Consider installing: `composer require --dev phpstan/phpstan`"
+- ESLint not configured → "Consider installing: `npm install --save-dev eslint`"
+- Deptrac missing (PHP project) → "Consider installing: `composer require --dev qossmic/deptrac`"
+
+Display detected tools so the user knows what's available.
+
+### Pack Auto-Selection
+
+Pre-select packs based on detection (user can override in Step 4):
+
+- PHP detected → pre-select Symfony Pack
+- Node detected → pre-select React Pack
+- Both detected → pre-select both, display confirmation prompt
+- Neither → Core only, no auto-selection
+
+### Existing Config Check
+
+Check if configuration already exists:
+
+!`cat ~/.claude/.craft-config.yml 2>/dev/null || echo "CONFIG_NOT_FOUND"`
 
 - If file exists: Show current config and ask "Do you want to reconfigure? [y/N]"
 - If file doesn't exist: Proceed with full setup
@@ -151,11 +176,13 @@ Default recommendation: All enabled.
 
 ### Step 4: Pack Selection
 
-Use `AskUserQuestion` with `multiSelect: true`:
+Use `AskUserQuestion` with `multiSelect: true`.
+
+Pre-select packs based on auto-detection results from the Pre-check (user can deselect):
 
 **Question 4 - Technology packs:**
-- **Symfony Pack** - PHP/Symfony/DDD patterns (/craftsman:entity, /craftsman:usecase)
-- **React Pack** - React/TypeScript patterns (/craftsman:component, /craftsman:hook)
+- **Symfony Pack** - PHP/Symfony/DDD patterns (/craftsman:entity, /craftsman:usecase) — _auto-selected if PHP detected_
+- **React Pack** - React/TypeScript patterns (/craftsman:component, /craftsman:hook) — _auto-selected if Node detected_
 - **AI Pack** - AI/ML patterns (/craftsman:rag, /craftsman:mlops, /craftsman:agent-design)
 
 Note: Core pack is always enabled.
@@ -258,6 +285,9 @@ Core (always available):
   /craftsman:test      - Pragmatic testing
   /craftsman:git       - Safe git workflow
   /craftsman:parallel  - Parallel execution
+  /craftsman:metrics   - Quality metrics dashboard
+  /craftsman:team      - Assemble agent teams
+  /craftsman:start     - Re-run onboarding anytime
 
 {if symfony enabled}
 Symfony Pack:
