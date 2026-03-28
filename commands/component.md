@@ -211,6 +211,16 @@ interface DataFetcherProps<T> {
 }
 ```
 
+## Isolation (Recommended)
+
+For safety, scaffolding can be done in an isolated worktree:
+1. Use `EnterWorktree` to create isolated workspace
+2. Generate all files
+3. Run tests and verification
+4. Use `ExitWorktree` to merge back
+
+This prevents half-generated scaffolds from polluting the main workspace.
+
 ## Process
 
 ### Step 0: MANDATORY - Load Canonical Examples
