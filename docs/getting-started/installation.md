@@ -64,9 +64,9 @@ brew install ollama  # macOS
 ollama pull nomic-embed-text
 ollama serve  # Keep running in background
 
-# 3. Build MCP server
+# 3. Install MCP server (build runs automatically via postinstall)
 cd ~/.claude/plugins/marketplaces/ai-craftsman-superpowers/ai-pack/mcp/knowledge-rag
-npm install && npm run build
+npm install
 
 # 4. Create knowledge directory
 mkdir -p ~/.claude/ai-craftsman-superpowers/knowledge
@@ -138,8 +138,8 @@ cd ~/.claude/plugins/marketplaces/ai-craftsman-superpowers/ai-pack/mcp/knowledge
 node dist/src/index.js
 # Should start without errors (Ctrl+C to stop)
 
-# 4. Rebuild if needed
-npm run build
+# 4. Reinstall if needed (triggers automatic rebuild)
+npm install
 ```
 
 ### Knowledge base empty

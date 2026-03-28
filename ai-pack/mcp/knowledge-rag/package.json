@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "postinstall": "npm run build",
     "dev": "tsc --watch",
     "index": "tsx scripts/index-pdfs.ts",
     "index:ollama": "tsx scripts/index-pdfs.ts",
