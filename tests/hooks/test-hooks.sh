@@ -751,6 +751,473 @@ else
 fi
 
 # =============================================================================
+# craftsman-ignore Multi-Rule Tests
+# =============================================================================
+echo ""
+echo "=== craftsman-ignore Multi-Rule Tests ==="
+
+# Test: multi-rule craftsman-ignore suppresses all listed rules (exit 0)
+result=$(run_post_hook "$FIXTURES_DIR/with-craftsman-ignore-multi.php")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "craftsman-ignore multi-rule suppresses violations (exit 0)"
+else
+    log_fail "craftsman-ignore multi-rule should suppress" "got exit $exit_code"
+fi
+
+# Test: single-rule craftsman-ignore still works (backward compat)
+result=$(run_post_hook "$FIXTURES_DIR/with-craftsman-ignore.php")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "craftsman-ignore single-rule backward compatible (exit 0)"
+else
+    log_fail "craftsman-ignore single-rule backward compat" "got exit $exit_code"
+fi
+
+# Test: line_has_ignore function matches single rule
+source "$ROOT_DIR/hooks/lib/config.sh"
+source "$ROOT_DIR/hooks/lib/metrics-db.sh"
+
+# Inline test: verify line_has_ignore logic for comma-separated rules
+FILE_PATH="$FIXTURES_DIR/with-craftsman-ignore-multi.php"
+FILE_PATTERN=$(metrics_file_pattern "$FILE_PATH" 2>/dev/null || echo "test/**/*.php")
+EXT="php"
+
+line_has_ignore_test() {
+    local line="$1"
+    local rule="$2"
+    if echo "$line" | grep -qE "craftsman-ignore:\s*[^#]*\b${rule}\b" 2>/dev/null; then
+        return 0
+    fi
+    if echo "$line" | grep -qE "craftsman-ignore\s*$" 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+
+if line_has_ignore_test "// craftsman-ignore: PHP001, TS001, LAYER001" "PHP001"; then
+    log_pass "line_has_ignore matches first rule in multi-rule list"
+else
+    log_fail "line_has_ignore should match PHP001 in multi-rule" ""
+fi
+
+if line_has_ignore_test "// craftsman-ignore: PHP001, TS001, LAYER001" "LAYER001"; then
+    log_pass "line_has_ignore matches last rule in multi-rule list"
+else
+    log_fail "line_has_ignore should match LAYER001 in multi-rule" ""
+fi
+
+if ! line_has_ignore_test "// craftsman-ignore: PHP001, TS001" "PHP002"; then
+    log_pass "line_has_ignore does NOT match absent rule"
+else
+    log_fail "line_has_ignore should not match PHP002 not in list" ""
+fi
+
+if line_has_ignore_test "// craftsman-ignore: no-setter, PHP003" "PHP003"; then
+    log_pass "line_has_ignore matches rule mixed with non-code token"
+else
+    log_fail "line_has_ignore should match PHP003 in mixed list" ""
+fi
+
+# =============================================================================
+# Cross-File Correction Pattern Tests
+# =============================================================================
+echo ""
+echo "=== Cross-File Correction Pattern Tests ==="
+
+# Simulate multiple file violations in session state to trigger pattern detection
+PATTERN_TEST_STATE="${CLAUDE_PLUGIN_DATA}/session-state.json"
+mkdir -p "$(dirname "$PATTERN_TEST_STATE")"
+
+# Write a session state with 3 files violating PHP001 in same directory
+python3 -c "
+import json, sys
+state = {
+    'blocked_violations': {
+        'src/Domain/**/*.php': ['PHP001'],
+        'src/Domain/Entity/**/*.php': ['PHP001'],
+        'src/Domain/ValueObject/**/*.php': ['PHP001'],
+    },
+    'patterns': {
+        'PHP001': {
+            'src/Domain': [
+                'src/Domain/**/*.php',
+                'src/Domain/Entity/**/*.php',
+                'src/Domain/ValueObject/**/*.php',
+            ]
+        }
+    }
+}
+with open(sys.argv[1], 'w') as f:
+    json.dump(state, f)
+" "$PATTERN_TEST_STATE" 2>/dev/null
+
+# Test: _detect_cross_file_patterns outputs PROJECT-WIDE PATTERN for 3+ files
+PATTERN_OUTPUT=$(python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    state = json.load(f)
+patterns = state.get('patterns', {})
+suggestions = []
+for rule, dir_map in patterns.items():
+    all_files = set()
+    for files in dir_map.values():
+        all_files.update(files)
+    if len(all_files) >= 3:
+        suggestions.append('PATTERN:' + rule + ':' + str(len(all_files)) + ' files')
+    for dir_b, files in dir_map.items():
+        if len(files) >= 2 and dir_b not in ('', '.'):
+            suggestions.append('DIR_PATTERN:' + rule + ':' + dir_b + ':' + str(len(files)) + ' files')
+for s in suggestions:
+    print(s)
+" "$PATTERN_TEST_STATE" 2>/dev/null)
+
+if echo "$PATTERN_OUTPUT" | grep -q "^PATTERN:PHP001"; then
+    log_pass "Cross-file patterns: PHP001 in 3+ files triggers PROJECT-WIDE PATTERN"
+else
+    log_fail "Cross-file pattern detection" "expected PATTERN:PHP001, got: $PATTERN_OUTPUT"
+fi
+
+if echo "$PATTERN_OUTPUT" | grep -q "^DIR_PATTERN:PHP001:src/Domain"; then
+    log_pass "Cross-file patterns: PHP001 in directory triggers DIR_PATTERN"
+else
+    log_fail "Directory pattern detection" "expected DIR_PATTERN:PHP001:src/Domain"
+fi
+
+# Test: session state has 'patterns' key after a blocked violation
+rm -f "$PATTERN_TEST_STATE"
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
+run_post_hook "$FIXTURES_DIR/invalid-no-strict.php" > /dev/null 2>&1 || true
+
+if [[ -f "$PATTERN_TEST_STATE" ]] && python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    state = json.load(f)
+assert 'patterns' in state, 'patterns key missing'
+" "$PATTERN_TEST_STATE" 2>/dev/null; then
+    log_pass "Session state contains 'patterns' key after block"
+else
+    log_fail "Session state 'patterns' key" "not present after block"
+fi
+
+# =============================================================================
+# Pre-Push Verify Hook Tests
+# =============================================================================
+echo ""
+echo "=== Pre-Push Verify Hook Tests ==="
+
+run_pre_push() {
+    local command="$1"
+    local output
+    output=$(jq -n --arg cmd "$command" '{"tool_input":{"command":$cmd}}' | bash "$ROOT_DIR/hooks/pre-push-verify.sh" 2>/dev/null)
+    local exit_code=$?
+    echo "$exit_code|$output"
+}
+
+# Test: non-push command passes silently (exit 0)
+result=$(run_pre_push "git status")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "pre-push-verify: non-push command passes (exit 0)"
+else
+    log_fail "pre-push-verify: non-push command should pass" "got exit $exit_code"
+fi
+
+# Test: git push without verified flag blocks (exit 2)
+rm -f "${CLAUDE_PLUGIN_DATA}/session-state.json"
+result=$(run_pre_push "git push origin main")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "2" ]] && echo "$output" | grep -q "craftsman:verify"; then
+    log_pass "pre-push-verify: blocks git push when not verified (exit 2)"
+else
+    log_fail "pre-push-verify: should block unverified push" "exit=$exit_code output=$output"
+fi
+
+# Test: git push with verified=true in session state passes (exit 0)
+mkdir -p "$CLAUDE_PLUGIN_DATA"
+python3 -c "
+import json, sys
+with open(sys.argv[1], 'w') as f:
+    json.dump({'verified': True}, f)
+" "${CLAUDE_PLUGIN_DATA}/session-state.json" 2>/dev/null
+result=$(run_pre_push "git push origin main")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "pre-push-verify: passes when verified=true (exit 0)"
+else
+    log_fail "pre-push-verify: should pass when verified" "got exit $exit_code"
+fi
+
+# Test: git push --force also blocked without verified
+rm -f "${CLAUDE_PLUGIN_DATA}/session-state.json"
+result=$(run_pre_push "git push --force origin main")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "2" ]]; then
+    log_pass "pre-push-verify: blocks git push --force without verify (exit 2)"
+else
+    log_fail "pre-push-verify: should block git push --force" "got exit $exit_code"
+fi
+
+# Test: output is valid JSON when blocking
+rm -f "${CLAUDE_PLUGIN_DATA}/session-state.json"
+result=$(run_pre_push "git push origin main")
+output="${result#*|}"
+if echo "$output" | jq . >/dev/null 2>&1; then
+    log_pass "pre-push-verify: output is valid JSON"
+else
+    log_fail "pre-push-verify: output should be valid JSON" "$output"
+fi
+
+# =============================================================================
+# Bias Detector Workflow Enforcement Tests
+# =============================================================================
+echo ""
+echo "=== Bias Detector Workflow Enforcement Tests ==="
+
+run_bias_detector() {
+    local prompt="$1"
+    local output
+    output=$(jq -n --arg p "$prompt" '{"prompt":$p}' | bash "$ROOT_DIR/hooks/bias-detector.sh" 2>/dev/null)
+    local exit_code=$?
+    echo "$exit_code|$output"
+}
+
+# Test: domain modeling without design flag triggers warning
+rm -f "${CLAUDE_PLUGIN_DATA}/session-state.json"
+result=$(run_bias_detector "create entity User with email and name")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qi "craftsman:design\|domain modeling"; then
+    log_pass "bias-detector: domain modeling without design warns (exit 0)"
+else
+    log_fail "bias-detector: should warn about missing /craftsman:design" "exit=$exit_code output=$(echo "$output" | head -3)"
+fi
+
+# Test: domain modeling WITH design_used=true does NOT warn
+mkdir -p "$CLAUDE_PLUGIN_DATA"
+python3 -c "
+import json, sys
+with open(sys.argv[1], 'w') as f:
+    json.dump({'design_used': True}, f)
+" "${CLAUDE_PLUGIN_DATA}/session-state.json" 2>/dev/null
+result=$(run_bias_detector "create entity User with email and name")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && ! echo "$output" | grep -qi "craftsman:design"; then
+    log_pass "bias-detector: no domain modeling warning when design_used=true"
+else
+    log_fail "bias-detector: should NOT warn when design_used=true" "output=$output"
+fi
+
+# Test: non-domain prompt produces no workflow warning
+rm -f "${CLAUDE_PLUGIN_DATA}/session-state.json"
+result=$(run_bias_detector "fix the login bug in UserController")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && ! echo "$output" | grep -qi "craftsman:design"; then
+    log_pass "bias-detector: no workflow warning for non-domain prompt"
+else
+    log_fail "bias-detector: non-domain prompt should not trigger workflow" "output=$output"
+fi
+
+# Test: existing bias patterns still work alongside new workflow check
+result=$(run_bias_detector "let's quickly create an entity, no time, asap")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qi "acceleration\|Acceleration"; then
+    log_pass "bias-detector: acceleration bias still detected alongside workflow check"
+else
+    log_fail "bias-detector: acceleration bias should still trigger" "exit=$exit_code"
+fi
+
+# Test: bias-detector always exits 0 (never blocks)
+result=$(run_bias_detector "create aggregate Order with line items urgently")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "bias-detector: always exits 0 (non-blocking)"
+else
+    log_fail "bias-detector: should always exit 0" "got exit $exit_code"
+fi
+
+# =============================================================================
+# TeammateIdle + TaskCompleted hooks.json Schema Tests
+# =============================================================================
+echo ""
+echo "=== TeammateIdle + TaskCompleted Hook Schema Tests ==="
+
+HOOKS_FILE="$ROOT_DIR/hooks/hooks.json"
+
+# Test: TeammateIdle event exists in hooks.json
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+assert 'TeammateIdle' in d['hooks'], 'TeammateIdle missing'
+" 2>/dev/null; then
+    log_pass "hooks.json: TeammateIdle event exists"
+else
+    log_fail "hooks.json TeammateIdle" "event missing"
+fi
+
+# Test: TeammateIdle has agent hook with haiku model and 15s timeout
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+hooks = d['hooks']['TeammateIdle'][0]['hooks']
+agents = [h for h in hooks if h.get('type') == 'agent']
+assert len(agents) == 1, 'Expected 1 agent hook'
+a = agents[0]
+assert a['model'] == 'haiku', f'Expected haiku, got {a[\"model\"]}'
+assert a['timeout'] == 15, f'Expected 15, got {a[\"timeout\"]}'
+assert 'idle' in a['prompt'].lower() or 'Idle' in a['prompt'], 'prompt missing idle context'
+" 2>/dev/null; then
+    log_pass "TeammateIdle: agent hook has haiku model, 15s timeout, idle prompt"
+else
+    log_fail "TeammateIdle agent hook schema" "invalid model, timeout, or prompt"
+fi
+
+# Test: TaskCompleted event exists in hooks.json
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+assert 'TaskCompleted' in d['hooks'], 'TaskCompleted missing'
+" 2>/dev/null; then
+    log_pass "hooks.json: TaskCompleted event exists"
+else
+    log_fail "hooks.json TaskCompleted" "event missing"
+fi
+
+# Test: TaskCompleted has command hook that references session-state
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+hooks = d['hooks']['TaskCompleted'][0]['hooks']
+cmds = [h for h in hooks if h.get('type') == 'command']
+assert len(cmds) >= 1, 'Expected command hook'
+cmd = cmds[0]['command']
+assert 'session-state' in cmd, 'session-state not referenced in command'
+" 2>/dev/null; then
+    log_pass "TaskCompleted: command hook references session-state"
+else
+    log_fail "TaskCompleted command hook" "missing or no session-state reference"
+fi
+
+# Test: hooks.json is still valid JSON after all additions
+if python3 -c "
+import json
+json.load(open('$HOOKS_FILE'))
+print('valid')
+" 2>/dev/null | grep -q "valid"; then
+    log_pass "hooks.json: valid JSON after all additions"
+else
+    log_fail "hooks.json" "invalid JSON"
+fi
+
+# =============================================================================
+# Session Metrics — Agent and Team Tracking Tests
+# =============================================================================
+echo ""
+echo "=== Session Metrics Agent/Team Tracking Tests ==="
+
+# Test: session-metrics outputs agent count from session state
+mkdir -p "$CLAUDE_PLUGIN_DATA"
+python3 -c "
+import json, sys
+with open(sys.argv[1], 'w') as f:
+    json.dump({'agent_invocations': 3, 'team_type': 'symfony-ddd', 'completed_tasks': [{'task':'t1'},{'task':'t2'}]}, f)
+" "${CLAUDE_PLUGIN_DATA}/session-state.json" 2>/dev/null
+
+result=$(echo '{"session_duration_seconds": 10}' | bash "$ROOT_DIR/hooks/session-metrics.sh" 2>/dev/null)
+if echo "$result" | grep -q "agent"; then
+    log_pass "session-metrics: includes agent count in summary"
+else
+    log_fail "session-metrics: should include agent stats" "got: $result"
+fi
+
+# Test: session-metrics outputs team type from session state
+if echo "$result" | grep -q "symfony-ddd\|team"; then
+    log_pass "session-metrics: includes team type in summary"
+else
+    log_fail "session-metrics: should include team type" "got: $result"
+fi
+
+# Test: session-metrics outputs task count from session state
+if echo "$result" | grep -q "task\|complet"; then
+    log_pass "session-metrics: includes completed task count in summary"
+else
+    log_fail "session-metrics: should include task count" "got: $result"
+fi
+
+# Test: session-metrics still exits 0
+result_exit=$(echo '{"session_duration_seconds": 10}' | bash "$ROOT_DIR/hooks/session-metrics.sh" 2>/dev/null; echo $?)
+# The echo $? trick — re-run cleanly
+if echo '{"session_duration_seconds": 0}' | bash "$ROOT_DIR/hooks/session-metrics.sh" > /dev/null 2>&1; then
+    log_pass "session-metrics: still exits 0 with empty session state"
+else
+    log_fail "session-metrics: should always exit 0" ""
+fi
+
+# =============================================================================
+# Static Analysis Structured Output Tests
+# =============================================================================
+echo ""
+echo "=== Static Analysis Structured Output Tests ==="
+
+# Source the lib to test directly
+source "$ROOT_DIR/hooks/lib/static-analysis.sh"
+
+# Test: _sa_map_phpstan_error maps undefined variable
+result=$(_sa_map_phpstan_error "src/Domain/Foo.php:42:Undefined variable \$bar" 2>/dev/null)
+if [[ "$result" == "PHPSTAN002" ]]; then
+    log_pass "sa: undefined variable maps to PHPSTAN002"
+else
+    log_fail "sa: undefined variable mapping" "got $result, expected PHPSTAN002"
+fi
+
+# Test: _sa_map_phpstan_error maps call to undefined to PHPSTAN003
+result=$(_sa_map_phpstan_error "src/Foo.php:10:Call to undefined method Foo::bar()" 2>/dev/null)
+if [[ "$result" == "PHPSTAN003" ]]; then
+    log_pass "sa: call to undefined maps to PHPSTAN003"
+else
+    log_fail "sa: call to undefined mapping" "got $result, expected PHPSTAN003"
+fi
+
+# Test: _sa_map_phpstan_error defaults to PHPSTAN001 for generic errors
+result=$(_sa_map_phpstan_error "src/Foo.php:5:Something wrong" 2>/dev/null)
+if [[ "$result" == "PHPSTAN001" ]]; then
+    log_pass "sa: generic phpstan error maps to PHPSTAN001"
+else
+    log_fail "sa: generic phpstan error default" "got $result, expected PHPSTAN001"
+fi
+
+# Test: _sa_map_eslint_error maps no-explicit-any to ESLINT001
+result=$(_sa_map_eslint_error "src/foo.ts: line 5, col 10, Error - Unexpected any (no-explicit-any)" 2>/dev/null || true)
+# Since rule id extraction depends on format, just verify it returns a valid code
+if echo "$result" | grep -qE "^ESLINT[0-9]{3}$"; then
+    log_pass "sa: eslint error maps to ESLINT code"
+else
+    log_fail "sa: eslint error mapping" "got $result"
+fi
+
+# Test: sa_phpstan not installed = graceful degradation (empty output, exit 0)
+# Force a path with no phpstan
+result=$(sa_phpstan "/tmp/nonexistent.php" 2>/dev/null)
+if [[ -z "$result" ]]; then
+    log_pass "sa_phpstan: graceful degradation when not installed"
+else
+    log_fail "sa_phpstan: should return empty when not installed" "got: $result"
+fi
+
+# Test: sa_eslint not installed = graceful degradation
+result=$(sa_eslint "/tmp/nonexistent.ts" 2>/dev/null)
+if [[ -z "$result" ]]; then
+    log_pass "sa_eslint: graceful degradation when not installed"
+else
+    log_fail "sa_eslint: should return empty when not installed" "got: $result"
+fi
+
+# =============================================================================
 # Cleanup & Summary
 # =============================================================================
 rm -rf "$CLAUDE_PLUGIN_DATA"

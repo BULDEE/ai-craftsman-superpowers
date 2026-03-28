@@ -8,6 +8,8 @@
 # =============================================================================
 set -euo pipefail
 
+SESSION_STATE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
+
 # Read the prompt from stdin (JSON format from Claude Code)
 INPUT=$(cat)
 PROMPT=$(echo "$INPUT" | jq -r '.prompt // empty' 2>/dev/null || echo "$INPUT")
@@ -38,6 +40,11 @@ SCOPE_CREEP_PATTERNS="(et aussi|tant qu'on y est|ajoutons|en plus|while we're at
 # FR: abstraire, généraliser
 # EN: generalize, abstract, make it configurable, future-proof
 OVER_OPT_PATTERNS="(abstraire|généraliser|generalize|abstract|make it configurable|future-proof)"
+
+# Workflow enforcement: domain modeling without /craftsman:design
+# FR: crée une entité|value object|agrégat
+# EN: create entity|value object|aggregate
+DOMAIN_MODELING_PATTERNS="(create (a |an |the )?(entity|value object|aggregate|domain event|domain service)|crée (une |un |l'?)?(entité|value object|agrégat|événement de domaine))"
 
 # =============================================================================
 # Detection & Warnings
@@ -82,10 +89,40 @@ Premature abstraction detected. Consider:
 EOF
 }
 
+warn_missing_design() {
+    cat << 'EOF'
+
+⚠️  WORKFLOW SUGGESTION: Domain Modeling
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+You are creating domain objects without running /craftsman:design first.
+Consider:
+  • Run /craftsman:design to model the domain properly
+  • Define bounded contexts and aggregate boundaries first
+  • Identify Value Objects before writing entities
+
+EOF
+}
+
 # Check each pattern
 echo "$PROMPT" | grep -iEq "$ACCELERATION_PATTERNS" && warn_acceleration || true
 echo "$PROMPT" | grep -iEq "$SCOPE_CREEP_PATTERNS" && warn_scope_creep || true
 echo "$PROMPT" | grep -iEq "$OVER_OPT_PATTERNS" && warn_over_optimization || true
+
+# Workflow enforcement: warn if domain modeling without /craftsman:design
+if echo "$PROMPT" | grep -iEq "$DOMAIN_MODELING_PATTERNS"; then
+    design_used=false
+    if [[ -f "$SESSION_STATE" ]]; then
+        design_used=$(python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    state = json.load(f)
+print('true' if state.get('design_used', False) else 'false')
+" "$SESSION_STATE" 2>/dev/null) || design_used=false
+    fi
+    if [[ "$design_used" != "true" ]]; then
+        warn_missing_design
+    fi
+fi
 
 # Always exit 0 (warning only, never block)
 exit 0
