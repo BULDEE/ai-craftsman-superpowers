@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+# =============================================================================
+# Hook Behavior Tests
+# Tests post-write-check.sh and pre-write-check.sh with fixtures.
+# =============================================================================
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
+FIXTURES_DIR="$SCRIPT_DIR/fixtures"
+
+# Use temp dir for metrics to avoid polluting real DB
+export CLAUDE_PLUGIN_DATA="/tmp/craftsman-hook-tests-$$"
+export CLAUDE_PLUGIN_ROOT="$ROOT_DIR"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+TESTS_PASSED=0
+TESTS_FAILED=0
+
+log_pass() { echo -e "  ${GREEN}✓${NC} $1"; TESTS_PASSED=$((TESTS_PASSED + 1)); }
+log_fail() { echo -e "  ${RED}✗${NC} $1: $2"; TESTS_FAILED=$((TESTS_FAILED + 1)); }
+
+# Run a hook with fixture, capture exit code and output
+run_post_hook() {
+    local fixture="$1"
+    local output
+    output=$(echo "{\"tool_input\":{\"file_path\":\"$fixture\"}}" | bash "$ROOT_DIR/hooks/post-write-check.sh" 2>/dev/null)
+    local exit_code=$?
+    echo "$exit_code|$output"
+}
+
+run_pre_hook() {
+    local file_path="$1"
+    local content="$2"
+    local output
+    output=$(jq -n --arg fp "$file_path" --arg c "$content" '{"tool_input":{"file_path":$fp,"content":$c}}' | bash "$ROOT_DIR/hooks/pre-write-check.sh" 2>/dev/null)
+    local exit_code=$?
+    echo "$exit_code|$output"
+}
+
+# =============================================================================
+# Post-Write Hook Tests
+# =============================================================================
+echo ""
+echo "=== Post-Write Hook Tests ==="
+
+# Test: Valid PHP should pass
+result=$(run_post_hook "$FIXTURES_DIR/valid-entity.php")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "Valid PHP passes (exit 0)"
+else
+    log_fail "Valid PHP should pass" "got exit $exit_code"
+fi
+
+# Test: Missing strict_types should block
+result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "2" ]] && echo "$output" | grep -q "PHP001"; then
+    log_pass "Missing strict_types blocks (exit 2, PHP001)"
+else
+    log_fail "Missing strict_types should block" "exit=$exit_code"
+fi
+
+# Test: Missing final should block
+result=$(run_post_hook "$FIXTURES_DIR/invalid-no-final.php")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "2" ]] && echo "$output" | grep -q "PHP002"; then
+    log_pass "Missing final blocks (exit 2, PHP002)"
+else
+    log_fail "Missing final should block" "exit=$exit_code"
+fi
+
+# Test: TypeScript any should block
+result=$(run_post_hook "$FIXTURES_DIR/invalid-any.ts")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "2" ]] && echo "$output" | grep -q "TS001"; then
+    log_pass "TypeScript any blocks (exit 2, TS001)"
+else
+    log_fail "TypeScript any should block" "exit=$exit_code"
+fi
+
+# Test: Valid TypeScript should pass
+result=$(run_post_hook "$FIXTURES_DIR/valid-component.tsx")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "Valid TypeScript passes (exit 0)"
+else
+    log_fail "Valid TypeScript should pass" "got exit $exit_code"
+fi
+
+# Test: craftsman-ignore should pass (not block)
+result=$(run_post_hook "$FIXTURES_DIR/with-craftsman-ignore.php")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "craftsman-ignore suppresses blocking (exit 0)"
+else
+    log_fail "craftsman-ignore should suppress" "got exit $exit_code"
+fi
+
+# Test: Layer violation should block
+result=$(run_post_hook "$FIXTURES_DIR/invalid-layer-violation.php")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "2" ]] && echo "$output" | grep -q "LAYER"; then
+    log_pass "Layer violation blocks (exit 2, LAYER)"
+else
+    log_fail "Layer violation should block" "exit=$exit_code"
+fi
+
+# Test: JSON output is valid
+result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
+output="${result#*|}"
+if echo "$output" | jq . >/dev/null 2>&1; then
+    log_pass "Output is valid JSON"
+else
+    log_fail "Output should be valid JSON" "$output"
+fi
+
+# Test: Metrics were recorded
+METRIC_COUNT=$(sqlite3 "$CLAUDE_PLUGIN_DATA/metrics.db" "SELECT COUNT(*) FROM violations;" 2>/dev/null || echo 0)
+if [[ "$METRIC_COUNT" -gt 0 ]]; then
+    log_pass "Metrics recorded ($METRIC_COUNT violations in DB)"
+else
+    log_fail "Metrics should be recorded" "0 violations in DB"
+fi
+
+# =============================================================================
+# Pre-Write Hook Tests
+# =============================================================================
+echo ""
+echo "=== Pre-Write Hook Tests ==="
+
+# Test: Domain importing Infrastructure should block
+result=$(run_pre_hook "src/Domain/Service/UserService.php" "<?php\nuse App\\\\Infrastructure\\\\Persistence\\\\Repo;\nfinal class UserService {}")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "2" ]]; then
+    log_pass "Pre-write blocks Domain->Infrastructure import (exit 2)"
+else
+    log_fail "Pre-write should block layer violation" "exit=$exit_code"
+fi
+
+# Test: Valid Domain file should pass
+result=$(run_pre_hook "src/Domain/Entity/User.php" "<?php\ndeclare(strict_types=1);\nnamespace App\\\\Domain\\\\Entity;\nfinal class User {}")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "Pre-write allows valid Domain file (exit 0)"
+else
+    log_fail "Pre-write should allow valid file" "exit=$exit_code"
+fi
+
+# Test: Non-source files should pass silently
+result=$(run_pre_hook "config/services.yaml" "services:\n  App\\:")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "Pre-write ignores non-source files (exit 0)"
+else
+    log_fail "Pre-write should ignore non-source files" "exit=$exit_code"
+fi
+
+# =============================================================================
+# Cleanup & Summary
+# =============================================================================
+rm -rf "$CLAUDE_PLUGIN_DATA"
+
+echo ""
+echo "==================================="
+echo -e " ${GREEN}Passed:${NC} $TESTS_PASSED"
+echo -e " ${RED}Failed:${NC} $TESTS_FAILED"
+echo "==================================="
+
+[[ $TESTS_FAILED -eq 0 ]] && exit 0 || exit 1
