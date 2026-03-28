@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-03-29
+
+### Added
+
+- **Custom Rule Engine** — Per-project rule customization with 3-level inheritance:
+  - Global (~/.claude/.craft-config.yml) → Project (.craft-config.yml) → Directory (.craft-rules.yml)
+  - Short form (`PHP001: warn`) and long form (custom rules with pattern, message, severity, languages)
+  - Custom rule validation on config load (bad regex = skipped with warning)
+- **CI Adapter System** — Universal adapter architecture for multi-provider CI:
+  - Auto-detection via env vars (GITHUB_ACTIONS, GITLAB_CI, BITBUCKET_BUILD_NUMBER)
+  - 4 adapters: GitHub Actions, GitLab CI, Bitbucket Pipelines, Generic (Jenkins/CircleCI)
+  - `craftsman-ci.sh ci` mode with full adapter lifecycle
+  - `craftsman-ci.sh init --provider` generates CI template files
+  - Unified PR/MR comment format across all providers
+  - Inline file annotations (GitHub ::error, GitLab codequality, Bitbucket Reports API)
+- **CI Templates** — GitLab CI, Bitbucket Pipelines, Jenkinsfile templates
+- **Circuit Breaker** — Protects against external service failures:
+  - 3 states: closed → open → half-open
+  - Configurable threshold and cooldown per channel
+  - File-based cache with TTL and LRU eviction
+  - Stale cache serving during circuit open
+- **Pack Template Variants**:
+  - Symfony: CRUD API (API Platform simple) + Event-Sourced (Aggregate + Event Store + Projections)
+  - React: Form-Heavy (multi-step wizard + Zod + useActionState) + Dashboard-Data (TanStack Table + Recharts)
+
+### Changed
+
+- **Config format** — Updated to v2.1 with `rules:` section for per-rule overrides and `channels:` for circuit breaker config
+- **post-write-check.sh** — Refactored to use rules engine instead of hardcoded severity logic
+- **craftsman-ci.sh** — Integrated rules engine, added `ci` and `init` subcommands, bumped to v2.1.0
+- **channels.sh** — Rewritten with circuit breaker integration and cache orchestration
+- **Sentry hook** — Now checks circuit breaker state before querying, records success/failure
+- **GitHub Actions template** — Simplified to use adapter system
+
+---
+
 ## [2.0.0] - 2026-03-28
 
 ### Added
