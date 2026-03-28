@@ -1,5 +1,5 @@
 /**
- * CANONICAL EXAMPLE: TanStack Query Hooks (v1.0)
+ * CANONICAL EXAMPLE: TanStack Query Hooks (v2.0)
  *
  * This is THE reference. Copy this structure exactly.
  *
@@ -9,14 +9,19 @@
  * - Optimistic updates for mutations (SHOULD)
  * - Cache invalidation strategy (MUST)
  * - No any types (MUST)
+ * - useSuspenseQuery for Suspense-integrated data fetching (SHOULD when using Suspense)
+ *
+ * Source: https://tanstack.com/query/v5/docs/framework/react/reference/useSuspenseQuery
  */
 
 import {
   useMutation,
   useQuery,
   useQueryClient,
+  useSuspenseQuery,
   type UseMutationResult,
   type UseQueryResult,
+  type UseSuspenseQueryResult,
 } from '@tanstack/react-query';
 
 import type { User } from '@/domain/entities/User';
@@ -181,6 +186,57 @@ export function useDeleteUser(): UseMutationResult<void, Error, UserId> {
     },
   });
 }
+
+// ============================================================
+// Query: Suspense-integrated (useSuspenseQuery)
+//
+// Source: https://tanstack.com/query/v5/docs/framework/react/reference/useSuspenseQuery
+//
+// Use when the component is already wrapped in <Suspense> and <ErrorBoundary>.
+// Key differences from useQuery:
+//   - data is ALWAYS defined (never undefined) — no loading state check needed
+//   - Suspends while loading — the parent <Suspense> fallback renders instead
+//   - Throws on error — an <ErrorBoundary> above MUST catch it
+//   - Does NOT return isPending or error — those are handled by boundaries
+// ============================================================
+
+export function useUserSuspense(id: UserId): UseSuspenseQueryResult<User, Error> {
+  return useSuspenseQuery({
+    queryKey: userKeys.detail(id),
+    queryFn: () => userApi.getById(id),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// Usage:
+//
+// import { Suspense } from 'react';
+// import { QueryErrorResetBoundary } from '@tanstack/react-query';
+// import { ErrorBoundary } from 'react-error-boundary';
+//
+// function UserProfilePage({ userId }: { userId: UserId }): ReactNode {
+//   return (
+//     <QueryErrorResetBoundary>
+//       {({ reset }) => (
+//         <ErrorBoundary onReset={reset} fallbackRender={({ error, resetErrorBoundary }) => (
+//           <div>
+//             <p>Error: {error.message}</p>
+//             <button onClick={resetErrorBoundary}>Retry</button>
+//           </div>
+//         )}>
+//           <Suspense fallback={<UserSkeleton />}>
+//             <UserProfileContent userId={userId} />
+//           </Suspense>
+//         </ErrorBoundary>
+//       )}
+//     </QueryErrorResetBoundary>
+//   );
+// }
+//
+// function UserProfileContent({ userId }: { userId: UserId }): ReactNode {
+//   const { data: user } = useUserSuspense(userId); // data is always defined here
+//   return <UserCard user={user} />;
+// }
 
 // ============================================================
 // Usage Example in Component
