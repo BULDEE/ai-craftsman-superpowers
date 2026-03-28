@@ -1,7 +1,7 @@
 {
   "name": "craftsman",
   "description": "Senior craftsman methodology for AI-assisted development. DDD, Clean Architecture, TDD, and systematic workflows that transform Claude into a disciplined software engineer.",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": {
     "name": "Alexandre Mallet",
     "email": "contact@woprrr.dev",
@@ -27,5 +27,17 @@
     "methodology",
     "quality-metrics",
     "static-analysis"
-  ]
+  ],
+  "userConfig": {
+    "strictness": {
+      "type": "string",
+      "description": "Enforcement level: strict (block violations), moderate (block critical only), relaxed (warn only)",
+      "default": "strict"
+    },
+    "stack": {
+      "type": "string",
+      "description": "Your tech stack: symfony (PHP only), react (TS only), fullstack (both), other (minimal rules)",
+      "default": "fullstack"
+    }
+  }
 }
