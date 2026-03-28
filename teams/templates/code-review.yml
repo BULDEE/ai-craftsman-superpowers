@@ -1,0 +1,27 @@
+# Code Review Team Template
+# Use when reviewing PRs, auditing code quality, or before major releases.
+# Trigger: /craftsman:team create → select "code-review"
+
+name: code-review
+description: Comprehensive code review team — architecture + security + domain quality
+trigger: "Use when reviewing PRs, auditing code quality, or before major releases"
+
+agents:
+  - agent: architecture-reviewer
+    role: lead
+    focus: "Layer violations, aggregate boundaries, dependency direction"
+
+  - agent: security-pentester
+    role: member
+    focus: "OWASP top 10, input validation, authentication flows"
+
+  - agent: symfony-reviewer
+    role: member
+    focus: "Framework best practices, performance, patterns"
+    condition: "Use symfony-reviewer for PHP/Symfony projects, react-reviewer for React/TS projects"
+
+workflow:
+  type: parallel
+  consolidation: "Lead aggregates findings into single review report"
+  steps:
+    - parallel: [architecture-reviewer, security-pentester, symfony-reviewer]

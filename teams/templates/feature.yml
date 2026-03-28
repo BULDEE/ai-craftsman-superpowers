@@ -1,0 +1,26 @@
+# Feature Implementation Team Template
+# Use when implementing new features requiring both backend and frontend work.
+# Trigger: /craftsman:team create → select "feature"
+
+name: feature
+description: Feature implementation team — plan, build, verify
+trigger: "Use when implementing new features requiring both backend and frontend work"
+
+agents:
+  - agent: backend-craftsman
+    role: lead
+    focus: "Domain modeling, use cases, infrastructure integration"
+
+  - agent: frontend-craftsman
+    role: member
+    focus: "Components, hooks, API integration"
+
+  - agent: architecture-reviewer
+    role: reviewer
+    focus: "Post-implementation architecture validation"
+
+workflow:
+  type: parallel-then-review
+  steps:
+    - parallel: [backend-craftsman, frontend-craftsman]
+    - sequential: [architecture-reviewer]
