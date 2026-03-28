@@ -78,8 +78,13 @@ jobs:
           import json
           import sys
 
-          VALID_HOOK_EVENTS = ["PreToolUse", "PostToolUse", "UserPromptSubmit", "Notification", "Stop"]
-          VALID_HOOK_TYPES = ["command"]
+          VALID_HOOK_EVENTS = [
+              "SessionStart", "PreToolUse", "PostToolUse",
+              "UserPromptSubmit", "FileChanged", "Notification",
+              "InstructionsLoaded", "Stop", "SessionEnd"
+          ]
+          VALID_HOOK_TYPES = ["command", "agent"]
+          VALID_AGENT_MODELS = ["haiku", "sonnet", "opus"]
 
           with open("hooks/hooks.json") as f:
               data = json.load(f)
@@ -109,8 +114,16 @@ jobs:
                           elif hook["type"] not in VALID_HOOK_TYPES:
                               errors.append(f"{event_name}[{i}].hooks[{j}]: Invalid type '{hook['type']}' (valid: {VALID_HOOK_TYPES})")
 
-                          if hook.get("type") == "command" and "command" not in hook:
+                          hook_type = hook.get("type")
+
+                          if hook_type == "command" and "command" not in hook:
                               errors.append(f"{event_name}[{i}].hooks[{j}]: command type requires 'command' field")
+
+                          if hook_type == "agent":
+                              if "prompt" not in hook:
+                                  errors.append(f"{event_name}[{i}].hooks[{j}]: agent type requires 'prompt' field")
+                              if "model" in hook and hook["model"] not in VALID_AGENT_MODELS:
+                                  errors.append(f"{event_name}[{i}].hooks[{j}]: Invalid model '{hook['model']}' (valid: {VALID_AGENT_MODELS})")
 
           if errors:
               print("Schema validation FAILED:")
@@ -183,6 +196,10 @@ jobs:
           SCRIPTS=(
             "hooks/post-write-check.sh"
             "hooks/bias-detector.sh"
+            "hooks/file-changed.sh"
+            "hooks/pre-write-check.sh"
+            "hooks/session-metrics.sh"
+            "hooks/session-start.sh"
             "tests/run-tests.sh"
           )
 
@@ -211,6 +228,10 @@ jobs:
           SCRIPTS=(
             "hooks/post-write-check.sh"
             "hooks/bias-detector.sh"
+            "hooks/file-changed.sh"
+            "hooks/pre-write-check.sh"
+            "hooks/session-metrics.sh"
+            "hooks/session-start.sh"
             "tests/run-tests.sh"
           )
 
@@ -238,6 +259,10 @@ jobs:
           SCRIPTS=(
             "hooks/post-write-check.sh"
             "hooks/bias-detector.sh"
+            "hooks/file-changed.sh"
+            "hooks/pre-write-check.sh"
+            "hooks/session-metrics.sh"
+            "hooks/session-start.sh"
             "tests/run-tests.sh"
           )
 
