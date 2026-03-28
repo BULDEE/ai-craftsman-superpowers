@@ -34,6 +34,12 @@
             "prompt": "You are a DDD architecture verifier for a Craftsman plugin. The tool input is: $ARGUMENTS\n\nExtract the file_path from the tool input. Use Read to inspect the file. Use Grep to find its imports and usages. Use Glob to discover related files (same namespace, tests, interfaces).\n\nCheck:\n1. LAYER VIOLATIONS: Does this file import from a layer it should not? (Domain must not import Infrastructure or Presentation. Application must not import Presentation.)\n2. AGGREGATE BOUNDARIES: Does this code modify state belonging to another aggregate? Look for direct property access or method calls on entities from different bounded contexts.\n3. VALUE OBJECTS: Are there primitive types (string $email, string $money, int $userId) where a Value Object should be used? Check if a matching VO already exists in the project via Glob.\n4. NAMING: Do class and method names match domain language? Flag generic names like Manager, Helper, Utils, process(), handle() in Domain layer.\n\nReturn ONLY findings as additionalContext. Format: one line per finding, max 300 chars each. If the file is clean, return empty additionalContext. Do NOT report issues already caught by regex (missing final, missing strict_types, any type, default exports).\n\nBe concise. Focus on semantic issues that regex cannot catch.",
             "model": "haiku",
             "timeout": 30
+          },
+          {
+            "type": "agent",
+            "prompt": "You are a Sentry error context agent for a Craftsman plugin.\n\nThe tool input is: $ARGUMENTS\n\nExtract the file_path from the tool input.\n\nFirst, check if Sentry is configured by running:\nbash -c 'echo ${CLAUDE_PLUGIN_OPTION_sentry_org:-}'\nIf empty, return empty additionalContext immediately.\n\nOtherwise, use the Sentry MCP tools:\n1. Call search_issues with query matching the filename/module\n2. For the top 3 results, get brief summaries (title, frequency, last seen)\n\nReturn as additionalContext:\n- One line per issue: [SENTRY] <title> (seen <N> times, last <date>)\n- Max 3 issues, max 200 chars each\n- If no issues found, return empty additionalContext\n\nBe concise. Only report issues relevant to the file being edited.",
+            "model": "haiku",
+            "timeout": 30
           }
         ]
       }

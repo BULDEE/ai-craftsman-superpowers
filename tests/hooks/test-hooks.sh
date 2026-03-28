@@ -473,34 +473,52 @@ echo "=== Agent Hook Schema Tests ==="
 
 HOOKS_FILE="$ROOT_DIR/hooks/hooks.json"
 
-# Test: hooks.json has PostToolUse agent hook
+# Test: PostToolUse has 3 hooks (command + 2 agents)
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 hooks = d['hooks']['PostToolUse'][0]['hooks']
-agent = [h for h in hooks if h.get('type') == 'agent']
-assert len(agent) == 1, 'Expected 1 agent hook'
-assert 'prompt' in agent[0], 'Missing prompt'
-assert 'model' in agent[0], 'Missing model'
-assert 'timeout' in agent[0], 'Missing timeout'
-assert agent[0]['model'] == 'haiku', 'Wrong model'
+assert len(hooks) == 3, f'Expected 3 hooks, got {len(hooks)}'
+assert hooks[0]['type'] == 'command'
+assert hooks[1]['type'] == 'agent'
+assert hooks[2]['type'] == 'agent'
 " 2>/dev/null; then
-    log_pass "PostToolUse agent hook: valid schema (type, prompt, model, timeout)"
+    log_pass "PostToolUse has 3 hooks (command + 2 agents)"
 else
-    log_fail "PostToolUse agent hook schema" "missing or invalid"
+    log_fail "PostToolUse hook count" "expected 3 hooks"
 fi
 
-# Test: PostToolUse agent prompt contains ARGUMENTS
+# Test: DDD verifier agent hook valid
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
-hooks = d['hooks']['PostToolUse'][0]['hooks']
-agent = [h for h in hooks if h.get('type') == 'agent'][0]
-assert '\$ARGUMENTS' in agent['prompt'], 'Missing \$ARGUMENTS'
+ddd_hook = d['hooks']['PostToolUse'][0]['hooks'][1]
+assert ddd_hook['type'] == 'agent'
+assert 'prompt' in ddd_hook
+assert ddd_hook['model'] == 'haiku'
+assert ddd_hook['timeout'] == 30
+assert '\$ARGUMENTS' in ddd_hook['prompt']
 " 2>/dev/null; then
-    log_pass "PostToolUse agent prompt contains \$ARGUMENTS"
+    log_pass "PostToolUse DDD agent hook: valid schema (type, prompt, model, timeout)"
 else
-    log_fail "PostToolUse agent prompt" "missing \$ARGUMENTS"
+    log_fail "PostToolUse DDD agent hook schema" "missing or invalid"
+fi
+
+# Test: Sentry agent hook valid
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+sentry_hook = d['hooks']['PostToolUse'][0]['hooks'][2]
+assert sentry_hook['type'] == 'agent'
+assert sentry_hook['model'] == 'haiku'
+assert sentry_hook['timeout'] == 30
+assert 'Sentry' in sentry_hook['prompt']
+assert '\$ARGUMENTS' in sentry_hook['prompt']
+assert 'CLAUDE_PLUGIN_OPTION_sentry_org' in sentry_hook['prompt']
+" 2>/dev/null; then
+    log_pass "PostToolUse Sentry agent hook: valid schema (haiku, 30s, org check)"
+else
+    log_fail "Sentry agent hook" "missing or invalid"
 fi
 
 # Test: InstructionsLoaded agent hook
