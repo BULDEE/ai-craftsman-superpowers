@@ -177,7 +177,7 @@ test_hooks() {
     fi
 
     # Test 3: Hook scripts exist
-    local scripts=("post-write-check.sh" "bias-detector.sh" "pre-write-check.sh" "session-metrics.sh")
+    local scripts=("post-write-check.sh" "bias-detector.sh" "pre-write-check.sh" "session-metrics.sh" "session-start.sh" "file-changed.sh")
     for script in "${scripts[@]}"; do
         if [[ -f "$PLUGIN_DIR/hooks/$script" ]]; then
             log_pass "Script exists: $script"
@@ -344,6 +344,24 @@ test_hook_behavior() {
     fi
 }
 
+# Test: Config resolution (unit tests)
+test_config_resolution() {
+    echo ""
+    log_info "Testing config resolution (unit)"
+
+    local config_test="$SCRIPT_DIR/hooks/test-config.sh"
+
+    if [[ -f "$config_test" ]]; then
+        if bash "$config_test" > /dev/null 2>&1; then
+            log_pass "Config resolution tests pass"
+        else
+            log_fail "Config resolution tests failed — run tests/hooks/test-config.sh for details"
+        fi
+    else
+        log_skip "Config resolution tests (tests/hooks/test-config.sh not found)"
+    fi
+}
+
 # Main test runner
 main() {
     echo "=================================================="
@@ -420,6 +438,7 @@ main() {
         test_adrs
 
         test_hook_behavior
+        test_config_resolution
     fi
 
     # Summary
