@@ -40,6 +40,18 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE INDEX IF NOT EXISTS idx_violations_project ON violations(project_hash, timestamp);
 CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_hash, timestamp);
+
+CREATE TABLE IF NOT EXISTS corrections (
+    id INTEGER PRIMARY KEY,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    project_hash TEXT NOT NULL,
+    rule TEXT NOT NULL,
+    file_pattern TEXT NOT NULL,
+    action TEXT NOT NULL CHECK (action IN ('fixed', 'ignored', 'overridden')),
+    context TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_corrections_project ON corrections(project_hash, timestamp);
 SQL
 
     # Migration v1.2.1: widen severity CHECK to include 'info'
@@ -111,4 +123,22 @@ metrics_trend() {
     project_hash=$(metrics_project_hash)
     sqlite3 -header -column "$METRICS_DB" \
         "SELECT date(timestamp) as day, COUNT(*) as violations, SUM(blocked) as blocked FROM violations WHERE project_hash='$project_hash' AND timestamp > datetime('now','-30 days') GROUP BY day ORDER BY day DESC LIMIT 14;"
+}
+
+metrics_record_correction() {
+    local rule="${1//\'/''}"
+    local file_pattern="${2//\'/''}"
+    local action="${3//\'/''}"
+    local context="${4:-}"
+    context="${context//\'/''}"
+    local project_hash
+    project_hash=$(metrics_project_hash)
+    sqlite3 "$METRICS_DB" "INSERT INTO corrections (project_hash, rule, file_pattern, action, context) VALUES ('$project_hash', '$rule', '$file_pattern', '$action', '$context');"
+}
+
+metrics_corrections_30d() {
+    local project_hash
+    project_hash=$(metrics_project_hash)
+    sqlite3 -header -column "$METRICS_DB" \
+        "SELECT rule, action, COUNT(*) as count FROM corrections WHERE project_hash='$project_hash' AND timestamp > datetime('now','-30 days') GROUP BY rule, action ORDER BY count DESC;"
 }

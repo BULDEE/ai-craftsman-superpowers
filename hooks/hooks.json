@@ -28,6 +28,12 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-write-check.sh\""
+          },
+          {
+            "type": "agent",
+            "prompt": "You are a DDD architecture verifier for a Craftsman plugin. The tool input is: $ARGUMENTS\n\nExtract the file_path from the tool input. Use Read to inspect the file. Use Grep to find its imports and usages. Use Glob to discover related files (same namespace, tests, interfaces).\n\nCheck:\n1. LAYER VIOLATIONS: Does this file import from a layer it should not? (Domain must not import Infrastructure or Presentation. Application must not import Presentation.)\n2. AGGREGATE BOUNDARIES: Does this code modify state belonging to another aggregate? Look for direct property access or method calls on entities from different bounded contexts.\n3. VALUE OBJECTS: Are there primitive types (string $email, string $money, int $userId) where a Value Object should be used? Check if a matching VO already exists in the project via Glob.\n4. NAMING: Do class and method names match domain language? Flag generic names like Manager, Helper, Utils, process(), handle() in Domain layer.\n\nReturn ONLY findings as additionalContext. Format: one line per finding, max 300 chars each. If the file is clean, return empty additionalContext. Do NOT report issues already caught by regex (missing final, missing strict_types, any type, default exports).\n\nBe concise. Focus on semantic issues that regex cannot catch.",
+            "model": "haiku",
+            "timeout": 30
           }
         ]
       }
@@ -48,6 +54,30 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/file-changed.sh\""
+          }
+        ]
+      }
+    ],
+    "InstructionsLoaded": [
+      {
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "You are a project structure analyzer for a Craftsman plugin. Analyze the project to build an architectural context map.\n\nUse Glob to scan:\n- src/Domain/**/*, src/Application/**/*, src/Infrastructure/**/*, src/Presentation/**/* (PHP)\n- src/domain/**/*, src/features/**/*, src/components/**/* (TypeScript)\n\nUse Read on 2-3 representative files to understand naming conventions.\n\nReturn a concise architectural map as additionalContext:\n- Bounded contexts found (list namespaces/directories)\n- Value Objects available (list class names)\n- Aggregate roots identified\n- Layer structure detected\n\nMax 500 chars total. One section per line. Skip sections with no findings. If no src/ directory exists, return empty.",
+            "model": "haiku",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "You are a final review agent for a Craftsman plugin. Review the changes made during this conversation.\n\nSTRICTNESS GATE: First, use Bash to run: echo ${CLAUDE_PLUGIN_OPTION_strictness:-strict}\nIf the result is NOT 'strict', return empty additionalContext immediately — no review needed.\n\nOtherwise, proceed:\nUse Bash to run: git diff --name-only HEAD 2>/dev/null\nFor each changed file, use Read to inspect it.\n\nCheck ONLY these critical issues:\n1. LAYER VIOLATIONS: Domain importing Infrastructure or Presentation. Application importing Presentation.\n2. MISSING TESTS: New class files in src/ without a corresponding test file in tests/.\n\nIf critical issues found, return decision 'block' with reason listing the violations.\nIf clean or if git diff returns nothing, approve silently.\n\nDo NOT block for style issues, naming suggestions, or non-critical improvements. Only block for architecture violations.",
+            "model": "haiku",
+            "timeout": 30
           }
         ]
       }
