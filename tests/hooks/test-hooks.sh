@@ -272,6 +272,109 @@ else
 fi
 
 # =============================================================================
+# SessionStart Hook Tests
+# =============================================================================
+echo ""
+echo "=== SessionStart Hook Tests ==="
+
+run_session_start() {
+    local output
+    output=$(echo '{}' | bash "$ROOT_DIR/hooks/session-start.sh" 2>/dev/null)
+    local exit_code=$?
+    echo "$exit_code|$output"
+}
+
+ORIGINAL_PWD="$PWD"
+SESSION_TEST_DIR="/tmp/craftsman-session-tests-$$"
+mkdir -p "$SESSION_TEST_DIR"
+cd "$SESSION_TEST_DIR"
+
+# Clean env for session tests
+unset CLAUDE_USER_CONFIG_strictness 2>/dev/null || true
+unset CLAUDE_USER_CONFIG_stack 2>/dev/null || true
+
+# Test: Outputs valid JSON
+result=$(run_session_start)
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | jq . >/dev/null 2>&1; then
+    log_pass "SessionStart outputs valid JSON (exit 0)"
+else
+    log_fail "SessionStart should output valid JSON" "exit=$exit_code"
+fi
+
+# Test: Detects symfony (composer.json only)
+rm -f package.json
+echo '{}' > composer.json
+result=$(run_session_start)
+output="${result#*|}"
+if echo "$output" | grep -qi "symfony\|Stack: symfony"; then
+    log_pass "SessionStart detects composer.json project"
+else
+    log_fail "SessionStart should detect symfony" "$output"
+fi
+rm -f composer.json
+
+# Test: Detects react (package.json only)
+rm -f composer.json
+echo '{}' > package.json
+result=$(run_session_start)
+output="${result#*|}"
+if echo "$output" | grep -qi "react\|Stack: react"; then
+    log_pass "SessionStart detects package.json project"
+else
+    log_fail "SessionStart should detect react" "$output"
+fi
+rm -f package.json
+
+# Test: Detects fullstack (both)
+echo '{}' > composer.json
+echo '{}' > package.json
+result=$(run_session_start)
+output="${result#*|}"
+if echo "$output" | grep -q "fullstack"; then
+    log_pass "SessionStart detects fullstack project"
+else
+    log_fail "SessionStart should detect fullstack" "$output"
+fi
+rm -f composer.json package.json
+
+# Test: Suggests setup when no .craft-config.yml
+result=$(run_session_start)
+output="${result#*|}"
+if echo "$output" | grep -q "craft-config\|setup"; then
+    log_pass "SessionStart suggests /craftsman:setup when no config"
+else
+    log_fail "SessionStart should suggest setup" "$output"
+fi
+
+# Test: No setup suggestion when .craft-config.yml exists
+cat > "$SESSION_TEST_DIR/.craft-config.yml" <<'YAML'
+strictness: strict
+stack: fullstack
+YAML
+result=$(run_session_start)
+output="${result#*|}"
+if ! echo "$output" | grep -q "setup"; then
+    log_pass "SessionStart silent about setup when config exists"
+else
+    log_fail "SessionStart should not suggest setup" "$output"
+fi
+rm -f .craft-config.yml
+
+# Test: Always exits 0
+result=$(run_session_start)
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "SessionStart always exits 0 (non-blocking)"
+else
+    log_fail "SessionStart should always exit 0" "got exit $exit_code"
+fi
+
+cd "$ORIGINAL_PWD"
+rm -rf "$SESSION_TEST_DIR"
+
+# =============================================================================
 # Cleanup & Summary
 # =============================================================================
 rm -rf "$CLAUDE_PLUGIN_DATA"
