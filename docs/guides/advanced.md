@@ -280,7 +280,7 @@ tools:
 ### Agent Testing
 
 ```
-> /test
+> /craftsman:test
 
 Test the CodeReviewAgent.
 Include:

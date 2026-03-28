@@ -4,9 +4,9 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
-[![Version](https://img.shields.io/badge/Version-1.2.0-blue)](CHANGELOG.md)
-[![Commands](https://img.shields.io/badge/Commands-21-orange)]()
-[![Agents](https://img.shields.io/badge/Agents-5-red)]()
+[![Version](https://img.shields.io/badge/Version-1.5.0-blue)](CHANGELOG.md)
+[![Commands](https://img.shields.io/badge/Commands-22-orange)]()
+[![Agents](https://img.shields.io/badge/Agents-12-red)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 **Transform Claude into a disciplined Senior Software Craftsman**
@@ -136,6 +136,7 @@ All commands are explicitly invoked with `/craftsman:command-name`. See [ADR-000
 | `/craftsman:agent-create` | Interactively create bounded context agents |
 | `/craftsman:scaffold` | Analyze code and generate context agents |
 | `/craftsman:metrics` | Display quality metrics dashboard (violations, trends, sessions) |
+| `/craftsman:setup` | Interactive setup wizard (DISC profile, stack, packs) |
 
 > **Why source-verify?** AI tools evolve rapidly. This command ensures claims about capabilities are verified against official documentation before being stated as facts. See [ADR-004](docs/adr/004-official-documentation-verification.md).
 
@@ -151,7 +152,52 @@ Hooks automatically detect and warn about cognitive biases:
 | **Scope Creep** | "et aussi", "while we're at it" | STOP - Is this in scope? |
 | **Over-Optimization** | "abstraire", "generalize" | STOP - YAGNI |
 
-### Code Rule Enforcement (v1.2.0)
+### Semantic Intelligence (v1.3.0+)
+
+Agent hooks provide semantic analysis beyond regex:
+
+| Hook | Event | Purpose |
+|------|-------|---------|
+| DDD Verifier (Haiku) | PostToolUse | Checks layer violations, aggregate boundaries, value objects, naming |
+| Sentry Context (Haiku) | PostToolUse | Injects error context from Sentry for edited files |
+| Project Analyzer (Haiku) | InstructionsLoaded | Builds architectural context map at session start |
+| Final Reviewer (Haiku) | Stop | Validates architecture before session end (strict mode) |
+
+### Correction Learning (v1.3.0+)
+
+The plugin detects when you fix Claude-generated code and records patterns in the metrics database. At session start, recent correction trends are injected so Claude learns from past mistakes. View trends with `/craftsman:metrics`.
+
+### Sentry Channel Integration (v1.4.0+)
+
+Sentry MCP server is bound as a channel. When editing files, the PostToolUse agent hook automatically queries Sentry for related errors and injects context. Configure via:
+
+```bash
+# In plugin settings
+sentry_org: your-org
+sentry_project: your-project
+sentry_token: (stored securely)
+```
+
+### Specialized Agents (v1.5.0)
+
+12 agents — 5 reviewers + 7 craftsmen:
+
+| Agent | Role | Model |
+|-------|------|-------|
+| `team-lead` | Orchestrator — delegates, challenges, never codes | Opus |
+| `backend-craftsman` | PHP/Symfony expert (Symfony.com + API Platform refs) | Sonnet |
+| `frontend-craftsman` | React/TS expert (65 Vercel best practices) | Sonnet |
+| `architect` | DDD/Clean Architecture validation (read-only) | Sonnet |
+| `ai-engineer` | RAG, LLM, MCP server, agent design | Sonnet |
+| `ui-ux-director` | UX, WCAG 2.1 AA, design tokens | Sonnet |
+| `doc-writer` | ADRs, README, CHANGELOG, runbooks | Haiku |
+| `architecture-reviewer` | Clean Architecture compliance | Sonnet |
+| `security-pentester` | Security vulnerability detection | Sonnet |
+| `symfony-reviewer` | Symfony/DDD best practices | Sonnet |
+| `react-reviewer` | React patterns and hooks | Sonnet |
+| `ai-reviewer` | RAG/MLOps/Agent best practices | Sonnet |
+
+### Code Rule Enforcement (v1.2.0+)
 
 Hooks validate your code automatically with **3-level analysis**:
 
@@ -259,11 +305,17 @@ See **[CLAUDE.md Best Practices Guide](docs/guides/claude-md-best-practices.md)*
 
 See [`/docs/adr`](docs/adr/) for Architecture Decision Records:
 
+- [ADR-0001: Skills over Prompts](docs/adr/0001-skills-over-prompts.md)
+- [ADR-0002: Ollama over OpenAI](docs/adr/0002-ollama-over-openai.md)
+- [ADR-0003: SQLite over pgvector](docs/adr/0003-sqlite-over-pgvector.md)
+- [ADR-0004: 3P Agent Pattern](docs/adr/0004-3p-agent-pattern.md)
+- [ADR-0005: Knowledge-First Architecture](docs/adr/0005-knowledge-first-architecture.md)
+- [ADR-0006: Project-Specific Knowledge](docs/adr/0006-project-specific-knowledge.md)
+- [ADR-0007: Commands over Skills](docs/adr/0007-commands-over-skills.md)
 - [ADR-001: Model Tiering Strategy](docs/adr/001-model-tiering.md)
 - [ADR-002: Context Fork Strategy](docs/adr/002-context-fork-strategy.md)
 - [ADR-003: Progressive Disclosure](docs/adr/003-progressive-disclosure.md)
-- [ADR-0002: Ollama over OpenAI](docs/adr/0002-ollama-over-openai.md)
-- [ADR-0007: Commands over Skills](docs/adr/0007-commands-over-skills.md)
+- [ADR-004: Official Documentation Verification](docs/adr/004-official-documentation-verification.md)
 
 ## Examples
 
@@ -282,16 +334,20 @@ See [`/examples`](examples/) for detailed usage examples:
 ai-craftsman-superpowers/
 ├── .claude-plugin/              # Plugin manifest
 │   └── plugin.json
-├── commands/                    # User-invocable commands (21 *.md files)
-├── agents/                      # Specialized reviewers (5)
-├── hooks/                       # Automated validation
-│   ├── hooks.json               # Hook event configuration
+├── commands/                    # User-invocable commands (22 *.md files)
+├── agents/                      # Reviewers (5) + Craftsmen (7) = 12 agents
+├── hooks/                       # Automated validation (6 scripts + 4 agent hooks)
+│   ├── hooks.json               # 8 hook events configuration
 │   ├── lib/                     # Shared hook libraries
+│   │   ├── config.sh            # Configuration resolution
+│   │   ├── channels.sh          # Channel lifecycle (Sentry)
 │   │   ├── metrics-db.sh        # SQLite metrics helper
 │   │   └── static-analysis.sh   # PHPStan/ESLint wrappers
-│   ├── bias-detector.sh         # UserPromptSubmit: cognitive bias detection
+│   ├── session-start.sh         # SessionStart: initialization
 │   ├── pre-write-check.sh       # PreToolUse: layer validation before write
 │   ├── post-write-check.sh      # PostToolUse: code rule enforcement after write
+│   ├── bias-detector.sh         # UserPromptSubmit: cognitive bias detection
+│   ├── file-changed.sh          # FileChanged: track modifications
 │   └── session-metrics.sh       # SessionEnd: session summary
 ├── knowledge/                   # Patterns & principles
 ├── examples/                    # Usage examples
@@ -339,9 +395,11 @@ This plugin prioritizes transparency and safety:
 
 | Component | Behavior | Modifies Files? |
 |-----------|----------|-----------------|
-| Skills | Prompt templates | Only when instructed |
-| Agents | Code reviewers | Never |
-| Hooks | Validation scripts | Never (read-only) |
+| Commands | Prompt templates | Only when instructed |
+| Reviewer Agents | Code analysis (5 agents) | Never (read-only) |
+| Craftsman Agents | Implementation (7 agents) | When instructed |
+| Command Hooks | Validation scripts (6 scripts) | Never (read-only, except metrics DB) |
+| Agent Hooks | Semantic analysis (4 agents, Haiku) | Never (read-only) |
 
 **Hooks use exit codes** — Bias detection warns (exit 0). Code rule violations **block** (exit 2) to enforce quality standards. See [Hooks Reference](docs/reference/hooks.md).
 

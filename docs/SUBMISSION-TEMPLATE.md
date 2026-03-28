@@ -10,9 +10,9 @@
 
 **Repository URL**: https://github.com/BULDEE/ai-craftsman-superpowers
 
-**Version**: 2.1.0
+**Version**: 1.5.0
 
-**License**: MIT
+**License**: Apache-2.0
 
 ---
 
@@ -43,7 +43,7 @@ Senior craftsman methodology for Claude Code. DDD, Clean Architecture, TDD workf
 
 ### What it does
 
-AI Craftsman Superpowers is a comprehensive Claude Code plugin that enforces senior engineering practices through 18 specialized skills, automated hooks, and a curated knowledge base.
+AI Craftsman Superpowers is a comprehensive Claude Code plugin that enforces senior engineering practices through 22 commands, 12 specialized agents, automated hooks (8 events + 4 agent hooks), and a curated knowledge base.
 
 ### Key Features
 
@@ -53,11 +53,15 @@ AI Craftsman Superpowers is a comprehensive Claude Code plugin that enforces sen
 
 3. **Bias Protection**: Automatic detection of cognitive biases (acceleration, scope creep, over-optimization) with actionable warnings
 
-4. **Code Rule Enforcement**: Post-write hooks validate PHP (strict_types, final classes, no setters) and TypeScript (no any, named exports)
+4. **Code Rule Enforcement**: 3-level validation (regex + static analysis + architecture) with blocking hooks. PHP (strict_types, final classes, no setters) and TypeScript (no any, named exports)
 
-5. **Model Tiering**: Optimal cost/quality balance using Haiku for simple tasks, Sonnet for balanced work, Opus for complex decisions
+5. **12 Specialized Agents**: 5 reviewers (architecture, security, Symfony, React, AI) + 7 craftsmen (team-lead, backend, frontend, architect, AI engineer, UX director, doc-writer)
 
-6. **Framework Scaffolding**: Ready-to-use templates for Symfony entities, React components, TanStack Query hooks
+6. **Semantic Intelligence**: Agent hooks (Haiku) provide DDD verification, Sentry error context, architectural analysis, and final review beyond regex patterns
+
+7. **Framework Scaffolding**: Ready-to-use templates for Symfony entities, React components, TanStack Query hooks
+
+8. **Correction Learning**: Records when users fix Claude-generated code and injects trends at session start
 
 ### Why it's different
 
@@ -70,12 +74,14 @@ AI Craftsman Superpowers is a comprehensive Claude Code plugin that enforces sen
 
 ## Skills Overview
 
-| Category | Skills | Model |
-|----------|--------|-------|
-| Core Methodology | design, debug, plan, challenge, verify, spec, refactor, test, git, parallel | Haiku/Sonnet/Opus |
-| Symfony/PHP | entity, usecase | Sonnet |
-| React/TypeScript | component, hook | Sonnet |
-| AI/ML | rag, mlops, agent-design | Opus |
+| Category | Commands | Count |
+|----------|----------|-------|
+| Core Methodology | design, debug, plan, challenge, verify, spec, refactor, test, git, parallel | 10 |
+| Symfony/PHP | entity, usecase | 2 |
+| React/TypeScript | component, hook | 2 |
+| AI/ML | rag, mlops, agent-design | 3 |
+| Utilities | source-verify, agent-create, scaffold, metrics, setup | 5 |
+| **Total** | | **22** |
 
 ---
 
@@ -122,7 +128,7 @@ AI Craftsman Superpowers is a comprehensive Claude Code plugin that enforces sen
 
 2. **Complete Solution**: Not just prompts - full ecosystem with hooks, agents, knowledge base
 
-3. **Quality**: 151 tests passing, comprehensive documentation, ADRs
+3. **Quality**: 42+ tests passing, 11 ADRs, comprehensive documentation
 
 4. **Active Maintenance**: Regular updates, responsive to issues
 

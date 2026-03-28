@@ -1,15 +1,50 @@
 # Hooks Reference
 
-The plugin uses Claude Code hooks to automatically enforce code quality rules. Hooks run as shell scripts triggered by Claude Code events.
+The plugin uses Claude Code hooks to automatically enforce code quality rules. Hooks run as shell scripts and agent prompts triggered by Claude Code events.
+
+**8 hook events** — 6 command hooks + 4 agent hooks.
 
 ## Hook Events
 
+### Command Hooks
+
 | Event | Hook | Purpose |
 |-------|------|---------|
+| SessionStart | `session-start.sh` | Initialization, config loading, first-run detection |
 | PreToolUse | `pre-write-check.sh` | Validate content **before** file write (layer violations) |
 | PostToolUse | `post-write-check.sh` | Validate file **after** write (all rules) |
 | UserPromptSubmit | `bias-detector.sh` | Detect cognitive biases in prompts |
+| FileChanged | `file-changed.sh` | Track file modifications for correction learning |
 | SessionEnd | `session-metrics.sh` | Record session summary to metrics database |
+
+### Agent Hooks (v1.3.0+)
+
+Agent hooks run AI models (Haiku) for semantic analysis beyond regex patterns:
+
+| Event | Agent | Model | Purpose | Timeout |
+|-------|-------|-------|---------|---------|
+| PostToolUse | DDD Verifier | Haiku | Layer violations, aggregate boundaries, value objects, naming | 30s |
+| PostToolUse | Sentry Context | Haiku | Error context from Sentry MCP for edited files | 30s |
+| InstructionsLoaded | Project Analyzer | Haiku | Architectural context map + correction trends + channel status | 20s |
+| Stop | Final Reviewer | Haiku | Architecture validation before session end (strict mode only) | 30s |
+
+**DDD Verifier** checks:
+1. Layer violations (semantic, not just regex)
+2. Aggregate boundary crossings
+3. Missing Value Objects (primitive obsession)
+4. Non-domain naming in Domain layer
+
+**Project Analyzer** builds at session start:
+1. Bounded contexts map (from namespaces/directories)
+2. Available Value Objects inventory
+3. Aggregate roots identified
+4. Correction trends (30-day window)
+5. Active channels status
+
+**Final Reviewer** (strict mode only):
+1. Layer violations in changed files
+2. Missing tests for new classes
+3. Returns `block` decision if critical issues found
 
 ## Exit Codes
 
