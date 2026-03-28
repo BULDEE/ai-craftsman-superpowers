@@ -1,8 +1,21 @@
 ---
 description: Scaffold DDD Entity with Value Objects, Domain Events, and Tests for Symfony/PHP. Use when creating domain entities in a Symfony project.
+paths:
+  - "src/Domain/Entity/**/*.php"
+  - "src/Domain/ValueObject/**/*.php"
+  - "tests/Unit/Domain/**/*Test.php"
+effort: medium
 ---
 
 # /craftsman:entity - DDD Entity Scaffolding (Symfony)
+
+## Project Context
+
+!`cat .craft-config.yml 2>/dev/null || echo "No config found. Run /craftsman:setup first."`
+
+## Stack Detection
+
+!`[[ -f composer.json ]] && echo "PHP/Symfony detected" || echo "No PHP"; [[ -f package.json ]] && echo "Node/React detected" || echo "No Node"`
 
 Scaffold a complete DDD Entity with Value Objects, Domain Events, and Tests.
 
@@ -252,6 +265,16 @@ final class {Name}Test extends TestCase
 | No setters | Behavior methods only |
 | Domain events | State changes emit events |
 | Value Objects | IDs are always VOs |
+
+## Isolation (Recommended)
+
+For safety, scaffolding can be done in an isolated worktree:
+1. Use `EnterWorktree` to create isolated workspace
+2. Generate all files
+3. Run tests and verification
+4. Use `ExitWorktree` to merge back
+
+This prevents half-generated scaffolds from polluting the main workspace.
 
 ## Process
 

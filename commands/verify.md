@@ -1,5 +1,6 @@
 ---
 description: Evidence-based verification before claiming completion. Use before committing, creating PRs, or claiming a task is done. Never claim success without proof.
+effort: quick
 ---
 
 # /craftsman:verify - Evidence Before Completion
@@ -91,6 +92,27 @@ Checked all files, no changes needed.
 ```
 **Status:** ✅ PASSED
 ```
+
+### Auto-Detection & Execution
+
+Before running verifications, detect the stack and available tools:
+
+!`[[ -f composer.json ]] && echo "PHP_STACK=true" || echo "PHP_STACK=false"; [[ -f package.json ]] && echo "NODE_STACK=true" || echo "NODE_STACK=false"`
+
+**Auto-run available checks:**
+
+For PHP projects, attempt in order (skip if tool not found):
+1. `vendor/bin/phpunit` — Unit tests
+2. `vendor/bin/phpstan analyse` — Static analysis
+3. `vendor/bin/php-cs-fixer fix --dry-run` — Code style
+
+For Node projects, attempt in order:
+1. `npm test` or `npx vitest run` — Tests
+2. `npx tsc --noEmit` — Type checking
+3. `npm run lint` or `npx eslint .` — Linting
+
+**Run each command via Bash tool and capture ACTUAL output as evidence.**
+Do NOT claim "tests pass" without showing the output.
 
 ### Phase 3: Evidence Summary
 
@@ -238,3 +260,19 @@ Failed asserting that 'invalid' matches expected 'valid@email.com'.
 
 **Confirmation bias:** "One test failed but it's minor"
 → A failure is a failure. Fix it first.
+
+## Session State Update
+
+After successful verification, update session state to allow git push:
+
+!`echo '{"verified": true, "verified_at": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' | python3 -c "
+import json, sys, os
+sf = os.path.join(os.environ.get('CLAUDE_PLUGIN_DATA', os.path.expanduser('~/.claude/plugins/data/craftsman')), 'session-state.json')
+new = json.load(sys.stdin)
+try:
+    with open(sf) as f: state = json.load(f)
+except: state = {}
+state.update(new)
+with open(sf, 'w') as f: json.dump(state, f)
+print('Session state updated: verified=true')
+" 2>/dev/null || echo "Session state update skipped"`

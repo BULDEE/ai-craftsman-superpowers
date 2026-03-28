@@ -1,8 +1,20 @@
 ---
 description: Scaffold React custom hook with TanStack Query integration. Use when creating data fetching or state management hooks.
+paths:
+  - "src/hooks/**/*.ts"
+  - "src/hooks/**/*.test.ts"
+effort: medium
 ---
 
 # /craftsman:hook - Custom Hook Scaffolding with TanStack Query
+
+## Project Context
+
+!`cat .craft-config.yml 2>/dev/null || echo "No config found. Run /craftsman:setup first."`
+
+## Stack Detection
+
+!`[[ -f composer.json ]] && echo "PHP/Symfony detected" || echo "No PHP"; [[ -f package.json ]] && echo "Node/React detected" || echo "No Node"`
 
 Scaffold custom React hooks for data fetching using TanStack Query.
 
@@ -269,6 +281,16 @@ export type { {Entity}ListFilters, {Entity}ListResponse } from './use{Entity}Lis
 | Query key factory | Consistent cache keys |
 | Error handling | Proper error types |
 | Named exports | No default exports |
+
+## Isolation (Recommended)
+
+For safety, scaffolding can be done in an isolated worktree:
+1. Use `EnterWorktree` to create isolated workspace
+2. Generate all files
+3. Run tests and verification
+4. Use `ExitWorktree` to merge back
+
+This prevents half-generated scaffolds from polluting the main workspace.
 
 ## Process
 

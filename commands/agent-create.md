@@ -1,5 +1,6 @@
 ---
 description: Interactively create a bounded context agent from template. Usage /craftsman:agent-create
+effort: heavy
 ---
 
 # /craftsman:agent-create - Interactive Agent Creation

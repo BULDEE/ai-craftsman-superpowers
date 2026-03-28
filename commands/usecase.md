@@ -1,8 +1,20 @@
 ---
 description: Scaffold Use Case with Command/Handler pattern for Symfony/PHP. Use when implementing application layer use cases following CQRS principles.
+paths:
+  - "src/Application/UseCase/**/*.php"
+  - "tests/Unit/Application/**/*Test.php"
+effort: medium
 ---
 
 # /craftsman:usecase - Command/Handler Scaffolding (Symfony)
+
+## Project Context
+
+!`cat .craft-config.yml 2>/dev/null || echo "No config found. Run /craftsman:setup first."`
+
+## Stack Detection
+
+!`[[ -f composer.json ]] && echo "PHP/Symfony detected" || echo "No PHP"; [[ -f package.json ]] && echo "Node/React detected" || echo "No Node"`
 
 Scaffold a complete Use Case with Command, Handler, and Tests following CQRS principles.
 
@@ -237,6 +249,16 @@ public function __invoke(
 | Max 3-4 dependencies | Constructor injection |
 | No business logic | Delegate to domain |
 | Explicit types | All properties typed |
+
+## Isolation (Recommended)
+
+For safety, scaffolding can be done in an isolated worktree:
+1. Use `EnterWorktree` to create isolated workspace
+2. Generate all files
+3. Run tests and verification
+4. Use `ExitWorktree` to merge back
+
+This prevents half-generated scaffolds from polluting the main workspace.
 
 ## Process
 

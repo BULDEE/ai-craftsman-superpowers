@@ -1,8 +1,20 @@
 ---
 description: Scaffold React component with TypeScript, tests, and Storybook. Use when creating React/TypeScript components.
+paths:
+  - "src/components/**/*.tsx"
+  - "src/components/**/*.test.tsx"
+effort: medium
 ---
 
 # /craftsman:component - React Component Scaffolding
+
+## Project Context
+
+!`cat .craft-config.yml 2>/dev/null || echo "No config found. Run /craftsman:setup first."`
+
+## Stack Detection
+
+!`[[ -f composer.json ]] && echo "PHP/Symfony detected" || echo "No PHP"; [[ -f package.json ]] && echo "Node/React detected" || echo "No Node"`
 
 Scaffold a complete React component with TypeScript, tests, and optional Storybook.
 
@@ -198,6 +210,16 @@ interface DataFetcherProps<T> {
   readonly children: (data: T) => ReactNode;
 }
 ```
+
+## Isolation (Recommended)
+
+For safety, scaffolding can be done in an isolated worktree:
+1. Use `EnterWorktree` to create isolated workspace
+2. Generate all files
+3. Run tests and verification
+4. Use `ExitWorktree` to merge back
+
+This prevents half-generated scaffolds from polluting the main workspace.
 
 ## Process
 

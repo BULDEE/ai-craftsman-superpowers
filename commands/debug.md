@@ -1,5 +1,6 @@
 ---
 description: Systematic debugging using ReAct pattern. Use when encountering bugs, errors, unexpected behavior, test failures, or performance issues. Never guess - investigate methodically.
+effort: medium
 ---
 
 # /craftsman:debug - Systematic Investigation
@@ -52,6 +53,10 @@ Based on symptoms, rank hypotheses by probability:
 
 ### Phase 3: Investigate (ReAct Loop)
 
+## Recent Corrections
+
+!`sqlite3 "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db" "SELECT rule, file_pattern, action, note FROM corrections WHERE timestamp > datetime('now','-7 days') ORDER BY timestamp DESC LIMIT 10;" 2>/dev/null || echo "No recent corrections"`
+
 Execute investigation cycles:
 
 ```markdown
@@ -71,6 +76,22 @@ Execute investigation cycles:
 ```
 
 Repeat until root cause is **confirmed with evidence**.
+
+### Web Research (when stuck)
+
+If after 2 investigation cycles the root cause is unclear:
+
+1. **Search** for the error message or symptom:
+   - Use WebSearch with the exact error message
+   - Filter results for: Stack Overflow, GitHub Issues, official docs
+
+2. **Fetch** relevant documentation:
+   - Use WebFetch on library docs for the specific API/method involved
+   - Check changelogs for recent breaking changes
+
+3. **Cross-reference** findings with local code:
+   - Compare documentation behavior vs observed behavior
+   - Check dependency versions: `composer show | grep <package>` or `npm list <package>`
 
 ### Phase 4: Root Cause Identification
 
