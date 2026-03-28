@@ -1,5 +1,9 @@
 ---
 description: Scaffold React component with TypeScript, tests, and Storybook. Use when creating React/TypeScript components.
+paths:
+  - "src/components/**/*.tsx"
+  - "src/components/**/*.test.tsx"
+effort: medium
 ---
 
 # /craftsman:component - React Component Scaffolding

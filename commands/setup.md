@@ -1,5 +1,6 @@
 ---
 description: Interactive setup wizard for AI Craftsman Superpowers. Configure your profile, select packs, and generate ~/.claude/.craft-config.yml.
+effort: medium
 ---
 
 # /craftsman:setup - Configuration Wizard

@@ -1,5 +1,9 @@
 ---
 description: Scaffold React custom hook with TanStack Query integration. Use when creating data fetching or state management hooks.
+paths:
+  - "src/hooks/**/*.ts"
+  - "src/hooks/**/*.test.ts"
+effort: medium
 ---
 
 # /craftsman:hook - Custom Hook Scaffolding with TanStack Query

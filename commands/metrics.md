@@ -1,6 +1,7 @@
 ---
 name: metrics
 description: Display quality metrics for the current project. Shows violations, trends, and session history from local SQLite database.
+effort: quick
 ---
 
 # /craftsman:metrics — Quality Metrics Dashboard

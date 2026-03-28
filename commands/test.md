@@ -1,5 +1,10 @@
 ---
 description: Pragmatic testing following Fowler/Martin principles. Use when writing or reviewing tests, deciding what to test, or improving test coverage strategically.
+paths:
+  - "tests/**/*"
+  - "src/**/*.test.*"
+  - "src/**/*.spec.*"
+effort: medium
 ---
 
 # /craftsman:test - Pragmatic Testing

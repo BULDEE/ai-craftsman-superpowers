@@ -1,5 +1,10 @@
 ---
 description: Scaffold DDD Entity with Value Objects, Domain Events, and Tests for Symfony/PHP. Use when creating domain entities in a Symfony project.
+paths:
+  - "src/Domain/Entity/**/*.php"
+  - "src/Domain/ValueObject/**/*.php"
+  - "tests/Unit/Domain/**/*Test.php"
+effort: medium
 ---
 
 # /craftsman:entity - DDD Entity Scaffolding (Symfony)

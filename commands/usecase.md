@@ -1,5 +1,9 @@
 ---
 description: Scaffold Use Case with Command/Handler pattern for Symfony/PHP. Use when implementing application layer use cases following CQRS principles.
+paths:
+  - "src/Application/UseCase/**/*.php"
+  - "tests/Unit/Application/**/*Test.php"
+effort: medium
 ---
 
 # /craftsman:usecase - Command/Handler Scaffolding (Symfony)
