@@ -362,6 +362,24 @@ test_config_resolution() {
     fi
 }
 
+# Test: craftsman-ci CLI (functional tests)
+test_craftsman_ci() {
+    echo ""
+    log_info "Testing craftsman-ci CLI (functional)"
+
+    local ci_test="$SCRIPT_DIR/ci/test-craftsman-ci.sh"
+
+    if [[ -f "$ci_test" ]]; then
+        if bash "$ci_test" > /dev/null 2>&1; then
+            log_pass "craftsman-ci CLI tests pass"
+        else
+            log_fail "craftsman-ci CLI tests failed — run tests/ci/test-craftsman-ci.sh for details"
+        fi
+    else
+        log_skip "craftsman-ci CLI tests (tests/ci/test-craftsman-ci.sh not found)"
+    fi
+}
+
 # Main test runner
 main() {
     echo "=================================================="
@@ -439,6 +457,7 @@ main() {
 
         test_hook_behavior
         test_config_resolution
+        test_craftsman_ci
     fi
 
     # Summary
