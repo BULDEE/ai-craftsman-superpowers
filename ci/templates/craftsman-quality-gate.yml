@@ -34,27 +34,6 @@ jobs:
         if: ${{ hashFiles('package.json') != '' }}
         run: npm ci
 
-      - name: Run PHPStan (if composer.json exists)
-        if: ${{ hashFiles('composer.json') != '' }}
-        run: |
-          if [ -f "vendor/bin/phpstan" ]; then
-            vendor/bin/phpstan analyse --level=8 --no-progress || true
-          fi
-
-      - name: Run ESLint strict (if package.json exists)
-        if: ${{ hashFiles('package.json') != '' }}
-        run: |
-          if [ -f "node_modules/.bin/eslint" ]; then
-            node_modules/.bin/eslint src --max-warnings 0 || true
-          fi
-
-      - name: Run deptrac (if deptrac.yaml exists)
-        if: ${{ hashFiles('deptrac.yaml') != '' }}
-        run: |
-          if [ -f "vendor/bin/deptrac" ]; then
-            vendor/bin/deptrac analyse --no-progress || true
-          fi
-
       - name: Run craftsman-ci quality gate
         env:
           GH_TOKEN: ${{ github.token }}
