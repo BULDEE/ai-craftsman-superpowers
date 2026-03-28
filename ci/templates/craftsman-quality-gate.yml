@@ -1,0 +1,138 @@
+name: Craftsman Quality Gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP (if composer.json exists)
+        if: ${{ hashFiles('composer.json') != '' }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer, phpstan
+
+      - name: Setup Node.js (if package.json exists)
+        if: ${{ hashFiles('package.json') != '' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install PHP dependencies
+        if: ${{ hashFiles('composer.json') != '' }}
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Install Node.js dependencies
+        if: ${{ hashFiles('package.json') != '' }}
+        run: npm ci
+
+      - name: Run PHPStan (if composer.json exists)
+        if: ${{ hashFiles('composer.json') != '' }}
+        run: |
+          if [ -f "vendor/bin/phpstan" ]; then
+            vendor/bin/phpstan analyse --level=8 --no-progress || true
+          fi
+
+      - name: Run ESLint strict (if package.json exists)
+        if: ${{ hashFiles('package.json') != '' }}
+        run: |
+          if [ -f "node_modules/.bin/eslint" ]; then
+            node_modules/.bin/eslint src --max-warnings 0 || true
+          fi
+
+      - name: Run deptrac (if deptrac.yaml exists)
+        if: ${{ hashFiles('deptrac.yaml') != '' }}
+        run: |
+          if [ -f "vendor/bin/deptrac" ]; then
+            vendor/bin/deptrac analyse --no-progress || true
+          fi
+
+      - name: Run craftsman-ci
+        run: |
+          chmod +x ci/craftsman-ci.sh
+          bash ci/craftsman-ci.sh --format json > craftsman-report.json || true
+          cat craftsman-report.json
+
+      - name: Check craftsman violations
+        id: check
+        run: |
+          violations=$(jq '.summary.violations' craftsman-report.json)
+          warnings=$(jq '.summary.warnings' craftsman-report.json)
+          files=$(jq '.summary.files_scanned' craftsman-report.json)
+
+          echo "violations=${violations}" >> "$GITHUB_OUTPUT"
+          echo "warnings=${warnings}" >> "$GITHUB_OUTPUT"
+          echo "files=${files}" >> "$GITHUB_OUTPUT"
+
+          echo "Scanned ${files} file(s): ${violations} violation(s), ${warnings} warning(s)"
+
+          if [ "$violations" -gt 0 ]; then
+            echo "::error::Craftsman found ${violations} violation(s). Fix them before merging."
+            exit 1
+          fi
+
+      - name: Comment PR with craftsman results
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('craftsman-report.json', 'utf8'));
+            const { violations, warnings, files_scanned } = report.summary;
+            const { strictness, stack } = report.config;
+
+            const statusIcon = violations > 0 ? '❌' : warnings > 0 ? '⚠️' : '✅';
+            const statusText = violations > 0 ? 'Failed' : warnings > 0 ? 'Passed with warnings' : 'Passed';
+
+            let body = `## ${statusIcon} Craftsman Quality Gate — ${statusText}\n\n`;
+            body += `**Config:** \`${strictness}\` strictness, \`${stack}\` stack\n`;
+            body += `**Scanned:** ${files_scanned} file(s)\n`;
+            body += `**Result:** ${violations} violation(s), ${warnings} warning(s)\n\n`;
+
+            if (report.violations.length > 0) {
+              body += `### Issues\n\n`;
+              body += `| File | Line | Rule | Message | Severity |\n`;
+              body += `|------|------|------|---------|----------|\n`;
+              for (const v of report.violations) {
+                body += `| \`${v.file}\` | ${v.line} | \`${v.rule}\` | ${v.message} | ${v.severity} |\n`;
+              }
+            }
+
+            body += `\n<details><summary>Raw JSON report</summary>\n\n\`\`\`json\n`;
+            body += JSON.stringify(report, null, 2);
+            body += `\n\`\`\`\n</details>`;
+
+            // Find existing craftsman comment to update
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('Craftsman Quality Gate')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
