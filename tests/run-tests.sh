@@ -331,16 +331,16 @@ test_hook_behavior() {
     echo ""
     log_info "Testing hook behavior (functional)"
 
-    local hook_test="$SCRIPT_DIR/hooks/test-hooks.sh"
+    local hook_test="$SCRIPT_DIR/core/test-hooks.sh"
 
     if [[ -f "$hook_test" ]]; then
         if bash "$hook_test" > /dev/null 2>&1; then
             log_pass "Hook behavior tests pass"
         else
-            log_fail "Hook behavior tests failed — run tests/hooks/test-hooks.sh for details"
+            log_fail "Hook behavior tests failed — run tests/core/test-hooks.sh for details"
         fi
     else
-        log_skip "Hook behavior tests (tests/hooks/test-hooks.sh not found)"
+        log_skip "Hook behavior tests (tests/core/test-hooks.sh not found)"
     fi
 }
 
@@ -349,16 +349,16 @@ test_config_resolution() {
     echo ""
     log_info "Testing config resolution (unit)"
 
-    local config_test="$SCRIPT_DIR/hooks/test-config.sh"
+    local config_test="$SCRIPT_DIR/core/test-config.sh"
 
     if [[ -f "$config_test" ]]; then
         if bash "$config_test" > /dev/null 2>&1; then
             log_pass "Config resolution tests pass"
         else
-            log_fail "Config resolution tests failed — run tests/hooks/test-config.sh for details"
+            log_fail "Config resolution tests failed — run tests/core/test-config.sh for details"
         fi
     else
-        log_skip "Config resolution tests (tests/hooks/test-config.sh not found)"
+        log_skip "Config resolution tests (tests/core/test-config.sh not found)"
     fi
 }
 
