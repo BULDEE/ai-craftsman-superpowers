@@ -362,6 +362,28 @@ test_config_resolution() {
     fi
 }
 
+# Test: Pack-specific test suites
+test_pack_suites() {
+    echo ""
+    log_info "Testing pack suites"
+
+    local packs_dir="$SCRIPT_DIR/packs"
+    if [[ ! -d "$packs_dir" ]]; then
+        log_skip "Pack tests (tests/packs/ not found)"
+        return
+    fi
+
+    for test_file in "$packs_dir"/test-*.sh; do
+        [[ -f "$test_file" ]] || continue
+        local name=$(basename "$test_file")
+        if bash "$test_file" > /dev/null 2>&1; then
+            log_pass "Pack suite passes: $name"
+        else
+            log_fail "Pack suite failed: $name — run tests/packs/$name for details"
+        fi
+    done
+}
+
 # Test: craftsman-ci CLI (functional tests)
 test_craftsman_ci() {
     echo ""
@@ -457,6 +479,7 @@ main() {
 
         test_hook_behavior
         test_config_resolution
+        test_pack_suites
         test_craftsman_ci
     fi
 
