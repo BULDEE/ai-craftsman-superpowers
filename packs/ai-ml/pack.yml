@@ -1,0 +1,20 @@
+name: ai-ml
+version: "1.0.0"
+description: "AI/ML craftsman pack — RAG pipelines, LLM integration, prompt engineering, MLOps"
+compatibility:
+  core: ">=2.4.0"
+  stack: ["*"]
+
+rules:
+  builtin: []
+  static_analysis: []
+
+hooks:
+  validators: []
+
+commands:
+  scaffold_types: []
+
+agents: ["agents/ai-engineer.md"]
+
+knowledge: ["knowledge/"]

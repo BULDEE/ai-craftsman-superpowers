@@ -1,0 +1,25 @@
+name: symfony
+version: "1.0.0"
+description: "PHP/Symfony craftsman pack — DDD, API Platform, Doctrine, Messenger"
+compatibility:
+  core: ">=2.4.0"
+  stack: ["symfony", "fullstack"]
+
+rules:
+  builtin: ["PHP001", "PHP002", "PHP003", "PHP004", "PHP005", "WARN-PHP001", "LAYER001", "LAYER002", "LAYER003"]
+  static_analysis: ["PHPSTAN001", "PHPSTAN002", "PHPSTAN003", "PHPSTAN004", "PHPSTAN005", "DEPTRAC001"]
+
+hooks:
+  validators: ["hooks/php-validator.sh", "hooks/layer-validator.sh"]
+
+static_analysis:
+  tools: ["static-analysis/phpstan.sh"]
+
+commands:
+  scaffold_types: ["entity", "usecase"]
+
+agents: ["agents/backend-craftsman.md", "agents/api-craftsman.md", "agents/symfony-reviewer.md"]
+
+knowledge: ["knowledge/"]
+
+templates: ["templates/"]
