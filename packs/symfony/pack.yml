@@ -16,7 +16,7 @@ static_analysis:
   tools: ["static-analysis/phpstan.sh"]
 
 commands:
-  scaffold_types: ["entity", "usecase"]
+  scaffold_types: ["entity", "usecase", "api-resource"]
 
 agents: ["agents/backend-craftsman.md", "agents/api-craftsman.md", "agents/symfony-reviewer.md"]
 

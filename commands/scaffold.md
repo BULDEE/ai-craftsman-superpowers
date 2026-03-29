@@ -39,6 +39,7 @@ Before generating ANY code, you MUST load and read the canonical example for the
 | usecase | `packs/symfony/knowledge/canonical/php-usecase.php` |
 | component | `packs/react/knowledge/canonical/ts-react-component.tsx` |
 | hook | `packs/react/knowledge/canonical/ts-tanstack-hook.ts` |
+| api-resource | `packs/symfony/knowledge/canonical/php-state-provider.php` |
 
 ## Process
 
