@@ -1,0 +1,25 @@
+name: python
+version: "1.0.0"
+description: "Python craftsman pack — type hints, ruff/mypy integration, Django/FastAPI patterns"
+compatibility:
+  core: ">=2.6.0"
+  stack: ["python"]
+
+rules:
+  builtin: ["PY001", "PY002", "PY003", "WARN-PY001"]
+  static_analysis: []
+
+hooks:
+  validators: ["hooks/python-validator.sh"]
+
+static_analysis:
+  tools: []
+
+commands:
+  scaffold_types: []
+
+agents: []
+
+knowledge: ["knowledge/"]
+
+templates: []
