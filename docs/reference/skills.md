@@ -333,3 +333,6 @@ Check security, tests, and style.
 | `/craftsman:agent-create` | Utility | Create bounded agent |
 | `/craftsman:metrics` | Utility | Quality metrics dashboard |
 | `/craftsman:setup` | Utility | Interactive setup wizard |
+| `/craftsman:team` | Core | Agent team management |
+| `/craftsman:ci` | Core | CI/CD quality gate export |
+| `/craftsman:start` | Core | First-time onboarding wizard |

@@ -6,7 +6,7 @@ The **ai-craftsman-superpowers** plugin is designed with security as a priority.
 
 ## What This Plugin Does
 
-### Commands (22 total)
+### Commands (25 total)
 
 Commands are **prompt templates** that guide Claude's behavior. They:
 
@@ -31,7 +31,7 @@ Agents include **5 specialized reviewers** (read-only analysis) and **7 craftsma
 - ✅ Follow domain-specific best practices
 - ✅ Operate within Claude Code's permission system
 
-### Hooks (6 scripts, 8 events, 4 agent hooks)
+### Hooks (7 scripts, 8 events, 4 agent hooks)
 
 Hooks execute **shell scripts** and **agent prompts** at specific lifecycle events:
 
@@ -42,6 +42,7 @@ Hooks execute **shell scripts** and **agent prompts** at specific lifecycle even
 | `post-write-check.sh` | PostToolUse | Code rule enforcement after write | READ-ONLY |
 | `bias-detector.sh` | UserPromptSubmit | Cognitive bias detection | READ-ONLY |
 | `file-changed.sh` | FileChanged | Tracks file modifications | READ-ONLY |
+| `pre-push-verify.sh` | PreToolUse | Validates git push commands | READ-ONLY |
 | `session-metrics.sh` | SessionEnd | Records session summary to SQLite | WRITE (local DB only) |
 | DDD verifier agent | PostToolUse | Semantic architecture check | READ-ONLY |
 | Sentry context agent | PostToolUse | Error context from Sentry MCP | READ-ONLY (via MCP) |
@@ -104,6 +105,9 @@ We will respond within 48 hours and work with you on disclosure.
 | 1.3.0 | 2026-03-28 | Internal | Agent hooks (Haiku), correction learning, env var fix |
 | 1.4.0 | 2026-03-28 | Internal | Sentry MCP channel, channel lifecycle library |
 | 1.5.0 | 2026-03-28 | Internal | 7 craftsman agents, Agent Teams support, enriched reviewers |
+| 2.0.0 | 2026-03-28 | Internal | Agent Teams, /craftsman:start onboarding, /craftsman:ci command |
+| 2.1.0 | 2026-03-29 | Internal | Rules engine, CI adapters, circuit breaker, pack template variants |
+| 2.2.0 | 2026-03-29 | Internal | SQL injection fix (metrics-query.py), schema validation, atomic commits, monorepo sampling |
 
 ## Third-Party Dependencies
 
@@ -112,6 +116,7 @@ This plugin has **zero runtime dependencies**. Hooks use only:
 - `bash` (system)
 - `jq` (optional, for JSON parsing)
 - `grep` (system)
+- `python3` (system, for parameterized SQL queries)
 
 No npm packages, no external binaries, no network calls.
 
@@ -137,6 +142,9 @@ grep -r "curl\|wget\|fetch\|http" hooks/
 
 | Version | Supported |
 |---------|-----------|
+| 2.2.x | ✅ |
+| 2.1.x | ✅ |
+| 2.0.x | ✅ |
 | 1.5.x | ✅ |
 | 1.4.x | ✅ |
 | 1.3.x | ✅ |

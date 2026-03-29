@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
-[![Version](https://img.shields.io/badge/Version-2.2.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-2.2.1-blue)](CHANGELOG.md)
 [![Commands](https://img.shields.io/badge/Commands-25-orange)]()
 [![Agents](https://img.shields.io/badge/Agents-12-red)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -154,6 +154,8 @@ All commands are explicitly invoked with `/craftsman:command-name`. See [ADR-000
 | `/craftsman:scaffold` | Analyze code and generate context agents |
 | `/craftsman:metrics` | Display quality metrics dashboard (violations, trends, sessions) |
 | `/craftsman:setup` | Interactive setup wizard (DISC profile, stack, packs) |
+| `/craftsman:team` | Create and manage agent teams for collaborative tasks |
+| `/craftsman:start` | Onboarding wizard for first-time users |
 
 ### CI/CD Integration
 
@@ -247,6 +249,54 @@ Hooks validate your code automatically with **3-level analysis**:
 **Suppressing rules:** Add `// craftsman-ignore: RULE_ID` inline to suppress a specific rule.
 
 Violations are **blocking** (exit 2) — Claude must fix the code before proceeding. All violations are recorded in a local SQLite database for trend tracking via `/craftsman:metrics`.
+
+### Custom Rule Engine (v2.1.0+)
+
+Override any rule per-project or per-directory with 3-level config inheritance:
+
+```
+~/.claude/.craft-config.yml          ← Global defaults
+  └─ {project}/.craft-config.yml     ← Project overrides
+      └─ {dir}/.craft-rules.yml      ← Directory overrides
+```
+
+Short form: `PHP001: warn` / `TS001: ignore`. Long form: custom rules with regex, severity, languages.
+
+### CI/CD Integration (v2.1.0+)
+
+Same rules engine runs in hooks (real-time) AND CI (pipeline). 4 providers with adapter pattern:
+
+| Provider | Template | Annotations |
+|----------|----------|-------------|
+| GitHub Actions | `craftsman-quality-gate.yml` | `::error` inline |
+| GitLab CI | `.gitlab-ci.craftsman.yml` | codequality artifact |
+| Bitbucket Pipelines | `bitbucket-pipelines.craftsman.yml` | Reports API |
+| Jenkins | `Jenkinsfile.craftsman` | Console output |
+
+Use `/craftsman:ci export` to generate or `craftsman-ci.sh init --provider` from CLI.
+
+### Circuit Breaker (v2.1.0+)
+
+Production-grade protection for external services (Sentry). 3 states: closed → open → half-open. File-based cache with TTL/LRU eviction serves stale data during outages.
+
+### Pack Template Variants (v2.1.0+)
+
+Each scaffolder offers template selection before generating code:
+
+| Pack | Template | Use Case |
+|------|----------|----------|
+| Symfony | `bounded-context` | Standard DDD entity |
+| Symfony | `crud-api` | API Platform 4 CRUD |
+| Symfony | `event-sourced` | Event Sourcing + Projections |
+| React | `bounded-context` | Standard TanStack Query hook |
+| React | `form-heavy` | Multi-step wizard + Zod |
+| React | `dashboard-data` | TanStack Table + Recharts |
+
+### Schema Validation & Safety (v2.2.0+)
+
+- **Hooks schema validation** — `session-start.sh` validates all hook events against the supported set at startup
+- **Atomic commit enforcement** — Stop hook warns when >15 files modified, caps inspection at 20
+- **Monorepo sampling** — InstructionsLoaded switches to directory-level analysis for large codebases (>100 files)
 
 ## Advanced: Knowledge Base RAG (Optional)
 
@@ -359,7 +409,7 @@ ai-craftsman-superpowers/
 │   └── plugin.json
 ├── commands/                    # User-invocable commands (25 *.md files)
 ├── agents/                      # Reviewers (5) + Craftsmen (7) = 12 agents
-├── hooks/                       # Automated validation (6 scripts + 4 agent hooks)
+├── hooks/                       # Automated validation (7 scripts + 4 agent hooks)
 │   ├── hooks.json               # 8 hook events configuration
 │   ├── lib/                     # Shared hook libraries
 │   │   ├── config.sh            # Configuration resolution
@@ -371,7 +421,14 @@ ai-craftsman-superpowers/
 │   ├── post-write-check.sh      # PostToolUse: code rule enforcement after write
 │   ├── bias-detector.sh         # UserPromptSubmit: cognitive bias detection
 │   ├── file-changed.sh          # FileChanged: track modifications
+│   ├── pre-push-verify.sh       # PreToolUse: git push safety check
 │   └── session-metrics.sh       # SessionEnd: session summary
+├── config/                      # Default configuration
+│   └── default-config.yml
+├── ci/                          # CI/CD integration (adapters + templates)
+│   ├── craftsman-ci.sh          # Standalone CI quality gate
+│   ├── adapters/                # Provider adapters (github, gitlab, bitbucket, generic)
+│   └── templates/               # CI template files
 ├── knowledge/                   # Patterns & principles
 ├── examples/                    # Usage examples
 ├── tests/                       # Test suite
