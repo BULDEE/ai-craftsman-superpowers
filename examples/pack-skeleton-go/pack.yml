@@ -1,0 +1,25 @@
+name: go
+version: "1.0.0"
+description: "Go craftsman pack — error handling, interfaces, testing conventions"
+compatibility:
+  core: ">=2.6.0"
+  stack: ["go"]
+
+rules:
+  builtin: ["GO001", "GO002", "GO003", "WARN-GO001"]
+  static_analysis: []
+
+hooks:
+  validators: ["hooks/go-validator.sh"]
+
+static_analysis:
+  tools: []
+
+commands:
+  scaffold_types: []
+
+agents: []
+
+knowledge: ["knowledge/"]
+
+templates: []
