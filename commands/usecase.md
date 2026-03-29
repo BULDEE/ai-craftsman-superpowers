@@ -50,6 +50,34 @@ that works with any technology stack.
 
 ### If Symfony Pack IS enabled:
 
+Continue with the template selection below.
+
+---
+
+## Template Selection
+
+Before scaffolding, present the available templates to the user:
+
+```
+Which pattern fits your use case?
+
+1. **bounded-context** — Full DDD (Command/Handler with Domain Events, Repository)
+   Best for: core domain, complex business rules with CQRS
+
+2. **crud-api** — API Platform CRUD (State Provider/Processor, DTO, Filters)
+   Best for: simple resources, admin endpoints, CRUD without domain logic
+
+3. **event-sourced** — Event Sourcing (Aggregate + Event Store + Projections + Snapshots)
+   Best for: audit trail, temporal queries, complex state machines
+```
+
+**If the user selects `crud-api`:**
+Load and follow template: `symfony-pack/templates/crud-api.template.md`
+
+**If the user selects `event-sourced`:**
+Load and follow template: `symfony-pack/templates/event-sourced.template.md`
+
+**If the user selects `bounded-context` (default):**
 Continue with the scaffolding process below.
 
 ---
