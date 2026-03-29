@@ -11,6 +11,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
+source "${SCRIPT_DIR}/lib/pack-loader.sh"
 
 # Check required dependencies
 _check_dependencies() {
@@ -21,6 +22,21 @@ _check_dependencies() {
 
     if [[ -n "$missing" ]]; then
         echo "Dependencies: MISSING${missing}. Install: brew install${missing} (macOS) or apt-get install${missing} (Linux)"
+    fi
+}
+
+_init_packs() {
+    pack_loader_init
+    pack_sync_symlinks
+
+    local loaded
+    loaded=$(pack_loaded)
+    if [[ -n "$loaded" ]]; then
+        local pack_list
+        pack_list=$(echo "$loaded" | tr '\n' ', ' | sed 's/,$//')
+        echo "PACKS:${pack_list}"
+    else
+        echo "PACKS:none"
     fi
 }
 
@@ -52,7 +68,8 @@ config_ts_enabled && TS_STATUS="ON"
 
 # Build message
 DEP_STATUS=$(_check_dependencies)
-MSG="Craftsman active | Stack: ${STACK} | Strictness: ${STRICTNESS} | PHP rules: ${PHP_STATUS} | TS rules: ${TS_STATUS} | Metrics: initialized"
+PACK_STATUS=$(_init_packs 2>/dev/null || echo "PACKS:error")
+MSG="Craftsman active | Stack: ${STACK} | Strictness: ${STRICTNESS} | PHP rules: ${PHP_STATUS} | TS rules: ${TS_STATUS} | Metrics: initialized | ${PACK_STATUS}"
 if [[ -n "$DEP_STATUS" ]]; then
     MSG="${MSG} | ${DEP_STATUS}"
 fi
