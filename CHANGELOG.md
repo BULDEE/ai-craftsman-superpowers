@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-03-29
+
+### Added
+
+- **Version bump script** — `scripts/bump-version.sh` updates all version references in one command
+- **README v2.x features** — Custom Rule Engine, CI/CD Integration, Circuit Breaker, Pack Templates, Schema Validation sections
+- **README missing commands** — Added `/craftsman:team`, `/craftsman:start` to commands table
+
+### Fixed
+
+- **SECURITY.md** — Updated commands count (22→25), hooks count (6→7), added pre-push-verify.sh, v2.x audit trail, supported versions
+- **docs/reference/skills.md** — Added 3 missing commands to Quick Reference Table (`/craftsman:team`, `/craftsman:ci`, `/craftsman:start`)
+- **docs/reference/hooks.md** — Added pre-push-verify.sh, Rules Engine, Schema Validation, Atomic Commits, Monorepo Safety sections
+- **README Project Structure** — Added `config/`, `ci/`, `pre-push-verify.sh`, fixed hooks count 6→7
+
+---
+
 ## [2.2.0] - 2026-03-29
 
 ### Security

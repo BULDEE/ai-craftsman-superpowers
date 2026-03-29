@@ -2,7 +2,7 @@
 
 The plugin uses Claude Code hooks to automatically enforce code quality rules. Hooks run as shell scripts and agent prompts triggered by Claude Code events.
 
-**8 hook events** — 6 command hooks + 4 agent hooks.
+**8 hook events** — 7 command hooks + 4 agent hooks.
 
 ## Hook Events
 
@@ -15,6 +15,7 @@ The plugin uses Claude Code hooks to automatically enforce code quality rules. H
 | PostToolUse | `post-write-check.sh` | Validate file **after** write (all rules) |
 | UserPromptSubmit | `bias-detector.sh` | Detect cognitive biases in prompts |
 | FileChanged | `file-changed.sh` | Track file modifications for correction learning |
+| PreToolUse | `pre-push-verify.sh` | Validate git push commands for safety |
 | SessionEnd | `session-metrics.sh` | Record session summary to metrics database |
 
 ### Agent Hooks (v1.3.0+)
@@ -199,6 +200,40 @@ Use the `/craftsman:metrics` command to view a formatted dashboard:
 ```
 
 This shows violations by rule, daily trends (14 days), and session history.
+
+## Custom Rule Engine (v2.1.0+)
+
+Rules can be overridden per-project using `.craft-config.yml`:
+
+```yaml
+rules:
+  PHP001: block     # Keep strict
+  PHP002: warn      # Allow non-final during migration
+  TS001: ignore     # Legacy codebase
+```
+
+Three-level inheritance: Global → Project → Directory. See CLAUDE.md for details.
+
+## Schema Validation (v2.2.0+)
+
+At session start, `session-start.sh` validates all hook event names in `hooks.json` against the supported set:
+
+`SessionStart`, `PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `FileChanged`, `InstructionsLoaded`, `Stop`, `SessionEnd`
+
+Unsupported events trigger a `SCHEMA WARNING` in the session startup message.
+
+## Atomic Commit Enforcement (v2.2.0+)
+
+The Stop hook's Final Reviewer agent monitors file changes per session:
+- If >20 files changed: inspects only the first 20
+- If >15 files changed: adds an `[ATOMIC COMMITS]` reminder encouraging small, focused commits
+
+## Monorepo Safety (v2.2.0+)
+
+The InstructionsLoaded agent applies sampling for large codebases:
+- If any `src/` Glob returns >100 results: switches to directory-level analysis (file counts per subdirectory)
+- Caps file Read to 3 representative files maximum
+- Limits Value Object and Aggregate root listings to 10 each
 
 ## Bias Detection
 
