@@ -10,8 +10,8 @@ ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 FIXTURES_DIR="$SCRIPT_DIR/fixtures"
 CLI="$ROOT_DIR/ci/craftsman-ci.sh"
 
-# Reuse hook fixtures where applicable
-HOOK_FIXTURES="$ROOT_DIR/tests/hooks/fixtures"
+# Reuse core fixtures where applicable (moved from tests/hooks/ to tests/core/ in v2.5.0)
+HOOK_FIXTURES="$ROOT_DIR/tests/core/fixtures"
 
 # Colors
 RED='\033[0;31m'

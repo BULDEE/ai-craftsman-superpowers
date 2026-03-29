@@ -170,6 +170,13 @@ else
     RULES_ENGINE_AVAILABLE=false
 fi
 
+# Load pack-specific rules if packs directory exists
+if [[ -d "$PLUGIN_ROOT/packs" ]]; then
+    export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
+    source "${PLUGIN_ROOT}/hooks/lib/pack-loader.sh" 2>/dev/null || true
+    pack_loader_init 2>/dev/null || true
+fi
+
 # Default scan path
 if [[ ${#SCAN_PATHS[@]} -eq 0 ]]; then
     SCAN_PATHS=("src/")
