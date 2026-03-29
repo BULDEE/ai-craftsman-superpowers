@@ -12,6 +12,7 @@
 
 METRICS_DB_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
 METRICS_DB="${METRICS_DB_DIR}/metrics.db"
+METRICS_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 metrics_init() {
     mkdir -p "$METRICS_DB_DIR"
@@ -90,25 +91,29 @@ metrics_file_pattern() {
 }
 
 metrics_record_violation() {
-    local rule="${1//\'/''}"
-    local file_pattern="${2//\'/''}"
+    local rule="$1"
+    local file_pattern="$2"
     local severity="$3"
     local blocked="${4:-0}"
     local ignored="${5:-0}"
     local project_hash
     project_hash=$(metrics_project_hash)
-    sqlite3 "$METRICS_DB" "INSERT INTO violations (project_hash, rule, file_pattern, severity, blocked, ignored) VALUES ('$project_hash', '$rule', '$file_pattern', '$severity', $blocked, $ignored);"
+    python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
+        "INSERT INTO violations (project_hash, rule, file_pattern, severity, blocked, ignored) VALUES (?, ?, ?, ?, ?, ?)" \
+        "$project_hash" "$rule" "$file_pattern" "$severity" "$blocked" "$ignored"
 }
 
 metrics_record_session() {
     local duration="$1"
-    local skills="${2//\'/''}"
-    local agents="${3//\'/''}"
+    local skills="$2"
+    local agents="$3"
     local blocked="$4"
     local warned="$5"
     local project_hash
     project_hash=$(metrics_project_hash)
-    sqlite3 "$METRICS_DB" "INSERT INTO sessions (project_hash, duration_seconds, skills_used, agents_spawned, violations_blocked, violations_warned) VALUES ('$project_hash', $duration, '$skills', '$agents', $blocked, $warned);"
+    python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
+        "INSERT INTO sessions (project_hash, duration_seconds, skills_used, agents_spawned, violations_blocked, violations_warned) VALUES (?, ?, ?, ?, ?, ?)" \
+        "$project_hash" "$duration" "$skills" "$agents" "$blocked" "$warned"
 }
 
 metrics_violations_7d() {
@@ -126,14 +131,15 @@ metrics_trend() {
 }
 
 metrics_record_correction() {
-    local rule="${1//\'/''}"
-    local file_pattern="${2//\'/''}"
-    local action="${3//\'/''}"
+    local rule="$1"
+    local file_pattern="$2"
+    local action="$3"
     local context="${4:-}"
-    context="${context//\'/''}"
     local project_hash
     project_hash=$(metrics_project_hash)
-    sqlite3 "$METRICS_DB" "INSERT INTO corrections (project_hash, rule, file_pattern, action, context) VALUES ('$project_hash', '$rule', '$file_pattern', '$action', '$context');"
+    python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
+        "INSERT INTO corrections (project_hash, rule, file_pattern, action, context) VALUES (?, ?, ?, ?, ?)" \
+        "$project_hash" "$rule" "$file_pattern" "$action" "$context"
 }
 
 metrics_corrections_30d() {

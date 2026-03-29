@@ -4,8 +4,8 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
-[![Version](https://img.shields.io/badge/Version-1.5.0-blue)](CHANGELOG.md)
-[![Commands](https://img.shields.io/badge/Commands-22-orange)]()
+[![Version](https://img.shields.io/badge/Version-2.2.0-blue)](CHANGELOG.md)
+[![Commands](https://img.shields.io/badge/Commands-25-orange)]()
 [![Agents](https://img.shields.io/badge/Agents-12-red)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -87,6 +87,23 @@ I need to migrate our API to microservices.
 
 See [`/examples`](examples/) for detailed usage examples with expected outputs.
 
+## Why Craftsman? — Key Differentiators
+
+What makes this plugin unique in the Claude Code ecosystem:
+
+| Differentiator | What It Does | Why It Matters |
+|----------------|-------------|----------------|
+| **Iron Law Pattern** | Forces canonical example loading before ANY code generation | Zero drift — generated code matches project standards exactly, every time |
+| **Cognitive Bias Detector** | Real-time detection of acceleration, scope creep, sunk cost, anchoring biases in user prompts | The only Claude Code plugin that protects against human cognitive biases |
+| **Correction Learning** | Records when you fix Claude-generated code, injects patterns at next session start | Claude learns from its own mistakes — error rate decreases over time |
+| **3-Level Validation** | Regex (<50ms) + Static Analysis (<2s) + Architecture (<2s) on every write | Sub-3-second quality gate that catches issues from typos to layer violations |
+| **Rules Engine** | Per-project rule override with 3-level inheritance (global → project → directory) | Enterprise-ready: legacy code coexists with strict new code in the same repo |
+| **Circuit Breaker** | Production-grade external service protection (closed → open → half-open) with stale cache | Sentry goes down? Plugin keeps working with cached data |
+| **Multi-Provider CI** | Same rules in hooks AND CI across GitHub Actions, GitLab CI, Bitbucket Pipelines, Jenkins | One source of truth — what blocks locally blocks in CI, zero drift |
+| **Metrics & Trends** | SQLite-backed violation tracking with 7d/30d trend analysis | Data-driven quality improvement: see which rules get violated most |
+
+> **No other Claude Code plugin combines real-time cognitive protection with automated code quality enforcement and cross-session learning.**
+
 ## Commands
 
 All commands are explicitly invoked with `/craftsman:command-name`. See [ADR-0007](docs/adr/0007-commands-over-skills.md) for the rationale.
@@ -137,6 +154,12 @@ All commands are explicitly invoked with `/craftsman:command-name`. See [ADR-000
 | `/craftsman:scaffold` | Analyze code and generate context agents |
 | `/craftsman:metrics` | Display quality metrics dashboard (violations, trends, sessions) |
 | `/craftsman:setup` | Interactive setup wizard (DISC profile, stack, packs) |
+
+### CI/CD Integration
+
+| Command | Purpose |
+|---------|---------|
+| `/craftsman:ci` | Export quality gates to CI/CD pipeline (GitHub, GitLab, Bitbucket, Jenkins) |
 
 > **Why source-verify?** AI tools evolve rapidly. This command ensures claims about capabilities are verified against official documentation before being stated as facts. See [ADR-004](docs/adr/004-official-documentation-verification.md).
 
@@ -334,7 +357,7 @@ See [`/examples`](examples/) for detailed usage examples:
 ai-craftsman-superpowers/
 ├── .claude-plugin/              # Plugin manifest
 │   └── plugin.json
-├── commands/                    # User-invocable commands (22 *.md files)
+├── commands/                    # User-invocable commands (25 *.md files)
 ├── agents/                      # Reviewers (5) + Craftsmen (7) = 12 agents
 ├── hooks/                       # Automated validation (6 scripts + 4 agent hooks)
 │   ├── hooks.json               # 8 hook events configuration
@@ -443,7 +466,6 @@ grep -r "curl\|wget\|fetch\|http" hooks/
 ### Not Supported
 
 - ❌ Auto-fixing violations (by design, for safety)
-- ❌ CI/CD integration (use native tools instead)
 - ❌ IDE plugins (Claude Code CLI only)
 
 ## Contributing

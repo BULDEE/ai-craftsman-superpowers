@@ -134,7 +134,7 @@ for c in data.get('values', []):
             -X PUT \
             -H "Authorization: Bearer ${token}" \
             -H "Content-Type: application/json" \
-            --data "$(python3 -c "import json; print(json.dumps({'content': {'raw': $(python3 -c "import json; print(json.dumps(open('/dev/stdin').read()))" <<< "$comment_body" 2>/dev/null)}}))" 2>/dev/null)" \
+            --data "$(python3 -c "import json,sys; print(json.dumps({'content':{'raw':sys.stdin.read()}}))" <<< "$comment_body")" \
             "${api_url}/repositories/${workspace}/${repo_slug}/pullrequests/${pr_id}/comments/${existing_comment_id}" \
             >/dev/null 2>&1
     else
@@ -142,7 +142,7 @@ for c in data.get('values', []):
             -X POST \
             -H "Authorization: Bearer ${token}" \
             -H "Content-Type: application/json" \
-            --data "$(python3 -c "import json; print(json.dumps({'content': {'raw': $(python3 -c "import json; print(json.dumps(open('/dev/stdin').read()))" <<< "$comment_body" 2>/dev/null)}}))" 2>/dev/null)" \
+            --data "$(python3 -c "import json,sys; print(json.dumps({'content':{'raw':sys.stdin.read()}}))" <<< "$comment_body")" \
             "${api_url}/repositories/${workspace}/${repo_slug}/pullrequests/${pr_id}/comments" \
             >/dev/null 2>&1
     fi
