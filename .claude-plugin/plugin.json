@@ -81,6 +81,11 @@
     "sentry": {
       "type": "http",
       "url": "https://mcp.sentry.dev/mcp"
+    },
+    "knowledge-rag": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["packs/ai-ml/mcp/knowledge-rag/dist/src/index.js"]
     }
   }
 }
