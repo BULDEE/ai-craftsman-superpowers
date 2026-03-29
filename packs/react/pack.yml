@@ -1,0 +1,25 @@
+name: react
+version: "1.0.0"
+description: "React/TypeScript craftsman pack — React 19, TanStack Query, Tailwind, shadcn/ui"
+compatibility:
+  core: ">=2.4.0"
+  stack: ["react", "fullstack"]
+
+rules:
+  builtin: ["TS001", "TS002", "TS003", "WARN-TS001", "LAYER001"]
+  static_analysis: ["ESLINT001", "ESLINT002", "ESLINT003", "ESLINT004"]
+
+hooks:
+  validators: ["hooks/typescript-validator.sh", "hooks/layer-validator.sh"]
+
+static_analysis:
+  tools: ["static-analysis/eslint.sh"]
+
+commands:
+  scaffold_types: ["component", "hook"]
+
+agents: ["agents/frontend-craftsman.md", "agents/react-reviewer.md"]
+
+knowledge: ["knowledge/"]
+
+templates: ["templates/"]
