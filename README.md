@@ -63,6 +63,21 @@ git clone https://github.com/BULDEE/ai-craftsman-superpowers.git
 # Go to "Errors" tab if skills don't appear
 ```
 
+## API Cost Model
+
+The plugin uses AI agent hooks for deep semantic analysis beyond regex. These are **optional** and can be disabled.
+
+| Agent Hook | Trigger | Model | Purpose |
+|------------|---------|-------|---------|
+| DDD Verifier | Each Write/Edit | Haiku | Layer violations, aggregate boundaries, naming |
+| Sentry Context | Each Write/Edit | Haiku | Error context from Sentry (if configured) |
+| Architecture Analyzer | Session start | Haiku | Build project context map |
+| Final Reviewer | Session end | Haiku | Validate architecture (strict mode only) |
+
+**Estimated cost:** ~$0.15-0.30 per session (50 Write/Edit operations)
+
+**Opt-out:** Set `agent_hooks: false` in plugin config to disable all agent hooks. Regex-based validation (Level 1) and static analysis (Level 2) continue to work without agent hooks.
+
 ## Quick Start
 
 After installation, try:
