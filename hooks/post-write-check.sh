@@ -21,6 +21,7 @@ source "${SCRIPT_DIR}/lib/metrics-db.sh"
 source "${SCRIPT_DIR}/lib/static-analysis.sh"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/rules-engine.sh"
+source "${SCRIPT_DIR}/lib/pack-loader.sh"
 rules_init "$PWD" "${HOME}/.claude"
 
 # Session state for correction learning
@@ -142,6 +143,9 @@ print(' '.join(rules))
 # Init metrics DB (creates tables if needed, idempotent)
 metrics_init 2>/dev/null || true
 
+# Init pack loader (discovers and sources pack validators)
+pack_loader_init
+
 # Read tool input from stdin (JSON from Claude Code)
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
@@ -231,91 +235,12 @@ add_warning() {
 }
 
 # =============================================================================
-# Level 1: Regex Validation (always runs, <50ms)
+# Static Analysis Helper — parses structured CODE:LINE:MESSAGE output
 # =============================================================================
-validate_php_regex() {
-    local file="$1"
-
-    # PHP001: declare(strict_types=1) required
-    if ! grep -q "declare(strict_types=1)" "$file" 2>/dev/null; then
-        add_violation "PHP001" "Missing declare(strict_types=1)"
-    fi
-
-    # PHP002: Classes must be final (except interface/trait/abstract)
-    if grep -q "^class " "$file" 2>/dev/null; then
-        if ! grep -q "final class" "$file" 2>/dev/null; then
-            if ! grep -qE "(interface |trait |abstract class )" "$file" 2>/dev/null; then
-                add_violation "PHP002" "Class should be final"
-            fi
-        fi
-    fi
-
-    # PHP003: No public setters (check each line for craftsman-ignore)
-    while IFS= read -r line; do
-        if echo "$line" | grep -qE "public function set[A-Z]" 2>/dev/null; then
-            if ! line_has_ignore "$line" "no-setter"; then
-                add_violation "PHP003" "Public setter found — use behavioral methods"
-            else
-                metrics_record_violation "PHP003" "$FILE_PATTERN" "critical" 0 1 2>/dev/null || true
-            fi
-        fi
-    done < "$file"
-
-    # PHP004: No new DateTime()
-    if grep -q "new DateTime()" "$file" 2>/dev/null || grep -q "new \\\\DateTime()" "$file" 2>/dev/null; then
-        add_violation "PHP004" "new DateTime() found — inject Clock instead"
-    fi
-
-    # PHP005: No empty catch blocks
-    if grep -A1 "catch" "$file" 2>/dev/null | grep -qE "^\s*\}\s*$" 2>/dev/null; then
-        add_warning "PHP005" "Possible empty catch block"
-    fi
-
-    # WARN-PHP001: Max 3 parameters
-    if grep -qE "function\s+\w+\(([^,]+,){3,}" "$file" 2>/dev/null; then
-        add_warning "WARN-PHP001" "Method with 4+ parameters — consider refactoring to object"
-    fi
-}
-
-validate_typescript_regex() {
-    local file="$1"
-
-    # TS001: No 'any' type (check per line for craftsman-ignore)
-    while IFS= read -r line; do
-        if echo "$line" | grep -qE ": any[^a-zA-Z]|<any>|: any$" 2>/dev/null; then
-            if ! line_has_ignore "$line" "no-any"; then
-                add_violation "TS001" "'any' type found — use proper types or 'unknown'"
-            else
-                metrics_record_violation "TS001" "$FILE_PATTERN" "critical" 0 1 2>/dev/null || true
-            fi
-        fi
-    done < "$file"
-
-    # TS002: No default exports
-    if grep -q "export default" "$file" 2>/dev/null; then
-        add_violation "TS002" "Default export found — use named exports"
-    fi
-
-    # TS003: No non-null assertion (!) — exclude != and !==
-    if grep -qE "[a-zA-Z0-9_\)]+\![^=\.]" "$file" 2>/dev/null; then
-        add_violation "TS003" "Non-null assertion (!) found — handle null explicitly"
-    fi
-
-    # WARN-TS001: Max 3 parameters
-    if grep -qE "(function\s+\w+|=>)\s*\(([^,]+,){3,}" "$file" 2>/dev/null; then
-        add_warning "WARN-TS001" "Function with 4+ parameters — consider refactoring to object"
-    fi
-}
-
-# =============================================================================
-# Level 2: Static Analysis (if tools installed, <2s timeout)
-# Parses structured output: CODE:LINE:MESSAGE
-# =============================================================================
-validate_static_analysis() {
+_run_static_analysis() {
     local file="$1"
     local errors
-    errors=$(timeout 2 bash -c "source '${SCRIPT_DIR}/lib/static-analysis.sh'; sa_analyze_file '$file'" 2>/dev/null) || true
-
+    errors=$(sa_analyze_file "$file" 2>/dev/null) || true
     [[ -z "$errors" ]] && return
 
     while IFS= read -r err_line; do
@@ -324,9 +249,7 @@ validate_static_analysis() {
         sa_code=$(echo "$err_line" | cut -d: -f1)
         sa_lineno=$(echo "$err_line" | cut -d: -f2)
         sa_msg=$(echo "$err_line" | cut -d: -f3-)
-        # Strip leading whitespace from message
         sa_msg="${sa_msg#"${sa_msg%%[![:space:]]*}"}"
-
         if [[ -n "$sa_lineno" && "$sa_lineno" -gt 0 ]] 2>/dev/null; then
             add_warning "${sa_code}" "line ${sa_lineno}: ${sa_msg}"
         else
@@ -336,93 +259,22 @@ validate_static_analysis() {
 }
 
 # =============================================================================
-# Level 3: deptrac layer check (if installed, <2s)
-# Runs separately so it can produce DEPTRAC001 violations
-# =============================================================================
-validate_deptrac() {
-    local file="$1"
-    [[ "${file##*.}" != "php" ]] && return
-    local errors
-    errors=$(timeout 2 bash -c "source '${SCRIPT_DIR}/lib/static-analysis.sh'; sa_deptrac_structured '$file'" 2>/dev/null) || true
-
-    [[ -z "$errors" ]] && return
-
-    while IFS= read -r err_line; do
-        [[ -z "$err_line" ]] && continue
-        local sa_code sa_lineno sa_msg
-        sa_code=$(echo "$err_line" | cut -d: -f1)
-        sa_lineno=$(echo "$err_line" | cut -d: -f2)
-        sa_msg=$(echo "$err_line" | cut -d: -f3-)
-        sa_msg="${sa_msg#"${sa_msg%%[![:space:]]*}"}"
-        add_warning "${sa_code}" "deptrac: line ${sa_lineno}: ${sa_msg}"
-    done <<< "$errors"
-}
-
-# =============================================================================
-# Layer Validation (checks BOTH path AND namespace)
-# =============================================================================
-validate_layer_regex() {
-    local file="$1"
-
-    local is_domain=false
-    local is_application=false
-    local is_domain_ts=false
-
-    # PHP: Check path OR namespace
-    if [[ "$file" == *"/Domain/"* ]] || grep -qE "namespace\s+App\\\\Domain" "$file" 2>/dev/null; then
-        is_domain=true
-    fi
-    if [[ "$file" == *"/Application/"* ]] || grep -qE "namespace\s+App\\\\Application" "$file" 2>/dev/null; then
-        is_application=true
-    fi
-    # TypeScript: Check path
-    if [[ "$file" == *"/domain/"* ]]; then
-        is_domain_ts=true
-    fi
-
-    # Domain must not import Infrastructure
-    if [[ "$is_domain" == true ]] && [[ "$EXT" == "php" ]]; then
-        if grep -qE "use\s+App\\\\Infrastructure" "$file" 2>/dev/null; then
-            add_violation "LAYER001" "Domain imports Infrastructure — DDD layer violation"
-        fi
-        if grep -qE "use\s+App\\\\Presentation" "$file" 2>/dev/null; then
-            add_violation "LAYER002" "Domain imports Presentation — DDD layer violation"
-        fi
-    fi
-
-    # Application must not import Presentation
-    if [[ "$is_application" == true ]] && [[ "$EXT" == "php" ]]; then
-        if grep -qE "use\s+App\\\\Presentation" "$file" 2>/dev/null; then
-            add_violation "LAYER003" "Application imports Presentation — DDD layer violation"
-        fi
-    fi
-
-    # TypeScript: domain must not import infrastructure
-    if [[ "$is_domain_ts" == true ]] && [[ "$EXT" == "ts" || "$EXT" == "tsx" ]]; then
-        if grep -qE "from\s+['\"].*infrastructure" "$file" 2>/dev/null; then
-            add_violation "LAYER001" "domain imports infrastructure — layer violation"
-        fi
-    fi
-}
-
-# =============================================================================
-# Run Validation
+# Run Validation — delegates to pack validators
 # =============================================================================
 
 case "$EXT" in
     php)
         if config_php_enabled; then
-            validate_php_regex "$FILE_PATH"
-            validate_layer_regex "$FILE_PATH"
-            validate_static_analysis "$FILE_PATH"
-            validate_deptrac "$FILE_PATH"
+            pack_run_validators "$FILE_PATH" "php"
+            pack_run_validators "$FILE_PATH" "php_layers"
+            _run_static_analysis "$FILE_PATH"
         fi
         ;;
     ts|tsx)
         if config_ts_enabled; then
-            validate_typescript_regex "$FILE_PATH"
-            validate_layer_regex "$FILE_PATH"
-            validate_static_analysis "$FILE_PATH"
+            pack_run_validators "$FILE_PATH" "typescript"
+            pack_run_validators "$FILE_PATH" "typescript_layers"
+            _run_static_analysis "$FILE_PATH"
         fi
         ;;
 esac
