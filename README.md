@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
-[![Version](https://img.shields.io/badge/Version-2.3.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-2.4.0-blue)](CHANGELOG.md)
 [![Commands](https://img.shields.io/badge/Commands-25-orange)]()
 [![Agents](https://img.shields.io/badge/Agents-12-red)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -416,51 +416,19 @@ See [`/examples`](examples/) for detailed usage examples:
 - [Git: Safe Commit](examples/git/01-safe-commit.md)
 - [Test: Testing Strategy](examples/test/01-testing-strategy.md)
 
-## Project Structure
+## Architecture
 
 ```
-ai-craftsman-superpowers/
-├── .claude-plugin/              # Plugin manifest
-│   └── plugin.json
-├── commands/                    # User-invocable commands (25 *.md files)
-├── agents/                      # Reviewers (5) + Craftsmen (7) = 12 agents
-├── hooks/                       # Automated validation (7 scripts + 4 agent hooks)
-│   ├── hooks.json               # 8 hook events configuration
-│   ├── lib/                     # Shared hook libraries
-│   │   ├── config.sh            # Configuration resolution
-│   │   ├── channels.sh          # Channel lifecycle (Sentry)
-│   │   ├── metrics-db.sh        # SQLite metrics helper
-│   │   └── static-analysis.sh   # PHPStan/ESLint wrappers
-│   ├── session-start.sh         # SessionStart: initialization
-│   ├── pre-write-check.sh       # PreToolUse: layer validation before write
-│   ├── post-write-check.sh      # PostToolUse: code rule enforcement after write
-│   ├── bias-detector.sh         # UserPromptSubmit: cognitive bias detection
-│   ├── file-changed.sh          # FileChanged: track modifications
-│   ├── pre-push-verify.sh       # PreToolUse: git push safety check
-│   └── session-metrics.sh       # SessionEnd: session summary
-├── config/                      # Default configuration
-│   └── default-config.yml
-├── ci/                          # CI/CD integration (adapters + templates)
-│   ├── craftsman-ci.sh          # Standalone CI quality gate
-│   ├── adapters/                # Provider adapters (github, gitlab, bitbucket, generic)
-│   └── templates/               # CI template files
-├── knowledge/                   # Patterns & principles
-├── examples/                    # Usage examples
-├── tests/                       # Test suite
-│   ├── hooks/                   # Hook behavioral tests
-│   │   ├── fixtures/            # PHP/TS test fixtures
-│   │   └── test-hooks.sh        # Automated hook tests
-│   └── run-tests.sh             # Main test runner
-├── docs/
-│   ├── adr/                     # Architecture decisions
-│   ├── getting-started/         # Installation & first steps
-│   ├── guides/                  # Level-based guides
-│   ├── reference/               # Skills, agents, hooks reference
-│   └── philosophy/              # Why & manifesto
-├── SECURITY.md                  # Security documentation
-├── CHANGELOG.md                 # Version history
-├── CONTRIBUTING.md
-└── LICENSE                      # Apache 2.0
+hooks/              → Real-time validation (SessionStart → PostToolUse → Stop → SessionEnd)
+hooks/lib/          → Shared libraries (pack-loader, config, rules-engine, metrics, static-analysis)
+commands/           → Core user-invoked workflows (15 commands)
+agents/             → Core agents (5) + pack symlinks
+knowledge/          → Core methodology (DDD, Clean Architecture, patterns)
+packs/              → Loadable language packs
+  symfony/          → PHP/Symfony pack (validators, agents, knowledge, templates)
+  react/            → React/TypeScript pack (validators, agents, knowledge, templates)
+  ai-ml/            → AI/ML pack (agents, knowledge, commands)
+ci/                 → CI pipeline integration (adapter pattern)
 ```
 
 ## Philosophy

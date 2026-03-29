@@ -1,7 +1,7 @@
 {
   "name": "craftsman",
   "description": "Senior craftsman methodology for AI-assisted development. DDD, Clean Architecture, TDD, and systematic workflows that transform Claude into a disciplined software engineer.",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "author": {
     "name": "Alexandre Mallet",
     "email": "contact@woprrr.dev",
@@ -48,6 +48,12 @@
       "title": "Agent Hooks",
       "description": "Enable AI agent hooks (DDD verifier, Sentry context, architecture review). Each Write/Edit triggers ~4 Haiku API calls (~$0.15-0.30/session). Disable to reduce API costs.",
       "default": true
+    },
+    "packs": {
+      "type": "string",
+      "title": "Active Packs",
+      "description": "Comma-separated pack names to load (e.g., 'symfony,react,ai-ml'). Auto-detected from stack if not set.",
+      "default": ""
     },
     "sentry_org": {
       "type": "string",
