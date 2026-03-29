@@ -1042,65 +1042,25 @@ else
 fi
 
 # =============================================================================
-# TeammateIdle + TaskCompleted hooks.json Schema Tests
+# Hook Event Validation (only supported events)
 # =============================================================================
 echo ""
-echo "=== TeammateIdle + TaskCompleted Hook Schema Tests ==="
+echo "=== Hook Event Validation ==="
 
 HOOKS_FILE="$ROOT_DIR/hooks/hooks.json"
 
-# Test: TeammateIdle event exists in hooks.json
+# Test: hooks.json contains only supported events
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
-assert 'TeammateIdle' in d['hooks'], 'TeammateIdle missing'
+supported = {'SessionStart','PreToolUse','PostToolUse','UserPromptSubmit','FileChanged','InstructionsLoaded','Stop','SessionEnd'}
+actual = set(d['hooks'].keys())
+unsupported = actual - supported
+assert not unsupported, f'Unsupported events: {unsupported}'
 " 2>/dev/null; then
-    log_pass "hooks.json: TeammateIdle event exists"
+    log_pass "hooks.json: all events are supported"
 else
-    log_fail "hooks.json TeammateIdle" "event missing"
-fi
-
-# Test: TeammateIdle has agent hook with haiku model and 15s timeout
-if python3 -c "
-import json
-d = json.load(open('$HOOKS_FILE'))
-hooks = d['hooks']['TeammateIdle'][0]['hooks']
-agents = [h for h in hooks if h.get('type') == 'agent']
-assert len(agents) == 1, 'Expected 1 agent hook'
-a = agents[0]
-assert a['model'] == 'haiku', f'Expected haiku, got {a[\"model\"]}'
-assert a['timeout'] == 15, f'Expected 15, got {a[\"timeout\"]}'
-assert 'idle' in a['prompt'].lower() or 'Idle' in a['prompt'], 'prompt missing idle context'
-" 2>/dev/null; then
-    log_pass "TeammateIdle: agent hook has haiku model, 15s timeout, idle prompt"
-else
-    log_fail "TeammateIdle agent hook schema" "invalid model, timeout, or prompt"
-fi
-
-# Test: TaskCompleted event exists in hooks.json
-if python3 -c "
-import json
-d = json.load(open('$HOOKS_FILE'))
-assert 'TaskCompleted' in d['hooks'], 'TaskCompleted missing'
-" 2>/dev/null; then
-    log_pass "hooks.json: TaskCompleted event exists"
-else
-    log_fail "hooks.json TaskCompleted" "event missing"
-fi
-
-# Test: TaskCompleted has command hook that references session-state
-if python3 -c "
-import json
-d = json.load(open('$HOOKS_FILE'))
-hooks = d['hooks']['TaskCompleted'][0]['hooks']
-cmds = [h for h in hooks if h.get('type') == 'command']
-assert len(cmds) >= 1, 'Expected command hook'
-cmd = cmds[0]['command']
-assert 'session-state' in cmd, 'session-state not referenced in command'
-" 2>/dev/null; then
-    log_pass "TaskCompleted: command hook references session-state"
-else
-    log_fail "TaskCompleted command hook" "missing or no session-state reference"
+    log_fail "hooks.json events" "contains unsupported hook events"
 fi
 
 # Test: hooks.json is still valid JSON after all additions
