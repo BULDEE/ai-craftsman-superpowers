@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-03-29
+
+### Added
+- **Pack Validation Script**: `scripts/validate-pack.sh` validates pack structure, references, rule ID collisions, agent conventions
+- **External Pack Support**: Load packs from outside the plugin via `.craft-config.yml` `packs.external` paths
+- **Pack Scaffold Type**: `/craftsman:scaffold pack` generates complete pack directory structure
+- **Pack Creation Guide**: `docs/creating-packs.md` — comprehensive guide for community pack authors
+- **Go Pack Skeleton**: `examples/pack-skeleton-go/` with error checking and init() detection rules
+- **Rust Pack Skeleton**: `examples/pack-skeleton-rust/` with unwrap/panic detection rules
+- **Python Pack Skeleton**: `examples/pack-skeleton-python/` with bare except, mutable defaults, wildcard import rules
+
+### Changed
+- **pack-loader.sh**: Now scans external pack directories from `.craft-config.yml`
+- **config.sh**: Added `config_external_packs()` for parsing external pack paths
+
 ## [2.5.0] - 2026-03-29
 
 ### Added
