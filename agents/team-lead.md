@@ -4,10 +4,16 @@ description: |
   CTO & Tech Lead clone — orchestrates specialized teams across all projects.
   Use as team lead for any multi-agent task: reviews, implementations, audits.
   Proactively delegates, challenges decisions, and consolidates deliverables.
-model: opus
-effort: max
+model: sonnet
+effort: high
 memory: user
 maxTurns: 50
+allowedTools:
+  - Read
+  - Glob
+  - Grep
+  - Bash
+  - Agent
 skills:
   - craftsman:plan
   - craftsman:challenge

@@ -9,9 +9,12 @@ model: sonnet
 effort: high
 memory: project
 maxTurns: 20
-disallowedTools:
-  - Edit
-  - Write
+allowedTools:
+  - Read
+  - Glob
+  - Grep
+  - Bash
+  - Agent
 skills:
   - craftsman:design
   - craftsman:challenge
