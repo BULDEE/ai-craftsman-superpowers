@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-03-29
+
+### Added
+- **Core + Pack Architecture**: Loadable language packs (symfony, react, ai-ml) with `pack.yml` manifests
+- **Pack Loader** (`hooks/lib/pack-loader.sh`): Discovers, validates, and loads packs based on stack config
+- **Symlink Management**: Pack agents and commands auto-linked into root directories for Claude Code discovery
+- **API Craftsman Agent**: New specialized agent for API Platform, REST/HATEOAS, OpenAPI in symfony pack
+- **Unified Scaffold Command**: `/craftsman:scaffold <type>` loads types from active packs
+- **Pack Selection in Setup**: `/craftsman:setup` now includes pack auto-detection and selection
+
+### Changed
+- **Commands consolidated** (25 → 15 core + 3 pack): Merged setup+start, unified scaffold, moved AI-ML commands to pack
+- **Agents consolidated** (12 → 5 core + 6 pack): Removed duplicates, added allowedTools, team-lead Opus→Sonnet
+- **post-write-check.sh refactored**: 536 → ~390 lines orchestrator delegating to pack validators
+- **file-changed.sh deduplicated**: Removed ~60 lines of duplicated validators, now uses pack-loader
+- **static-analysis.sh**: Reduced to thin dispatcher, wrappers moved to packs
+- **Knowledge distributed**: PHP examples → symfony pack, TS examples → react pack, AI/ML → ai-ml pack
+- **Templates migrated**: `symfony-pack/` → `packs/symfony/templates/`, `react-pack/` → `packs/react/templates/`
+
+### Removed
+- `architecture-reviewer` agent (absorbed by `architect`)
+- `ai-reviewer` agent (absorbed by `ai-engineer`)
+- `/craftsman:source-verify` command (moved to CLAUDE.md instruction)
+- `/craftsman:agent-create` command (integrated into scaffold)
+- `/craftsman:start` command (absorbed into setup)
+- Standalone scaffold commands (entity, usecase, component, hook — unified into scaffold)
+- Old `symfony-pack/`, `react-pack/` root directories
+
+---
+
 ## [2.3.0] - 2026-03-29
 
 ### Added

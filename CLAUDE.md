@@ -4,7 +4,7 @@
 
 Claude Code plugin that transforms Claude into a disciplined Senior Software Craftsman. DDD, Clean Architecture, TDD methodology enforced through hooks, commands, agents, and a rules engine.
 
-**Current version:** 2.3.0
+**Current version:** 2.4.0
 **Stack:** Bash (hooks/CI), Markdown (commands/agents/templates), Python (metrics helpers), YAML (config)
 
 ## Development Rules
@@ -62,8 +62,8 @@ Same rules engine runs in hooks (real-time) AND CI (pipeline). 4 providers: GitH
 ### 8. Metrics & Trend Analysis
 SQLite-backed tracking of violations, corrections, and sessions. 7-day and 30-day trend views. Data-driven quality improvement: identify most-violated rules and adjust strictness.
 
-### 9. 12 Specialized Agents with Model Tiering
-Opus (team-lead) → Sonnet (craftsmen/reviewers) → Haiku (hooks). Cost-optimized: expensive models only where judgment is needed.
+### 9. 5 Core Agents + Pack Agents with Model Tiering
+Sonnet (team-lead/craftsmen/reviewers) → Haiku (hooks). Cost-optimized: expensive models only where judgment is needed.
 
 ### 10. Atomic Commit Enforcement
 Stop hook monitors file change count per session. Warns when >15 files modified, encouraging craftsman practice of small, focused commits.
@@ -72,12 +72,15 @@ Stop hook monitors file change count per session. Warns when >15 files modified,
 
 ```
 hooks/              → Real-time validation (SessionStart → PostToolUse → Stop → SessionEnd)
-commands/           → User-invoked workflows (25 commands)
-agents/             → Specialized bounded-context agents (12 agents)
+hooks/lib/          → Shared libraries (pack-loader, config, rules-engine, metrics, static-analysis)
+commands/           → Core user-invoked workflows (15 commands)
+agents/             → Core agents (5) + pack symlinks
+knowledge/          → Core methodology (DDD, Clean Architecture, patterns)
+packs/              → Loadable language packs
+  symfony/          → PHP/Symfony pack (validators, agents, knowledge, templates)
+  react/            → React/TypeScript pack (validators, agents, knowledge, templates)
+  ai-ml/            → AI/ML pack (agents, knowledge, commands)
 ci/                 → CI pipeline integration (adapter pattern)
-symfony-pack/       → PHP/Symfony templates (3 variants)
-react-pack/         → React/TypeScript templates (3 variants)
-knowledge/          → Canonical examples + patterns
 ```
 
 ## Version Sync Checklist
