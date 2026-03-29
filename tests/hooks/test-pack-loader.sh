@@ -267,6 +267,93 @@ else
 fi
 
 # =============================================================================
+# 8. Integration: Symlink creation for agents and commands
+# =============================================================================
+echo ""
+echo "=== Integration: Symlink Creation ==="
+
+_pack_reset
+export CLAUDE_PLUGIN_OPTION_stack="symfony"
+
+INTEG_ROOT="/tmp/craftsman-integ-symlink-$$"
+mkdir -p "$INTEG_ROOT/packs/test-pack/agents" "$INTEG_ROOT/packs/test-pack/commands"
+mkdir -p "$INTEG_ROOT/agents" "$INTEG_ROOT/commands"
+
+cat > "$INTEG_ROOT/packs/test-pack/pack.yml" <<'YAML'
+name: test-pack
+version: "1.0.0"
+description: "Test pack"
+compatibility:
+  core: ">=2.4.0"
+  stack: ["symfony", "fullstack"]
+hooks:
+  validators: []
+agents: ["agents/test-agent.md"]
+commands: []
+YAML
+echo -e "---\nname: test-agent\n---" > "$INTEG_ROOT/packs/test-pack/agents/test-agent.md"
+echo -e "---\ndescription: test\n---" > "$INTEG_ROOT/packs/test-pack/commands/test-cmd.md"
+
+CLAUDE_PLUGIN_ROOT="$INTEG_ROOT" pack_loader_init "$INTEG_ROOT/packs"
+CLAUDE_PLUGIN_ROOT="$INTEG_ROOT" pack_sync_symlinks
+
+if [[ -L "$INTEG_ROOT/agents/test-agent.md" ]]; then
+    log_pass "Integration: agent symlink created in agents/"
+else
+    log_fail "Integration: agent symlink creation" "agents/test-agent.md symlink missing"
+fi
+
+if [[ -L "$INTEG_ROOT/commands/test-cmd.md" ]]; then
+    log_pass "Integration: command symlink created in commands/"
+else
+    log_fail "Integration: command symlink creation" "commands/test-cmd.md symlink missing"
+fi
+
+# =============================================================================
+# 9. Integration: Stale symlink cleanup
+# =============================================================================
+echo ""
+echo "=== Integration: Stale Symlink Cleanup ==="
+
+ln -sf "/nonexistent/old-agent.md" "$INTEG_ROOT/agents/old-agent.md"
+
+_pack_reset
+CLAUDE_PLUGIN_ROOT="$INTEG_ROOT" pack_loader_init "$INTEG_ROOT/packs"
+CLAUDE_PLUGIN_ROOT="$INTEG_ROOT" pack_sync_symlinks
+
+if [[ ! -L "$INTEG_ROOT/agents/old-agent.md" && ! -e "$INTEG_ROOT/agents/old-agent.md" ]]; then
+    log_pass "Integration: stale symlink removed by pack_sync_symlinks"
+else
+    log_fail "Integration: stale symlink cleanup" "old-agent.md still present"
+fi
+
+if [[ -L "$INTEG_ROOT/agents/test-agent.md" ]]; then
+    log_pass "Integration: valid symlink preserved after stale cleanup"
+else
+    log_fail "Integration: valid symlink preserved" "test-agent.md missing after stale cleanup"
+fi
+
+# =============================================================================
+# 10. Integration: Real files not deleted by cleanup
+# =============================================================================
+echo ""
+echo "=== Integration: Real Files Not Deleted ==="
+
+echo "real file content" > "$INTEG_ROOT/agents/real-agent.md"
+
+_pack_reset
+CLAUDE_PLUGIN_ROOT="$INTEG_ROOT" pack_loader_init "$INTEG_ROOT/packs"
+CLAUDE_PLUGIN_ROOT="$INTEG_ROOT" pack_sync_symlinks
+
+if [[ -f "$INTEG_ROOT/agents/real-agent.md" && ! -L "$INTEG_ROOT/agents/real-agent.md" ]]; then
+    log_pass "Integration: real file preserved (not deleted by symlink cleanup)"
+else
+    log_fail "Integration: real file preservation" "real-agent.md was deleted or turned into symlink"
+fi
+
+rm -rf "$INTEG_ROOT"
+
+# =============================================================================
 # Cleanup
 # =============================================================================
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
