@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-03-29
+
+### Added
+
+- **Distribution ignore** — `.claude-plugin/ignore` reduces plugin size from 134 MB to <1 MB by excluding ai-pack/, tests/, scripts/, docs/superpowers/
+- **Dependency check** — `session-start.sh` verifies python3, jq, sqlite3 at boot with clear install instructions if missing
+- **Agent hooks opt-out** — `agent_hooks: false` in userConfig disables all 4 AI agent hooks (DDD verifier, Sentry, analyzer, reviewer). Saves ~$0.15-0.30/session in Haiku API costs.
+- **API Cost Model** — README section documenting agent hook costs and opt-out mechanism
+- **Auto-setup gate** — Improved first-run detection: checks both global (`~/.claude/.craft-config.yml`) and project config, with clear guidance to run `/craftsman:setup`
+
+---
+
 ## [2.2.1] - 2026-03-29
 
 ### Added
