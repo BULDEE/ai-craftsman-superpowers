@@ -12,6 +12,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
 
+# Check required dependencies
+_check_dependencies() {
+    local missing=""
+    command -v python3 >/dev/null 2>&1 || missing="${missing} python3"
+    command -v jq >/dev/null 2>&1 || missing="${missing} jq"
+    command -v sqlite3 >/dev/null 2>&1 || missing="${missing} sqlite3"
+
+    if [[ -n "$missing" ]]; then
+        echo "Dependencies: MISSING${missing}. Install: brew install${missing} (macOS) or apt-get install${missing} (Linux)"
+    fi
+}
+
 # Consume stdin (may be empty or JSON)
 cat > /dev/null 2>&1 || true
 
@@ -39,7 +51,11 @@ config_php_enabled && PHP_STATUS="ON"
 config_ts_enabled && TS_STATUS="ON"
 
 # Build message
+DEP_STATUS=$(_check_dependencies)
 MSG="Craftsman active | Stack: ${STACK} | Strictness: ${STRICTNESS} | PHP rules: ${PHP_STATUS} | TS rules: ${TS_STATUS} | Metrics: initialized"
+if [[ -n "$DEP_STATUS" ]]; then
+    MSG="${MSG} | ${DEP_STATUS}"
+fi
 
 # Config mismatch warning
 WARNINGS=""
@@ -68,9 +84,11 @@ if [[ "$DETECTED" != "other" && "$DETECTED" != "$STACK" ]]; then
     WARNINGS="${WARNINGS} | Warning: detected '${DETECTED}' but config says '${STACK}'. Run /craftsman:setup to update."
 fi
 
-# First session detection
-if [[ ! -f "${PWD}/.craft-config.yml" ]]; then
-    WARNINGS="${WARNINGS} | No .craft-config.yml found. Run /craftsman:setup to configure this project."
+# Auto-setup gate — check both global and project config
+if [[ ! -f "${HOME}/.claude/.craft-config.yml" ]] && [[ ! -f "${PWD}/.craft-config.yml" ]]; then
+    WARNINGS="${WARNINGS} | First time? Run /craftsman:setup to configure your profile and project. The plugin works with defaults, but setup unlocks full customization."
+elif [[ ! -f "${PWD}/.craft-config.yml" ]]; then
+    WARNINGS="${WARNINGS} | No project .craft-config.yml found. Run /craftsman:setup to configure this project."
 fi
 
 jq -n --arg msg "${MSG}${WARNINGS}" '{
