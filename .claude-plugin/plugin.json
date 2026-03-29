@@ -1,7 +1,7 @@
 {
   "name": "craftsman",
   "description": "Senior craftsman methodology for AI-assisted development. DDD, Clean Architecture, TDD, and systematic workflows that transform Claude into a disciplined software engineer.",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "author": {
     "name": "Alexandre Mallet",
     "email": "contact@woprrr.dev",

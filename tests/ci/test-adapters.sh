@@ -251,7 +251,7 @@ echo "=== Comment Formatting Tests ==="
 # Create mock report: clean (no violations)
 cat > "$TEMP_DIR/clean-report.json" <<'JSON'
 {
-  "version": "2.1.0",
+  "version": "2.2.0",
   "timestamp": "2025-01-01T00:00:00Z",
   "config": {
     "strictness": "strict",
@@ -269,7 +269,7 @@ JSON
 # Create mock report: violations
 cat > "$TEMP_DIR/violations-report.json" <<'JSON'
 {
-  "version": "2.1.0",
+  "version": "2.2.0",
   "timestamp": "2025-01-01T00:00:00Z",
   "config": {
     "strictness": "strict",
@@ -290,7 +290,7 @@ JSON
 # Create mock report: warnings only
 cat > "$TEMP_DIR/warnings-report.json" <<'JSON'
 {
-  "version": "2.1.0",
+  "version": "2.2.0",
   "timestamp": "2025-01-01T00:00:00Z",
   "config": {
     "strictness": "strict",

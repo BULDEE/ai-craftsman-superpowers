@@ -1,7 +1,6 @@
 ---
-name: ci
 description: Export craftsman quality rules to CI/CD pipeline and check integration status
-trigger: /craftsman:ci
+effort: medium
 ---
 
 # /craftsman:ci — CI/CD Integration

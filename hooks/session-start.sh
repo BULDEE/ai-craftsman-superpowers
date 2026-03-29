@@ -43,6 +43,27 @@ MSG="Craftsman active | Stack: ${STACK} | Strictness: ${STRICTNESS} | PHP rules:
 
 # Config mismatch warning
 WARNINGS=""
+
+# Validate hooks.json schema — catch unsupported events early
+HOOKS_FILE="${SCRIPT_DIR}/hooks.json"
+if [[ -f "$HOOKS_FILE" ]]; then
+    _unsupported=$(python3 -c "
+import json, sys
+supported = {'SessionStart','PreToolUse','PostToolUse','UserPromptSubmit','FileChanged','InstructionsLoaded','Stop','SessionEnd'}
+try:
+    data = json.load(open(sys.argv[1]))
+    actual = set(data.get('hooks', {}).keys())
+    bad = actual - supported
+    if bad:
+        print(','.join(sorted(bad)))
+except Exception:
+    pass
+" "$HOOKS_FILE" 2>/dev/null)
+    if [[ -n "$_unsupported" ]]; then
+        WARNINGS="${WARNINGS} | SCHEMA WARNING: hooks.json contains unsupported events: ${_unsupported}. Remove them to avoid CI failures."
+    fi
+fi
+
 if [[ "$DETECTED" != "other" && "$DETECTED" != "$STACK" ]]; then
     WARNINGS="${WARNINGS} | Warning: detected '${DETECTED}' but config says '${STACK}'. Run /craftsman:setup to update."
 fi

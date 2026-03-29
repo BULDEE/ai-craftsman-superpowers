@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-03-29
+
+### Security
+
+- **SQL injection fix** — `metrics-db.sh` write functions now use parameterized queries via `metrics-query.py` Python helper. Eliminates injection risk from filenames/rule names containing SQL metacharacters.
+- **Bitbucket adapter fix** — Replaced fragile double-nested `python3 -c` JSON encoding with single safe call using `sys.stdin.read()`.
+
+### Added
+
+- **Hooks schema validation** — `session-start.sh` validates `hooks.json` events against supported set at startup. Catches unsupported events before CI fails.
+- **Atomic commit enforcement** — Stop hook caps file inspection at 20 files and warns when >15 files modified in a session, encouraging small focused commits.
+- **Monorepo sampling** — InstructionsLoaded agent switches to directory-level analysis when Glob returns >100 files. Prevents token explosion on large codebases.
+- **Key Differentiators section** — README "Why Craftsman?" marketing table with 8 unique selling points.
+- **Project CLAUDE.md** — Development rules, testing commands, version sync checklist, and 10 marketing differentiators.
+
+### Fixed
+
+- `commands/ci.md` — Added missing `effort: medium` frontmatter field.
+- README badges — Updated from v1.5.0/22 commands to v2.2.0/25 commands.
+- README — Removed outdated "CI/CD not supported" line (CI has been supported since v2.1.0).
+
+---
+
 ## [2.1.0] - 2026-03-29
 
 ### Added
