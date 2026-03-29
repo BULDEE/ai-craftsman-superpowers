@@ -105,3 +105,7 @@ config_sentry_project() {
 config_sentry_enabled() {
     [[ -n "$(config_sentry_org)" ]] && [[ -n "$(config_sentry_project)" ]]
 }
+
+config_packs_dir() {
+    echo "${CLAUDE_PLUGIN_ROOT:-$(pwd)}/packs"
+}
