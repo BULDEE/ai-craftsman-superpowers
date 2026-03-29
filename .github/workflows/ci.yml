@@ -441,12 +441,19 @@ jobs:
             FAILED=1
           fi
 
-          # Check canonical directory
-          if [ -d "$KNOWLEDGE_DIR/canonical" ]; then
-            count=$(find "$KNOWLEDGE_DIR/canonical" -name "*.md" | wc -l)
-            echo "✓ canonical/ exists ($count files)"
+          # Check canonical examples in packs (moved from core in v2.4.0)
+          PACKS_WITH_CANONICAL=0
+          for pack_dir in packs/*/; do
+            if [ -d "${pack_dir}knowledge/canonical" ]; then
+              count=$(find "${pack_dir}knowledge/canonical" -type f | wc -l)
+              echo "✓ ${pack_dir}knowledge/canonical/ exists ($count files)"
+              PACKS_WITH_CANONICAL=$((PACKS_WITH_CANONICAL + 1))
+            fi
+          done
+          if [ $PACKS_WITH_CANONICAL -gt 0 ]; then
+            echo "✓ Found canonical examples in $PACKS_WITH_CANONICAL pack(s)"
           else
-            echo "✗ canonical/ directory missing"
+            echo "✗ No canonical examples found in any pack"
             FAILED=1
           fi
 
