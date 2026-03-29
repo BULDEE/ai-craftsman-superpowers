@@ -109,3 +109,31 @@ config_sentry_enabled() {
 config_packs_dir() {
     echo "${CLAUDE_PLUGIN_ROOT:-$(pwd)}/packs"
 }
+
+# Parse external pack paths from .craft-config.yml
+# Returns one path per line (resolves ~ to $HOME)
+config_external_packs() {
+    local config_file="$PWD/.craft-config.yml"
+    [[ ! -f "$config_file" ]] && return
+
+    local in_external=false
+    while IFS= read -r line; do
+        if echo "$line" | grep -qE '^[[:space:]]+external:'; then
+            in_external=true
+            continue
+        fi
+        if [[ "$in_external" == true ]]; then
+            # Exit nested block on non-indented or less-indented key
+            if echo "$line" | grep -qE '^[a-zA-Z]' || echo "$line" | grep -qE '^[[:space:]]{0,3}[a-zA-Z]'; then
+                in_external=false
+                continue
+            fi
+            local path_val
+            path_val=$(echo "$line" | grep -oE 'path:[[:space:]]*.*' | sed -E 's/^path:[[:space:]]*//' | tr -d '"' | tr -d "'")
+            if [[ -n "$path_val" ]]; then
+                path_val="${path_val/#\~/$HOME}"
+                echo "$path_val"
+            fi
+        fi
+    done < "$config_file"
+}

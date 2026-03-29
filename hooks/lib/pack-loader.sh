@@ -150,14 +150,29 @@ _load_pack() {
 pack_loader_init() {
     local packs_dir="${1:-${CLAUDE_PLUGIN_ROOT:-}/packs}"
     _PACKS_DIR="$packs_dir"
-    [[ ! -d "$packs_dir" ]] && return 0
 
-    for pack_dir in "$packs_dir"/*/; do
-        [[ ! -f "$pack_dir/pack.yml" ]] && continue
-        if _pack_stack_compatible "$pack_dir"; then
-            _load_pack "$pack_dir"
-        fi
-    done
+    # 1. Load internal packs
+    if [[ -d "$packs_dir" ]]; then
+        for pack_dir in "$packs_dir"/*/; do
+            [[ ! -f "$pack_dir/pack.yml" ]] && continue
+            if _pack_stack_compatible "$pack_dir"; then
+                _load_pack "$pack_dir"
+            fi
+        done
+    fi
+
+    # 2. Load external packs from .craft-config.yml
+    if type config_external_packs &>/dev/null; then
+        local ext_path
+        while IFS= read -r ext_path; do
+            [[ -z "$ext_path" ]] && continue
+            [[ ! -d "$ext_path" ]] && continue
+            [[ ! -f "$ext_path/pack.yml" ]] && continue
+            if _pack_stack_compatible "$ext_path"; then
+                _load_pack "$ext_path"
+            fi
+        done <<< "$(config_external_packs)"
+    fi
 }
 
 # Invoke pack_validate_<lang>() if it was sourced from a loaded pack.
