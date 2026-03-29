@@ -1,0 +1,20 @@
+# Heavy dependencies (127 MB)
+ai-pack/
+
+# Development-only
+tests/
+scripts/
+examples/
+docs/superpowers/
+
+# CI/Build artifacts
+.git/
+.github/
+*.log
+coverage/
+.nyc_output/
+
+# Internal docs
+BRUTAL-EVALUATION-PROMPT.md
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
