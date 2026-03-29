@@ -1,5 +1,6 @@
-# Heavy dependencies (127 MB)
-ai-pack/
+# Heavy dependencies (node_modules in packs)
+packs/*/mcp/*/node_modules/
+packs/*/mcp/*/dist/
 
 # Development-only
 tests/
