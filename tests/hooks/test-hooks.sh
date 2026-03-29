@@ -1124,53 +1124,53 @@ fi
 echo ""
 echo "=== Static Analysis Structured Output Tests ==="
 
-# Source the lib to test directly
+# Source the pack-specific static analysis libs (moved from hooks/lib/static-analysis.sh in v2.4.0)
+source "$ROOT_DIR/packs/symfony/static-analysis/phpstan.sh" 2>/dev/null || true
+source "$ROOT_DIR/packs/react/static-analysis/eslint.sh" 2>/dev/null || true
 source "$ROOT_DIR/hooks/lib/static-analysis.sh"
 
-# Test: _sa_map_phpstan_error maps undefined variable
-result=$(_sa_map_phpstan_error "src/Domain/Foo.php:42:Undefined variable \$bar" 2>/dev/null)
+# Test: _pack_sa_phpstan_map_error maps undefined variable (moved to packs in v2.4.0)
+result=$(_pack_sa_phpstan_map_error "src/Domain/Foo.php:42:Undefined variable \$bar" 2>/dev/null)
 if [[ "$result" == "PHPSTAN002" ]]; then
     log_pass "sa: undefined variable maps to PHPSTAN002"
 else
     log_fail "sa: undefined variable mapping" "got $result, expected PHPSTAN002"
 fi
 
-# Test: _sa_map_phpstan_error maps call to undefined to PHPSTAN003
-result=$(_sa_map_phpstan_error "src/Foo.php:10:Call to undefined method Foo::bar()" 2>/dev/null)
+# Test: _pack_sa_phpstan_map_error maps call to undefined to PHPSTAN003
+result=$(_pack_sa_phpstan_map_error "src/Foo.php:10:Call to undefined method Foo::bar()" 2>/dev/null)
 if [[ "$result" == "PHPSTAN003" ]]; then
     log_pass "sa: call to undefined maps to PHPSTAN003"
 else
     log_fail "sa: call to undefined mapping" "got $result, expected PHPSTAN003"
 fi
 
-# Test: _sa_map_phpstan_error defaults to PHPSTAN001 for generic errors
-result=$(_sa_map_phpstan_error "src/Foo.php:5:Something wrong" 2>/dev/null)
+# Test: _pack_sa_phpstan_map_error defaults to PHPSTAN001 for generic errors
+result=$(_pack_sa_phpstan_map_error "src/Foo.php:5:Something wrong" 2>/dev/null)
 if [[ "$result" == "PHPSTAN001" ]]; then
     log_pass "sa: generic phpstan error maps to PHPSTAN001"
 else
     log_fail "sa: generic phpstan error default" "got $result, expected PHPSTAN001"
 fi
 
-# Test: _sa_map_eslint_error maps no-explicit-any to ESLINT001
-result=$(_sa_map_eslint_error "src/foo.ts: line 5, col 10, Error - Unexpected any (no-explicit-any)" 2>/dev/null || true)
-# Since rule id extraction depends on format, just verify it returns a valid code
+# Test: _pack_sa_eslint_map_error maps no-explicit-any to ESLINT001
+result=$(_pack_sa_eslint_map_error "src/foo.ts: line 5, col 10, Error - Unexpected any (no-explicit-any)" 2>/dev/null || true)
 if echo "$result" | grep -qE "^ESLINT[0-9]{3}$"; then
     log_pass "sa: eslint error maps to ESLINT code"
 else
     log_fail "sa: eslint error mapping" "got $result"
 fi
 
-# Test: sa_phpstan not installed = graceful degradation (empty output, exit 0)
-# Force a path with no phpstan
-result=$(sa_phpstan "/tmp/nonexistent.php" 2>/dev/null)
+# Test: pack_sa_php not installed = graceful degradation (empty output, exit 0)
+result=$(pack_sa_php "/tmp/nonexistent.php" 2>/dev/null)
 if [[ -z "$result" ]]; then
     log_pass "sa_phpstan: graceful degradation when not installed"
 else
     log_fail "sa_phpstan: should return empty when not installed" "got: $result"
 fi
 
-# Test: sa_eslint not installed = graceful degradation
-result=$(sa_eslint "/tmp/nonexistent.ts" 2>/dev/null)
+# Test: pack_sa_typescript not installed = graceful degradation
+result=$(pack_sa_typescript "/tmp/nonexistent.ts" 2>/dev/null)
 if [[ -z "$result" ]]; then
     log_pass "sa_eslint: graceful degradation when not installed"
 else
