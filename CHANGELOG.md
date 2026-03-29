@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-03-29
+
+### Added
+- **Knowledge-RAG MCP Server**: Migrated from excluded ai-pack to proper packs/ai-ml/mcp/ with setup script
+- **API Resource Scaffold Type**: `/craftsman:scaffold api-resource` with API Platform State Provider/Processor patterns
+- **Pack-Specific Test Suites**: Separate test files for symfony, react, and ai-ml packs
+- **CI Pack-Loader Integration**: craftsman-ci.sh now loads pack-specific rules
+
+### Changed
+- **Test structure reorganized**: tests/hooks/ → tests/core/ + tests/packs/ for better modularity
+- **Distribution ignore updated**: Targets packs/*/mcp/*/node_modules/ instead of blanket ai-pack/
+- **plugin.json**: Registers knowledge-rag MCP server for AI-ML pack users
+
+### Removed
+- Old `ai-pack/` directory (replaced by packs/ai-ml/mcp/)
+
 ## [2.4.0] - 2026-03-29
 
 ### Added
