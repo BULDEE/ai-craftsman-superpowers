@@ -50,6 +50,34 @@ guidance that works with any technology stack.
 
 ### If React Pack IS enabled:
 
+Continue with the template selection below.
+
+---
+
+## Template Selection
+
+Before scaffolding, present the available templates to the user:
+
+```
+Which pattern fits your hook?
+
+1. **bounded-context** — Standard TanStack Query Hook (useSuspenseQuery, mutations, cache)
+   Best for: data fetching, CRUD operations, API integration
+
+2. **form-heavy** — Form Wizard Hook (multi-step state, Zod validation, autosave, useActionState)
+   Best for: complex form state management, wizard navigation, draft persistence
+
+3. **dashboard-data** — Dashboard Data Hook (server pagination, sorting, filters, export)
+   Best for: data table state, filter composition, CSV/JSON export
+```
+
+**If the user selects `form-heavy`:**
+Load and follow template: `react-pack/templates/form-heavy.template.md`
+
+**If the user selects `dashboard-data`:**
+Load and follow template: `react-pack/templates/dashboard-data.template.md`
+
+**If the user selects `bounded-context` (default):**
 Continue with the scaffolding process below.
 
 ---

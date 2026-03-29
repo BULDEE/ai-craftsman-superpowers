@@ -50,6 +50,34 @@ guidance that works with any technology stack.
 
 ### If React Pack IS enabled:
 
+Continue with the template selection below.
+
+---
+
+## Template Selection
+
+Before scaffolding, present the available templates to the user:
+
+```
+Which pattern fits your component?
+
+1. **bounded-context** — Standard React Component (Props, Hooks, Tests, Storybook)
+   Best for: general UI components, feature components, page layouts
+
+2. **form-heavy** — Multi-Step Form Wizard (Zod, useActionState, useOptimistic, autosave)
+   Best for: complex forms, wizards, multi-step flows with validation
+
+3. **dashboard-data** — Data Table + Charts (TanStack Table, Recharts, filters, export)
+   Best for: admin dashboards, data grids, analytics views
+```
+
+**If the user selects `form-heavy`:**
+Load and follow template: `react-pack/templates/form-heavy.template.md`
+
+**If the user selects `dashboard-data`:**
+Load and follow template: `react-pack/templates/dashboard-data.template.md`
+
+**If the user selects `bounded-context` (default):**
 Continue with the scaffolding process below.
 
 ---
