@@ -1,5 +1,5 @@
 ---
-description: Unified scaffolder for all pack types (entity, usecase, component, hook, api-resource). Types loaded from active packs.
+description: Unified scaffolder for all pack types (entity, usecase, component, hook, api-resource, pack). Types loaded from active packs.
 effort: medium
 ---
 
@@ -27,6 +27,7 @@ Examples:
 /craftsman:scaffold usecase CreateOrder
 /craftsman:scaffold component UserProfile
 /craftsman:scaffold hook useOrders
+/craftsman:scaffold pack my-go-pack
 ```
 
 ## Iron Law
@@ -40,6 +41,7 @@ Before generating ANY code, you MUST load and read the canonical example for the
 | component | `packs/react/knowledge/canonical/ts-react-component.tsx` |
 | hook | `packs/react/knowledge/canonical/ts-tanstack-hook.ts` |
 | api-resource | `packs/symfony/knowledge/canonical/php-state-provider.php` |
+| pack | *(generates new pack from convention — no canonical needed)* |
 
 ## Process
 
@@ -62,6 +64,15 @@ Based on the type argument:
 - Load the canonical example file from `packs/react/knowledge/canonical/`
 - Follow the exact patterns: named exports, branded types, TanStack Query integration
 - Generate: Component/Hook + tests + Storybook if component
+
+**Meta type (pack):**
+- Generate the full pack directory structure under `packs/<name>/`
+- Create `pack.yml` with the name, version 1.0.0, description placeholder, and stack `["*"]`
+- Create a starter validator in `hooks/<name>-validator.sh` with a `pack_validate_<name>()` function
+- Create empty directories: `agents/`, `knowledge/canonical/`, `commands/scaffold-types/`, `static-analysis/`, `templates/`
+- Create a test file at `tests/packs/test-<name>.sh` with basic structure checks
+- Run `scripts/validate-pack.sh packs/<name>/` to verify the generated pack
+- Print next steps: "Pack created at `packs/<name>/`. Edit pack.yml to configure stack compatibility and add your rules."
 
 ### Phase 3: Verify
 
