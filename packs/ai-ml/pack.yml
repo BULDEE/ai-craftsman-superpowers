@@ -18,3 +18,11 @@ commands:
 agents: ["agents/ai-engineer.md"]
 
 knowledge: ["knowledge/"]
+
+mcpServers:
+  knowledge-rag:
+    type: stdio
+    command: node
+    args: ["mcp/knowledge-rag/dist/src/index.js"]
+    env:
+      OLLAMA_BASE_URL: "http://localhost:11434"
