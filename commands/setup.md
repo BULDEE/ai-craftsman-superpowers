@@ -1,11 +1,28 @@
 ---
-description: Interactive setup wizard for AI Craftsman Superpowers. Configure your profile, select packs, and generate ~/.claude/.craft-config.yml.
+description: Interactive setup wizard and onboarding for AI Craftsman Superpowers. Configure your profile, select packs, and generate ~/.claude/.craft-config.yml.
 effort: medium
 ---
 
 # /craftsman:setup - Configuration Wizard
 
-You are the **AI Craftsman setup assistant**. Your role is to guide the user through initial configuration.
+You are the **AI Craftsman setup assistant**. Your role is to guide the user through initial configuration and onboarding.
+
+## Welcome (First-time users)
+
+If no `.craft-config.yml` exists in `$PWD` or `~/.claude/`:
+
+```
+Welcome to AI Craftsman Superpowers!
+
+You now have a Senior Craftsman methodology baked into your Claude Code.
+
+Here's what's included:
+- 15 core skills (DDD, TDD, debugging, planning, scaffolding...)
+- 5 core agents + pack-specific specialists
+- Real-time code quality hooks with pack-based validators
+- Quality metrics dashboard
+- Team collaboration system
+```
 
 ## Pre-check
 
@@ -177,14 +194,21 @@ Default recommendation: All enabled.
 
 ### Step 4: Pack Selection
 
-Use `AskUserQuestion` with `multiSelect: true`.
+Detect available packs and their descriptions:
 
-Pre-select packs based on auto-detection results from the Pre-check (user can deselect):
+!`ls -d packs/*/pack.yml 2>/dev/null | while read f; do dir=$(dirname "$f"); name=$(basename "$dir"); desc=$(grep "^description:" "$f" | sed 's/description: *"//;s/"$//'); echo "- **$name**: $desc"; done || echo "No packs found."`
+
+Pre-select packs based on auto-detection from Pre-check (user can adjust):
+- PHP detected → **Symfony Pack** auto-selected
+- Node detected → **React Pack** auto-selected
+- **AI-ML Pack** → Always available (supports all stacks)
+
+Use `AskUserQuestion` with `multiSelect: true` to confirm pack selection.
 
 **Question 4 - Technology packs:**
-- **Symfony Pack** - PHP/Symfony/DDD patterns (/craftsman:entity, /craftsman:usecase) — _auto-selected if PHP detected_
-- **React Pack** - React/TypeScript patterns (/craftsman:component, /craftsman:hook) — _auto-selected if Node detected_
-- **AI Pack** - AI/ML patterns (/craftsman:rag, /craftsman:mlops, /craftsman:agent-design)
+- **Symfony Pack** - PHP/Symfony/DDD patterns — _auto-selected if PHP detected_
+- **React Pack** - React/TypeScript patterns — _auto-selected if Node detected_
+- **AI-ML Pack** - AI/ML patterns (RAG, MLOps, agent design)
 
 Note: Core pack is always enabled.
 
@@ -271,43 +295,42 @@ Enabled Packs:
   Core: Always enabled
   Symfony: {Enabled/Disabled}
   React: {Enabled/Disabled}
-  AI: {Enabled/Disabled}
+  AI-ML: {Enabled/Disabled}
 
 Available Commands:
 
-Core (always available):
-  /craftsman:design    - DDD design with challenge phases
-  /craftsman:debug     - Systematic debugging
-  /craftsman:plan      - Structured planning
+Core (15 commands, always available):
   /craftsman:challenge - Architecture review
-  /craftsman:verify    - Evidence-based verification
-  /craftsman:spec      - Specification-first (TDD)
-  /craftsman:refactor  - Systematic refactoring
-  /craftsman:test      - Pragmatic testing
+  /craftsman:ci        - CI/CD integration
+  /craftsman:debug     - Systematic debugging
+  /craftsman:design    - DDD design with challenge phases
   /craftsman:git       - Safe git workflow
-  /craftsman:parallel  - Parallel execution
   /craftsman:metrics   - Quality metrics dashboard
+  /craftsman:parallel  - Parallel execution
+  /craftsman:plan      - Structured planning
+  /craftsman:refactor  - Systematic refactoring
+  /craftsman:scaffold  - Unified scaffolding
+  /craftsman:setup     - Configuration wizard (re-run anytime)
+  /craftsman:spec      - Specification-first (TDD)
   /craftsman:team      - Assemble agent teams
-  /craftsman:start     - Re-run onboarding anytime
+  /craftsman:test      - Pragmatic testing
+  /craftsman:verify    - Evidence-based verification
 
 {if symfony enabled}
 Symfony Pack:
-  /craftsman:entity   - Scaffold DDD entity
-  /craftsman:usecase  - Scaffold use case
+  /craftsman:scaffold [entity|usecase]  - Scaffold DDD patterns
 {/if}
 
 {if react enabled}
 React Pack:
-  /craftsman:component - Scaffold React component
-  /craftsman:hook      - Scaffold TanStack Query hook
+  /craftsman:scaffold [component|hook]  - Scaffold React patterns
 {/if}
 
-{if ai enabled}
-AI Pack:
+{if ai-ml enabled}
+AI-ML Pack:
   /craftsman:rag          - Design RAG pipeline
   /craftsman:mlops        - MLOps audit
   /craftsman:agent-design - Agent 3P pattern
-  /craftsman:source-verify - Verify AI capabilities
 {/if}
 
 Happy crafting!
