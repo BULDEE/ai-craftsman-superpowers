@@ -1,0 +1,25 @@
+name: rust
+version: "1.0.0"
+description: "Rust craftsman pack — ownership patterns, error handling, clippy integration"
+compatibility:
+  core: ">=2.6.0"
+  stack: ["rust"]
+
+rules:
+  builtin: ["RUST001", "RUST002", "RUST003", "WARN-RUST001"]
+  static_analysis: []
+
+hooks:
+  validators: ["hooks/rust-validator.sh"]
+
+static_analysis:
+  tools: []
+
+commands:
+  scaffold_types: []
+
+agents: []
+
+knowledge: ["knowledge/"]
+
+templates: []
