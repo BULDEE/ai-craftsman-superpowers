@@ -12,6 +12,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
+source "${SCRIPT_DIR}/lib/pack-loader.sh"
 
 # Read file path from stdin JSON
 INPUT=$(cat)
@@ -27,7 +28,7 @@ case "$EXT" in
     *) exit 0 ;;
 esac
 
-# Init metrics (idempotent)
+# Init metrics and pack loader
 metrics_init 2>/dev/null || true
 
 FILE_PATTERN=$(metrics_file_pattern "$FILE_PATH")
@@ -42,65 +43,30 @@ add_issue() {
     metrics_record_violation "$rule" "$FILE_PATTERN" "info" 0 0 2>/dev/null || true
 }
 
-# Level 1: Regex checks (<50ms, same rules as post-write-check)
-if [[ "$EXT" == "php" ]] && config_php_enabled; then
-    if ! grep -q "declare(strict_types=1)" "$FILE_PATH" 2>/dev/null; then
-        if grep -qE "(class |interface |trait |enum )" "$FILE_PATH" 2>/dev/null; then
-            add_issue "PHP001" "Missing declare(strict_types=1)"
+# Provide add_violation/add_warning as aliases for pack validators
+# In file-changed context, all violations are non-blocking issues
+add_violation() { add_issue "$1" "$2"; }
+add_warning() { add_issue "$1" "$2"; }
+line_has_ignore() { return 1; }
+
+# Initialize pack loader (sources validators from compatible packs)
+pack_loader_init
+
+# Level 1: Pack validators
+case "$EXT" in
+    php)
+        if config_php_enabled; then
+            pack_run_validators "$FILE_PATH" "php"
+            pack_run_validators "$FILE_PATH" "php_layers"
         fi
-    fi
-
-    if grep -q "^class " "$FILE_PATH" 2>/dev/null; then
-        if ! grep -q "final class" "$FILE_PATH" 2>/dev/null; then
-            if ! grep -qE "(interface |trait |abstract class )" "$FILE_PATH" 2>/dev/null; then
-                add_issue "PHP002" "Class should be final"
-            fi
+        ;;
+    ts|tsx)
+        if config_ts_enabled; then
+            pack_run_validators "$FILE_PATH" "typescript"
+            pack_run_validators "$FILE_PATH" "typescript_layers"
         fi
-    fi
-
-    if grep -qE "public function set[A-Z]" "$FILE_PATH" 2>/dev/null; then
-        add_issue "PHP003" "Public setter found"
-    fi
-
-    if grep -qE "new \\\\?DateTime\(\)" "$FILE_PATH" 2>/dev/null; then
-        add_issue "PHP004" "new DateTime() found"
-    fi
-
-    # Layer checks for PHP
-    if [[ "$FILE_PATH" == *"/Domain/"* ]] || grep -qE "namespace\s+App\\\\Domain" "$FILE_PATH" 2>/dev/null; then
-        if grep -qE "use\s+App\\\\Infrastructure" "$FILE_PATH" 2>/dev/null; then
-            add_issue "LAYER001" "Domain imports Infrastructure"
-        fi
-        if grep -qE "use\s+App\\\\Presentation" "$FILE_PATH" 2>/dev/null; then
-            add_issue "LAYER002" "Domain imports Presentation"
-        fi
-    fi
-    if [[ "$FILE_PATH" == *"/Application/"* ]] || grep -qE "namespace\s+App\\\\Application" "$FILE_PATH" 2>/dev/null; then
-        if grep -qE "use\s+App\\\\Presentation" "$FILE_PATH" 2>/dev/null; then
-            add_issue "LAYER003" "Application imports Presentation"
-        fi
-    fi
-fi
-
-if [[ "$EXT" == "ts" || "$EXT" == "tsx" ]] && config_ts_enabled; then
-    if grep -qE ": any[^a-zA-Z]|<any>|: any$" "$FILE_PATH" 2>/dev/null; then
-        add_issue "TS001" "'any' type found"
-    fi
-
-    if grep -q "export default" "$FILE_PATH" 2>/dev/null; then
-        add_issue "TS002" "Default export found"
-    fi
-
-    if grep -qE "[a-zA-Z0-9_\)]+\![^=\.]" "$FILE_PATH" 2>/dev/null; then
-        add_issue "TS003" "Non-null assertion (!) found"
-    fi
-
-    if [[ "$FILE_PATH" == *"/domain/"* ]]; then
-        if grep -qE "from\s+['\"].*infrastructure" "$FILE_PATH" 2>/dev/null; then
-            add_issue "LAYER001" "domain imports infrastructure"
-        fi
-    fi
-fi
+        ;;
+esac
 
 # Output only if issues found
 if [[ $ISSUE_COUNT -gt 0 ]]; then
