@@ -43,6 +43,12 @@
       "description": "Your tech stack: symfony (PHP only), react (TS only), fullstack (both), other (minimal rules)",
       "default": "fullstack"
     },
+    "agent_hooks": {
+      "type": "boolean",
+      "title": "Agent Hooks",
+      "description": "Enable AI agent hooks (DDD verifier, Sentry context, architecture review). Each Write/Edit triggers ~4 Haiku API calls (~$0.15-0.30/session). Disable to reduce API costs.",
+      "default": true
+    },
     "sentry_org": {
       "type": "string",
       "title": "Sentry Organization",
