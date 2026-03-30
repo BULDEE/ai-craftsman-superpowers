@@ -10,23 +10,12 @@ You are a **metrics analyst** reporting on code quality trends.
 
 ## Process
 
-### Step 1: Load Metrics
+### Step 1: Load All Metrics
 
-Read the metrics database:
-
-!`sqlite3 -header -column "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db" "SELECT rule, severity, COUNT(*) as total, SUM(blocked) as blocked, SUM(ignored) as ignored FROM violations WHERE project_hash='$(echo -n $PWD | shasum -a 256 | cut -d' ' -f1)' AND timestamp > datetime('now','-7 days') GROUP BY rule, severity ORDER BY total DESC;" 2>/dev/null || echo "No metrics yet. Start coding and violations will be tracked automatically."`
-
-### Step 2: Load Trends
-
-!`sqlite3 -header -column "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db" "SELECT date(timestamp) as day, COUNT(*) as violations, SUM(blocked) as blocked, SUM(ignored) as ignored FROM violations WHERE project_hash='$(echo -n $PWD | shasum -a 256 | cut -d' ' -f1)' AND timestamp > datetime('now','-14 days') GROUP BY day ORDER BY day DESC;" 2>/dev/null || echo "No trend data yet."`
-
-### Step 3: Load Sessions
-
-!`sqlite3 -header -column "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db" "SELECT date(timestamp) as day, COUNT(*) as sessions, SUM(violations_blocked) as blocked, SUM(violations_warned) as warned FROM sessions WHERE project_hash='$(echo -n $PWD | shasum -a 256 | cut -d' ' -f1)' AND timestamp > datetime('now','-14 days') GROUP BY day ORDER BY day DESC;" 2>/dev/null || echo "No session data yet."`
-
-### Step 4: Load Corrections Summary
-
-!`sqlite3 -header -column "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db" "SELECT rule, action, COUNT(*) as count FROM corrections WHERE project_hash='$(echo -n $PWD | shasum -a 256 | cut -d' ' -f1)' AND timestamp > datetime('now','-30 days') GROUP BY rule, action ORDER BY count DESC LIMIT 10;" 2>/dev/null || echo "No correction data yet"`
+Use the Bash tool to query the metrics database. Run all 4 queries in a single call:
+```bash
+DB=~/.claude/plugins/data/craftsman/metrics.db; echo "=== VIOLATIONS ===" && sqlite3 -header -column "$DB" "SELECT rule, severity, COUNT(*) as total, SUM(blocked) as blocked, SUM(ignored) as ignored FROM violations WHERE timestamp > datetime('now','-7 days') GROUP BY rule, severity ORDER BY total DESC;" 2>/dev/null || echo "No metrics yet."; echo "=== TREND ===" && sqlite3 -header -column "$DB" "SELECT date(timestamp) as day, COUNT(*) as violations, SUM(blocked) as blocked, SUM(ignored) as ignored FROM violations WHERE timestamp > datetime('now','-14 days') GROUP BY day ORDER BY day DESC;" 2>/dev/null || echo "No trend data yet."; echo "=== SESSIONS ===" && sqlite3 -header -column "$DB" "SELECT date(timestamp) as day, COUNT(*) as sessions, SUM(violations_blocked) as blocked, SUM(violations_warned) as warned FROM sessions WHERE timestamp > datetime('now','-14 days') GROUP BY day ORDER BY day DESC;" 2>/dev/null || echo "No session data yet."; echo "=== CORRECTIONS ===" && sqlite3 -header -column "$DB" "SELECT rule, action, COUNT(*) as count FROM corrections WHERE timestamp > datetime('now','-30 days') GROUP BY rule, action ORDER BY count DESC LIMIT 10;" 2>/dev/null || echo "No correction data yet."
+```
 
 ### Step 5: Present Report
 
@@ -60,9 +49,7 @@ If no data exists, explain that metrics are collected automatically as the user 
 
 ### Step 5: Correction Trends
 
-!`sqlite3 -header -column "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db" "SELECT rule, action, COUNT(*) as count FROM corrections WHERE project_hash='$(echo -n $PWD | shasum -a 256 | cut -d' ' -f1)' AND timestamp > datetime('now','-30 days') GROUP BY rule, action ORDER BY count DESC LIMIT 10;" 2>/dev/null || echo "No correction data yet."`
-
-Add a **Correction Trends** section to the report:
+The corrections data was already loaded in Step 1 (=== CORRECTIONS === section). Use that data to add a **Correction Trends** section to the report:
 
 ```
 ### Correction Trends (30 days)
@@ -105,7 +92,10 @@ To calculate trend, compare current 7-day score against the prior 7-day window (
 
 ### Step 7: Agent & Team Stats
 
-!`sqlite3 -header -column "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db" "SELECT date(timestamp) as day, agent_invocations, team_type FROM sessions WHERE project_hash='$(echo -n $PWD | shasum -a 256 | cut -d' ' -f1)' AND timestamp > datetime('now','-14 days') AND (agent_invocations > 0 OR team_type IS NOT NULL) ORDER BY day DESC;" 2>/dev/null || echo "No agent/team data yet."`
+Use the Bash tool to query agent/team stats:
+```bash
+sqlite3 -header -column ~/.claude/plugins/data/craftsman/metrics.db "SELECT date(timestamp) as day, agent_invocations, team_type FROM sessions WHERE timestamp > datetime('now','-14 days') AND (agent_invocations > 0 OR team_type IS NOT NULL) ORDER BY day DESC;" 2>/dev/null || echo "No agent/team data yet."
+```
 
 Add to the report:
 
