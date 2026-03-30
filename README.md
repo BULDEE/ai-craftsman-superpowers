@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
-[![Version](https://img.shields.io/badge/Version-2.6.1-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-2.7.0-blue)](CHANGELOG.md)
 [![Commands](https://img.shields.io/badge/Commands-15-orange)]()
 [![Agents](https://img.shields.io/badge/Agents-5-red)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -103,22 +103,50 @@ I need to migrate our API to microservices.
 
 See [`/examples`](examples/) for detailed usage examples with expected outputs.
 
-## Why Craftsman? — Key Differentiators
+## Why Craftsman? — 6 Core Differentiators
 
-What makes this plugin unique in the Claude Code ecosystem:
+What makes this plugin genuinely unique in the Claude Code ecosystem:
 
-| Differentiator | What It Does | Why It Matters |
-|----------------|-------------|----------------|
-| **Iron Law Pattern** | Forces canonical example loading before ANY code generation | Zero drift — generated code matches project standards exactly, every time |
-| **Cognitive Bias Detector** | Real-time detection of acceleration, scope creep, sunk cost, anchoring biases in user prompts | The only Claude Code plugin that protects against human cognitive biases |
-| **Correction Learning** | Records when you fix Claude-generated code, injects patterns at next session start | Claude learns from its own mistakes — error rate decreases over time |
-| **3-Level Validation** | Regex (<50ms) + Static Analysis (<2s) + Architecture (<2s) on every write | Sub-3-second quality gate that catches issues from typos to layer violations |
-| **Rules Engine** | Per-project rule override with 3-level inheritance (global → project → directory) | Enterprise-ready: legacy code coexists with strict new code in the same repo |
-| **Circuit Breaker** | Production-grade external service protection (closed → open → half-open) with stale cache | Sentry goes down? Plugin keeps working with cached data |
-| **Multi-Provider CI** | Same rules in hooks AND CI across GitHub Actions, GitLab CI, Bitbucket Pipelines, Jenkins | One source of truth — what blocks locally blocks in CI, zero drift |
-| **Metrics & Trends** | SQLite-backed violation tracking with 7d/30d trend analysis | Data-driven quality improvement: see which rules get violated most |
+### 1. **Correction Learning System**
+Records every violation fix users make and injects correction trends at next session start. SQLite-backed feedback loop that progressively teaches Claude the exact patterns your codebase rejects. Cross-file pattern detection suggests project-wide fixes when 3+ files share the same violation. Unique in the ecosystem — no other Claude Code plugin creates this behavioral feedback loop.
 
-> **No other Claude Code plugin combines real-time cognitive protection with automated code quality enforcement and cross-session learning.**
+### 2. **Rules Engine with 3-Level Inheritance**
+Enterprise-ready rule customization: Global → Project → Directory overrides. Short form (`PHP001: warn`) and long form (custom rules with regex, message, severity, languages, paths). Legacy code coexists with strict new code via directory-level relaxation. Python-backed YAML parser with bash 3.2 shell compatibility.
+
+### 3. **Cognitive Bias Detector**
+Real-time detection of acceleration bias, scope creep, and over-optimization in user prompts. Bilingual FR/EN pattern matching on UserPromptSubmit hook. Non-blocking warnings that encourage reflection before action. Currently regex-based — semantic analysis planned for v3.
+
+### 4. **Real-Time Quality Gate**
+3-level progressive validation on every Write/Edit:
+- **Level 1: Regex (<50ms)** — strict_types, final, any, setters. Always active.
+- **Level 2: Static analysis (<2s)** — PHPStan, ESLint. When tools installed.
+- **Level 3: Architecture (<2s)** — deptrac, dependency-cruiser. When tools installed.
+
+Graceful degradation: works with zero tools installed (Level 1 only).
+
+### 5. **Multi-Provider CI Pipeline**
+Same rules engine runs in hooks (real-time) AND CI (pipeline) with zero drift — CI sources the same pack validators as hooks. 4 providers: GitHub Actions, GitLab CI, Bitbucket Pipelines, Jenkins. Adapter pattern: detect → run → annotate → comment → exit.
+
+### 6. **Metrics & Trend Analysis**
+SQLite-backed tracking of violations, corrections, and sessions. 7-day and 30-day trend views. Data-driven quality improvement: identify most-violated rules and adjust strictness. Currently per-machine — team metrics sync planned for v3.
+
+---
+
+> **No other Claude Code plugin combines all 6: learning from past mistakes, enterprise rule customization, cognitive protection, real-time validation, zero CI drift, and measurable quality trends.**
+
+## Additional Features
+
+### Model Tiering
+Configure which Claude model each agent uses. Cost-optimize by assigning Haiku to documentation tasks and Sonnet to complex analysis.
+
+### Atomic Commit Enforcement
+Stop hook warns when >15 files modified in a session and caps inspection at 20 files, encouraging small focused commits.
+
+### Circuit Breaker
+Production-grade protection for external services (Sentry). 3 states: closed → open → half-open. File-based cache with TTL/LRU eviction serves stale data during outages.
+
+### Iron Law Pattern
+Design-first methodology enforced through hooks: bias detection warns when domain modeling without `/craftsman:design`. Prevents impulsive architecture changes.
 
 ## Commands
 
@@ -139,19 +167,16 @@ All commands are explicitly invoked with `/craftsman:command-name`. See [ADR-000
 | `/craftsman:git` | Safe git workflow with destructive command protection |
 | `/craftsman:parallel` | Parallel agent orchestration for independent tasks |
 
-### Symfony/PHP Scaffolding
+### Scaffolding
 
 | Command | Purpose |
 |---------|---------|
-| `/craftsman:entity` | Scaffold DDD entity with Value Objects, Events, Tests |
-| `/craftsman:usecase` | Scaffold use case with Command/Handler pattern |
-
-### React/TypeScript Scaffolding
-
-| Command | Purpose |
-|---------|---------|
-| `/craftsman:component` | Scaffold React component with TypeScript, tests, Storybook |
-| `/craftsman:hook` | Scaffold TanStack Query hook with tests |
+| `/craftsman:scaffold entity` | DDD entity with Value Objects, Events, Tests |
+| `/craftsman:scaffold usecase` | Use case with Command/Handler pattern |
+| `/craftsman:scaffold component` | React component with TypeScript, tests, Storybook |
+| `/craftsman:scaffold hook` | TanStack Query hook with tests |
+| `/craftsman:scaffold api-resource` | API Platform resource with State Provider |
+| `/craftsman:scaffold pack` | Create new community pack |
 
 ### AI/ML Engineering
 
@@ -165,21 +190,16 @@ All commands are explicitly invoked with `/craftsman:command-name`. See [ADR-000
 
 | Command | Purpose |
 |---------|---------|
-| `/craftsman:source-verify` | Verify AI capabilities against official documentation |
-| `/craftsman:agent-create` | Interactively create bounded context agents |
-| `/craftsman:scaffold` | Analyze code and generate context agents |
+| `/craftsman:scaffold` | Unified scaffolder for all types (entity, usecase, component, hook, api-resource, pack) |
 | `/craftsman:metrics` | Display quality metrics dashboard (violations, trends, sessions) |
 | `/craftsman:setup` | Interactive setup wizard (DISC profile, stack, packs) |
 | `/craftsman:team` | Create and manage agent teams for collaborative tasks |
-| `/craftsman:start` | Onboarding wizard for first-time users |
 
 ### CI/CD Integration
 
 | Command | Purpose |
 |---------|---------|
 | `/craftsman:ci` | Export quality gates to CI/CD pipeline (GitHub, GitLab, Bitbucket, Jenkins) |
-
-> **Why source-verify?** AI tools evolve rapidly. This command ensures claims about capabilities are verified against official documentation before being stated as facts. See [ADR-004](docs/adr/004-official-documentation-verification.md).
 
 ## Features
 
@@ -221,22 +241,21 @@ sentry_token: (stored securely)
 
 ### Specialized Agents (v1.5.0)
 
-12 agents — 5 reviewers + 7 craftsmen:
+11 agents — 4 reviewers + 7 craftsmen:
 
 | Agent | Role | Model |
 |-------|------|-------|
-| `team-lead` | Orchestrator — delegates, challenges, never codes | Opus |
+| `team-lead` | Orchestrator — delegates, challenges, never codes | Sonnet |
 | `backend-craftsman` | PHP/Symfony expert (Symfony.com + API Platform refs) | Sonnet |
 | `frontend-craftsman` | React/TS expert (65 Vercel best practices) | Sonnet |
 | `architect` | DDD/Clean Architecture validation (read-only) | Sonnet |
 | `ai-engineer` | RAG, LLM, MCP server, agent design | Sonnet |
+| `api-craftsman` | API Platform 4, REST/HATEOAS, OpenAPI | Sonnet |
 | `ui-ux-director` | UX, WCAG 2.1 AA, design tokens | Sonnet |
 | `doc-writer` | ADRs, README, CHANGELOG, runbooks | Haiku |
-| `architecture-reviewer` | Clean Architecture compliance | Sonnet |
 | `security-pentester` | Security vulnerability detection | Sonnet |
 | `symfony-reviewer` | Symfony/DDD best practices | Sonnet |
 | `react-reviewer` | React patterns and hooks | Sonnet |
-| `ai-reviewer` | RAG/MLOps/Agent best practices | Sonnet |
 
 ### Code Rule Enforcement (v1.2.0+)
 

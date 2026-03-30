@@ -13,7 +13,7 @@
 # =============================================================================
 set -o pipefail
 
-VERSION="2.6.1"
+VERSION="2.7.0"
 
 # =============================================================================
 # Defaults
@@ -158,22 +158,40 @@ EOF
 done
 
 # =============================================================================
-# Rules engine integration (optional — plugin context only)
+# Shared library loading (single source of truth with hooks)
 # =============================================================================
 PLUGIN_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Source rules engine if available (plugin context)
+# Provide defaults for Claude Code-specific env vars (standalone mode)
+export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}"
+export CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
+
+# Source shared libraries if available (plugin context)
+PACKS_AVAILABLE=false
+RULES_ENGINE_AVAILABLE=false
+SA_AVAILABLE=false
+
+if [[ -f "$PLUGIN_ROOT/hooks/lib/config.sh" ]]; then
+    source "$PLUGIN_ROOT/hooks/lib/config.sh"
+fi
+
 if [[ -f "$PLUGIN_ROOT/hooks/lib/rules-engine.sh" ]]; then
     source "$PLUGIN_ROOT/hooks/lib/rules-engine.sh"
     RULES_ENGINE_AVAILABLE=true
-else
-    RULES_ENGINE_AVAILABLE=false
 fi
 
-# Load pack-specific rules if packs directory exists
-if [[ -d "$PLUGIN_ROOT/packs" ]]; then
-    export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
-    source "${PLUGIN_ROOT}/hooks/lib/pack-loader.sh" 2>/dev/null || true
+if [[ -f "$PLUGIN_ROOT/hooks/lib/pack-loader.sh" ]]; then
+    source "$PLUGIN_ROOT/hooks/lib/pack-loader.sh"
+    PACKS_AVAILABLE=true
+fi
+
+if [[ -f "$PLUGIN_ROOT/hooks/lib/static-analysis.sh" ]]; then
+    source "$PLUGIN_ROOT/hooks/lib/static-analysis.sh"
+    SA_AVAILABLE=true
+fi
+
+# Init packs (discovers and sources pack validators + SA tools)
+if [[ "$PACKS_AVAILABLE" == true && -d "$PLUGIN_ROOT/packs" ]]; then
     pack_loader_init 2>/dev/null || true
 fi
 
@@ -324,191 +342,91 @@ _add_violation() {
 }
 
 # =============================================================================
-# Line number helpers
+# CI-compatible shims for pack validator API
+# Pack validators (php-validator.sh, layer-validator.sh, etc.) call these
+# functions which are normally provided by post-write-check.sh.
+# These shims bridge the pack API to CI's violation storage arrays.
 # =============================================================================
-_find_line() {
-    local file="$1"
-    local pattern="$2"
-    grep -n "$pattern" "$file" 2>/dev/null | head -1 | cut -d: -f1 || echo "0"
+_CI_CURRENT_FILE=""
+FILE_PATH=""
+FILE_PATTERN=""
+
+add_violation() {
+    local rule="$1"
+    local message="$2"
+    local file="${3:-$_CI_CURRENT_FILE}"
+    _add_violation "$file" "0" "$rule" "$message"
 }
 
-_find_line_e() {
-    local file="$1"
-    local pattern="$2"
-    grep -nE "$pattern" "$file" 2>/dev/null | head -1 | cut -d: -f1 || echo "0"
+add_warning() {
+    local rule="$1"
+    local message="$2"
+    _add_violation "$_CI_CURRENT_FILE" "0" "$rule" "$message"
 }
 
-# =============================================================================
-# PHP Rules (mirrors post-write-check.sh exactly)
-# =============================================================================
-validate_php() {
-    local file="$1"
-
-    # PHP001: declare(strict_types=1) required
-    if ! grep -q "declare(strict_types=1)" "$file" 2>/dev/null; then
-        _add_violation "$file" "1" "PHP001" "Missing declare(strict_types=1)"
-    fi
-
-    # PHP002: Classes must be final (except interface/trait/abstract)
-    if grep -q "^class " "$file" 2>/dev/null; then
-        if ! grep -q "final class" "$file" 2>/dev/null; then
-            if ! grep -qE "(interface |trait |abstract class )" "$file" 2>/dev/null; then
-                local ln
-                ln=$(_find_line_e "$file" "^class ")
-                _add_violation "$file" "$ln" "PHP002" "Class should be final"
-            fi
-        fi
-    fi
-
-    # PHP003: No public setters
-    local ln_num=0
-    while IFS= read -r line; do
-        ln_num=$((ln_num + 1))
-        if echo "$line" | grep -qE "public function set[A-Z]" 2>/dev/null; then
-            if ! echo "$line" | grep -qE "craftsman-ignore:\s*no-setter" 2>/dev/null; then
-                _add_violation "$file" "$ln_num" "PHP003" "Public setter found — use behavioral methods"
-            fi
-        fi
-    done < "$file"
-
-    # PHP004: No new DateTime()
-    if grep -q "new DateTime()" "$file" 2>/dev/null || grep -q 'new \\DateTime()' "$file" 2>/dev/null; then
-        local ln
-        ln=$(grep -n "new DateTime()" "$file" 2>/dev/null | head -1 | cut -d: -f1 || echo "0")
-        [[ "$ln" == "0" ]] && ln=$(grep -n 'new \\DateTime()' "$file" 2>/dev/null | head -1 | cut -d: -f1 || echo "0")
-        _add_violation "$file" "$ln" "PHP004" "new DateTime() found — inject Clock instead"
-    fi
-
-    # PHP005: No empty catch blocks (always a warning via _should_block)
-    if grep -A1 "catch" "$file" 2>/dev/null | grep -qE "^\s*\}\s*$" 2>/dev/null; then
-        local ln
-        ln=$(_find_line_e "$file" "catch")
-        _add_violation "$file" "$ln" "PHP005" "Possible empty catch block"
-    fi
-
-    # WARN-PHP001: Max 3 parameters (always warning)
-    if grep -qE "function\s+\w+\(([^,]+,){3,}" "$file" 2>/dev/null; then
-        local ln
-        ln=$(_find_line_e "$file" "function\s+\w+\(([^,]+,){3,}")
-        _add_violation "$file" "$ln" "WARN-PHP001" "Method with 4+ parameters — consider refactoring to object"
-    fi
+line_has_ignore() {
+    local line="$1"
+    local rule="$2"
+    echo "$line" | grep -qE "craftsman-ignore:\s*[^#]*\b${rule}\b" 2>/dev/null
 }
 
-# =============================================================================
-# TypeScript Rules (mirrors post-write-check.sh exactly)
-# =============================================================================
-validate_typescript() {
-    local file="$1"
-
-    # TS001: No 'any' type (check per line for craftsman-ignore)
-    local ln_num=0
-    while IFS= read -r line; do
-        ln_num=$((ln_num + 1))
-        if echo "$line" | grep -qE ": any[^a-zA-Z]|<any>|: any$" 2>/dev/null; then
-            if ! echo "$line" | grep -qE "craftsman-ignore:\s*no-any" 2>/dev/null; then
-                _add_violation "$file" "$ln_num" "TS001" "'any' type found — use proper types or 'unknown'"
-            fi
-        fi
-    done < "$file"
-
-    # TS002: No default exports
-    if grep -q "export default" "$file" 2>/dev/null; then
-        local ln
-        ln=$(grep -n "export default" "$file" 2>/dev/null | head -1 | cut -d: -f1 || echo "0")
-        _add_violation "$file" "$ln" "TS002" "Default export found — use named exports"
-    fi
-
-    # TS003: No non-null assertion (!) — exclude != and !==
-    if grep -qE "[a-zA-Z0-9_\)]+\![^=\.]" "$file" 2>/dev/null; then
-        local ln
-        ln=$(_find_line_e "$file" "[a-zA-Z0-9_\)]+\![^=\.]")
-        _add_violation "$file" "$ln" "TS003" "Non-null assertion (!) found — handle null explicitly"
-    fi
-
-    # WARN-TS001: Max 3 parameters (always warning)
-    if grep -qE "(function\s+\w+|=>)\s*\(([^,]+,){3,}" "$file" 2>/dev/null; then
-        local ln
-        ln=$(_find_line_e "$file" "(function\s+\w+|=>)\s*\(([^,]+,){3,}")
-        _add_violation "$file" "$ln" "WARN-TS001" "Function with 4+ parameters — consider refactoring to object"
-    fi
+file_has_ignore() {
+    local rule="$1"
+    grep -qE "craftsman-ignore:\s*[^#]*\b${rule}\b" "$_CI_CURRENT_FILE" 2>/dev/null
 }
 
-# =============================================================================
-# Layer Rules (mirrors post-write-check.sh exactly)
-# =============================================================================
-validate_layers() {
-    local file="$1"
-    local ext="${file##*.}"
-
-    local is_domain=false
-    local is_application=false
-    local is_domain_ts=false
-
-    if [[ "$file" == *"/Domain/"* ]] || grep -qE "namespace\s+App\\\\Domain" "$file" 2>/dev/null; then
-        is_domain=true
-    fi
-    if [[ "$file" == *"/Application/"* ]] || grep -qE "namespace\s+App\\\\Application" "$file" 2>/dev/null; then
-        is_application=true
-    fi
-    if [[ "$file" == *"/domain/"* ]]; then
-        is_domain_ts=true
-    fi
-
-    # Domain must not import Infrastructure
-    if [[ "$is_domain" == true ]] && [[ "$ext" == "php" ]]; then
-        if grep -qE "use\s+App\\\\Infrastructure" "$file" 2>/dev/null; then
-            local ln
-            ln=$(_find_line_e "$file" "use\s+App\\\\Infrastructure")
-            _add_violation "$file" "$ln" "LAYER001" "Domain imports Infrastructure — DDD layer violation"
-        fi
-        if grep -qE "use\s+App\\\\Presentation" "$file" 2>/dev/null; then
-            local ln
-            ln=$(_find_line_e "$file" "use\s+App\\\\Presentation")
-            _add_violation "$file" "$ln" "LAYER002" "Domain imports Presentation — DDD layer violation"
-        fi
-    fi
-
-    # Application must not import Presentation
-    if [[ "$is_application" == true ]] && [[ "$ext" == "php" ]]; then
-        if grep -qE "use\s+App\\\\Presentation" "$file" 2>/dev/null; then
-            local ln
-            ln=$(_find_line_e "$file" "use\s+App\\\\Presentation")
-            _add_violation "$file" "$ln" "LAYER003" "Application imports Presentation — DDD layer violation"
-        fi
-    fi
-
-    # TypeScript: domain must not import infrastructure
-    if [[ "$is_domain_ts" == true ]] && [[ "$ext" == "ts" || "$ext" == "tsx" ]]; then
-        if grep -qE "from\s+['\"].*infrastructure" "$file" 2>/dev/null; then
-            local ln
-            ln=$(_find_line_e "$file" "from\s+['\"].*infrastructure")
-            _add_violation "$file" "$ln" "LAYER001" "domain imports infrastructure — layer violation"
-        fi
-    fi
-}
+metrics_record_violation() { :; }
+metrics_file_pattern() { echo "$1"; }
+metrics_init() { :; }
 
 # =============================================================================
-# File scanner
+# File scanner — delegates to pack validators (single source of truth)
 # =============================================================================
 scan_file() {
     local file="$1"
     local ext="${file##*.}"
 
+    # Set globals for pack validator compatibility
+    _CI_CURRENT_FILE="$file"
+    FILE_PATH="$file"
+    FILE_PATTERN="$file"
+
     case "$ext" in
         php)
             _php_enabled || return 0
-            validate_php "$file"
-            validate_layers "$file"
+            if [[ "$PACKS_AVAILABLE" == true ]]; then
+                pack_run_validators "$file" "php"
+                pack_run_validators "$file" "php_layers"
+            fi
             ;;
         ts|tsx)
             _ts_enabled || return 0
-            validate_typescript "$file"
-            validate_layers "$file"
+            if [[ "$PACKS_AVAILABLE" == true ]]; then
+                pack_run_validators "$file" "typescript"
+                pack_run_validators "$file" "typescript_layers"
+            fi
             ;;
         *)
             return 0
             ;;
     esac
+
+    # Static analysis Level 2/3 (PHPStan, ESLint, Deptrac, dependency-cruiser)
+    if [[ "$SA_AVAILABLE" == true ]]; then
+        local sa_errors
+        sa_errors=$(sa_analyze_file "$file" 2>/dev/null) || true
+        if [[ -n "$sa_errors" ]]; then
+            while IFS= read -r err_line; do
+                [[ -z "$err_line" ]] && continue
+                local sa_code sa_lineno sa_msg
+                sa_code=$(echo "$err_line" | cut -d: -f1)
+                sa_lineno=$(echo "$err_line" | cut -d: -f2)
+                sa_msg=$(echo "$err_line" | cut -d: -f3-)
+                sa_msg="${sa_msg#"${sa_msg%%[![:space:]]*}"}"
+                _add_violation "$file" "${sa_lineno:-0}" "$sa_code" "$sa_msg"
+            done <<< "$sa_errors"
+        fi
+    fi
 
     # Custom rules from rules engine (plugin context only)
     if [[ "$RULES_ENGINE_AVAILABLE" == true ]]; then
