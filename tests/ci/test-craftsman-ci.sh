@@ -466,7 +466,97 @@ else
 fi
 
 # =============================================================================
-# 9. --help flag test
+# 9. CI vs Hooks rule parity tests
+# Verifies that CI output detects the same rules as hooks for identical fixtures
+# =============================================================================
+echo ""
+echo "=== CI/Hooks Parity Tests ==="
+
+# CI detects same PHP rules as hooks on shared fixture
+result=$(run_ci --format json "$HOOK_FIXTURES/invalid-no-strict.php")
+output="${result#*|}"
+ci_rules=$(echo "$output" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+rules = sorted(set(v['rule'] for v in d['violations']))
+print(' '.join(rules))
+" 2>/dev/null || echo "")
+if echo "$ci_rules" | grep -q "PHP001"; then
+    log_pass "CI detects PHP001 on shared hook fixture (parity confirmed)"
+else
+    log_fail "CI should detect PHP001 on hook fixture" "got rules: $ci_rules"
+fi
+
+# CI detects same TS rules as hooks on shared fixture
+result=$(run_ci --format json "$HOOK_FIXTURES/invalid-any.ts")
+output="${result#*|}"
+ci_rules=$(echo "$output" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+rules = sorted(set(v['rule'] for v in d['violations']))
+print(' '.join(rules))
+" 2>/dev/null || echo "")
+if echo "$ci_rules" | grep -q "TS001" && echo "$ci_rules" | grep -q "TS002"; then
+    log_pass "CI detects TS001+TS002 on shared hook fixture (parity confirmed)"
+else
+    log_fail "CI should detect TS001+TS002 on hook fixture" "got rules: $ci_rules"
+fi
+
+# CI detects LAYER001 on shared fixture
+result=$(run_ci --format json "$HOOK_FIXTURES/invalid-layer-violation.php")
+output="${result#*|}"
+ci_rules=$(echo "$output" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+rules = sorted(set(v['rule'] for v in d['violations']))
+print(' '.join(rules))
+" 2>/dev/null || echo "")
+if echo "$ci_rules" | grep -q "LAYER001"; then
+    log_pass "CI detects LAYER001 on shared hook fixture (parity confirmed)"
+else
+    log_fail "CI should detect LAYER001 on hook fixture" "got rules: $ci_rules"
+fi
+
+# =============================================================================
+# 10. Standalone mode (no Claude Code env vars)
+# =============================================================================
+echo ""
+echo "=== Standalone Mode Tests ==="
+
+# Unset all Claude-specific env vars and verify CI still works
+(
+    unset CLAUDE_PLUGIN_ROOT
+    unset CLAUDE_PLUGIN_DATA
+    unset CLAUDE_PLUGIN_OPTION_strictness
+    unset CLAUDE_PLUGIN_OPTION_stack
+    result=$(bash "$CLI" --format json "$FIXTURES_DIR/invalid-no-strict.php" 2>&1)
+    exit_code=$?
+    echo "${exit_code}|${result}"
+)
+standalone_result=$( (
+    unset CLAUDE_PLUGIN_ROOT
+    unset CLAUDE_PLUGIN_DATA
+    unset CLAUDE_PLUGIN_OPTION_strictness
+    unset CLAUDE_PLUGIN_OPTION_stack
+    bash "$CLI" --format json "$FIXTURES_DIR/invalid-no-strict.php" 2>&1
+    echo "EXIT:$?"
+) )
+standalone_exit=$(echo "$standalone_result" | grep -oE 'EXIT:[0-9]+' | cut -d: -f2)
+standalone_output=$(echo "$standalone_result" | grep -v 'EXIT:')
+if [[ "$standalone_exit" == "2" ]]; then
+    log_pass "Standalone mode: exits 2 on invalid file (no Claude env vars)"
+else
+    log_fail "Standalone mode should exit 2" "got exit $standalone_exit"
+fi
+
+if echo "$standalone_output" | python3 -m json.tool >/dev/null 2>&1; then
+    log_pass "Standalone mode: produces valid JSON output"
+else
+    log_fail "Standalone mode should produce valid JSON" "${standalone_output:0:200}"
+fi
+
+# =============================================================================
+# 11. --help flag test
 # =============================================================================
 echo ""
 echo "=== CLI Interface Tests ==="
