@@ -150,6 +150,9 @@ pack_loader_init
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 
+# Validate file path contains only safe characters
+[[ "$FILE_PATH" =~ ^[a-zA-Z0-9_./@:\ -]+$ ]] || exit 0
+
 # Exit silently if no file path or file doesn't exist
 [[ -z "$FILE_PATH" || ! -f "$FILE_PATH" ]] && exit 0
 

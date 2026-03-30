@@ -21,8 +21,13 @@ SESSION_DURATION=$(echo "$INPUT" | jq -r '.session_duration_seconds // 0' 2>/dev
 
 # Count violations from this session (approximate using duration)
 PROJECT_HASH=$(metrics_project_hash)
-BLOCKED=$(sqlite3 "$METRICS_DB" "SELECT COUNT(*) FROM violations WHERE project_hash='$PROJECT_HASH' AND blocked=1 AND timestamp > datetime('now', '-${SESSION_DURATION:-3600} seconds');" 2>/dev/null || echo 0)
-WARNED=$(sqlite3 "$METRICS_DB" "SELECT COUNT(*) FROM violations WHERE project_hash='$PROJECT_HASH' AND blocked=0 AND ignored=0 AND timestamp > datetime('now', '-${SESSION_DURATION:-3600} seconds');" 2>/dev/null || echo 0)
+DURATION_PARAM="-${SESSION_DURATION:-3600} seconds"
+BLOCKED=$(python3 "${SCRIPT_DIR}/lib/metrics-query.py" "$METRICS_DB" \
+    "SELECT COUNT(*) FROM violations WHERE project_hash=? AND blocked=1 AND timestamp > datetime('now', ?)" \
+    "$PROJECT_HASH" "$DURATION_PARAM" 2>/dev/null || echo 0)
+WARNED=$(python3 "${SCRIPT_DIR}/lib/metrics-query.py" "$METRICS_DB" \
+    "SELECT COUNT(*) FROM violations WHERE project_hash=? AND blocked=0 AND ignored=0 AND timestamp > datetime('now', ?)" \
+    "$PROJECT_HASH" "$DURATION_PARAM" 2>/dev/null || echo 0)
 
 # Extract agent usage count and team type from session state
 AGENT_COUNT=0

@@ -103,22 +103,18 @@ _rules_ensure_store() {
 }
 
 # ---------------------------------------------------------------------------
-# Unescape a YAML string value: strip surrounding quotes, un-escape \\
+# Python YAML parser path (co-located with this script)
 # ---------------------------------------------------------------------------
-_rules_unescape_yaml_string() {
-    local val="$1"
-    # Strip surrounding double quotes
-    val=$(echo "$val" | sed 's/^"//' | sed 's/"$//')
-    # Strip surrounding single quotes
-    val=$(echo "$val" | sed "s/^'//" | sed "s/'$//")
-    # Un-escape double backslashes → single backslash (YAML double-quote semantics)
-    val=$(printf '%s' "$val" | sed 's/\\\\/\\/g')
-    printf '%s' "$val"
+_RULES_YAML_PARSER=""
+_rules_yaml_parser_path() {
+    if [[ -z "$_RULES_YAML_PARSER" ]]; then
+        _RULES_YAML_PARSER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/yaml-parser.py"
+    fi
+    echo "$_RULES_YAML_PARSER"
 }
 
 # ---------------------------------------------------------------------------
-# Pure-bash YAML parser (handles nested rules section)
-# Parses .craft-config.yml and populates rule stores
+# Parse .craft-config.yml via Python yaml-parser.py → populate stores from JSON
 # ---------------------------------------------------------------------------
 _rules_parse_config() {
     local file="$1"
@@ -126,90 +122,70 @@ _rules_parse_config() {
 
     [[ ! -f "$file" ]] && return 0
 
-    local in_rules=0
-    local current_rule=""
-    local indent_level=0
+    local parser_path
+    parser_path="$(_rules_yaml_parser_path)"
+    local json_output
+    json_output=$(python3 "$parser_path" "$file" "config") || json_output="{}"
 
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        # Skip empty lines and comments
-        [[ -z "$line" ]] && continue
-        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    # Empty or invalid → skip
+    if [[ -z "$json_output" ]] || [[ "$json_output" == "{}" ]]; then
+        return 0
+    fi
 
-        # Count leading spaces
-        local stripped="${line#"${line%%[![:space:]]*}"}"
-        local leading_spaces=$(( ${#line} - ${#stripped} ))
+    # Parse strictness
+    local val
+    val=$(printf '%s' "$json_output" | jq -r '.strictness // empty' 2>/dev/null)
+    if [[ -n "$val" ]]; then
+        if [[ "$source_label" == "project" ]] || [[ -z "$_RULES_STRICTNESS" ]] || [[ "$_RULES_STRICTNESS" == "strict" && "$source_label" == "global" ]]; then
+            _RULES_STRICTNESS="$val"
+        fi
+    fi
 
-        # Top-level keys (no indentation)
-        if [[ $leading_spaces -eq 0 ]]; then
-            in_rules=0
-            current_rule=""
+    # Parse rules
+    local rule_ids
+    rule_ids=$(printf '%s' "$json_output" | jq -r '.rules // {} | keys[]' 2>/dev/null)
 
-            # Parse strictness
-            if [[ "$stripped" =~ ^strictness:[[:space:]]*(.+)$ ]]; then
-                local val="${BASH_REMATCH[1]}"
-                val=$(echo "$val" | tr -d '"' | tr -d "'" | xargs)
-                if [[ "$source_label" == "project" ]] || [[ -z "$_RULES_STRICTNESS" ]] || [[ "$_RULES_STRICTNESS" == "strict" && "$source_label" == "global" ]]; then
-                    _RULES_STRICTNESS="$val"
-                fi
-            fi
+    local rule_id
+    for rule_id in $rule_ids; do
+        # Check if short form (severity only) or long form (custom rule)
+        local rule_json
+        rule_json=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"]" 2>/dev/null)
 
-            # Enter rules section
-            if [[ "$stripped" =~ ^rules: ]]; then
-                in_rules=1
-                indent_level=2
-            fi
-            continue
+        local sev
+        sev=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"].severity // empty" 2>/dev/null)
+        if [[ -n "$sev" ]]; then
+            _rules_set "severity" "$rule_id" "$sev"
         fi
 
-        # Inside rules section
-        if [[ $in_rules -eq 1 ]]; then
-            # Rule entry (2-space indent)
-            if [[ $leading_spaces -eq 2 ]] || [[ $leading_spaces -le 4 && -z "$current_rule" ]] || [[ $leading_spaces -le 4 && "$stripped" =~ ^[A-Z_][A-Z0-9_]*: ]]; then
-                if [[ "$stripped" =~ ^([A-Za-z_][A-Za-z0-9_]*):[[:space:]]*$ ]]; then
-                    # Long form: "CUSTOM001:" (value on next lines)
-                    current_rule="${BASH_REMATCH[1]}"
-                elif [[ "$stripped" =~ ^([A-Za-z_][A-Za-z0-9_]*):[[:space:]]+(.+)$ ]]; then
-                    local rule_id="${BASH_REMATCH[1]}"
-                    local rule_val="${BASH_REMATCH[2]}"
-                    rule_val=$(echo "$rule_val" | tr -d '"' | tr -d "'" | xargs)
-                    # Short form: "PHP001: block"
-                    if [[ "$rule_val" =~ ^(block|warn|ignore)$ ]]; then
-                        _rules_set "severity" "$rule_id" "$rule_val"
-                        current_rule=""
-                    else
-                        # Could be long form with first prop on same line (unlikely but handle)
-                        current_rule="$rule_id"
-                    fi
-                fi
-            elif [[ -n "$current_rule" && $leading_spaces -ge 4 ]]; then
-                # Sub-property of current custom rule
-                if [[ "$stripped" =~ ^pattern:[[:space:]]+(.+)$ ]]; then
-                    local pat="${BASH_REMATCH[1]}"
-                    pat=$(_rules_unescape_yaml_string "$pat")
-                    _rules_set "pattern" "$current_rule" "$pat"
-                elif [[ "$stripped" =~ ^message:[[:space:]]+(.+)$ ]]; then
-                    local msg="${BASH_REMATCH[1]}"
-                    msg=$(_rules_unescape_yaml_string "$msg")
-                    _rules_set "message" "$current_rule" "$msg"
-                elif [[ "$stripped" =~ ^severity:[[:space:]]+(.+)$ ]]; then
-                    local sev="${BASH_REMATCH[1]}"
-                    sev=$(echo "$sev" | tr -d '"' | tr -d "'" | xargs)
-                    _rules_set "severity" "$current_rule" "$sev"
-                elif [[ "$stripped" =~ ^languages:[[:space:]]+\[(.+)\]$ ]]; then
-                    local langs="${BASH_REMATCH[1]}"
-                    # Normalize: remove quotes, spaces around commas
-                    langs=$(echo "$langs" | tr -d '"' | tr -d "'" | sed 's/[[:space:]]*,[[:space:]]*/,/g' | xargs)
-                    _rules_set "languages" "$current_rule" "$langs"
-                elif [[ "$stripped" =~ ^languages:[[:space:]]*\[\]$ ]]; then
-                    _rules_set "languages" "$current_rule" ""
-                fi
+        local pat
+        pat=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"].pattern // empty" 2>/dev/null)
+        if [[ -n "$pat" ]]; then
+            _rules_set "pattern" "$rule_id" "$pat"
+        fi
+
+        local msg
+        msg=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"].message // empty" 2>/dev/null)
+        if [[ -n "$msg" ]]; then
+            _rules_set "message" "$rule_id" "$msg"
+        fi
+
+        local langs
+        langs=$(printf '%s' "$json_output" | jq -r '.rules["'"$rule_id"'"].languages // empty | if type == "array" then join(",") else empty end' 2>/dev/null)
+        if [[ -n "$langs" ]]; then
+            _rules_set "languages" "$rule_id" "$langs"
+        else
+            # Check for empty array explicitly
+            local langs_type
+            langs_type=$(printf '%s' "$json_output" | jq -r '.rules["'"$rule_id"'"].languages | type' 2>/dev/null)
+            if [[ "$langs_type" == "array" ]]; then
+                _rules_set "languages" "$rule_id" ""
             fi
         fi
-    done < "$file"
+    done
 }
 
 # ---------------------------------------------------------------------------
-# Parse directory-level .craft-rules.yml (rules section only)
+# Parse directory-level .craft-rules.yml via Python yaml-parser.py
 # ---------------------------------------------------------------------------
 _rules_parse_dir_config() {
     local file="$1"
@@ -217,33 +193,26 @@ _rules_parse_dir_config() {
 
     [[ ! -f "$file" ]] && return 0
 
-    local in_rules=0
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        [[ -z "$line" ]] && continue
-        [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    local parser_path
+    parser_path="$(_rules_yaml_parser_path)"
+    local json_output
+    json_output=$(python3 "$parser_path" "$file" "rules") || json_output="{}"
 
-        local stripped="${line#"${line%%[![:space:]]*}"}"
-        local leading_spaces=$(( ${#line} - ${#stripped} ))
+    if [[ -z "$json_output" ]] || [[ "$json_output" == "{}" ]]; then
+        return 0
+    fi
 
-        if [[ $leading_spaces -eq 0 ]]; then
-            in_rules=0
-            if [[ "$stripped" =~ ^rules: ]]; then
-                in_rules=1
-            fi
-            continue
+    local rule_ids
+    rule_ids=$(printf '%s' "$json_output" | jq -r '.rules // {} | keys[]' 2>/dev/null)
+
+    local rule_id
+    for rule_id in $rule_ids; do
+        local rule_val
+        rule_val=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"]" 2>/dev/null)
+        if [[ "$rule_val" =~ ^(block|warn|ignore)$ ]]; then
+            _rules_set "dir_cache" "${dir_key}:${rule_id}" "$rule_val"
         fi
-
-        if [[ $in_rules -eq 1 && $leading_spaces -ge 2 ]]; then
-            if [[ "$stripped" =~ ^([A-Za-z_][A-Za-z0-9_]*):[[:space:]]+(.+)$ ]]; then
-                local rule_id="${BASH_REMATCH[1]}"
-                local rule_val="${BASH_REMATCH[2]}"
-                rule_val=$(echo "$rule_val" | tr -d '"' | tr -d "'" | xargs)
-                if [[ "$rule_val" =~ ^(block|warn|ignore)$ ]]; then
-                    _rules_set "dir_cache" "${dir_key}:${rule_id}" "$rule_val"
-                fi
-            fi
-        fi
-    done < "$file"
+    done
 }
 
 # ---------------------------------------------------------------------------
@@ -481,4 +450,63 @@ rules_pattern() {
 rules_message() {
     local rule_id="$1"
     _rules_get "message" "$rule_id"
+}
+
+# ---------------------------------------------------------------------------
+# rules_explain "$rule_id" ["$file_path"]
+# Shows where the rule's current severity comes from (traceability).
+# Output: "RULE_ID: severity (source: description)"
+# ---------------------------------------------------------------------------
+rules_explain() {
+    local rule_id="$1"
+    local file_path="${2:-}"
+
+    # If file_path provided, check directory overrides first
+    if [[ -n "$file_path" ]]; then
+        local dir
+        dir=$(dirname "$file_path")
+
+        while [[ -n "$dir" ]]; do
+            local dir_key
+            dir_key=$(echo "$dir" | sed 's|/|__|g')
+
+            # Parse if needed
+            if [[ -f "$dir/.craft-rules.yml" ]]; then
+                if ! _rules_has "dir_parsed" "$dir_key"; then
+                    _rules_parse_dir_config "$dir/.craft-rules.yml" "$dir_key"
+                    _rules_set "dir_parsed" "$dir_key" "1"
+                fi
+
+                local cached
+                cached=$(_rules_get "dir_cache" "${dir_key}:${rule_id}")
+                if [[ -n "$cached" ]]; then
+                    echo "$rule_id: $cached (source: directory override $dir/.craft-rules.yml)"
+                    return 0
+                fi
+            fi
+
+            if [[ "$dir" == "$_RULES_PROJECT_DIR" ]] || [[ "$dir" == "/" ]]; then
+                break
+            fi
+            dir=$(dirname "$dir")
+        done
+    fi
+
+    # Check project-level explicit config
+    local sev
+    sev=$(_rules_get "severity" "$rule_id")
+    if [[ -n "$sev" ]]; then
+        # Determine if from project or global
+        if [[ -f "$_RULES_PROJECT_DIR/.craft-config.yml" ]]; then
+            echo "$rule_id: $sev (source: project $_RULES_PROJECT_DIR/.craft-config.yml)"
+        else
+            echo "$rule_id: $sev (source: global ~/.claude/.craft-config.yml)"
+        fi
+        return 0
+    fi
+
+    # Default severity from strictness
+    local default_sev
+    default_sev=$(_rules_default_severity "$rule_id")
+    echo "$rule_id: $default_sev (source: default strictness '$_RULES_STRICTNESS')"
 }
