@@ -323,17 +323,15 @@ if [[ $CRITICAL_COUNT -gt 0 ]]; then
 
     # Check for cross-file patterns and append actionable suggestion
     PATTERN_SUGGESTIONS=$(_detect_cross_file_patterns 2>/dev/null) || true
-    local pattern_msg=""
+    pattern_msg=""
     if [[ -n "$PATTERN_SUGGESTIONS" ]]; then
         while IFS= read -r ps_line; do
             [[ -z "$ps_line" ]] && continue
             if [[ "$ps_line" == PATTERN:* ]]; then
-                local ps_rule ps_count
                 ps_rule=$(echo "$ps_line" | cut -d: -f2)
                 ps_count=$(echo "$ps_line" | cut -d: -f3)
                 pattern_msg="${pattern_msg}PROJECT-WIDE PATTERN: ${ps_rule} found in ${ps_count} — consider a project-wide fix or global craftsman-ignore.\n"
             elif [[ "$ps_line" == DIR_PATTERN:* ]]; then
-                local ps_rule ps_dir ps_count
                 ps_rule=$(echo "$ps_line" | cut -d: -f2)
                 ps_dir=$(echo "$ps_line" | cut -d: -f3)
                 ps_count=$(echo "$ps_line" | cut -d: -f4)
@@ -357,17 +355,15 @@ fi
 if [[ $WARNING_COUNT -gt 0 ]]; then
     # Append cross-file pattern suggestions to warnings too
     PATTERN_SUGGESTIONS=$(_detect_cross_file_patterns 2>/dev/null) || true
-    local pattern_msg=""
+    pattern_msg=""
     if [[ -n "$PATTERN_SUGGESTIONS" ]]; then
         while IFS= read -r ps_line; do
             [[ -z "$ps_line" ]] && continue
             if [[ "$ps_line" == PATTERN:* ]]; then
-                local ps_rule ps_count
                 ps_rule=$(echo "$ps_line" | cut -d: -f2)
                 ps_count=$(echo "$ps_line" | cut -d: -f3)
                 pattern_msg="${pattern_msg}PROJECT-WIDE PATTERN: ${ps_rule} found in ${ps_count} — consider a project-wide fix.\n"
             elif [[ "$ps_line" == DIR_PATTERN:* ]]; then
-                local ps_rule ps_dir ps_count
                 ps_rule=$(echo "$ps_line" | cut -d: -f2)
                 ps_dir=$(echo "$ps_line" | cut -d: -f3)
                 ps_count=$(echo "$ps_line" | cut -d: -f4)
