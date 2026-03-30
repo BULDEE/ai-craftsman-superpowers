@@ -119,15 +119,17 @@ metrics_record_session() {
 metrics_violations_7d() {
     local project_hash
     project_hash=$(metrics_project_hash)
-    sqlite3 -header -column "$METRICS_DB" \
-        "SELECT rule, severity, COUNT(*) as count, SUM(blocked) as blocked, SUM(ignored) as ignored FROM violations WHERE project_hash='$project_hash' AND timestamp > datetime('now','-7 days') GROUP BY rule, severity ORDER BY count DESC;"
+    python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
+        "SELECT rule, severity, COUNT(*) as count, SUM(blocked) as blocked, SUM(ignored) as ignored FROM violations WHERE project_hash=? AND timestamp > datetime('now','-7 days') GROUP BY rule, severity ORDER BY count DESC" \
+        "$project_hash"
 }
 
 metrics_trend() {
     local project_hash
     project_hash=$(metrics_project_hash)
-    sqlite3 -header -column "$METRICS_DB" \
-        "SELECT date(timestamp) as day, COUNT(*) as violations, SUM(blocked) as blocked FROM violations WHERE project_hash='$project_hash' AND timestamp > datetime('now','-30 days') GROUP BY day ORDER BY day DESC LIMIT 14;"
+    python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
+        "SELECT date(timestamp) as day, COUNT(*) as violations, SUM(blocked) as blocked FROM violations WHERE project_hash=? AND timestamp > datetime('now','-30 days') GROUP BY day ORDER BY day DESC LIMIT 14" \
+        "$project_hash"
 }
 
 metrics_record_correction() {
@@ -145,6 +147,7 @@ metrics_record_correction() {
 metrics_corrections_30d() {
     local project_hash
     project_hash=$(metrics_project_hash)
-    sqlite3 -header -column "$METRICS_DB" \
-        "SELECT rule, action, COUNT(*) as count FROM corrections WHERE project_hash='$project_hash' AND timestamp > datetime('now','-30 days') GROUP BY rule, action ORDER BY count DESC;"
+    python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
+        "SELECT rule, action, COUNT(*) as count FROM corrections WHERE project_hash=? AND timestamp > datetime('now','-30 days') GROUP BY rule, action ORDER BY count DESC" \
+        "$project_hash"
 }
