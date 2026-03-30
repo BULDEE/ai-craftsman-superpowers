@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-03-30
+
+### Changed
+- Reorganized Key Differentiators from 10 to 6 genuine USPs
+- Correction Learning System promoted to #1 differentiator
+- Honest descriptions for Quality Gate levels and Bias Detector limitations
+- Model Tiering, Atomic Commit, Circuit Breaker, Iron Law moved to feature sections
+
+### Fixed
+- SQL injection in metrics read functions (parameterized queries via metrics-query.py)
+- test-templates.sh phantom paths (symfony-pack → packs/symfony)
+- Version sync across all config files
+
+### Added
+- Test coverage for bias-detector, correction-learning, session-metrics
+- YAML parser Python3 migration for rules engine reliability
+- rules_explain() debug function for enterprise rule resolution tracing
+- CI sources pack validators directly (DRY fix, 145 lines removed)
+- FILE_PATH whitelist validation in post-write-check hooks
+
 ## [2.6.1] - 2026-03-30
 
 ### Changed

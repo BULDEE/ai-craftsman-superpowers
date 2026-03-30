@@ -392,6 +392,182 @@ assert_eq "CUSTOM_VAR severity" "block" "$(rules_severity "CUSTOM_VAR")"
 assert_eq "CUSTOM_VAR message" "No direct superglobal access" "$(rules_message "CUSTOM_VAR")"
 
 # =============================================================================
+# 11. YAML with quoted strings containing special characters
+# =============================================================================
+echo ""
+echo "=== 11. Quoted Strings with Special Characters ==="
+
+_rules_reset
+cat > "$PROJECT_DIR/.craft-config.yml" <<'YAML'
+version: "2.1"
+strictness: strict
+stack: fullstack
+rules:
+  SPECIAL_QUOTES:
+    pattern: "class\s+\w+\s*\{"
+    message: "Class brace on same line (PSR-12)"
+    severity: warn
+    languages: [php]
+  DOLLAR_SIGN:
+    pattern: "\\$_SERVER"
+    message: "No direct $_SERVER access"
+    severity: block
+    languages: [php]
+YAML
+
+rules_init "$PROJECT_DIR" 2>/dev/null
+
+assert_eq "SPECIAL_QUOTES severity" "warn" "$(rules_severity "SPECIAL_QUOTES")"
+assert_eq "SPECIAL_QUOTES message" "Class brace on same line (PSR-12)" "$(rules_message "SPECIAL_QUOTES")"
+assert_eq "DOLLAR_SIGN severity" "block" "$(rules_severity "DOLLAR_SIGN")"
+assert_eq "DOLLAR_SIGN message" 'No direct $_SERVER access' "$(rules_message "DOLLAR_SIGN")"
+
+# =============================================================================
+# 12. YAML with backslash regex patterns
+# =============================================================================
+echo ""
+echo "=== 12. Backslash Regex Patterns ==="
+
+_rules_reset
+cat > "$PROJECT_DIR/.craft-config.yml" <<'YAML'
+version: "2.1"
+strictness: strict
+stack: fullstack
+rules:
+  BACKSLASH_PAT:
+    pattern: "\\bvar_dump\\("
+    message: "No var_dump()"
+    severity: block
+    languages: [php]
+  MULTI_ESCAPE:
+    pattern: "\\bnew\\s+DateTime\\b"
+    message: "Use Clock abstraction"
+    severity: warn
+    languages: [php]
+YAML
+
+rules_init "$PROJECT_DIR" 2>/dev/null
+
+assert_eq "BACKSLASH_PAT severity" "block" "$(rules_severity "BACKSLASH_PAT")"
+assert_eq "BACKSLASH_PAT pattern parsed" '\bvar_dump\(' "$(rules_pattern "BACKSLASH_PAT")"
+assert_eq "MULTI_ESCAPE severity" "warn" "$(rules_severity "MULTI_ESCAPE")"
+assert_eq "MULTI_ESCAPE pattern parsed" '\bnew\s+DateTime\b' "$(rules_pattern "MULTI_ESCAPE")"
+
+# =============================================================================
+# 13. rules_explain() output
+# =============================================================================
+echo ""
+echo "=== 13. rules_explain() ==="
+
+_rules_reset
+cat > "$PROJECT_DIR/.craft-config.yml" <<'YAML'
+version: "2.1"
+strictness: strict
+stack: fullstack
+rules:
+  PHP001: warn
+YAML
+
+mkdir -p "$PROJECT_DIR/src/Legacy"
+cat > "$PROJECT_DIR/src/Legacy/.craft-rules.yml" <<'YAML'
+rules:
+  PHP001: ignore
+YAML
+
+rules_init "$PROJECT_DIR"
+
+# Project-level explain
+explain_project=$(rules_explain "PHP001")
+assert_contains "Explain project: shows severity" "warn" "$explain_project"
+assert_contains "Explain project: shows source" "project" "$explain_project"
+
+# Directory-level explain with file path
+explain_dir=$(rules_explain "PHP001" "$PROJECT_DIR/src/Legacy/OldCode.php")
+assert_contains "Explain dir: shows ignore" "ignore" "$explain_dir"
+assert_contains "Explain dir: shows directory override" "directory override" "$explain_dir"
+assert_contains "Explain dir: shows file path" "src/Legacy/.craft-rules.yml" "$explain_dir"
+
+# Default severity explain (no config for this rule)
+explain_default=$(rules_explain "TS002")
+assert_contains "Explain default: shows strictness" "strictness" "$explain_default"
+assert_contains "Explain default: shows block" "block" "$explain_default"
+
+# =============================================================================
+# 14. Python fallback parser (without PyYAML)
+# =============================================================================
+echo ""
+echo "=== 14. Python Fallback Parser ==="
+
+# Test the Python parser directly in line-parser mode
+PARSER_PATH="$ROOT_DIR/hooks/lib/yaml-parser.py"
+
+_rules_reset
+cat > "$PROJECT_DIR/.craft-config.yml" <<'YAML'
+version: "2.1"
+strictness: moderate
+stack: fullstack
+rules:
+  PHP001: warn
+  CUSTOM_FALLBACK:
+    pattern: "die\\("
+    message: "No die() calls"
+    severity: block
+    languages: [php, python]
+YAML
+
+# Force fallback by calling the line parser function directly via Python
+fallback_json=$(python3 -c "
+import sys
+sys.path.insert(0, '$ROOT_DIR/hooks/lib')
+from importlib.machinery import SourceFileLoader
+mod = SourceFileLoader('yaml_parser', '$PARSER_PATH').load_module()
+raw = mod.parse_line_by_line('$PROJECT_DIR/.craft-config.yml')
+output = mod.format_config(raw)
+import json
+print(json.dumps(output))
+" 2>/dev/null)
+
+# Verify fallback parser produces valid JSON with expected structure
+fallback_strictness=$(printf '%s' "$fallback_json" | jq -r '.strictness // empty' 2>/dev/null)
+assert_eq "Fallback: strictness parsed" "moderate" "$fallback_strictness"
+
+fallback_php001=$(printf '%s' "$fallback_json" | jq -r '.rules.PHP001.severity // empty' 2>/dev/null)
+assert_eq "Fallback: PHP001 severity" "warn" "$fallback_php001"
+
+fallback_custom_sev=$(printf '%s' "$fallback_json" | jq -r '.rules.CUSTOM_FALLBACK.severity // empty' 2>/dev/null)
+assert_eq "Fallback: CUSTOM_FALLBACK severity" "block" "$fallback_custom_sev"
+
+fallback_custom_pat=$(printf '%s' "$fallback_json" | jq -r '.rules.CUSTOM_FALLBACK.pattern // empty' 2>/dev/null)
+assert_eq "Fallback: CUSTOM_FALLBACK pattern" 'die\(' "$fallback_custom_pat"
+
+fallback_custom_langs=$(printf '%s' "$fallback_json" | jq -r '.rules.CUSTOM_FALLBACK.languages // empty | join(",")' 2>/dev/null)
+assert_eq "Fallback: CUSTOM_FALLBACK languages" "php,python" "$fallback_custom_langs"
+
+# Test rules mode fallback
+cat > "$PROJECT_DIR/src/Legacy/.craft-rules.yml" <<'YAML'
+rules:
+  PHP002: ignore
+  TS001: warn
+YAML
+
+fallback_rules_json=$(python3 -c "
+import sys
+sys.path.insert(0, '$ROOT_DIR/hooks/lib')
+from importlib.machinery import SourceFileLoader
+mod = SourceFileLoader('yaml_parser', '$PARSER_PATH').load_module()
+raw = mod.parse_line_by_line('$PROJECT_DIR/src/Legacy/.craft-rules.yml')
+output = mod.format_rules(raw)
+import json
+print(json.dumps(output))
+" 2>/dev/null)
+
+fallback_php002=$(printf '%s' "$fallback_rules_json" | jq -r '.rules.PHP002 // empty' 2>/dev/null)
+assert_eq "Fallback rules: PHP002 is ignore" "ignore" "$fallback_php002"
+
+fallback_ts001=$(printf '%s' "$fallback_rules_json" | jq -r '.rules.TS001 // empty' 2>/dev/null)
+assert_eq "Fallback rules: TS001 is warn" "warn" "$fallback_ts001"
+
+# =============================================================================
 # Cleanup
 # =============================================================================
 rm -rf "$TEST_DIR"
