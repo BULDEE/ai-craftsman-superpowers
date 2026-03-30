@@ -171,23 +171,49 @@ Analyze the codebase to recommend the optimal team composition.
 
 ### Step 1: Structure Analysis
 
-!`find . -type d \( -name vendor -o -name node_modules -o -name .git \) -prune -o -type f \( -name "*.php" -o -name "*.ts" -o -name "*.tsx" \) -print | head -200 2>/dev/null || echo "No source files found."`
+Use the **Glob** tool to list source files (exclude vendor/node_modules/.git):
+- `Glob("src/**/*.php")` — list PHP source files
+- `Glob("src/**/*.ts")` and `Glob("src/**/*.tsx")` — list TypeScript source files
+
+Report up to 200 files found. If no files match, say "No source files found."
 
 ### Step 2: Detect Stack
 
-!`{ [[ -f composer.json ]] && echo "PHP_DETECTED=true" || echo "PHP_DETECTED=false"; } ; { [[ -f package.json ]] && echo "NODE_DETECTED=true" || echo "NODE_DETECTED=false"; } ; { [[ -f composer.json ]] && grep -q '"symfony/framework-bundle"' composer.json && echo "SYMFONY=true" || echo "SYMFONY=false"; } ; { [[ -f package.json ]] && grep -q '"react"' package.json && echo "REACT=true" || echo "REACT=false"; } ; { [[ -f composer.json ]] && grep -q '"langchain\|openai\|pgvector"' composer.json && echo "AI_PHP=true" || echo "AI_PHP=false"; } ; { [[ -f package.json ]] && grep -q '"langchain\|openai\|@anthropic"' package.json && echo "AI_NODE=true" || echo "AI_NODE=false"; } 2>/dev/null || echo "Stack detection failed."`
+Use the **Glob** tool to check for stack indicator files:
+- `Glob("composer.json")` → if exists, set PHP_DETECTED=true
+- `Glob("package.json")` → if exists, set NODE_DETECTED=true
+
+If PHP detected, use **Grep** to check `composer.json` for:
+- `"symfony/framework-bundle"` → SYMFONY=true/false
+- `"langchain"`, `"openai"`, or `"pgvector"` → AI_PHP=true/false
+
+If Node detected, use **Grep** to check `package.json` for:
+- `"react"` → REACT=true/false
+- `"langchain"`, `"openai"`, or `"@anthropic"` → AI_NODE=true/false
 
 ### Step 3: Bounded Context Detection
 
-!`find src -type d 2>/dev/null | grep -E "(Domain|Application|Infrastructure|Presentation)" | sort || echo "No DDD structure detected."`
+Use the **Glob** tool to detect DDD layers:
+- `Glob("src/Domain/**")`, `Glob("src/Application/**")`, `Glob("src/Infrastructure/**")`, `Glob("src/Presentation/**")`
 
-!`find src -type d 2>/dev/null | grep -v -E "(Domain|Application|Infrastructure|Presentation|vendor|node_modules)" | awk -F'/' '{print $2}' | sort -u | head -20 || echo "No bounded contexts found."`
+If no DDD directories found, say "No DDD structure detected."
+
+Use the **Glob** tool to detect bounded contexts:
+- `Glob("src/*/")` — list top-level directories under src/, excluding Domain/Application/Infrastructure/Presentation/vendor/node_modules
 
 ### Step 4: Count Files by Layer
 
-!`for layer in Domain Application Infrastructure Presentation; do count=$(find src/$layer -type f 2>/dev/null | wc -l | tr -d ' '); echo "$layer: $count files"; done 2>/dev/null || echo "No layered structure found."`
+Use the **Glob** tool to count files per DDD layer:
+- `Glob("src/Domain/**/*")` → count results → "Domain: N files"
+- `Glob("src/Application/**/*")` → count results → "Application: N files"
+- `Glob("src/Infrastructure/**/*")` → count results → "Infrastructure: N files"
+- `Glob("src/Presentation/**/*")` → count results → "Presentation: N files"
 
-!`for dir in components hooks pages services; do count=$(find src/$dir -type f 2>/dev/null | wc -l | tr -d ' '); [[ $count -gt 0 ]] && echo "frontend/$dir: $count files"; done 2>/dev/null || true`
+If no layered structure found, say so.
+
+Use the **Glob** tool to count frontend files:
+- `Glob("src/components/**/*")`, `Glob("src/hooks/**/*")`, `Glob("src/pages/**/*")`, `Glob("src/services/**/*")`
+- Only display directories with count > 0
 
 ### Step 5: Output Recommendation
 
@@ -223,7 +249,7 @@ or let me generate a custom config based on this analysis.
 
 ### Step 1: List Built-in Templates
 
-!`ls teams/templates/*.yml 2>/dev/null | xargs -I{} basename {} .yml || echo "No templates directory found."`
+Use the **Glob** tool: `Glob("teams/templates/*.yml")`. Extract template names from the file paths. If no files found, say "No templates directory found."
 
 For each template found, read and display:
 - Name and description
@@ -233,7 +259,7 @@ For each template found, read and display:
 
 ### Step 2: List Custom Teams
 
-!`ls teams/*.yml 2>/dev/null | grep -v templates | xargs -I{} basename {} .yml || echo "No custom teams configured yet."`
+Use the **Glob** tool: `Glob("teams/*.yml")`. Exclude files under `teams/templates/`. Extract team names from the file paths. If no files found, say "No custom teams configured yet."
 
 For each custom team found, display:
 - Name and purpose

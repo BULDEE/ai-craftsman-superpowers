@@ -7,14 +7,15 @@ effort: medium
 
 ## Project Context
 
-!`cat .craft-config.yml 2>/dev/null || echo "No config found. Run /craftsman:setup first."`
+Use the **Read** tool to read `.craft-config.yml`. If the file does not exist, say "No config found. Run /craftsman:setup first."
 
 ## Iron Law
 
 Before generating ANY code, load the canonical examples:
 
-!`cat packs/symfony/knowledge/canonical/php-state-provider.php 2>/dev/null || echo "Canonical not found"`
-!`cat packs/symfony/knowledge/canonical/php-entity.php 2>/dev/null || echo "Canonical not found"`
+Use the **Read** tool to load canonical examples:
+- Read `packs/symfony/knowledge/canonical/php-state-provider.php` — if not found, say "Canonical not found"
+- Read `packs/symfony/knowledge/canonical/php-entity.php` — if not found, say "Canonical not found"
 
 ## Process
 

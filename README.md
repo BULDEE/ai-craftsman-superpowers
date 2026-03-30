@@ -49,8 +49,9 @@ claude
 
 ```bash
 # If you cloned the repo locally
-git clone https://github.com/BULDEE/ai-craftsman-superpowers.git
-/plugin install craftsman@/path/to/ai-craftsman-superpowers
+git clone https://github.com/BULDEE/ai-craftsman-superpowers.git /path/to/ai-craftsman-superpowers
+/plugin marketplace add /path/to/ai-craftsman-superpowers
+/plugin install craftsman@ai-craftsman-superpowers
 ```
 
 ### Verify Installation

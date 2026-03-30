@@ -56,7 +56,10 @@ Create tickets for later:
 
 ## Violation History
 
-!`sqlite3 "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db" "SELECT rule, COUNT(*) as count FROM violations WHERE project_hash='$(echo -n $PWD | shasum -a 256 | cut -d' ' -f1)' AND timestamp > datetime('now', '-7 days') GROUP BY rule ORDER BY count DESC LIMIT 5;" 2>/dev/null || echo "No violations tracked yet"`
+Use the Bash tool to query the metrics database for recent violations:
+```bash
+sqlite3 ~/.claude/plugins/data/craftsman/metrics.db "SELECT rule, COUNT(*) as count FROM violations WHERE timestamp > datetime('now', '-7 days') GROUP BY rule ORDER BY count DESC LIMIT 5;" 2>/dev/null || echo "No violations tracked yet"
+```
 
 ### Review Process
 
