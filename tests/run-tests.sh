@@ -402,6 +402,60 @@ test_craftsman_ci() {
     fi
 }
 
+# Test: Bias detector (functional tests)
+test_bias_detector() {
+    echo ""
+    log_info "Testing bias detector (functional)"
+
+    local bias_test="$SCRIPT_DIR/core/test-bias-detector.sh"
+
+    if [[ -f "$bias_test" ]]; then
+        if bash "$bias_test" > /dev/null 2>&1; then
+            log_pass "Bias detector tests pass"
+        else
+            log_fail "Bias detector tests failed — run tests/core/test-bias-detector.sh for details"
+        fi
+    else
+        log_skip "Bias detector tests (tests/core/test-bias-detector.sh not found)"
+    fi
+}
+
+# Test: Correction learning (functional tests)
+test_correction_learning() {
+    echo ""
+    log_info "Testing correction learning (functional)"
+
+    local correction_test="$SCRIPT_DIR/core/test-correction-learning.sh"
+
+    if [[ -f "$correction_test" ]]; then
+        if bash "$correction_test" > /dev/null 2>&1; then
+            log_pass "Correction learning tests pass"
+        else
+            log_fail "Correction learning tests failed — run tests/core/test-correction-learning.sh for details"
+        fi
+    else
+        log_skip "Correction learning tests (tests/core/test-correction-learning.sh not found)"
+    fi
+}
+
+# Test: Session metrics (functional tests)
+test_session_metrics() {
+    echo ""
+    log_info "Testing session metrics (functional)"
+
+    local metrics_test="$SCRIPT_DIR/core/test-session-metrics.sh"
+
+    if [[ -f "$metrics_test" ]]; then
+        if bash "$metrics_test" > /dev/null 2>&1; then
+            log_pass "Session metrics tests pass"
+        else
+            log_fail "Session metrics tests failed — run tests/core/test-session-metrics.sh for details"
+        fi
+    else
+        log_skip "Session metrics tests (tests/core/test-session-metrics.sh not found)"
+    fi
+}
+
 # Main test runner
 main() {
     echo "=================================================="
@@ -479,6 +533,9 @@ main() {
 
         test_hook_behavior
         test_config_resolution
+        test_bias_detector
+        test_correction_learning
+        test_session_metrics
         test_pack_suites
         test_craftsman_ci
     fi

@@ -41,11 +41,11 @@ REACT_TEMPLATES=()
 
 while IFS= read -r f; do
     SYMFONY_TEMPLATES+=("$f")
-done < <(find "$ROOT_DIR/symfony-pack/templates" -name "*.template.md" 2>/dev/null | sort)
+done < <(find "$ROOT_DIR/packs/symfony/templates" -name "*.template.md" 2>/dev/null | sort)
 
 while IFS= read -r f; do
     REACT_TEMPLATES+=("$f")
-done < <(find "$ROOT_DIR/react-pack/templates" -name "*.template.md" 2>/dev/null | sort)
+done < <(find "$ROOT_DIR/packs/react/templates" -name "*.template.md" 2>/dev/null | sort)
 
 ALL_TEMPLATES=("${SYMFONY_TEMPLATES[@]}" "${REACT_TEMPLATES[@]}")
 
@@ -66,7 +66,7 @@ fi
 
 # Expected template names
 for expected in "bounded-context-backend" "crud-api" "event-sourced"; do
-    if [[ -f "$ROOT_DIR/symfony-pack/templates/${expected}.template.md" ]]; then
+    if [[ -f "$ROOT_DIR/packs/symfony/templates/${expected}.template.md" ]]; then
         pass "Symfony template exists: ${expected}"
     else
         fail "Symfony template missing: ${expected}"
@@ -74,7 +74,7 @@ for expected in "bounded-context-backend" "crud-api" "event-sourced"; do
 done
 
 for expected in "bounded-context-frontend" "form-heavy" "dashboard-data"; do
-    if [[ -f "$ROOT_DIR/react-pack/templates/${expected}.template.md" ]]; then
+    if [[ -f "$ROOT_DIR/packs/react/templates/${expected}.template.md" ]]; then
         pass "React template exists: ${expected}"
     else
         fail "React template missing: ${expected}"
