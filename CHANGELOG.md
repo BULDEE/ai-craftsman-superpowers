@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1] - 2026-03-30
+
+### Changed
+- **Native Agent Teams**: `/craftsman:team` now uses `TeamCreate` + `TaskCreate` + teammates instead of isolated `Agent` subagents
+- **team-lead agent**: Added `TeamCreate`, `TaskCreate`, `TaskList`, `TaskUpdate`, `SendMessage` to allowedTools
+- **team-lead agent**: Added `craftsman:team` skill and "Native Agent Teams Integration" section
+- `/craftsman:team list` now shows active teams alongside templates
+
+### Fixed
+- `/craftsman:team create` spawned isolated subagents instead of coordinated teammates with shared task lists
+
 ## [2.6.0] - 2026-03-29
 
 ### Added

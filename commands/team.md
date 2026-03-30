@@ -3,9 +3,11 @@ description: Create and manage agent teams for collaborative tasks. Supports tea
 effort: heavy
 ---
 
-# /craftsman:team — Agent Team Manager
+# /craftsman:team — Agent Team Manager (Native Teams)
 
-You are the **team coordinator** for AI Craftsman Superpowers. You assemble, configure, and spawn teams of specialized agents.
+You are the **team coordinator** for AI Craftsman Superpowers. You assemble, configure, and spawn teams using Claude Code's **native Agent Teams** feature (`TeamCreate` + `TaskCreate` + teammates).
+
+> **IMPORTANT**: This skill requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json env block and `teammateMode` set to `"iterm"` or `"tmux"`.
 
 ## Subcommand Dispatch
 
@@ -105,62 +107,138 @@ agents:
     tools: [Read, Write, Edit, Bash, Glob, Grep]
 ```
 
-Agent slug → file mapping:
-- `architecture` → `architecture-reviewer`
-- `security` → `security-pentester`
+Agent slug → subagent_type mapping:
+- `architecture` → `craftsman:architect`
+- `security` → `craftsman:security-pentester`
 - `frontend` → `frontend-craftsman`
 - `backend` → `backend-craftsman`
 - `ddd` → `architect`
-- `performance` → `symfony-reviewer` (backend perf) or `react-reviewer` (frontend perf)
+- `performance` → `craftsman:team-lead`
+- `team-lead` → `craftsman:team-lead`
 
 Show the generated config to the user and ask for confirmation before proceeding.
 
-### Step 4: Spawn the Team
+### Step 4: Spawn the Team (Native Agent Teams)
 
-Use the **Agent tool** to spawn agents according to the workflow type.
+**This is the critical step.** Use Claude Code's native team infrastructure, NOT raw `Agent` calls.
 
-#### Parallel workflow
+#### Step 4.1: Create the Team
 
-Launch all agents in a single message (one Agent tool call per agent):
+Use the `TeamCreate` tool:
 
-For each agent in the config:
-- `subagent_type`: use the agent's slug (e.g., `architecture-reviewer`)
-- Pass the agent's `scope`, `tools`, and the team purpose as context
-- Include the team YAML path so agents can read shared context
+```
+TeamCreate({
+  team_name: "<team-name>",
+  description: "<purpose from team config>"
+})
+```
 
-#### Sequential workflow
+This creates:
+- `~/.claude/teams/<team-name>.json` — team config with member registry
+- `~/.claude/tasks/<team-name>/` — shared task list directory
 
-Launch agents one at a time. Wait for each to complete before spawning the next.
-Pass the previous agent's output as context to the next agent.
+#### Step 4.2: Create Tasks
 
-#### Parallel-then-review workflow
+Use `TaskCreate` for each agent's work scope. Tasks should be:
+- **Specific**: one clear deliverable per task
+- **Independent**: no cross-dependencies for parallel workflow
+- **Scoped**: include the glob pattern or file list for the agent
 
-1. Launch all `parallel` agents simultaneously
-2. Collect their outputs
-3. Launch `sequential` reviewer agents with the combined outputs as context
+Example for a code-review team:
+```
+TaskCreate({ title: "Architecture review — layer violations and dependency direction", description: "..." })
+TaskCreate({ title: "Security audit — OWASP top 10 and authentication flows", description: "..." })
+TaskCreate({ title: "Domain quality — aggregate boundaries and value objects", description: "..." })
+```
 
-### Step 5: Collect and Consolidate
+For **parallel-then-review** workflows, also create the review task:
+```
+TaskCreate({ title: "Consolidation review — merge findings and resolve conflicts", description: "Depends on: [task IDs of parallel tasks]" })
+```
 
-After all agents complete:
-1. Aggregate findings by severity (BLOCKING → MUST FIX → IMPROVE)
-2. Deduplicate overlapping findings
-3. Present consolidated report:
+#### Step 4.3: Spawn Teammates
+
+Use the `Agent` tool with the `team_name` parameter to spawn each teammate:
+
+```
+Agent({
+  description: "<3-5 word summary>",
+  prompt: "<full task brief including team context>",
+  subagent_type: "<agent-slug>",
+  name: "<agent-name>",
+  team_name: "<team-name>"
+})
+```
+
+**CRITICAL**: Include `team_name` — this is what makes the agent a **teammate** instead of an isolated subagent. Teammates:
+- Appear in their own terminal window (iTerm tab or tmux pane)
+- Share a task list at `~/.claude/tasks/<team-name>/`
+- Can send messages to each other via `SendMessage`
+- Go idle between turns and can be re-activated
+- Are visible and observable by the user
+
+For each teammate prompt, include:
+1. The team name and purpose
+2. Their specific task (reference the TaskCreate ID)
+3. Instructions to claim their task via `TaskUpdate` (set owner + in_progress)
+4. Instructions to mark task completed via `TaskUpdate` when done
+5. Instructions to check `TaskList` for additional work after completion
+
+#### Workflow-specific spawning:
+
+**Parallel workflow:**
+Launch ALL teammates in a single message (multiple Agent tool calls):
+```
+// Single message with multiple parallel Agent calls
+Agent({ ..., name: "arch-reviewer", team_name: "code-review" })
+Agent({ ..., name: "sec-pentester", team_name: "code-review" })
+Agent({ ..., name: "domain-reviewer", team_name: "code-review" })
+```
+
+**Sequential workflow:**
+Launch teammates one at a time. Wait for idle notification + task completion before spawning the next. Pass previous output via `SendMessage` or task description.
+
+**Parallel-then-review workflow:**
+1. Launch all `parallel` teammates simultaneously
+2. Wait for all parallel tasks to be marked completed
+3. Launch `sequential` reviewer teammate with instructions to read all completed task outputs
+
+### Step 5: Monitor and Consolidate
+
+After spawning teammates:
+
+1. **Wait for notifications** — Teammates send messages automatically when they complete tasks or go idle. Do NOT poll or sleep.
+2. **Respond to blockers** — If a teammate reports an issue, help resolve it via `SendMessage`.
+3. **Track progress** — Use `TaskList` to see overall completion status.
+4. **Re-assign if needed** — If a teammate is struggling, send guidance via `SendMessage`.
+
+When all tasks are completed:
+
+1. **Collect findings** — Read each teammate's task output or messages
+2. **Aggregate by severity** — BLOCKING → MUST FIX → IMPROVE
+3. **Deduplicate** — Remove overlapping findings across agents
+4. **Present consolidated report:**
 
 ```markdown
 ## Team Report: <team-name>
 
 ### Summary
-- Agents run: <count>
+- Teammates: <count>
 - Total findings: <count>
 - BLOCKING: <count> | MUST FIX: <count> | IMPROVE: <count>
 
-### Findings by Agent
-<per-agent section>
+### Findings by Teammate
+<per-teammate section>
 
 ### Consolidated Action Items
 1. [BLOCKING] ...
 2. [MUST FIX] ...
 3. [IMPROVE] ...
+```
+
+5. **Shutdown the team** — Send shutdown to all teammates:
+```
+SendMessage({ to: "<teammate-name>", message: { type: "shutdown_request" } })
 ```
 
 ---
@@ -266,7 +344,15 @@ For each custom team found, display:
 - Agent count
 - Creation date (from file mtime if available)
 
-### Step 3: Display Summary
+### Step 3: List Active Teams
+
+!`ls ~/.claude/teams/*.json 2>/dev/null | xargs -I{} basename {} .json || echo "No active teams running."`
+
+For each active team:
+- Read the config to show member count and status
+- Show task completion progress via TaskList
+
+### Step 4: Display Summary
 
 ```
 Available Teams
@@ -281,6 +367,10 @@ CUSTOM TEAMS
   <name>         (<n> agents) — <purpose>
   (none yet)
 
+ACTIVE TEAMS
+  <name>         (<n> members) — <status>
+  (none running)
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Run /craftsman:team create to build a new team.
 Run /craftsman:team context to get a recommendation.
@@ -291,16 +381,20 @@ Run /craftsman:team context to get a recommendation.
 ## Help (no subcommand)
 
 ```
-/craftsman:team — Agent Team Manager
+/craftsman:team — Agent Team Manager (Native Teams)
 
 SUBCOMMANDS
-  /craftsman:team create   — Interactive team builder
+  /craftsman:team create   — Interactive team builder (uses TeamCreate)
   /craftsman:team context  — Analyze codebase and get team recommendation
-  /craftsman:team list     — List available templates and custom teams
+  /craftsman:team list     — List templates, custom teams, and active teams
 
 EXAMPLES
   /craftsman:team create                → guided team assembly
   /craftsman:team create feature        → fast-track feature template
   /craftsman:team context               → analyze this repo first
   /craftsman:team list                  → see what's available
+
+REQUIREMENTS
+  - settings.json: CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+  - settings.json: teammateMode: "iterm" | "tmux"
 ```
