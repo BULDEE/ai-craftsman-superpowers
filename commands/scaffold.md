@@ -7,13 +7,13 @@ effort: medium
 
 ## Project Context
 
-!`cat .craft-config.yml 2>/dev/null || echo "No config found. Run /craftsman:setup first."`
+Use the **Read** tool to read `.craft-config.yml`. If the file does not exist, say "No config found. Run /craftsman:setup first."
 
 ## Available Types
 
 Detect available scaffold types from loaded packs:
 
-!`for pack_dir in packs/*/; do [ -f "$pack_dir/pack.yml" ] || continue; name=$(basename "$pack_dir"); types=$(grep -A5 "scaffold_types:" "$pack_dir/pack.yml" | grep -oE '"[^"]+"' | tr -d '"' | tr '\n' ', ' | sed 's/,$//'); [ -n "$types" ] && echo "**${name}:** ${types}"; done 2>/dev/null || echo "No scaffold types available. Check pack configuration."`
+Use the **Glob** tool: `Glob("packs/*/pack.yml")`. For each found file, use the **Read** tool to read it and extract the `scaffold_types:` list. Display each pack's types as `**<pack-name>:** <type1>, <type2>, ...`. If no scaffold types found, say "No scaffold types available. Check pack configuration."
 
 ## Usage
 

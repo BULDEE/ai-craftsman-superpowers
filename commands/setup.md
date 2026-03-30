@@ -30,7 +30,14 @@ Here's what's included:
 
 Before anything else, detect the project stack and available tooling:
 
-!`{ [[ -f composer.json ]] && echo "PHP_DETECTED=true" || echo "PHP_DETECTED=false"; } ; { [[ -f package.json ]] && echo "NODE_DETECTED=true" || echo "NODE_DETECTED=false"; } ; { command -v phpstan >/dev/null 2>&1 && echo "PHPSTAN=available" || { [[ -f vendor/bin/phpstan ]] && echo "PHPSTAN=available" || echo "PHPSTAN=missing"; }; } ; { command -v npx >/dev/null 2>&1 && echo "NPX=available" || echo "NPX=missing"; } ; { [[ -f vendor/bin/deptrac ]] && echo "DEPTRAC=available" || echo "DEPTRAC=missing"; } 2>/dev/null || echo "Detection failed — continuing manually."`
+Use the **Glob** tool to detect the project stack and available tooling:
+- `Glob("composer.json")` → if exists, PHP_DETECTED=true
+- `Glob("package.json")` → if exists, NODE_DETECTED=true
+- `Glob("vendor/bin/phpstan")` → if exists, PHPSTAN=available, else missing
+- `Glob("vendor/bin/deptrac")` → if exists, DEPTRAC=available, else missing
+
+Use the **Bash** tool with simple commands to check CLI tools:
+- `command -v npx` → if found, NPX=available, else missing
 
 ### Analysis Tools Check
 
@@ -55,7 +62,7 @@ Pre-select packs based on detection (user can override in Step 4):
 
 Check if configuration already exists:
 
-!`cat ~/.claude/.craft-config.yml 2>/dev/null || echo "CONFIG_NOT_FOUND"`
+Use the **Read** tool to read `~/.claude/.craft-config.yml`. If the file does not exist, treat as CONFIG_NOT_FOUND.
 
 - If file exists: Show current config and ask "Do you want to reconfigure? [y/N]"
 - If file doesn't exist: Proceed with full setup
@@ -196,7 +203,7 @@ Default recommendation: All enabled.
 
 Detect available packs and their descriptions:
 
-!`ls -d packs/*/pack.yml 2>/dev/null | while read f; do dir=$(dirname "$f"); name=$(basename "$dir"); desc=$(grep "^description:" "$f" | sed 's/description: *"//;s/"$//'); echo "- **$name**: $desc"; done || echo "No packs found."`
+Use the **Glob** tool: `Glob("packs/*/pack.yml")`. For each found file, use the **Read** tool to read it and extract the `description:` field. Display each pack as `- **<pack-name>**: <description>`. If no packs found, say "No packs found."
 
 Pre-select packs based on auto-detection from Pre-check (user can adjust):
 - PHP detected → **Symfony Pack** auto-selected

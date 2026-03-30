@@ -55,7 +55,10 @@ Based on symptoms, rank hypotheses by probability:
 
 ## Recent Corrections
 
-!`sqlite3 "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db" "SELECT rule, file_pattern, action, note FROM corrections WHERE timestamp > datetime('now','-7 days') ORDER BY timestamp DESC LIMIT 10;" 2>/dev/null || echo "No recent corrections"`
+Use the Bash tool to query recent corrections from the metrics database:
+```bash
+sqlite3 ~/.claude/plugins/data/craftsman/metrics.db "SELECT rule, file_pattern, action, context FROM corrections WHERE timestamp > datetime('now','-7 days') ORDER BY timestamp DESC LIMIT 10;" 2>/dev/null || echo "No recent corrections"
+```
 
 Execute investigation cycles:
 

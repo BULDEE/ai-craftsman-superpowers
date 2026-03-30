@@ -473,132 +473,116 @@ echo "=== Agent Hook Schema Tests ==="
 
 HOOKS_FILE="$ROOT_DIR/hooks/hooks.json"
 
-# Test: PostToolUse has 3 hooks (command + 2 agents)
+# Test: PostToolUse has 3 command hooks (post-write-check + ddd-verifier + sentry-context)
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 hooks = d['hooks']['PostToolUse'][0]['hooks']
 assert len(hooks) == 3, f'Expected 3 hooks, got {len(hooks)}'
-assert hooks[0]['type'] == 'command'
-assert hooks[1]['type'] == 'agent'
-assert hooks[2]['type'] == 'agent'
+assert all(h['type'] == 'command' for h in hooks), 'All hooks must be command type'
 " 2>/dev/null; then
-    log_pass "PostToolUse has 3 hooks (command + 2 agents)"
+    log_pass "PostToolUse has 3 command hooks"
 else
-    log_fail "PostToolUse hook count" "expected 3 hooks"
+    log_fail "PostToolUse hook count" "expected 3 command hooks"
 fi
 
-# Test: DDD verifier agent hook valid
+# Test: DDD verifier command hook references correct script
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 ddd_hook = d['hooks']['PostToolUse'][0]['hooks'][1]
-assert ddd_hook['type'] == 'agent'
-assert 'prompt' in ddd_hook
-assert ddd_hook['model'] == 'haiku'
-assert ddd_hook['timeout'] == 30
-assert '\$ARGUMENTS' in ddd_hook['prompt']
+assert ddd_hook['type'] == 'command'
+assert 'agent-ddd-verifier.sh' in ddd_hook['command']
 " 2>/dev/null; then
-    log_pass "PostToolUse DDD agent hook: valid schema (type, prompt, model, timeout)"
+    log_pass "PostToolUse DDD verifier: command hook with gate script"
 else
-    log_fail "PostToolUse DDD agent hook schema" "missing or invalid"
+    log_fail "PostToolUse DDD verifier" "missing or invalid"
 fi
 
-# Test: Sentry agent hook valid
+# Test: DDD verifier script has agent_hooks gate
+if grep -q 'CLAUDE_PLUGIN_OPTION_agent_hooks' "$ROOT_DIR/hooks/agent-ddd-verifier.sh" 2>/dev/null; then
+    log_pass "DDD verifier script contains agent_hooks gate"
+else
+    log_fail "DDD verifier gate" "missing CLAUDE_PLUGIN_OPTION_agent_hooks check"
+fi
+
+# Test: Sentry context command hook references correct script
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 sentry_hook = d['hooks']['PostToolUse'][0]['hooks'][2]
-assert sentry_hook['type'] == 'agent'
-assert sentry_hook['model'] == 'haiku'
-assert sentry_hook['timeout'] == 30
-assert 'Sentry' in sentry_hook['prompt']
-assert '\$ARGUMENTS' in sentry_hook['prompt']
-assert 'CLAUDE_PLUGIN_OPTION_sentry_org' in sentry_hook['prompt']
+assert sentry_hook['type'] == 'command'
+assert 'agent-sentry-context.sh' in sentry_hook['command']
 " 2>/dev/null; then
-    log_pass "PostToolUse Sentry agent hook: valid schema (haiku, 30s, org check)"
+    log_pass "PostToolUse Sentry context: command hook with gate script"
 else
-    log_fail "Sentry agent hook" "missing or invalid"
+    log_fail "Sentry context hook" "missing or invalid"
 fi
 
-# Test: InstructionsLoaded agent hook
+# Test: Sentry context script has sentry_org gate
+if grep -q 'CLAUDE_PLUGIN_OPTION_sentry_org' "$ROOT_DIR/hooks/agent-sentry-context.sh" 2>/dev/null; then
+    log_pass "Sentry context script contains sentry_org gate"
+else
+    log_fail "Sentry context gate" "missing CLAUDE_PLUGIN_OPTION_sentry_org check"
+fi
+
+# Test: InstructionsLoaded command hook references structure analyzer
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 hooks = d['hooks']['InstructionsLoaded'][0]['hooks']
-agent = [h for h in hooks if h.get('type') == 'agent']
-assert len(agent) == 1
-assert agent[0]['model'] == 'haiku'
-assert agent[0]['timeout'] == 20
+assert len(hooks) == 1
+assert hooks[0]['type'] == 'command'
+assert 'agent-structure-analyzer.sh' in hooks[0]['command']
 " 2>/dev/null; then
-    log_pass "InstructionsLoaded agent hook: valid schema (haiku, 20s timeout)"
+    log_pass "InstructionsLoaded: command hook with structure analyzer"
 else
-    log_fail "InstructionsLoaded agent hook schema" "missing or invalid"
+    log_fail "InstructionsLoaded hook" "missing or invalid"
 fi
 
-# Test: InstructionsLoaded prompt contains correction trends query
-if python3 -c "
-import json
-d = json.load(open('$HOOKS_FILE'))
-prompt = d['hooks']['InstructionsLoaded'][0]['hooks'][0]['prompt']
-assert 'corrections' in prompt.lower(), 'Missing corrections reference'
-assert 'sqlite3' in prompt, 'Missing sqlite3 query'
-" 2>/dev/null; then
-    log_pass "InstructionsLoaded prompt contains correction trends query"
+# Test: Structure analyzer script contains corrections query
+if grep -q 'corrections' "$ROOT_DIR/hooks/agent-structure-analyzer.sh" 2>/dev/null; then
+    log_pass "Structure analyzer contains correction trends query"
 else
-    log_fail "InstructionsLoaded corrections" "missing sqlite3 or corrections reference"
+    log_fail "InstructionsLoaded corrections" "missing corrections reference"
 fi
 
-# Test: InstructionsLoaded prompt contains channel status check
-if python3 -c "
-import json
-d = json.load(open('$HOOKS_FILE'))
-prompt = d['hooks']['InstructionsLoaded'][0]['hooks'][0]['prompt']
-assert 'channel_status_summary' in prompt, 'Missing channel_status_summary'
-" 2>/dev/null; then
-    log_pass "InstructionsLoaded prompt contains channel_status_summary"
+# Test: Structure analyzer script contains channel status check
+if grep -q 'channel_status_summary' "$ROOT_DIR/hooks/agent-structure-analyzer.sh" 2>/dev/null; then
+    log_pass "Structure analyzer contains channel_status_summary"
 else
     log_fail "InstructionsLoaded channel status" "missing channel_status_summary"
 fi
 
-# Test: Stop agent hook
+# Test: Stop command hook references final review
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 hooks = d['hooks']['Stop'][0]['hooks']
-agent = [h for h in hooks if h.get('type') == 'agent']
-assert len(agent) == 1
-assert agent[0]['model'] == 'haiku'
-assert agent[0]['timeout'] == 30
+assert len(hooks) == 1
+assert hooks[0]['type'] == 'command'
+assert 'agent-final-review.sh' in hooks[0]['command']
 " 2>/dev/null; then
-    log_pass "Stop agent hook: valid schema (haiku, 30s timeout)"
+    log_pass "Stop: command hook with final review"
 else
-    log_fail "Stop agent hook schema" "missing or invalid"
+    log_fail "Stop hook" "missing or invalid"
 fi
 
-# Test: Stop agent prompt contains strictness gate
-if python3 -c "
-import json
-d = json.load(open('$HOOKS_FILE'))
-hooks = d['hooks']['Stop'][0]['hooks']
-agent = [h for h in hooks if h.get('type') == 'agent'][0]
-assert 'CLAUDE_PLUGIN_OPTION_strictness' in agent['prompt']
-" 2>/dev/null; then
-    log_pass "Stop agent prompt contains strictness gate"
+# Test: Final review script contains strictness gate
+if grep -q 'CLAUDE_PLUGIN_OPTION_strictness' "$ROOT_DIR/hooks/agent-final-review.sh" 2>/dev/null; then
+    log_pass "Final review script contains strictness gate"
 else
-    log_fail "Stop agent prompt" "missing CLAUDE_PLUGIN_OPTION_strictness gate"
+    log_fail "Final review gate" "missing CLAUDE_PLUGIN_OPTION_strictness check"
 fi
 
-# Test: Existing command hooks still present
+# Test: post-write-check.sh command hook still present
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 hooks = d['hooks']['PostToolUse'][0]['hooks']
-cmd = [h for h in hooks if h.get('type') == 'command']
-assert len(cmd) == 1, 'Command hook missing'
-assert 'post-write-check.sh' in cmd[0]['command']
+assert 'post-write-check.sh' in hooks[0]['command']
 " 2>/dev/null; then
-    log_pass "PostToolUse command hook preserved alongside agent hook"
+    log_pass "PostToolUse post-write-check.sh command hook present"
 else
     log_fail "PostToolUse command hook" "missing or modified"
 fi

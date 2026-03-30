@@ -97,7 +97,9 @@ Checked all files, no changes needed.
 
 Before running verifications, detect the stack and available tools:
 
-!`[[ -f composer.json ]] && echo "PHP_STACK=true" || echo "PHP_STACK=false"; [[ -f package.json ]] && echo "NODE_STACK=true" || echo "NODE_STACK=false"`
+Use the **Glob** tool to detect the stack:
+- `Glob("composer.json")` → if exists, PHP_STACK=true
+- `Glob("package.json")` → if exists, NODE_STACK=true
 
 **Auto-run available checks:**
 
@@ -265,14 +267,18 @@ Failed asserting that 'invalid' matches expected 'valid@email.com'.
 
 After successful verification, update session state to allow git push:
 
-!`echo '{"verified": true, "verified_at": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' | python3 -c "
-import json, sys, os
+Use the **Bash** tool to update session state:
+```
+python3 -c "
+import json, os, datetime
 sf = os.path.join(os.environ.get('CLAUDE_PLUGIN_DATA', os.path.expanduser('~/.claude/plugins/data/craftsman')), 'session-state.json')
-new = json.load(sys.stdin)
 try:
     with open(sf) as f: state = json.load(f)
 except: state = {}
-state.update(new)
+state['verified'] = True
+state['verified_at'] = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 with open(sf, 'w') as f: json.dump(state, f)
 print('Session state updated: verified=true')
-" 2>/dev/null || echo "Session state update skipped"`
+"
+```
+If the command fails, say "Session state update skipped".
