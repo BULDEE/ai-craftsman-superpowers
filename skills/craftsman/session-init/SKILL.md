@@ -72,19 +72,16 @@ Then show commands based on enabled packs.
 | `/craftsman:git` | Safe git workflow |
 | `/craftsman:parallel` | Parallel agent orchestration |
 
-### Symfony Pack (if `packs.symfony: true`)
+### Scaffolding (if `packs.symfony: true` or `packs.react: true`)
 
 | Command | Purpose |
 |---------|---------|
-| `/craftsman:entity` | Scaffold DDD entity with Value Objects |
-| `/craftsman:usecase` | Scaffold Use Case with Command/Handler |
-
-### React Pack (if `packs.react: true`)
-
-| Command | Purpose |
-|---------|---------|
-| `/craftsman:component` | Scaffold React component with tests |
-| `/craftsman:hook` | Scaffold TanStack Query hook |
+| `/craftsman:scaffold entity` | Scaffold DDD entity with Value Objects |
+| `/craftsman:scaffold usecase` | Scaffold Use Case with Command/Handler |
+| `/craftsman:scaffold component` | Scaffold React component with tests |
+| `/craftsman:scaffold hook` | Scaffold TanStack Query hook |
+| `/craftsman:scaffold api-resource` | API Platform resource with State Provider |
+| `/craftsman:scaffold pack` | Create new community pack |
 
 ### AI Pack (if `packs.ai: true`)
 
@@ -93,14 +90,12 @@ Then show commands based on enabled packs.
 | `/craftsman:rag` | Design RAG pipeline |
 | `/craftsman:mlops` | MLOps audit |
 | `/craftsman:agent-design` | Agent 3P pattern |
-| `/craftsman:source-verify` | Verify AI capabilities |
 
 ### Utility (Always Available)
 
 | Command | Purpose |
 |---------|---------|
-| `/craftsman:scaffold` | Generate context agent from code |
-| `/craftsman:agent-create` | Create bounded context agent |
+| `/craftsman:scaffold` | Unified scaffolder (entity, usecase, component, hook, api-resource, pack) |
 
 ---
 

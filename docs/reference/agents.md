@@ -1,7 +1,7 @@
 # Agents Reference
 
-The plugin provides **12 agents** organized in two categories:
-- **5 Reviewers** — read-only analysis and code review
+The plugin provides **11 agents** organized in two categories:
+- **4 Reviewers** — read-only analysis and code review
 - **7 Craftsmen** — implementation specialists with domain expertise
 
 ## How to Use Agents
@@ -11,7 +11,7 @@ The plugin provides **12 agents** organized in two categories:
 ```
 > Review this PR with the architecture-reviewer agent
 
-> Run ai-reviewer on the ML pipeline code
+> Run ai-engineer on the ML pipeline code
 ```
 
 **Craftsmen** are invoked for implementation tasks:
@@ -30,7 +30,7 @@ The plugin provides **12 agents** organized in two categories:
 
 ### team-lead
 
-**Model**: Opus | **Effort**: max | **Memory**: user | **Max Turns**: 50
+**Model**: Sonnet | **Effort**: high | **Memory**: user | **Max Turns**: 50
 
 **Mission**: Orchestrator that delegates, challenges decisions, and validates deliverables. **Never codes directly.**
 
@@ -110,6 +110,20 @@ The plugin provides **12 agents** organized in two categories:
 - LLM integration (Claude, OpenAI)
 - MCP server design and implementation
 - Agent patterns (3P: Perceive/Plan/Perform)
+
+---
+
+### api-craftsman
+
+**Model**: Sonnet | **Effort**: high | **Memory**: project | **Max Turns**: 30
+
+**Mission**: Senior API architect.
+
+**Expertise**:
+- API Platform 4, REST/HATEOAS standards
+- OpenAPI specification, JSON-LD/Hydra
+- API security (OAuth2, JWT)
+- API design reviews and RESTful architecture decisions
 
 ---
 
@@ -237,7 +251,7 @@ The plugin provides **12 agents** organized in two categories:
 
 ## AI Pack
 
-### ai-reviewer
+### ai-engineer
 
 **Mission**: Review AI/ML code for production best practices.
 
@@ -316,12 +330,12 @@ All agents are defined as `.md` files with YAML frontmatter. Supported fields:
 | `tools` | Allowed tools | `Read, Glob, Grep, Bash` |
 | `disallowedTools` | Blocked tools | `Edit, Write` |
 | `maxTurns` | Maximum conversation turns | `30` |
-| `skills` | Pre-loaded skills | `craftsman:entity, craftsman:spec` |
+| `skills` | Pre-loaded skills | `craftsman:scaffold, craftsman:spec` |
 | `memory` | Memory scope | `project`, `user` |
 
 ## Creating Custom Agents
 
-See [Master Guide](../guides/master.md) for creating your own agents, or use `/craftsman:agent-create` for interactive creation.
+See [Master Guide](../guides/master.md) for creating your own agents, or use `/craftsman:scaffold` to generate one.
 
 Template:
 ```markdown

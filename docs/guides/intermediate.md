@@ -22,10 +22,10 @@ You've mastered the basics. Now let's go deeper into advanced patterns, pack-spe
 
 The Symfony pack provides DDD-focused scaffolding.
 
-#### /craftsman:entity
+#### /craftsman:scaffold entity
 
 ```
-> /craftsman:entity
+> /craftsman:scaffold entity
 
 Create a Product entity for an e-commerce bounded context.
 Products have SKU, name, price, and stock quantity.
@@ -57,10 +57,10 @@ tests/Unit/Domain/Product/
 - Domain events for state changes
 - Full test coverage
 
-#### /craftsman:usecase
+#### /craftsman:scaffold usecase
 
 ```
-> /craftsman:usecase
+> /craftsman:scaffold usecase
 
 Create a PlaceOrder use case.
 It should validate stock and create an order.
@@ -79,10 +79,10 @@ tests/Unit/Application/UseCase/
 
 ### React Pack
 
-#### /craftsman:component
+#### /craftsman:scaffold component
 
 ```
-> /craftsman:component
+> /craftsman:scaffold component
 
 Create a ProductCard component.
 Shows product image, name, price, and add to cart button.
@@ -103,10 +103,10 @@ src/components/ProductCard/
 - No `any` types
 - Named exports only
 
-#### /craftsman:hook
+#### /craftsman:scaffold hook
 
 ```
-> /craftsman:hook
+> /craftsman:scaffold hook
 
 Create a useProduct hook.
 Fetches product by ID with loading and error states.
@@ -243,17 +243,17 @@ What aggregates do we need for Shipping?
 Consider: Shipment, Route, Carrier.
 
 # 3. Create entities
-> /craftsman:entity
+> /craftsman:scaffold entity
 Create the Shipment aggregate.
 
-> /craftsman:entity
+> /craftsman:scaffold entity
 Create the Route entity.
 
 # 4. Create use cases
-> /craftsman:usecase
+> /craftsman:scaffold usecase
 CreateShipment use case.
 
-> /craftsman:usecase
+> /craftsman:scaffold usecase
 UpdateShipmentStatus use case.
 
 # 5. Review architecture
@@ -300,14 +300,14 @@ What are the alternatives?
 
 ```
 # Create a Subscription entity (Symfony)
-> /craftsman:entity
+> /craftsman:scaffold entity
 Subscription with: plan, status, billing cycle, next billing date.
 
 # Write comprehensive tests
 > /craftsman:test
 
 # Create use cases
-> /craftsman:usecase
+> /craftsman:scaffold usecase
 CreateSubscription, CancelSubscription, RenewSubscription
 ```
 
@@ -315,13 +315,13 @@ CreateSubscription, CancelSubscription, RenewSubscription
 
 ```
 # Create subscription management UI (React)
-> /craftsman:component
+> /craftsman:scaffold component
 SubscriptionCard - shows plan, status, renewal date
 
-> /craftsman:hook
+> /craftsman:scaffold hook
 useSubscription - manages subscription state
 
-> /craftsman:component
+> /craftsman:scaffold component
 SubscriptionForm - create/edit subscription
 ```
 

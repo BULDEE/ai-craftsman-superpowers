@@ -112,13 +112,13 @@ Available skills:
 - /craftsman:git       - Safe git workflow
 
 {if symfony}
-- /craftsman:entity  - Scaffold DDD entity
-- /craftsman:usecase - Scaffold use case
+- /craftsman:scaffold entity  - Scaffold DDD entity
+- /craftsman:scaffold usecase - Scaffold use case
 {/if}
 
 {if react}
-- /craftsman:component - Scaffold React component
-- /craftsman:hook      - Scaffold query hook
+- /craftsman:scaffold component - Scaffold React component
+- /craftsman:scaffold hook      - Scaffold query hook
 {/if}
 
 Type /craftsman: for the full command reference.

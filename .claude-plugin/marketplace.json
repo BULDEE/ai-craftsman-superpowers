@@ -1,6 +1,6 @@
 {
   "name": "ai-craftsman-superpowers",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "owner": {
     "name": "Alexandre Mallet",
     "email": "alexandre.mallet@buldee.com"
@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "craftsman",
-      "version": "2.7.0",
+      "version": "2.8.0",
       "description": "Core craftsman methodology - DDD design, systematic debugging, structured planning, architecture review, and safe git workflows.",
       "author": {
         "name": "Alexandre Mallet",

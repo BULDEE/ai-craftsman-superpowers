@@ -26,7 +26,7 @@ This plugin encodes these practices into repeatable skills.
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐ │
 │  │  CORE PACK  │  │SYMFONY PACK │  │ REACT PACK  │  │  AI PACK   │ │
 │  │             │  │             │  │             │  │            │ │
-│  │ /craftsman: │  │ /craftsman: │  │ /craftsman: │  │/craftsman: │ │
+│  │ /craftsman: │  │ /scaffold:  │  │ /scaffold:  │  │/craftsman: │ │
 │  │   design    │  │   entity    │  │   component │  │   rag      │ │
 │  │   debug     │  │   usecase   │  │   hook      │  │   mlops    │ │
 │  │   test      │  │             │  │             │  │   agent-   │ │
@@ -76,10 +76,10 @@ This plugin encodes these practices into repeatable skills.
 
 | Pack | Domain | Skills |
 |------|--------|--------|
-| Core | Universal | design, debug, test, refactor, plan |
-| Symfony | PHP/DDD | entity, usecase |
-| React | Frontend | component, hook |
-| AI | ML/RAG | rag, mlops, agent |
+| Core | Universal | design, debug, test, refactor, plan, scaffold |
+| Symfony | PHP/DDD | scaffold entity, scaffold usecase |
+| React | Frontend | scaffold component, scaffold hook |
+| AI | ML/RAG | rag, mlops, agent-design |
 
 ### 3. Knowledge
 
@@ -91,23 +91,23 @@ This plugin encodes these practices into repeatable skills.
 - **Canonical**: Golden examples to follow
 - **Anti-patterns**: What NOT to do
 
-### 4. Agents (12 total)
+### 4. Agents (11 total)
 
-**What**: Specialized AI agents — 5 reviewers (read-only analysis) and 7 craftsmen (implementation).
+**What**: Specialized AI agents — 4 reviewers (read-only analysis) and 7 craftsmen (implementation).
 
 **Reviewers** (code analysis):
-- `architecture-reviewer` — Clean Architecture compliance
 - `symfony-reviewer` — Symfony/DDD best practices
 - `security-pentester` — Security vulnerability detection
 - `react-reviewer` — React patterns and hooks
-- `ai-reviewer` — RAG/MLOps/Agent best practices
+- `ai-engineer` — RAG/MLOps/Agent best practices
 
 **Craftsmen** (implementation, v1.5.0):
-- `team-lead` — Orchestrator (Opus, never codes)
+- `team-lead` — Orchestrator (Sonnet, never codes)
 - `backend-craftsman` — PHP/Symfony expert
 - `frontend-craftsman` — React/TS expert (65 Vercel best practices)
 - `architect` — DDD validation (read-only)
 - `ai-engineer` — RAG, LLM, MCP design
+- `api-craftsman` — API Platform 4, REST/HATEOAS, OpenAPI
 - `ui-ux-director` — UX, WCAG 2.1 AA
 - `doc-writer` — Technical documentation (Haiku, cost-optimized)
 
