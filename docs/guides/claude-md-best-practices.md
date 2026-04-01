@@ -281,7 +281,7 @@ make test-e2e      # E2E with Cypress
 │     ├── ./.claude/*.md (additional)                                  │
 │     └── Plugin knowledge base (if skill invoked)                     │
 │                                                                      │
-│  4. SKILL EXECUTION (e.g., /craftsman:entity)                        │
+│  4. SKILL EXECUTION (e.g., /craftsman:scaffold entity)               │
 │     ├── Load SKILL.md instructions                                   │
 │     ├── MANDATORY: Read canonical examples                           │
 │     │   └── knowledge/canonical/php-entity.php                       │
@@ -331,7 +331,7 @@ plugins/craftsman/knowledge/
 **How skills use knowledge**:
 
 ```
-/craftsman:entity invoked
+/craftsman:scaffold entity invoked
         ↓
 Step 0: MANDATORY - Read canonicals
         ↓

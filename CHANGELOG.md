@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - 2026-04-01
+
+### Added
+- Unified `/craftsman:scaffold` command replacing standalone entity/usecase/component/hook commands
+- New `api-craftsman` agent (API Platform 4, REST/HATEOAS, OpenAPI)
+- New `api-resource` and `pack` scaffold types
+- New guides: command chaining, model tiering, workflow comparison
+- New examples: parallel review, fullstack feature team
+
+### Changed
+- Renamed `ai-reviewer` agent to `ai-engineer`
+- Team-lead agent model changed from Opus to Sonnet
+- Agent count corrected to 11 (4 reviewers + 7 craftsmen)
+- Removed Sentry MCP server from plugin (uses official Sentry plugin instead)
+
+### Removed
+- Phantom commands: `/craftsman:source-verify`, `/craftsman:agent-create`, `/craftsman:start`
+- Duplicate Sentry channel declaration from plugin config
+
 ## [2.7.0] - 2026-03-30
 
 ### Changed

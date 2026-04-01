@@ -1,7 +1,7 @@
 {
   "name": "craftsman",
   "description": "Senior craftsman methodology for AI-assisted development. DDD, Clean Architecture, TDD, and systematic workflows that transform Claude into a disciplined software engineer.",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "author": {
     "name": "Alexandre Mallet",
     "email": "contact@woprrr.dev",
@@ -72,16 +72,7 @@
       "sensitive": true
     }
   },
-  "channels": [
-    {
-      "server": "sentry"
-    }
-  ],
   "mcpServers": {
-    "sentry": {
-      "type": "http",
-      "url": "https://mcp.sentry.dev/mcp"
-    },
     "knowledge-rag": {
       "type": "stdio",
       "command": "node",

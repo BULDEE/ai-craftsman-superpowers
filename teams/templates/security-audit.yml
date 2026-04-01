@@ -15,7 +15,7 @@ agents:
     role: member
     focus: "Multi-tenancy isolation, data flow, trust boundaries"
 
-  - agent: ai-reviewer
+  - agent: ai-engineer
     role: member
     focus: "Prompt injection, RAG security, LLM data leakage"
     condition: "Only if AI/ML code detected (presence of LangChain, OpenAI, pgvector, etc.)"
@@ -25,4 +25,4 @@ workflow:
   steps:
     - security-pentester      # Full scan first
     - architecture-reviewer   # Architecture-level security
-    - ai-reviewer             # AI-specific (conditional — skip if no AI/ML code)
+    - ai-engineer             # AI-specific (conditional — skip if no AI/ML code)

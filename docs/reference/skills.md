@@ -170,76 +170,35 @@ Resolve any conflicts preserving feature changes.
 
 ---
 
-## Symfony Pack
+## Scaffolding (Unified)
 
-### /craftsman:entity
+### /craftsman:scaffold
 
-**Purpose**: Scaffold DDD entity with all components.
+**Purpose**: Unified scaffolder for all types. Replaces the former standalone `/craftsman:entity`, `/craftsman:usecase`, `/craftsman:component`, and `/craftsman:hook` commands.
 
-**Generates**:
-- Entity class (final, private constructor)
-- Identity Value Object
-- Domain events
-- Unit tests
+**Supported Types**:
 
-**Example**:
+| Type | Pack | What It Generates |
+|------|------|-------------------|
+| `entity` | Symfony | DDD entity, Identity VO, Domain events, Unit tests |
+| `usecase` | Symfony | Command DTO, Handler, Output DTO, Unit tests |
+| `component` | React | Component file, Test file, Storybook story, Export index |
+| `hook` | React | Hook file with typing, Query/mutation config, Error handling |
+| `api-resource` | Symfony | API Platform resource with State Provider |
+| `pack` | Core | New community pack structure |
+
+**Examples**:
 ```
-> /craftsman:entity
+> /craftsman:scaffold entity
 Create Product entity with SKU, name, price, stock.
-```
 
----
-
-### /craftsman:usecase
-
-**Purpose**: Scaffold application use case.
-
-**Generates**:
-- Command DTO
-- Handler class
-- Output DTO
-- Unit tests
-
-**Example**:
-```
-> /craftsman:usecase
+> /craftsman:scaffold usecase
 PlaceOrder - validates stock and creates order
-```
 
----
-
-## React Pack
-
-### /craftsman:component
-
-**Purpose**: Scaffold React component with TypeScript.
-
-**Generates**:
-- Component file
-- Test file
-- Storybook story (optional)
-- Export index
-
-**Example**:
-```
-> /craftsman:component
+> /craftsman:scaffold component
 ProductCard - shows image, name, price, add to cart
-```
 
----
-
-### /craftsman:hook
-
-**Purpose**: Scaffold TanStack Query hook.
-
-**Generates**:
-- Hook file with proper typing
-- Query/mutation configuration
-- Error handling
-
-**Example**:
-```
-> /craftsman:hook
+> /craftsman:scaffold hook
 useProducts - fetches paginated product list
 ```
 
@@ -321,18 +280,11 @@ Check security, tests, and style.
 | `/craftsman:git` | Core | Git operations |
 | `/craftsman:verify` | Core | Evidence-based verification |
 | `/craftsman:parallel` | Core | Parallel agent orchestration |
-| `/craftsman:entity` | Symfony | Entity scaffolding |
-| `/craftsman:usecase` | Symfony | Use case scaffolding |
-| `/craftsman:component` | React | Component scaffolding |
-| `/craftsman:hook` | React | Hook scaffolding |
+| `/craftsman:scaffold` | Core | Unified scaffolder (entity, usecase, component, hook, api-resource, pack) |
 | `/craftsman:rag` | AI | RAG pipeline design |
 | `/craftsman:mlops` | AI | MLOps audit |
 | `/craftsman:agent-design` | AI | Agent design |
-| `/craftsman:source-verify` | AI | Verify AI capabilities |
-| `/craftsman:scaffold` | Utility | Generate context agent |
-| `/craftsman:agent-create` | Utility | Create bounded agent |
 | `/craftsman:metrics` | Utility | Quality metrics dashboard |
 | `/craftsman:setup` | Utility | Interactive setup wizard |
 | `/craftsman:team` | Core | Agent team management |
 | `/craftsman:ci` | Core | CI/CD quality gate export |
-| `/craftsman:start` | Core | First-time onboarding wizard |
