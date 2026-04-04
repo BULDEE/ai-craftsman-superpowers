@@ -4,18 +4,22 @@
 #
 # Usage:
 #   source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/healthcheck.sh"
-#   hc_run_all          # Run all checks, populate _HC_RESULTS array
+#   hc_run_all          # Run all checks, populate _HC_NAMES/_HC_STATUSES/_HC_MESSAGES arrays
 #   hc_summary          # One-line summary for SessionStart
 #   hc_full_report      # Full formatted report for /craftsman:healthcheck
 # =============================================================================
 
-declare -a _HC_RESULTS=()
+declare -a _HC_NAMES=()
+declare -a _HC_STATUSES=()
+declare -a _HC_MESSAGES=()
 _HC_PASS=0
 _HC_TOTAL=0
 
 _hc_record() {
     local name="$1" status="$2" message="$3"
-    _HC_RESULTS+=("${name}|${status}|${message}")
+    _HC_NAMES+=("$name")
+    _HC_STATUSES+=("$status")
+    _HC_MESSAGES+=("$message")
     (( _HC_TOTAL++ ))
     [[ "$status" == "ok" ]] && (( _HC_PASS++ ))
 }
@@ -105,13 +109,15 @@ hc_check_ollama() {
         return
     fi
 
-    if curl -s --max-time 2 "http://localhost:11434/api/tags" >/dev/null 2>&1; then
-        local model
-        model=$(curl -s --max-time 2 "http://localhost:11434/api/tags" 2>/dev/null | python3 -c "import sys,json; models=json.load(sys.stdin).get('models',[]); print(models[0]['name'] if models else 'none')" 2>/dev/null || echo "unknown")
-        _hc_record "ollama" "ok" "running (${model})"
-    else
+    local response
+    response=$(curl -s --max-time 2 "http://localhost:11434/api/tags" 2>/dev/null) || {
         _hc_record "ollama" "error" "not running — run: ollama serve"
-    fi
+        return
+    }
+
+    local model
+    model=$(echo "$response" | python3 -c "import sys,json; models=json.load(sys.stdin).get('models',[]); print(models[0]['name'] if models else 'none')" 2>/dev/null || echo "unknown")
+    _hc_record "ollama" "ok" "running (${model})"
 }
 
 hc_check_knowledge() {
@@ -147,7 +153,9 @@ hc_check_knowledge() {
 # --- Aggregate ---
 
 hc_run_all() {
-    _HC_RESULTS=()
+    _HC_NAMES=()
+    _HC_STATUSES=()
+    _HC_MESSAGES=()
     _HC_PASS=0
     _HC_TOTAL=0
 
@@ -165,13 +173,9 @@ hc_summary() {
     hc_run_all
 
     local failures=""
-    for result in "${_HC_RESULTS[@]}"; do
-        local status="${result#*|}"
-        status="${status%%|*}"
-        if [[ "$status" != "ok" ]]; then
-            local name="${result%%|*}"
-            local msg="${result##*|}"
-            failures="${failures}, ${name}: ${msg}"
+    for i in "${!_HC_NAMES[@]}"; do
+        if [[ "${_HC_STATUSES[$i]}" != "ok" ]]; then
+            failures="${failures}, ${_HC_NAMES[$i]}: ${_HC_MESSAGES[$i]}"
         fi
     done
 
@@ -186,15 +190,10 @@ hc_summary() {
 hc_json() {
     hc_run_all
 
-    local json_items=""
-    for result in "${_HC_RESULTS[@]}"; do
-        local name="${result%%|*}"
-        local rest="${result#*|}"
-        local status="${rest%%|*}"
-        local message="${rest#*|}"
-        json_items="${json_items}, {\"name\": \"${name}\", \"status\": \"${status}\", \"message\": \"${message}\"}"
+    local json_array="[]"
+    for i in "${!_HC_NAMES[@]}"; do
+        json_array=$(echo "$json_array" | jq -c --arg n "${_HC_NAMES[$i]}" --arg s "${_HC_STATUSES[$i]}" --arg m "${_HC_MESSAGES[$i]}" '. + [{name: $n, status: $s, message: $m}]')
     done
-    json_items="${json_items#, }"
 
-    echo "[${json_items}]"
+    echo "$json_array"
 }

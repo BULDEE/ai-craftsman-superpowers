@@ -27,29 +27,29 @@ echo "=== Healthcheck Library Tests ==="
 source "$ROOT_DIR/hooks/lib/healthcheck.sh"
 
 # Test: hc_check_system_deps should pass (python3, jq, sqlite3 available in test env)
-_HC_RESULTS=(); _HC_PASS=0; _HC_TOTAL=0
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
 hc_check_system_deps
-if [[ "${_HC_RESULTS[0]}" == *"|ok|"* ]]; then
+if [[ "${_HC_STATUSES[0]}" == "ok" ]]; then
     log_pass "hc_check_system_deps reports ok when deps present"
 else
-    log_fail "hc_check_system_deps should report ok: ${_HC_RESULTS[0]}"
+    log_fail "hc_check_system_deps should report ok: ${_HC_STATUSES[0]}"
 fi
 
 # Test: hc_check_node should pass (node available)
-_HC_RESULTS=(); _HC_PASS=0; _HC_TOTAL=0
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
 hc_check_node
-if [[ "${_HC_RESULTS[0]}" == *"|ok|"* ]]; then
+if [[ "${_HC_STATUSES[0]}" == "ok" ]]; then
     log_pass "hc_check_node reports ok for node >= 20"
 else
-    log_fail "hc_check_node should report ok: ${_HC_RESULTS[0]}"
+    log_fail "hc_check_node should report ok: ${_HC_STATUSES[0]}"
 fi
 
 # Test: hc_run_all produces results
 hc_run_all
-if [[ ${#_HC_RESULTS[@]} -ge 4 ]]; then
-    log_pass "hc_run_all produces ${#_HC_RESULTS[@]} check results"
+if [[ ${#_HC_NAMES[@]} -ge 4 ]]; then
+    log_pass "hc_run_all produces ${#_HC_NAMES[@]} check results"
 else
-    log_fail "hc_run_all should produce at least 4 results, got ${#_HC_RESULTS[@]}"
+    log_fail "hc_run_all should produce at least 4 results, got ${#_HC_NAMES[@]}"
 fi
 
 # Test: hc_summary produces a one-liner
