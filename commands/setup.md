@@ -1,5 +1,5 @@
 ---
-description: Interactive setup wizard and onboarding for AI Craftsman Superpowers. Configure your profile, select packs, and generate ~/.claude/.craft-config.yml.
+description: "Interactive setup and onboarding. Use on first run, when changing stack/packs, or when healthcheck reports config issues."
 effort: medium
 ---
 
