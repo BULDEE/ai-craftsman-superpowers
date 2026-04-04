@@ -1,21 +1,13 @@
-import { readdir, readFile, copyFile } from "node:fs/promises";
+import { readdir, copyFile, stat } from "node:fs/promises";
 import { join, extname, basename, resolve } from "node:path";
 import { existsSync, statSync } from "node:fs";
-import pdf from "pdf-parse";
 
 import { VectorStore } from "../db/vector-store.js";
 import { OllamaEmbeddingProvider } from "../embeddings/provider.js";
 import { hashFile, type FileHash } from "./hasher.js";
+import { parseFile, chunkText, type ChunkResult, CHUNK_SIZE, CHUNK_OVERLAP, SUPPORTED_EXTENSIONS } from "../parsing/document-parser.js";
 
-const CHUNK_SIZE = 500;
-const CHUNK_OVERLAP = 100;
-const SUPPORTED_EXTENSIONS = new Set([".pdf", ".md", ".txt"]);
-
-interface ChunkResult {
-  readonly content: string;
-  readonly page: number;
-  readonly index: number;
-}
+export type { ChunkResult };
 
 export interface SyncReport {
   readonly added: string[];
@@ -36,92 +28,8 @@ export interface StatusReport {
   readonly lastSync: string | null;
 }
 
-async function checkOllamaRunning(): Promise<boolean> {
-  try {
-    const response = await fetch("http://localhost:11434/api/tags", {
-      signal: AbortSignal.timeout(2000),
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
-
 function listSupportedFiles(files: string[]): string[] {
   return files.filter((f) => SUPPORTED_EXTENSIONS.has(extname(f).toLowerCase()));
-}
-
-async function parseFile(filePath: string): Promise<{ text: string; pageCount: number }> {
-  const ext = extname(filePath).toLowerCase();
-
-  if (ext === ".pdf") {
-    const buffer = await readFile(filePath);
-    const data = await pdf(buffer);
-    return { text: data.text, pageCount: data.numpages };
-  }
-
-  const text = await readFile(filePath, "utf-8");
-  return { text, pageCount: 1 };
-}
-
-function chunkText(text: string, chunkSize: number, overlap: number): ChunkResult[] {
-  const chunks: ChunkResult[] = [];
-  const cleaned = text
-    .replace(/\r\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/[ \t]+/g, " ")
-    .trim();
-
-  const paragraphs = cleaned.split(/\n\n+/);
-  let currentChunk = "";
-  let currentPage = 1;
-  let chunkIndex = 0;
-
-  for (const paragraph of paragraphs) {
-    const trimmed = paragraph.trim();
-    if (!trimmed) continue;
-
-    if (trimmed.match(/^page\s*\d+/i)) {
-      const match = trimmed.match(/\d+/);
-      if (match) currentPage = parseInt(match[0], 10);
-      continue;
-    }
-
-    if (currentChunk.length + trimmed.length + 1 <= chunkSize) {
-      currentChunk += (currentChunk ? "\n\n" : "") + trimmed;
-    } else {
-      if (currentChunk) {
-        chunks.push({ content: currentChunk.trim(), page: currentPage, index: chunkIndex++ });
-      }
-
-      if (trimmed.length > chunkSize) {
-        const words = trimmed.split(/\s+/);
-        currentChunk = "";
-        for (const word of words) {
-          if (currentChunk.length + word.length + 1 <= chunkSize) {
-            currentChunk += (currentChunk ? " " : "") + word;
-          } else {
-            if (currentChunk) {
-              chunks.push({ content: currentChunk.trim(), page: currentPage, index: chunkIndex++ });
-            }
-            const overlapStart = Math.max(0, currentChunk.length - overlap);
-            const overlapText = currentChunk.slice(overlapStart);
-            currentChunk = overlapText + (overlapText ? " " : "") + word;
-          }
-        }
-      } else {
-        const overlapStart = Math.max(0, currentChunk.length - overlap);
-        const overlapText = currentChunk.slice(overlapStart);
-        currentChunk = overlapText + (overlapText ? "\n\n" : "") + trimmed;
-      }
-    }
-  }
-
-  if (currentChunk.trim()) {
-    chunks.push({ content: currentChunk.trim(), page: currentPage, index: chunkIndex });
-  }
-
-  return chunks.filter((c) => c.content.length >= 50);
 }
 
 async function indexFile(
@@ -149,7 +57,7 @@ export async function sync(store: VectorStore): Promise<SyncReport> {
   const location = store.getLocation();
   const knowledgeDir = location.knowledgeDir;
 
-  const ollamaRunning = await checkOllamaRunning();
+  const ollamaRunning = await OllamaEmbeddingProvider.checkRunning();
   if (!ollamaRunning) {
     throw new Error("Ollama is not running. Start it with: ollama serve");
   }
@@ -177,9 +85,16 @@ export async function sync(store: VectorStore): Promise<SyncReport> {
       }
 
       if (existing) {
-        store.deleteBySource(fileName);
-        await indexFile(filePath, fileName, fileHash, store, embeddings);
-        updated.push(fileName);
+        const tempName = `__reindex__${fileName}`;
+        try {
+          await indexFile(filePath, tempName, fileHash, store, embeddings);
+          store.deleteBySource(fileName);
+          store.renameSource(tempName, fileName);
+          updated.push(fileName);
+        } catch (reindexErr) {
+          store.deleteBySource(tempName);
+          throw reindexErr;
+        }
       } else {
         await indexFile(filePath, fileName, fileHash, store, embeddings);
         added.push(fileName);
@@ -204,7 +119,7 @@ export async function sync(store: VectorStore): Promise<SyncReport> {
 }
 
 export async function addFile(store: VectorStore, sourcePath: string): Promise<{ fileName: string; chunks: number }> {
-  const ollamaRunning = await checkOllamaRunning();
+  const ollamaRunning = await OllamaEmbeddingProvider.checkRunning();
   if (!ollamaRunning) {
     throw new Error("Ollama is not running. Start it with: ollama serve");
   }
@@ -251,7 +166,7 @@ export async function status(store: VectorStore): Promise<StatusReport> {
   const location = store.getLocation();
   const stats = store.getStats();
   const existingHashes = store.getAllSourceHashes();
-  const ollamaRunning = await checkOllamaRunning();
+  const ollamaRunning = await OllamaEmbeddingProvider.checkRunning();
 
   const allFiles = existsSync(location.knowledgeDir) ? await readdir(location.knowledgeDir) : [];
   const supportedFiles = listSupportedFiles(allFiles);
@@ -262,12 +177,12 @@ export async function status(store: VectorStore): Promise<StatusReport> {
   for (const fileName of supportedFiles) {
     filesSeen.add(fileName);
     const filePath = join(location.knowledgeDir, fileName);
-    const fileHash = await hashFile(filePath);
+    const { size } = await stat(filePath);
     const existing = existingHashes.get(fileName);
 
     if (!existing) {
       pending.push({ file: fileName, reason: "new" });
-    } else if (existing.hash !== fileHash.hash) {
+    } else if (existing.size !== size) {
       pending.push({ file: fileName, reason: "modified" });
     }
   }

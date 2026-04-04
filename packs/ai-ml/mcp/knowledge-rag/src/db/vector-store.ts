@@ -165,6 +165,17 @@ export class VectorStore {
     return count;
   }
 
+  renameSource(oldName: string, newName: string): void {
+    const renameChunks = this.db.prepare("UPDATE chunks SET source = ? WHERE source = ?");
+    const renameSource = this.db.prepare("UPDATE sources SET name = ? WHERE name = ?");
+    const transaction = this.db.transaction((from: string, to: string) => {
+      renameChunks.run(to, from);
+      renameSource.run(to, from);
+    });
+    transaction(oldName, newName);
+    this.embeddingsCache = null;
+  }
+
   getAllSourceHashes(): Map<string, { hash: string; size: number }> {
     const stmt = this.db.prepare("SELECT name, file_hash, file_size FROM sources");
     const rows = stmt.all() as Array<{ name: string; file_hash: string; file_size: number }>;
