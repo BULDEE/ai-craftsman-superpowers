@@ -194,6 +194,15 @@
         "craftsman:rag",
         "craftsman:agent-design",
         "craftsman:mlops"
+      ],
+      "allowedTools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Agent",
+        "Edit",
+        "Write"
       ]
     },
     "api-craftsman": {
@@ -245,6 +254,15 @@
         "craftsman:usecase",
         "craftsman:spec",
         "craftsman:test"
+      ],
+      "allowedTools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Agent",
+        "Edit",
+        "Write"
       ]
     },
     "doc-writer": {
@@ -252,7 +270,14 @@
       "name": "doc-writer",
       "description": "|",
       "model": "haiku",
-      "memory": "project"
+      "memory": "project",
+      "allowedTools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Edit",
+        "Write"
+      ]
     },
     "frontend-craftsman": {
       "path": "agents/frontend-craftsman.md",
@@ -265,6 +290,15 @@
         "craftsman:hook",
         "craftsman:spec",
         "craftsman:test"
+      ],
+      "allowedTools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Agent",
+        "Edit",
+        "Write"
       ]
     },
     "react-reviewer": {
@@ -275,6 +309,13 @@
       "memory": "project",
       "skills": [
         "craftsman:challenge"
+      ],
+      "allowedTools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Edit"
       ]
     },
     "security-pentester": {
@@ -282,7 +323,14 @@
       "name": "security-pentester",
       "description": "|",
       "model": "sonnet",
-      "memory": "project"
+      "memory": "project",
+      "allowedTools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Write"
+      ]
     },
     "symfony-reviewer": {
       "path": "agents/symfony-reviewer.md",
@@ -292,6 +340,13 @@
       "memory": "project",
       "skills": [
         "craftsman:challenge"
+      ],
+      "allowedTools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Edit"
       ]
     },
     "team-lead": {
@@ -324,7 +379,13 @@
       "name": "ui-ux-director",
       "description": "|",
       "model": "sonnet",
-      "memory": "project"
+      "memory": "project",
+      "allowedTools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write"
+      ]
     }
   }
 }
