@@ -4,7 +4,10 @@
 # Lightweight Level 1 regex validation on file changes.
 # Complements Write/Edit hooks — covers external changes (IDE, git).
 #
-# TRIGGERS: FileChanged
+# FileChanged is a supported Claude Code hook type (verified 2026-04-04).
+# Wired in hooks.json with matcher "*.php|*.ts|*.tsx" and async: true.
+#
+# TRIGGERS: FileChanged (async)
 # EXIT CODES: 0 always (non-blocking, monitoring only)
 # =============================================================================
 set -uo pipefail

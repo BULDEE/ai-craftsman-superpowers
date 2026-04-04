@@ -1,6 +1,6 @@
 ---
 name: metrics
-description: Display quality metrics for the current project. Shows violations, trends, and session history from local SQLite database.
+description: "Quality metrics dashboard. Use when reviewing violation trends, session history, or correction patterns from the local SQLite database."
 effort: quick
 ---
 

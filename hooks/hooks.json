@@ -22,6 +22,7 @@
       },
       {
         "matcher": "Bash",
+        "if": "Bash(git push*)",
         "hooks": [
           {
             "type": "command",
@@ -37,14 +38,18 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-write-check.sh\""
-          },
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Write|Edit|Bash",
+        "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-ddd-verifier.sh\""
-          },
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-sentry-context.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/tool-failure-tracker.sh\"",
+            "async": true
           }
         ]
       }
@@ -69,12 +74,66 @@
         ]
       }
     ],
+    "FileChanged": [
+      {
+        "matcher": "*.php|*.ts|*.tsx",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/file-changed.sh\"",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/subagent-quality-gate.sh\"",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-compact-save.sh\""
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-verify.sh\""
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-final-review.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-ddd-verifier.sh\"",
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-sentry-context.sh\"",
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-final-review.sh\"",
+            "async": true
           }
         ]
       }

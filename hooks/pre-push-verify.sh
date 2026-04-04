@@ -8,6 +8,9 @@
 # =============================================================================
 set -uo pipefail
 
+# Fail-open trap: if hook crashes, allow the push
+trap 'echo "WARNING: pre-push-verify.sh failed at line $LINENO" >&2; exit 0' ERR
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/config.sh"
 
@@ -25,12 +28,8 @@ fi
 # Check if /craftsman:verify was run in this session
 VERIFIED=false
 if [[ -f "$SESSION_STATE" ]]; then
-    VERIFIED=$(python3 -c "
-import json, sys
-with open(sys.argv[1]) as f:
-    state = json.load(f)
-print('true' if state.get('verified', False) else 'false')
-" "$SESSION_STATE" 2>/dev/null) || VERIFIED=false
+    LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib"
+    VERIFIED=$(python3 "$LIB_DIR/session_state.py" check-flag "$SESSION_STATE" verified 2>/dev/null) || VERIFIED=false
 fi
 
 if [[ "$VERIFIED" == "true" ]]; then

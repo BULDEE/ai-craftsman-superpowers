@@ -4,7 +4,7 @@ description: |
   Symfony/PHP specialist for reviewing Symfony applications.
   Use when reviewing PHP/Symfony code, Doctrine entities, or Symfony services.
 model: sonnet
-effort: high
+effort: medium
 memory: project
 tools: Read, Glob, Grep, Bash
 maxTurns: 15

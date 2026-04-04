@@ -5,7 +5,7 @@ description: |
   READMEs, runbooks, and user guides. Verifies documentation accuracy against code.
   Use for documentation audits, API doc generation, or technical writing tasks.
 model: haiku
-effort: medium
+effort: low
 memory: project
 maxTurns: 20
 ---

@@ -14,16 +14,7 @@ mkdir -p "$CLAUDE_PLUGIN_DATA"
 # Cleanup
 trap 'rm -rf "$CLAUDE_PLUGIN_DATA"' EXIT
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
-TESTS_PASSED=0
-TESTS_FAILED=0
-
-log_pass() { echo -e "  ${GREEN}✓${NC} $1"; TESTS_PASSED=$((TESTS_PASSED + 1)); }
-log_fail() { echo -e "  ${RED}✗${NC} $1: $2"; TESTS_FAILED=$((TESTS_FAILED + 1)); }
+source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
 # Helper to run bias detector
 run_bias() {
@@ -132,10 +123,10 @@ fi
 result=$(run_bias "the quick brown fox jumps over the lazy dog")
 exit_code="${result%%|*}"
 output="${result#*|}"
-if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qi "Acceleration"; then
-    log_pass "'the quick brown fox' triggers acceleration (known: 'quick' matches regex)"
+if [[ "$exit_code" == "0" ]] && [[ -z "$output" || ! "$output" =~ "Acceleration" ]]; then
+    log_pass "'the quick brown fox' no false positive (context-aware patterns)"
 else
-    log_fail "'the quick brown fox' should match 'quick' pattern" "exit=$exit_code"
+    log_fail "'the quick brown fox' should NOT detect acceleration" "got output: $output"
 fi
 
 result=$(run_bias "the brown fox jumps over the lazy dog")
@@ -172,13 +163,4 @@ for prompt in "fais ça vite" "et aussi" "abstraire" "crée une entité User" "n
     fi
 done
 
-# =============================================================================
-# Summary
-# =============================================================================
-echo ""
-echo "==================================="
-printf " ${GREEN}Passed:${NC} %d\n" "$TESTS_PASSED"
-printf " ${RED}Failed:${NC} %d\n" "$TESTS_FAILED"
-echo "==================================="
-
-[[ $TESTS_FAILED -eq 0 ]] && exit 0 || exit 1
+test_summary

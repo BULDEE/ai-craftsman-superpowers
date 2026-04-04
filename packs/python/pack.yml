@@ -1,0 +1,21 @@
+name: python
+version: "1.0.0"
+description: "Python craftsman pack — Clean Code, type hints, pytest, architectural patterns"
+compatibility:
+  core: ">=3.1.0"
+  stack: ["python", "ai-ml", "fullstack"]
+
+rules:
+  builtin: ["PY001", "PY002", "PY003", "PY004", "PY005", "WARN-PY001"]
+
+hooks:
+  validators: ["hooks/python-validator.sh"]
+
+commands:
+  scaffold_types: []
+
+agents: []
+
+knowledge: ["knowledge/"]
+
+templates: []

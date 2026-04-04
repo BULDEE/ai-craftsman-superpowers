@@ -12,16 +12,6 @@ import { OllamaEmbeddingProvider } from "./embeddings/provider.js";
 import { SearchKnowledgeTool } from "./tools/search-knowledge.js";
 import { ListSourcesTool } from "./tools/list-sources.js";
 
-async function checkOllamaAvailable(baseUrl: string): Promise<boolean> {
-  try {
-    const response = await fetch(`${baseUrl}/api/tags`, {
-      signal: AbortSignal.timeout(2000)
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
 
 async function main(): Promise<void> {
   const server = new Server(
@@ -59,7 +49,7 @@ async function main(): Promise<void> {
   const embeddings = OllamaEmbeddingProvider.create();
 
   // Check Ollama availability (non-blocking warning)
-  const ollamaAvailable = await checkOllamaAvailable(embeddings.baseUrl);
+  const ollamaAvailable = await OllamaEmbeddingProvider.checkRunning();
   if (!ollamaAvailable) {
     console.error(`[knowledge-rag] WARNING: Ollama not responding at ${embeddings.baseUrl}`);
     console.error(`[knowledge-rag] Search will fail until Ollama is started: ollama serve`);

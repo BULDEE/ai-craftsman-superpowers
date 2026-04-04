@@ -1,5 +1,6 @@
 ---
-description: Unified scaffolder for all pack types (entity, usecase, component, hook, api-resource, pack). Types loaded from active packs.
+name: scaffold
+description: "Unified scaffolder for all pack types. Use when creating new entities, use cases, components, hooks, API resources, or custom packs. Types loaded from active packs."
 effort: medium
 ---
 

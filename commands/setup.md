@@ -1,5 +1,6 @@
 ---
-description: Interactive setup wizard and onboarding for AI Craftsman Superpowers. Configure your profile, select packs, and generate ~/.claude/.craft-config.yml.
+name: setup
+description: "Interactive setup and onboarding. Use on first run, when changing stack/packs, or when healthcheck reports config issues."
 effort: medium
 ---
 
@@ -251,7 +252,7 @@ packs:
   core: true
   symfony: {true/false}
   react: {true/false}
-  ai: {true/false}
+  ai-ml: {true/false}
 
 stack:
   php_version: "{version}"
@@ -306,7 +307,7 @@ Enabled Packs:
 
 Available Commands:
 
-Core (15 commands, always available):
+Core (20 skills, always available):
   /craftsman:challenge - Architecture review
   /craftsman:ci        - CI/CD integration
   /craftsman:debug     - Systematic debugging

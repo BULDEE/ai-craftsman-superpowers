@@ -27,6 +27,17 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     this.dimensions = dimensions;
   }
 
+  static async checkRunning(): Promise<boolean> {
+    try {
+      const response = await fetch("http://localhost:11434/api/tags", {
+        signal: AbortSignal.timeout(2000),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
   static create(
     model?: string,
     baseUrl?: string
@@ -57,10 +68,17 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     return data.embedding;
   }
 
-  async embedBatch(texts: string[]): Promise<number[][]> {
-    const results = await Promise.all(
-      texts.map((text) => this.embed(text))
-    );
+  async embedBatch(texts: string[], concurrency: number = 10): Promise<number[][]> {
+    const results: number[][] = [];
+
+    for (let i = 0; i < texts.length; i += concurrency) {
+      const batch = texts.slice(i, i + concurrency);
+      const batchResults = await Promise.all(
+        batch.map((text) => this.embed(text))
+      );
+      results.push(...batchResults);
+    }
+
     return results;
   }
 }

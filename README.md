@@ -4,8 +4,8 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
-[![Version](https://img.shields.io/badge/Version-2.9.1-blue)](CHANGELOG.md)
-[![Commands](https://img.shields.io/badge/Commands-15-orange)]()
+[![Version](https://img.shields.io/badge/Version-3.2.0-blue)](CHANGELOG.md)
+[![Commands](https://img.shields.io/badge/Commands-20-orange)]()
 [![Agents](https://img.shields.io/badge/Agents-11-red)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -114,7 +114,7 @@ Records every violation fix users make and injects correction trends at next ses
 Enterprise-ready rule customization: Global → Project → Directory overrides. Short form (`PHP001: warn`) and long form (custom rules with regex, message, severity, languages, paths). Legacy code coexists with strict new code via directory-level relaxation. Python-backed YAML parser with bash 3.2 shell compatibility.
 
 ### 3. **Cognitive Bias Detector**
-Real-time detection of acceleration bias, scope creep, and over-optimization in user prompts. Bilingual FR/EN pattern matching on UserPromptSubmit hook. Non-blocking warnings that encourage reflection before action. Currently regex-based — semantic analysis planned for v3.
+Real-time detection of acceleration bias, scope creep, and over-optimization in user prompts. Context-aware bilingual FR/EN pattern matching on UserPromptSubmit hook — requires imperative verb context to reduce false positives. Non-blocking warnings that encourage reflection before action.
 
 ### 4. **Real-Time Quality Gate**
 3-level progressive validation on every Write/Edit:
@@ -128,7 +128,7 @@ Graceful degradation: works with zero tools installed (Level 1 only).
 Same rules engine runs in hooks (real-time) AND CI (pipeline) with zero drift — CI sources the same pack validators as hooks. 4 providers: GitHub Actions, GitLab CI, Bitbucket Pipelines, Jenkins. Adapter pattern: detect → run → annotate → comment → exit.
 
 ### 6. **Metrics & Trend Analysis**
-SQLite-backed tracking of violations, corrections, and sessions. 7-day and 30-day trend views. Data-driven quality improvement: identify most-violated rules and adjust strictness. Currently per-machine — team metrics sync planned for v3.
+SQLite-backed tracking of violations, corrections, and sessions. 7-day and 30-day trend views. Data-driven quality improvement: identify most-violated rules and adjust strictness. Currently per-machine — team metrics sync planned for v4.
 
 ---
 
@@ -207,11 +207,11 @@ All commands are explicitly invoked with `/craftsman:command-name`. See [ADR-000
 
 Hooks automatically detect and warn about cognitive biases:
 
-| Bias | Trigger | Protection |
+| Bias | Trigger (context-aware) | Protection |
 |------|---------|------------|
-| **Acceleration** | "vite", "quick", "just do it" | STOP - Design first |
-| **Scope Creep** | "et aussi", "while we're at it" | STOP - Is this in scope? |
-| **Over-Optimization** | "abstraire", "generalize" | STOP - YAGNI |
+| **Acceleration** | "fais ça vite", "just do it", "skip the design" | STOP - Design first |
+| **Scope Creep** | "et aussi ajoutons", "let's also add" | STOP - Is this in scope? |
+| **Over-Optimization** | "abstraire ce pattern", "make it generic" | STOP - YAGNI |
 
 ### Semantic Intelligence (v1.3.0+)
 
@@ -273,6 +273,16 @@ Hooks validate your code automatically with **3-level analysis**:
 | TS001 | TypeScript | No `any` types |
 | TS002 | TypeScript | Named exports only |
 | TS003 | TypeScript | No non-null assertions (`!`) |
+| PY001 | Python | No short variable names (min 3 chars) |
+| PY002 | Python | Function max 25 lines |
+| PY003 | Python | Return type hints required |
+| PY004 | Python | No bare `except:` |
+| PY005 | Python | No mutable default arguments |
+| SH001 | Bash | `set -u` required (not in sourced libs) |
+| SH002 | Bash | Function max 30 lines |
+| SH003 | Bash | No short variable names |
+| SH004 | Bash | No `eval` usage |
+| SH005 | Bash | No unquoted variables in file ops |
 | LAYER001 | PHP | Domain cannot import Infrastructure |
 | LAYER002 | PHP | Domain cannot import Presentation |
 | LAYER003 | PHP | Application cannot import Presentation |
@@ -405,10 +415,11 @@ See [`/docs/adr`](docs/adr/) for Architecture Decision Records:
 - [ADR-0005: Knowledge-First Architecture](docs/adr/0005-knowledge-first-architecture.md)
 - [ADR-0006: Project-Specific Knowledge](docs/adr/0006-project-specific-knowledge.md)
 - [ADR-0007: Commands over Skills](docs/adr/0007-commands-over-skills.md)
-- [ADR-001: Model Tiering Strategy](docs/adr/001-model-tiering.md)
-- [ADR-002: Context Fork Strategy](docs/adr/002-context-fork-strategy.md)
-- [ADR-003: Progressive Disclosure](docs/adr/003-progressive-disclosure.md)
-- [ADR-004: Official Documentation Verification](docs/adr/004-official-documentation-verification.md)
+- [ADR-0008: Inline SQLite over Bash Expansion](docs/adr/0008-inline-sqlite-over-bash-expansion.md)
+- [ADR-0009: Command Hooks over Agent Hooks](docs/adr/0009-command-hooks-over-agent-hooks.md)
+- [ADR-0010: Model Tiering Strategy](docs/adr/0010-model-tiering.md)
+- [ADR-0011: Context Fork Strategy](docs/adr/0011-context-fork-strategy.md)
+- [ADR-0012: Progressive Disclosure](docs/adr/0012-progressive-disclosure.md)
 
 ## Examples
 
@@ -418,16 +429,21 @@ See [`/examples`](examples/) for detailed usage examples:
 - [Debug: Memory Leak](examples/debug/01-memory-leak.md)
 - [Challenge: Code Review](examples/challenge/01-code-review.md)
 - [Plan: Migration](examples/plan/01-migration-microservices.md)
+- [Refactor: Extract Value Object](examples/refactor/01-extract-value-object.md)
 - [Git: Safe Commit](examples/git/01-safe-commit.md)
 - [Test: Testing Strategy](examples/test/01-testing-strategy.md)
+- [Verify: Pre-Commit Verification](examples/verify/01-pre-commit-verification.md)
+- [Healthcheck: Plugin Diagnostic](examples/healthcheck/01-plugin-diagnostic.md)
+- [Team: Fullstack Feature](examples/team/01-feature-fullstack.md)
+- [Parallel: Code Review](examples/parallel/01-parallel-review.md)
 
 ## Architecture
 
 ```
 hooks/              → Real-time validation (SessionStart → PostToolUse → Stop → SessionEnd)
 hooks/lib/          → Shared libraries (pack-loader, config, rules-engine, metrics, static-analysis)
-commands/           → Core user-invoked workflows (15 commands)
-agents/             → Core agents (5) + pack symlinks
+commands/           → Core user-invoked workflows (20 skills)
+agents/             → Core agents (11) + pack symlinks
 knowledge/          → Core methodology (DDD, Clean Architecture, patterns)
 packs/              → Loadable language packs
   symfony/          → PHP/Symfony pack (validators, agents, knowledge, templates)
@@ -435,6 +451,36 @@ packs/              → Loadable language packs
   ai-ml/            → AI/ML pack (agents, knowledge, commands)
 ci/                 → CI pipeline integration (adapter pattern)
 ```
+
+## Using with Superpowers Plugin
+
+Craftsman and [Superpowers](https://github.com/anthropics/claude-code-plugins/tree/main/superpowers) are complementary. Superpowers provides workflow orchestration (brainstorming, planning, TDD, subagent-driven development). Craftsman provides domain-specific quality enforcement (DDD rules, architectural validation, correction learning).
+
+**Recommended development flow:**
+
+```
+1. /superpowers:brainstorming     → Design the solution collaboratively
+2. /superpowers:writing-plans     → Create implementation plan
+3. /superpowers:subagent-driven-development → Execute with fresh subagents
+   ├── Craftsman hooks fire on every Write/Edit (real-time quality gate)
+   ├── /craftsman:design           → DDD modeling when domain entities appear
+   └── /craftsman:challenge        → Architecture review at milestones
+4. /craftsman:verify              → Evidence-based verification before commit
+5. /superpowers:finishing-a-development-branch → PR and merge
+```
+
+**What each plugin handles:**
+
+| Concern | Superpowers | Craftsman |
+|---------|-------------|-----------|
+| Workflow orchestration | Brainstorming, planning, TDD | - |
+| Code quality enforcement | - | Hooks, rules engine, correction learning |
+| Architecture validation | - | Layer boundaries, DDD patterns |
+| Bias detection | - | Acceleration, scope creep, over-optimization |
+| CI pipeline | - | Multi-provider adapter pattern |
+| Subagent management | Dispatch, review loops | Quality gate on subagent output |
+
+Both plugins load simultaneously. No configuration needed — hooks.json events do not conflict.
 
 ## Philosophy
 
@@ -464,9 +510,9 @@ This plugin prioritizes transparency and safety:
 | Component | Behavior | Modifies Files? |
 |-----------|----------|-----------------|
 | Commands | Prompt templates | Only when instructed |
-| Reviewer Agents | Code analysis (5 agents) | Never (read-only) |
+| Reviewer Agents | Code analysis (11 agents) | Never (read-only) |
 | Craftsman Agents | Implementation (7 agents) | When instructed |
-| Command Hooks | Validation scripts (6 scripts) | Never (read-only, except metrics DB) |
+| Command Hooks | Validation scripts (15 scripts) | Never (read-only, except metrics DB + session state) |
 | Agent Hooks | Semantic analysis (4 agents, Haiku) | Never (read-only) |
 
 **Hooks use exit codes** — Bias detection warns (exit 0). Code rule violations **block** (exit 2) to enforce quality standards. See [Hooks Reference](docs/reference/hooks.md).

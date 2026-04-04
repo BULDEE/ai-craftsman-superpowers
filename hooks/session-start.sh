@@ -12,18 +12,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
 source "${SCRIPT_DIR}/lib/pack-loader.sh"
-
-# Check required dependencies
-_check_dependencies() {
-    local missing=""
-    command -v python3 >/dev/null 2>&1 || missing="${missing} python3"
-    command -v jq >/dev/null 2>&1 || missing="${missing} jq"
-    command -v sqlite3 >/dev/null 2>&1 || missing="${missing} sqlite3"
-
-    if [[ -n "$missing" ]]; then
-        echo "Dependencies: MISSING${missing}. Install: brew install${missing} (macOS) or apt-get install${missing} (Linux)"
-    fi
-}
+source "${SCRIPT_DIR}/lib/healthcheck.sh"
+source "${SCRIPT_DIR}/lib/routing-table.sh"
+source "${SCRIPT_DIR}/lib/hook-events.sh"
 
 _init_packs() {
     pack_loader_init
@@ -43,8 +34,14 @@ _init_packs() {
 # Consume stdin (may be empty or JSON)
 cat > /dev/null 2>&1 || true
 
-# Init metrics DB (idempotent)
-metrics_init 2>/dev/null || true
+# Python3 availability check — skip python-dependent features if missing
+HAS_PYTHON3=true
+command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
+
+# Init metrics DB (idempotent, non-blocking)
+if $HAS_PYTHON3; then
+    metrics_init 2>/dev/null || echo "WARNING: Metrics DB init failed" >&2
+fi
 
 # Detect project type from filesystem
 detect_project_type() {
@@ -67,11 +64,15 @@ config_php_enabled && PHP_STATUS="ON"
 config_ts_enabled && TS_STATUS="ON"
 
 # Build message
-DEP_STATUS=$(_check_dependencies)
 PACK_STATUS=$(_init_packs 2>/dev/null || echo "PACKS:error")
 MSG="Craftsman active | Stack: ${STACK} | Strictness: ${STRICTNESS} | PHP rules: ${PHP_STATUS} | TS rules: ${TS_STATUS} | Metrics: initialized | ${PACK_STATUS}"
-if [[ -n "$DEP_STATUS" ]]; then
-    MSG="${MSG} | ${DEP_STATUS}"
+
+# Correction learning: inject trends from past sessions (requires python3)
+if $HAS_PYTHON3; then
+    CORRECTION_TRENDS=$(metrics_correction_trends 2>/dev/null || true)
+    if [[ -n "$CORRECTION_TRENDS" ]]; then
+        MSG="${MSG} | Learning: ${CORRECTION_TRENDS}"
+    fi
 fi
 
 # Config mismatch warning
@@ -80,9 +81,10 @@ WARNINGS=""
 # Validate hooks.json schema — catch unsupported events early
 HOOKS_FILE="${SCRIPT_DIR}/hooks.json"
 if [[ -f "$HOOKS_FILE" ]]; then
+    SUPPORTED_EVENTS=$(hook_events_python_set)
     _unsupported=$(python3 -c "
 import json, sys
-supported = {'SessionStart','PreToolUse','PostToolUse','UserPromptSubmit','FileChanged','InstructionsLoaded','Stop','SessionEnd'}
+supported = ${SUPPORTED_EVENTS}
 try:
     data = json.load(open(sys.argv[1]))
     actual = set(data.get('hooks', {}).keys())
@@ -106,6 +108,18 @@ if [[ ! -f "${HOME}/.claude/.craft-config.yml" ]] && [[ ! -f "${PWD}/.craft-conf
     WARNINGS="${WARNINGS} | First time? Run /craftsman:setup to configure your profile and project. The plugin works with defaults, but setup unlocks full customization."
 elif [[ ! -f "${PWD}/.craft-config.yml" ]]; then
     WARNINGS="${WARNINGS} | No project .craft-config.yml found. Run /craftsman:setup to configure this project."
+fi
+
+# Healthcheck summary
+HC_SUMMARY=$(hc_summary 2>/dev/null || echo "Healthcheck: unavailable")
+MSG="${MSG} | ${HC_SUMMARY}"
+
+# Command routing table
+ROUTING=$(routing_table 2>/dev/null || echo "")
+if [[ -n "$ROUTING" ]]; then
+    MSG="${MSG}
+
+${ROUTING}"
 fi
 
 jq -n --arg msg "${MSG}${WARNINGS}" '{
