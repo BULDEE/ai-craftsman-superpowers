@@ -1,0 +1,1 @@
+../packs/ai-ml/commands/knowledge.md
