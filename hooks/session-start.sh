@@ -13,6 +13,7 @@ source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
 source "${SCRIPT_DIR}/lib/pack-loader.sh"
 source "${SCRIPT_DIR}/lib/healthcheck.sh"
+source "${SCRIPT_DIR}/lib/routing-table.sh"
 
 # Check required dependencies
 _check_dependencies() {
@@ -112,6 +113,14 @@ fi
 # Healthcheck summary
 HC_SUMMARY=$(hc_summary 2>/dev/null || echo "Healthcheck: unavailable")
 MSG="${MSG} | ${HC_SUMMARY}"
+
+# Command routing table
+ROUTING=$(routing_table 2>/dev/null || echo "")
+if [[ -n "$ROUTING" ]]; then
+    MSG="${MSG}
+
+${ROUTING}"
+fi
 
 jq -n --arg msg "${MSG}${WARNINGS}" '{
     systemMessage: $msg
