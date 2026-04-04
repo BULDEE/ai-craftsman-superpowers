@@ -1,151 +1,176 @@
 # API Platform Patterns
 
-## Resource Declaration
+## State-Driven Architecture
+
+API Platform 4.0 introduced State Providers/Processors as the core pattern. Unlike traditional controllers, state handlers own read/write logic.
+
+## Pattern: State Provider for Collection Reads
+
+The `LeadCollectionProvider` demonstrates role-based filtering at query level:
+
+```php
+final readonly class LeadCollectionProvider implements ProviderInterface
+{
+    public function provide(Operation $operation, array $uriVariables = [], array $context = []): iterable
+    {
+        $user = $this->security->getUser();
+        $tenant = $user->getTenant();
+        $tenantRole = $user->getTenantRole();
+
+        $filters = $context['filters'] ?? [];
+        $page = (int) ($filters['page'] ?? 1);
+
+        if ($tenantRole === TenantRole::SETTER) {
+            $filterDTO = LeadQueryFilterDTO::create(
+                setter: $user,
+                statusRestriction: $this->getSettingPhaseStatuses(),
+                page: $page,
+                limit: 30,
+            );
+        } else {
+            return [];
+        }
+
+        $leads = $this->leadRepository->findByTenantWithFilters($tenant, $filterDTO);
+        $totalItems = $this->leadRepository->countByTenantWithFilters($tenant, $filterDTO);
+
+        return new TraversablePaginator(
+            new \ArrayIterator($leads),
+            $page,
+            30,
+            $totalItems,
+        );
+    }
+}
+```
+
+**Why:** Authorization happens in SQL WHERE (efficient). Filters are validated once. Role-based restrictions are explicit.
+
+## Declarative Operations on Entity
+
+Operations declared on entity via attributes (no separate Resource class):
 
 ```php
 #[ApiResource(
     operations: [
-        new GetCollection(),
-        new Get(),
-        new Post(processor: CreateOrderProcessor::class),
+        new GetCollection(uriTemplate: '/leads', pagination: true),
+        new Get(uriTemplate: '/leads/{id}'),
+        new Post(processor: CreateLeadProcessor::class),
+        new Patch(processor: UpdateLeadProcessor::class),
     ],
-    normalizationContext: ['groups' => ['order:read']],
-    denormalizationContext: ['groups' => ['order:write']],
+    stateOptions: new Options(fetchInstead: true),
 )]
-final class Order
+class Lead
 {
-    #[Groups(['order:read'])]
-    public readonly int $id;
+    #[Groups(['lead:read', 'lead:write'])]
+    private LeadId $id;
 
-    #[Groups(['order:read', 'order:write'])]
-    #[Assert\NotBlank]
-    public string $reference;
+    #[Groups(['lead:read', 'lead:write'])]
+    #[SerializedName('email_address')]
+    private Email $email;
+
+    #[Groups(['lead:read'])]
+    private LeadStatus $status;
 }
 ```
 
-## State Providers & Processors
+**Why:** Single source of truth. `fetchInstead: true` ensures State Provider controls reads.
 
-API Platform is **100% independent of the persistence system**.
+## State Processors for Writes
+
+Processors transform HTTP input → entity → persistence:
 
 ```php
-// State Provider: reads data from any source
-final class OrderProvider implements ProviderInterface
-{
-    public function provide(Operation $operation, array $uriVariables = [], array $context = []): object|array|null
-    {
-        // Query database, API, cache, filesystem...
-    }
-}
-
-// State Processor: writes data to any destination
-final class CreateOrderProcessor implements ProcessorInterface
+final readonly class CreateLeadProcessor implements ProcessorInterface
 {
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
     {
-        // Business logic + persistence
+        $user = $this->security->getUser();
+        $tenant = $user->getTenant();
+
+        if (!$data instanceof CreateLeadDTO) {
+            throw InvalidInputException::unexpectedType($data);
+        }
+
+        $lead = $this->leadFactory->createFromDTO($data, $tenant);
+        $this->leadRepository->save($lead);
+
+        foreach ($lead->getDomainEvents() as $event) {
+            $this->eventDispatcher->dispatch(
+                new GenericEvent($event, ['event' => $event]),
+                $event->eventName()
+            );
+        }
+
+        return $lead;
     }
 }
 ```
 
-## Architecture: DTOs Over Entities
+## Input DTOs with Validation
 
-Separate API contract from domain model:
+Validation on DTO, not entity:
 
 ```php
-// API Resource (DTO) — public contract
-#[ApiResource]
-final class OrderOutput
+final class CreateLeadDTO
 {
-    public readonly int $id;
-    public readonly string $reference;
-    public readonly string $status;
+    #[Assert\NotBlank]
+    #[Assert\Email]
+    public string $email;
+
+    #[Assert\Choice(['website', 'social', 'referral'])]
+    public string $source;
 }
-
-// Domain Entity — internal model (no #[ApiResource])
-final class Order
-{
-    // Rich domain model with behavior
-}
-
-// Provider maps entity → DTO
-// Processor maps DTO → entity
 ```
 
-## Serialization Groups
+**Why:** Decouples API contract from domain model. Entity uses factory pattern; DTO uses validation.
 
-Control what's exposed per operation:
+## Pagination with TraversablePaginator
+
+Returns paginated iterator:
 
 ```php
-#[ApiResource(
-    normalizationContext: ['groups' => ['order:read']],
-    operations: [
-        new GetCollection(normalizationContext: ['groups' => ['order:list']]),
-        new Get(normalizationContext: ['groups' => ['order:read', 'order:detail']]),
-    ],
-)]
+return new TraversablePaginator(
+    new \ArrayIterator($leads),
+    $page,
+    $itemsPerPage,
+    $totalItems,
+);
 ```
 
-## Validation
+API Platform adds pagination metadata:
+- `hydra:totalItems` (total count)
+- `hydra:view.hydra:first|last|next` (pagination links)
+- `hydra:member` (current page)
 
-Constraints on the resource class, auto-validated by API Platform:
+## Tag-Based Cache Invalidation
+
+Cache with tenant-scoped tags:
 
 ```php
-#[Assert\NotBlank]
-#[Assert\Length(min: 3, max: 255)]
-public string $reference;
-
-#[Assert\Range(min: 0)]
-public int $quantity;
+$this->performanceCache->get($cacheKey, function (ItemInterface $item) use (...) {
+    $item->expiresAfter($ttl);
+    $item->tag([$this->cacheTagManager->forPerformance($tenant)]);
+    return $this->repository->getCampaignData($user, $dateRange);
+});
 ```
 
-Errors returned in Hydra format with field-level detail.
-
-## Filters & Pagination
+Invalidate on state changes:
 
 ```php
-#[ApiResource(paginationItemsPerPage: 30)]
-#[ApiFilter(SearchFilter::class, properties: ['reference' => 'partial'])]
-#[ApiFilter(OrderFilter::class, properties: ['createdAt'])]
-#[ApiFilter(DateFilter::class, properties: ['createdAt'])]
-final class Order { }
+$this->performanceCache->invalidateTags([
+    $this->cacheTagManager->forPerformance($tenant),
+]);
 ```
 
-## Security
+**Why:** One sync invalidates all campaign caches. Tenant-scoped prevents cross-tenant pollution. TTL differs: historical (30d, stable) vs realtime (15min, volatile).
 
-```php
-#[ApiResource(
-    operations: [
-        new Get(security: "is_granted('VIEW', object)"),
-        new Put(security: "is_granted('EDIT', object)"),
-        new Delete(security: "is_granted('ROLE_ADMIN')"),
-    ],
-)]
-```
+## Anti-Patterns to Avoid
 
-Use Symfony Voters for complex authorization (not inline expressions).
-
-## HTTP Caching
-
-Built-in cache invalidation with Varnish:
-
-```php
-#[ApiResource(
-    cacheHeaders: ['max_age' => 3600, 'shared_max_age' => 7200],
-)]
-```
-
-## Content Negotiation
-
-Supported formats: JSON-LD (default), JSON:API, HAL, GraphQL, OpenAPI, CSV, XML.
-
-## Anti-Patterns
-
-| Anti-Pattern | Instead |
-|-------------|---------|
-| Exposing Doctrine entities directly | Use DTOs as API resources |
-| Business logic in processors | Domain model with behavior |
-| Complex security expressions | Symfony Voters |
-| Manual OpenAPI docs | Auto-generated from attributes |
-| Custom serialization logic | Serialization groups |
-| Raw SQL in providers | Repository pattern |
-| Pagination disabled | Default 30 items, customize per resource |
+| Anti-Pattern | Problem | Solution |
+|-------------|---------|----------|
+| Returning raw arrays from providers | Type-unsafe | Return entity objects |
+| Filtering after query | N+1 queries on large sets | Apply filters in WHERE clause |
+| Authorization in serialization groups | Hidden data still loaded from DB | Apply authorization in State Provider |
+| Single processor for all operations | Tangled validation rules | Separate Input DTOs per operation |
+| Forgetting cache invalidation | Stale data served | Use tag-based invalidation |
