@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] — 2026-04-04
+
+### BREAKING — Paradigm Shift: Passive → Proactive
+
+The plugin now actively suggests the right command at the right time. Claude reads the routing table at session start and proposes craftsman commands when the context matches.
+
+### Added
+- **Proactive Command Discovery** — routing table injected into session-start systemMessage
+- `hooks/lib/routing-table.sh` — dynamic routing table adapted to loaded packs
+- `/craftsman:healthcheck` — global plugin diagnostic (system deps, config, runtime, AI/ML)
+- `/craftsman:knowledge` — knowledge base management (add, sync, list, status, remove)
+- Incremental indexing — hash-based sync replaces full rebuild (SHA256 per file)
+- Healthcheck summary injected into session-start output
+- `hooks/lib/healthcheck.sh` shared library for health checks
+
+### Fixed
+- Config key `ai` renamed to `ai-ml` in setup template to match pack directory
+- All command descriptions now include explicit trigger conditions for discovery
+- Removed unused `packs/ai-ml/mcp/knowledge-rag/data/` directory
+
+### Changed
+- `index-pdfs.ts` refactored to CLI with modes: sync, add, remove, status, list, rebuild
+- VectorStore gains incremental methods: deleteBySource, getSourceHash, getAllSourceHashes
+- DB schema migration: sources table gains `file_hash` and `file_size` columns (auto-migrated)
+- session-start.sh output now includes healthcheck summary + command routing table
+
 ## [2.9.1] - 2026-04-04
 
 ### Fixed
