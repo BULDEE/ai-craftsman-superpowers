@@ -15,18 +15,6 @@ source "${SCRIPT_DIR}/lib/pack-loader.sh"
 source "${SCRIPT_DIR}/lib/healthcheck.sh"
 source "${SCRIPT_DIR}/lib/routing-table.sh"
 
-# Check required dependencies
-_check_dependencies() {
-    local missing=""
-    command -v python3 >/dev/null 2>&1 || missing="${missing} python3"
-    command -v jq >/dev/null 2>&1 || missing="${missing} jq"
-    command -v sqlite3 >/dev/null 2>&1 || missing="${missing} sqlite3"
-
-    if [[ -n "$missing" ]]; then
-        echo "Dependencies: MISSING${missing}. Install: brew install${missing} (macOS) or apt-get install${missing} (Linux)"
-    fi
-}
-
 _init_packs() {
     pack_loader_init
     pack_sync_symlinks
@@ -69,12 +57,8 @@ config_php_enabled && PHP_STATUS="ON"
 config_ts_enabled && TS_STATUS="ON"
 
 # Build message
-DEP_STATUS=$(_check_dependencies)
 PACK_STATUS=$(_init_packs 2>/dev/null || echo "PACKS:error")
 MSG="Craftsman active | Stack: ${STACK} | Strictness: ${STRICTNESS} | PHP rules: ${PHP_STATUS} | TS rules: ${TS_STATUS} | Metrics: initialized | ${PACK_STATUS}"
-if [[ -n "$DEP_STATUS" ]]; then
-    MSG="${MSG} | ${DEP_STATUS}"
-fi
 
 # Config mismatch warning
 WARNINGS=""
