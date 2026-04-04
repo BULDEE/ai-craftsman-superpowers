@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Knowledge: Clean Code** (`knowledge/clean-code.md`) — naming, functions, comments, error handling, SOLID reference
 - **Knowledge: Refactoring Techniques** (`knowledge/refactoring-techniques.md`) — code smells catalog, composing methods, moving features, simplifying conditionals. Reference: refactoring.guru
 - **Knowledge: Design Patterns** (`knowledge/design-patterns.md`) — 23 GoF patterns (creational, structural, behavioral) with Python examples and selection guide. Reference: refactoring.guru
+- **Symfony Knowledge Base** — 8 new methodology documents extracted from production projects (Metrikia, Qualia):
+  - `ddd-cqrs-architecture.md` — Full DDD+CQRS layer architecture with Symfony & API Platform
+  - `ddd-domain-design.md` — Entities as aggregates, value objects, domain events, bounded contexts
+  - `api-platform-patterns.md` — State Providers/Processors, pagination, cache invalidation, serialization groups
+  - `messenger-patterns.md` — Async processing, idempotency, retry strategy, message versioning
+  - `symfony-best-practices.md` — Configuration hierarchy, services, controllers, security, testing
+  - `repository-composition.md` — Interface Segregation for repositories (7 focused interfaces per aggregate)
+  - `anti-patterns/anemic-domain.md` — Behavioral methods vs getter/setter entities
+  - `anti-patterns/service-locator.md` — Constructor injection vs ContainerInterface::get()
 - 15 new tests: 8 Python pack tests + 7 Bash pack tests
 - `craftsman-ignore: SH001` support for sourced library files (validators loaded via `source` must not have `set -euo pipefail`)
 
@@ -20,7 +29,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Python validation migrated from inline code in `post-write-check.sh` to proper pack architecture (`packs/python/hooks/python-validator.sh`)
 - `post-write-check.sh` now delegates to `pack_run_validators` for Python and Bash — same pattern as PHP/TypeScript
 - Plugin now validates **all 4 language families** it touches: PHP, TypeScript, Python, Bash
-- Knowledge base expanded from 5 to 8 documents (added clean-code, refactoring-techniques, design-patterns)
+- Knowledge base expanded from 5 to 45 documents across 5 packs + core
+- Bias detector patterns made context-aware — requires imperative verb context, eliminates false positives on "quick", "fast"
+- Rules engine refactored: extracted `_rules_find_directory_override`, `_rules_store_rule_fields` (SRP compliance)
+
+### Fixed
+- 4 phantom skill references in agents: `craftsman:entity`, `craftsman:usecase`, `craftsman:component`, `craftsman:hook` → unified to `craftsman:scaffold`
+- 13 command skills missing `name:` field in frontmatter
+- 8 agent effort level mismatches between plugin.json and .md files
+- README version badge 3.0.0 → 3.2.0
 
 ## [3.1.0] — 2026-04-04
 
