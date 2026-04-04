@@ -14,6 +14,9 @@
 # =============================================================================
 set -uo pipefail
 
+# Fail-open trap: if hook crashes, pass instead of blocking all writes
+trap 'echo "WARNING: post-write-check.sh failed at line $LINENO" >&2; exit 0' ERR
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Load helpers
@@ -24,10 +27,15 @@ source "${SCRIPT_DIR}/lib/rules-engine.sh"
 source "${SCRIPT_DIR}/lib/pack-loader.sh"
 rules_init "$PWD" "${HOME}/.claude"
 
+# Python3 availability — skip correction learning features if missing
+HAS_PYTHON3=true
+command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
+
 # Session state for correction learning
 SESSION_STATE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
 
 _write_session_state() {
+    $HAS_PYTHON3 || return 0
     local file="$1"
     local file_pattern
     file_pattern=$(metrics_file_pattern "$file")
@@ -71,7 +79,7 @@ for rule in rj:
 
 with open(sf, 'w') as f:
     json.dump(state, f)
-" "$SESSION_STATE" "$file_pattern" "$dir_bucket" "$rules_json" 2>/dev/null || true
+" "$SESSION_STATE" "$file_pattern" "$dir_bucket" "$rules_json" 2>&1 || echo "WARNING: session state write failed" >&2
     else
         python3 -c "
 import json, sys
@@ -81,12 +89,13 @@ for rule in rj:
     patterns.setdefault(rule, {}).setdefault(dir_b, []).append(fp)
 with open(sf, 'w') as f:
     json.dump({'blocked_violations': {fp: rj}, 'patterns': patterns}, f)
-" "$SESSION_STATE" "$file_pattern" "$dir_bucket" "$rules_json" 2>/dev/null || true
+" "$SESSION_STATE" "$file_pattern" "$dir_bucket" "$rules_json" 2>&1 || echo "WARNING: session state init failed" >&2
     fi
 }
 
 # Detect cross-file patterns: same rule in 3+ files → suggest project-wide fix
 _detect_cross_file_patterns() {
+    $HAS_PYTHON3 || return 0
     [[ ! -f "$SESSION_STATE" ]] && return
 
     python3 -c "
@@ -108,10 +117,11 @@ for rule, dir_map in patterns.items():
             suggestions.append('DIR_PATTERN:' + rule + ':' + dir_b + ':' + str(len(files)) + ' files')
 for s in suggestions:
     print(s)
-" "$SESSION_STATE" 2>/dev/null || true
+" "$SESSION_STATE" 2>&1 || echo "WARNING: cross-file pattern detection failed" >&2
 }
 
 _check_corrections() {
+    $HAS_PYTHON3 || return 0
     local file="$1"
     local file_pattern
     file_pattern=$(metrics_file_pattern "$file")

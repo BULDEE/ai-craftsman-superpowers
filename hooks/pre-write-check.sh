@@ -8,6 +8,9 @@
 # =============================================================================
 set -uo pipefail
 
+# Fail-open trap: if hook crashes, allow the write
+trap 'echo "WARNING: pre-write-check.sh failed at line $LINENO" >&2; exit 0' ERR
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/config.sh"
 

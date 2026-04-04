@@ -151,3 +151,34 @@ metrics_corrections_30d() {
         "SELECT rule, action, COUNT(*) as count FROM corrections WHERE project_hash=? AND timestamp > datetime('now','-30 days') GROUP BY rule, action ORDER BY count DESC" \
         "$project_hash"
 }
+
+# Correction learning summary for SessionStart injection
+metrics_correction_trends() {
+    local project_hash
+    project_hash=$(metrics_project_hash)
+    python3 -c "
+import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+ph = sys.argv[2]
+# Top fixed rules (7 days)
+fixed = db.execute('''
+    SELECT rule, COUNT(*) as c FROM corrections
+    WHERE project_hash=? AND action='fixed' AND timestamp > datetime('now','-7 days')
+    GROUP BY rule ORDER BY c DESC LIMIT 5
+''', (ph,)).fetchall()
+# Top still-violated rules (7 days)
+violated = db.execute('''
+    SELECT rule, COUNT(*) as c FROM violations
+    WHERE project_hash=? AND blocked=1 AND timestamp > datetime('now','-7 days')
+    GROUP BY rule ORDER BY c DESC LIMIT 5
+''', (ph,)).fetchall()
+parts = []
+if fixed:
+    parts.append('Recently fixed: ' + ', '.join(f'{r}({c}x)' for r,c in fixed))
+if violated:
+    parts.append('Recurring violations: ' + ', '.join(f'{r}({c}x)' for r,c in violated))
+if parts:
+    print(' | '.join(parts))
+db.close()
+" "$METRICS_DB" "$project_hash" 2>/dev/null || true
+}

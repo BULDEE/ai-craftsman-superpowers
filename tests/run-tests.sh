@@ -344,6 +344,23 @@ test_hook_behavior() {
     fi
 }
 
+test_agent_hooks() {
+    echo ""
+    log_info "Testing agent hook gates (functional)"
+
+    local agent_test="$SCRIPT_DIR/core/test-agent-hooks.sh"
+
+    if [[ -f "$agent_test" ]]; then
+        if bash "$agent_test" > /dev/null 2>&1; then
+            log_pass "Agent hook gate tests pass"
+        else
+            log_fail "Agent hook gate tests failed — run tests/core/test-agent-hooks.sh for details"
+        fi
+    else
+        log_skip "Agent hook gate tests (tests/core/test-agent-hooks.sh not found)"
+    fi
+}
+
 # Test: Config resolution (unit tests)
 test_config_resolution() {
     echo ""
@@ -532,6 +549,7 @@ main() {
         test_adrs
 
         test_hook_behavior
+        test_agent_hooks
         test_config_resolution
         test_bias_detector
         test_correction_learning

@@ -33,8 +33,14 @@ _init_packs() {
 # Consume stdin (may be empty or JSON)
 cat > /dev/null 2>&1 || true
 
-# Init metrics DB (idempotent)
-metrics_init 2>/dev/null || true
+# Python3 availability check — skip python-dependent features if missing
+HAS_PYTHON3=true
+command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
+
+# Init metrics DB (idempotent, non-blocking)
+if $HAS_PYTHON3; then
+    metrics_init 2>/dev/null || echo "WARNING: Metrics DB init failed" >&2
+fi
 
 # Detect project type from filesystem
 detect_project_type() {
@@ -60,6 +66,14 @@ config_ts_enabled && TS_STATUS="ON"
 PACK_STATUS=$(_init_packs 2>/dev/null || echo "PACKS:error")
 MSG="Craftsman active | Stack: ${STACK} | Strictness: ${STRICTNESS} | PHP rules: ${PHP_STATUS} | TS rules: ${TS_STATUS} | Metrics: initialized | ${PACK_STATUS}"
 
+# Correction learning: inject trends from past sessions (requires python3)
+if $HAS_PYTHON3; then
+    CORRECTION_TRENDS=$(metrics_correction_trends 2>/dev/null || true)
+    if [[ -n "$CORRECTION_TRENDS" ]]; then
+        MSG="${MSG} | Learning: ${CORRECTION_TRENDS}"
+    fi
+fi
+
 # Config mismatch warning
 WARNINGS=""
 
@@ -68,7 +82,7 @@ HOOKS_FILE="${SCRIPT_DIR}/hooks.json"
 if [[ -f "$HOOKS_FILE" ]]; then
     _unsupported=$(python3 -c "
 import json, sys
-supported = {'SessionStart','PreToolUse','PostToolUse','UserPromptSubmit','FileChanged','InstructionsLoaded','Stop','SessionEnd'}
+supported = {'SessionStart','PreToolUse','PostToolUse','PostToolUseFailure','UserPromptSubmit','PermissionRequest','PermissionDenied','Notification','SubagentStart','SubagentStop','TaskCreated','TaskCompleted','TeammateIdle','InstructionsLoaded','ConfigChange','CwdChanged','FileChanged','WorktreeCreate','WorktreeRemove','PreCompact','PostCompact','Elicitation','ElicitationResult','Stop','StopFailure','SessionEnd'}
 try:
     data = json.load(open(sys.argv[1]))
     actual = set(data.get('hooks', {}).keys())

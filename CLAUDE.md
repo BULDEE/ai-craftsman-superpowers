@@ -13,6 +13,7 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
 - Hook command output MUST be valid JSON (`jq -n` pattern).
 - Agent hook prompts use `$ARGUMENTS` for tool input injection.
 - The `metrics-query.py` helper MUST be used for all SQLite writes (parameterized queries). NEVER use string interpolation in SQL.
+- All writes to `session-state.json` MUST use atomic writes (`tempfile.mkstemp() + os.rename()`). Known TOCTOU window between read and rename when multiple async hooks fire simultaneously — acceptable at current hook frequencies but do not add file-locking without benchmarking first.
 - CI adapters follow the `adapter_detect/run/annotate/comment/exit` interface.
 - All commands MUST have `description`, `effort` (quick/medium/heavy) in frontmatter.
 - Templates MUST have: top-level heading, `## Mission` section, `## Context Files` section.
@@ -61,8 +62,8 @@ SQLite-backed tracking of violations, corrections, and sessions. 7-day and 30-da
 ```
 hooks/              → Real-time validation (SessionStart → PostToolUse → Stop → SessionEnd)
 hooks/lib/          → Shared libraries (pack-loader, config, rules-engine, metrics, static-analysis)
-commands/           → Core user-invoked workflows (15 commands)
-agents/             → Core agents (5) + pack symlinks
+commands/           → Core user-invoked workflows (20 skills)
+agents/             → Core agents (11) + pack symlinks
 knowledge/          → Core methodology (DDD, Clean Architecture, patterns)
 packs/              → Loadable language packs
   symfony/          → PHP/Symfony pack (validators, agents, knowledge, templates)

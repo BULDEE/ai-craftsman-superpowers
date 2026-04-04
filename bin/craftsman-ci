@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Craftsman CI — standalone validation CLI exposed via plugin bin/
+# Invokable as bare command in Bash tool while plugin is enabled.
+exec bash "$(cd "$(dirname "$0")/.." && pwd)/ci/craftsman-ci.sh" "$@"

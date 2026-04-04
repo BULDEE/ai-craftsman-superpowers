@@ -306,7 +306,7 @@ Enabled Packs:
 
 Available Commands:
 
-Core (15 commands, always available):
+Core (20 skills, always available):
   /craftsman:challenge - Architecture review
   /craftsman:ci        - CI/CD integration
   /craftsman:debug     - Systematic debugging

@@ -375,7 +375,7 @@ cd "$ORIGINAL_PWD"
 rm -rf "$SESSION_TEST_DIR"
 
 # =============================================================================
-# FileChanged Hook Tests
+# FileChanged Hook Tests — wired in hooks.json with matcher *.php|*.ts|*.tsx
 # =============================================================================
 echo ""
 echo "=== FileChanged Hook Tests ==="
@@ -473,30 +473,31 @@ echo "=== Agent Hook Schema Tests ==="
 
 HOOKS_FILE="$ROOT_DIR/hooks/hooks.json"
 
-# Test: PostToolUse has 3 command hooks (post-write-check + ddd-verifier + sentry-context)
+# Test: PostToolUse has 1 command hook (post-write-check only — agent hooks moved to Stop)
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 hooks = d['hooks']['PostToolUse'][0]['hooks']
-assert len(hooks) == 3, f'Expected 3 hooks, got {len(hooks)}'
-assert all(h['type'] == 'command' for h in hooks), 'All hooks must be command type'
+assert len(hooks) == 1, f'Expected 1 hook, got {len(hooks)}'
+assert hooks[0]['type'] == 'command'
+assert 'post-write-check.sh' in hooks[0]['command']
 " 2>/dev/null; then
-    log_pass "PostToolUse has 3 command hooks"
+    log_pass "PostToolUse has 1 command hook (post-write-check)"
 else
-    log_fail "PostToolUse hook count" "expected 3 command hooks"
+    log_fail "PostToolUse hook count" "expected 1 command hook"
 fi
 
-# Test: DDD verifier command hook references correct script
+# Test: DDD verifier in Stop hook (moved from PostToolUse for latency reduction)
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
-ddd_hook = d['hooks']['PostToolUse'][0]['hooks'][1]
-assert ddd_hook['type'] == 'command'
-assert 'agent-ddd-verifier.sh' in ddd_hook['command']
+stop_hooks = d['hooks']['Stop'][0]['hooks']
+ddd_found = any('agent-ddd-verifier.sh' in h['command'] for h in stop_hooks)
+assert ddd_found, 'DDD verifier not found in Stop hooks'
 " 2>/dev/null; then
-    log_pass "PostToolUse DDD verifier: command hook with gate script"
+    log_pass "Stop DDD verifier: command hook with gate script"
 else
-    log_fail "PostToolUse DDD verifier" "missing or invalid"
+    log_fail "Stop DDD verifier" "missing or invalid"
 fi
 
 # Test: DDD verifier script has agent_hooks gate
@@ -506,15 +507,15 @@ else
     log_fail "DDD verifier gate" "missing CLAUDE_PLUGIN_OPTION_agent_hooks check"
 fi
 
-# Test: Sentry context command hook references correct script
+# Test: Sentry context in Stop hook (moved from PostToolUse for latency reduction)
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
-sentry_hook = d['hooks']['PostToolUse'][0]['hooks'][2]
-assert sentry_hook['type'] == 'command'
-assert 'agent-sentry-context.sh' in sentry_hook['command']
+stop_hooks = d['hooks']['Stop'][0]['hooks']
+sentry_found = any('agent-sentry-context.sh' in h['command'] for h in stop_hooks)
+assert sentry_found, 'Sentry context not found in Stop hooks'
 " 2>/dev/null; then
-    log_pass "PostToolUse Sentry context: command hook with gate script"
+    log_pass "Stop Sentry context: command hook with gate script"
 else
     log_fail "Sentry context hook" "missing or invalid"
 fi
@@ -554,16 +555,16 @@ else
     log_fail "InstructionsLoaded channel status" "missing channel_status_summary"
 fi
 
-# Test: Stop command hook references final review
+# Test: Stop has 3 command hooks (ddd-verifier + sentry-context + final-review)
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 hooks = d['hooks']['Stop'][0]['hooks']
-assert len(hooks) == 1
-assert hooks[0]['type'] == 'command'
-assert 'agent-final-review.sh' in hooks[0]['command']
+assert len(hooks) == 3, f'Expected 3 Stop hooks, got {len(hooks)}'
+assert all(h['type'] == 'command' for h in hooks)
+assert 'agent-final-review.sh' in hooks[2]['command']
 " 2>/dev/null; then
-    log_pass "Stop: command hook with final review"
+    log_pass "Stop: 3 command hooks (ddd-verifier, sentry, final-review)"
 else
     log_fail "Stop hook" "missing or invalid"
 fi
@@ -585,6 +586,171 @@ assert 'post-write-check.sh' in hooks[0]['command']
     log_pass "PostToolUse post-write-check.sh command hook present"
 else
     log_fail "PostToolUse command hook" "missing or modified"
+fi
+
+# =============================================================================
+# New Hook Events Tests (v3.1 — PostToolUseFailure, FileChanged, SubagentStop, PreCompact)
+# =============================================================================
+echo ""
+echo "=== New Hook Events Tests ==="
+
+# Test: PostToolUseFailure event wired with async
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+hooks = d['hooks']['PostToolUseFailure'][0]['hooks']
+assert len(hooks) == 1
+assert hooks[0].get('async') == True, 'Expected async: true'
+assert 'tool-failure-tracker.sh' in hooks[0]['command']
+" 2>/dev/null; then
+    log_pass "PostToolUseFailure: async tool-failure-tracker hook"
+else
+    log_fail "PostToolUseFailure hook" "missing or invalid"
+fi
+
+# Test: FileChanged event wired with matcher and async
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+fc = d['hooks']['FileChanged'][0]
+assert fc.get('matcher') == '*.php|*.ts|*.tsx', f'Wrong matcher: {fc.get(\"matcher\")}'
+assert fc['hooks'][0].get('async') == True
+assert 'file-changed.sh' in fc['hooks'][0]['command']
+" 2>/dev/null; then
+    log_pass "FileChanged: async file-changed hook with *.php|*.ts|*.tsx matcher"
+else
+    log_fail "FileChanged hook" "missing or invalid"
+fi
+
+# Test: SubagentStop event wired with async
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+hooks = d['hooks']['SubagentStop'][0]['hooks']
+assert len(hooks) == 1
+assert hooks[0].get('async') == True
+assert 'subagent-quality-gate.sh' in hooks[0]['command']
+" 2>/dev/null; then
+    log_pass "SubagentStop: async subagent-quality-gate hook"
+else
+    log_fail "SubagentStop hook" "missing or invalid"
+fi
+
+# Test: PreCompact event wired (non-async — must complete before compaction)
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+hooks = d['hooks']['PreCompact'][0]['hooks']
+assert len(hooks) == 1
+assert hooks[0].get('async', False) == False, 'PreCompact must be synchronous'
+assert 'pre-compact-save.sh' in hooks[0]['command']
+" 2>/dev/null; then
+    log_pass "PreCompact: synchronous pre-compact-save hook"
+else
+    log_fail "PreCompact hook" "missing or invalid"
+fi
+
+# Test: Stop hooks have async: true
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+hooks = d['hooks']['Stop'][0]['hooks']
+assert all(h.get('async') == True for h in hooks), 'All Stop hooks should be async'
+" 2>/dev/null; then
+    log_pass "Stop hooks: all async (non-blocking session end)"
+else
+    log_fail "Stop hooks async" "expected all async: true"
+fi
+
+# Test: PreToolUse Bash has conditional if field
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+bash_entry = d['hooks']['PreToolUse'][1]
+assert bash_entry.get('if') is not None, 'Expected if field on Bash PreToolUse'
+assert 'git push' in bash_entry['if'], f'Expected git push in if, got: {bash_entry[\"if\"]}'
+" 2>/dev/null; then
+    log_pass "PreToolUse Bash: conditional if field for git push"
+else
+    log_fail "PreToolUse conditional" "missing if field"
+fi
+
+# Test: New hook scripts exist and are executable
+for script in tool-failure-tracker.sh subagent-quality-gate.sh pre-compact-save.sh; do
+    if [[ -x "$ROOT_DIR/hooks/$script" ]]; then
+        log_pass "$script exists and is executable"
+    else
+        log_fail "$script" "missing or not executable"
+    fi
+done
+
+# Test: PostCompact event wired (synchronous — verify state after compaction)
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+hooks = d['hooks']['PostCompact'][0]['hooks']
+assert len(hooks) == 1
+assert hooks[0].get('async', False) == False, 'PostCompact must be synchronous'
+assert 'post-compact-verify.sh' in hooks[0]['command']
+" 2>/dev/null; then
+    log_pass "PostCompact: synchronous post-compact-verify hook"
+else
+    log_fail "PostCompact verify hook" "missing or invalid"
+fi
+
+# Test: post-compact-verify.sh exists and is executable
+if [[ -x "$ROOT_DIR/hooks/post-compact-verify.sh" ]]; then
+    log_pass "post-compact-verify.sh exists and is executable"
+else
+    log_fail "post-compact-verify.sh" "missing or not executable"
+fi
+
+# Test: Total hook event count (12 events wired)
+if python3 -c "
+import json
+d = json.load(open('$HOOKS_FILE'))
+events = list(d['hooks'].keys())
+assert len(events) == 12, f'Expected 12 hook events, got {len(events)}: {events}'
+" 2>/dev/null; then
+    log_pass "Total hook events: 12 (was 7, +5 new)"
+else
+    log_fail "Hook event count" "expected 12"
+fi
+
+# =============================================================================
+# Plugin Integrity Tests (badges, bin/, output-styles)
+# =============================================================================
+echo ""
+echo "=== Plugin Integrity Tests ==="
+
+# Test: bin/ executables exist
+for exe in craftsman-ci craftsman-validate; do
+    if [[ -x "$ROOT_DIR/bin/$exe" ]]; then
+        log_pass "bin/$exe exists and is executable"
+    else
+        log_fail "bin/$exe" "missing or not executable"
+    fi
+done
+
+# Test: output-styles exist
+STYLE_COUNT=$(find "$ROOT_DIR/output-styles" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+if [[ "$STYLE_COUNT" -ge 2 ]]; then
+    log_pass "output-styles: $STYLE_COUNT style files found"
+else
+    log_fail "output-styles" "expected >= 2 style files, got $STYLE_COUNT"
+fi
+
+# Test: All agents have effort field in plugin.json
+if python3 -c "
+import json
+d = json.load(open('$ROOT_DIR/.claude-plugin/plugin.json'))
+agents = d.get('agents', {})
+missing = [n for n, a in agents.items() if 'effort' not in a]
+assert not missing, f'Agents missing effort field: {missing}'
+" 2>/dev/null; then
+    log_pass "All 11 agents have effort field in plugin.json"
+else
+    log_fail "Agent effort fields" "some agents missing effort"
 fi
 
 # =============================================================================
@@ -968,7 +1134,7 @@ run_bias_detector() {
     echo "$exit_code|$output"
 }
 
-# Test: domain modeling without design flag triggers warning
+# Test: domain modeling without design flag triggers warning (JSON output)
 rm -f "${CLAUDE_PLUGIN_DATA}/session-state.json"
 result=$(run_bias_detector "create entity User with email and name")
 exit_code="${result%%|*}"
@@ -977,6 +1143,13 @@ if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qi "craftsman:design\|dom
     log_pass "bias-detector: domain modeling without design warns (exit 0)"
 else
     log_fail "bias-detector: should warn about missing /craftsman:design" "exit=$exit_code output=$(echo "$output" | head -3)"
+fi
+
+# Test: bias-detector outputs valid JSON when warning
+if echo "$output" | jq -e '.systemMessage' >/dev/null 2>&1; then
+    log_pass "bias-detector: output is valid JSON with systemMessage"
+else
+    log_fail "bias-detector: output should be JSON with systemMessage" "$output"
 fi
 
 # Test: domain modeling WITH design_used=true does NOT warn
@@ -1025,6 +1198,15 @@ else
     log_fail "bias-detector: should always exit 0" "got exit $exit_code"
 fi
 
+# Test: no output when no bias detected
+result=$(run_bias_detector "add a unit test for the UserRepository")
+output="${result#*|}"
+if [[ -z "$output" ]]; then
+    log_pass "bias-detector: no output when no bias detected"
+else
+    log_fail "bias-detector: should produce no output for clean prompt" "$output"
+fi
+
 # =============================================================================
 # Hook Event Validation (only supported events)
 # =============================================================================
@@ -1037,7 +1219,7 @@ HOOKS_FILE="$ROOT_DIR/hooks/hooks.json"
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
-supported = {'SessionStart','PreToolUse','PostToolUse','UserPromptSubmit','FileChanged','InstructionsLoaded','Stop','SessionEnd'}
+supported = {'SessionStart','PreToolUse','PostToolUse','PostToolUseFailure','UserPromptSubmit','PermissionRequest','PermissionDenied','Notification','SubagentStart','SubagentStop','TaskCreated','TaskCompleted','TeammateIdle','InstructionsLoaded','ConfigChange','CwdChanged','FileChanged','WorktreeCreate','WorktreeRemove','PreCompact','PostCompact','Elicitation','ElicitationResult','Stop','StopFailure','SessionEnd'}
 actual = set(d['hooks'].keys())
 unsupported = actual - supported
 assert not unsupported, f'Unsupported events: {unsupported}'
@@ -1159,6 +1341,274 @@ if [[ -z "$result" ]]; then
     log_pass "sa_eslint: graceful degradation when not installed"
 else
     log_fail "sa_eslint: should return empty when not installed" "got: $result"
+fi
+
+# =============================================================================
+# Behavioral Integration Tests — New Hook Scripts
+# =============================================================================
+echo ""
+echo "=== Behavioral Integration Tests ==="
+
+# Setup clean session state for behavioral tests
+rm -rf "$CLAUDE_PLUGIN_DATA"
+mkdir -p "$CLAUDE_PLUGIN_DATA"
+
+# --- tool-failure-tracker.sh behavioral tests ---
+
+# Test: tool-failure-tracker writes failure to session-state.json
+echo '{"tool_name":"Write","error":"Permission denied: /etc/hosts"}' | bash "$ROOT_DIR/hooks/tool-failure-tracker.sh" 2>/dev/null
+if python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    state = json.load(f)
+failures = state.get('tool_failures', [])
+assert len(failures) == 1, f'Expected 1 failure, got {len(failures)}'
+assert failures[0]['tool'] == 'Write'
+assert 'Permission denied' in failures[0]['error']
+assert 'timestamp' in failures[0]
+assert state.get('tool_failure_count') == 1
+" "${CLAUDE_PLUGIN_DATA}/session-state.json" 2>/dev/null; then
+    log_pass "tool-failure-tracker: writes failure with tool, error, timestamp"
+else
+    log_fail "tool-failure-tracker behavioral" "session-state.json not written correctly"
+fi
+
+# Test: tool-failure-tracker increments count on subsequent failures
+echo '{"tool_name":"Bash","error":"Command failed"}' | bash "$ROOT_DIR/hooks/tool-failure-tracker.sh" 2>/dev/null
+if python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    state = json.load(f)
+assert state.get('tool_failure_count') == 2, f'Expected 2, got {state.get(\"tool_failure_count\")}'
+assert len(state.get('tool_failures', [])) == 2
+" "${CLAUDE_PLUGIN_DATA}/session-state.json" 2>/dev/null; then
+    log_pass "tool-failure-tracker: increments count on subsequent failures"
+else
+    log_fail "tool-failure-tracker count" "count not incremented"
+fi
+
+# Test: tool-failure-tracker truncates long errors at 200 chars
+LONG_ERROR=$(python3 -c "print('X' * 500)")
+jq -n --arg e "$LONG_ERROR" '{"tool_name":"Edit","error":$e}' | bash "$ROOT_DIR/hooks/tool-failure-tracker.sh" 2>/dev/null
+if python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    state = json.load(f)
+last = state['tool_failures'][-1]
+assert len(last['error']) <= 200, f'Error too long: {len(last[\"error\"])}'
+" "${CLAUDE_PLUGIN_DATA}/session-state.json" 2>/dev/null; then
+    log_pass "tool-failure-tracker: truncates errors at 200 chars"
+else
+    log_fail "tool-failure-tracker truncation" "error not truncated"
+fi
+
+# Test: tool-failure-tracker caps at 50 entries
+rm -f "${CLAUDE_PLUGIN_DATA}/session-state.json"
+for i in $(seq 1 55); do
+    echo "{\"tool_name\":\"Write\",\"error\":\"err$i\"}" | bash "$ROOT_DIR/hooks/tool-failure-tracker.sh" 2>/dev/null
+done
+if python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    state = json.load(f)
+assert len(state.get('tool_failures', [])) == 50, f'Expected 50, got {len(state.get(\"tool_failures\", []))}'
+assert state['tool_failures'][0]['error'] == 'err6', f'Expected err6 (oldest kept), got {state[\"tool_failures\"][0][\"error\"]}'
+assert state.get('tool_failure_count') == 55
+" "${CLAUDE_PLUGIN_DATA}/session-state.json" 2>/dev/null; then
+    log_pass "tool-failure-tracker: caps at 50 entries, count tracks all 55"
+else
+    log_fail "tool-failure-tracker cap" "50-entry cap not working"
+fi
+
+# Test: tool-failure-tracker exits 0 with empty input
+echo '' | bash "$ROOT_DIR/hooks/tool-failure-tracker.sh" 2>/dev/null
+if [[ $? -eq 0 ]]; then
+    log_pass "tool-failure-tracker: exits 0 with empty input"
+else
+    log_fail "tool-failure-tracker empty" "non-zero exit"
+fi
+
+# --- subagent-quality-gate.sh behavioral tests ---
+
+# Reset session state
+rm -f "${CLAUDE_PLUGIN_DATA}/session-state.json"
+
+# Test: subagent-quality-gate writes agent activity
+echo '{"agent_type":"architect"}' | bash "$ROOT_DIR/hooks/subagent-quality-gate.sh" 2>/dev/null
+if python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    state = json.load(f)
+agents = state.get('subagent_activity', [])
+assert len(agents) == 1, f'Expected 1 agent entry, got {len(agents)}'
+assert agents[0]['agent_type'] == 'architect'
+assert 'completed_at' in agents[0]
+assert state.get('subagent_count') == 1
+" "${CLAUDE_PLUGIN_DATA}/session-state.json" 2>/dev/null; then
+    log_pass "subagent-quality-gate: writes agent activity with type and timestamp"
+else
+    log_fail "subagent-quality-gate behavioral" "session-state.json not written correctly"
+fi
+
+# Test: subagent-quality-gate increments on multiple agents
+echo '{"agent_type":"security-pentester"}' | bash "$ROOT_DIR/hooks/subagent-quality-gate.sh" 2>/dev/null
+echo '{"agent_type":"doc-writer"}' | bash "$ROOT_DIR/hooks/subagent-quality-gate.sh" 2>/dev/null
+if python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    state = json.load(f)
+assert state.get('subagent_count') == 3, f'Expected 3, got {state.get(\"subagent_count\")}'
+types = [a['agent_type'] for a in state.get('subagent_activity', [])]
+assert 'security-pentester' in types
+assert 'doc-writer' in types
+" "${CLAUDE_PLUGIN_DATA}/session-state.json" 2>/dev/null; then
+    log_pass "subagent-quality-gate: tracks multiple agent types"
+else
+    log_fail "subagent-quality-gate multi" "count or types wrong"
+fi
+
+# Test: subagent-quality-gate caps at 100 entries
+rm -f "${CLAUDE_PLUGIN_DATA}/session-state.json"
+for i in $(seq 1 105); do
+    echo "{\"agent_type\":\"agent$i\"}" | bash "$ROOT_DIR/hooks/subagent-quality-gate.sh" 2>/dev/null
+done
+if python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    state = json.load(f)
+assert len(state.get('subagent_activity', [])) == 100, f'Expected 100, got {len(state.get(\"subagent_activity\", []))}'
+assert state.get('subagent_count') == 105
+" "${CLAUDE_PLUGIN_DATA}/session-state.json" 2>/dev/null; then
+    log_pass "subagent-quality-gate: caps at 100 entries, count tracks all 105"
+else
+    log_fail "subagent-quality-gate cap" "100-entry cap not working"
+fi
+
+# Test: subagent-quality-gate exits 0 with empty input
+echo '' | bash "$ROOT_DIR/hooks/subagent-quality-gate.sh" 2>/dev/null
+if [[ $? -eq 0 ]]; then
+    log_pass "subagent-quality-gate: exits 0 with empty input"
+else
+    log_fail "subagent-quality-gate empty" "non-zero exit"
+fi
+
+# --- pre-compact-save.sh behavioral tests ---
+
+# Setup: create session state with violations and patterns
+python3 -c "
+import json, sys
+state = {
+    'blocked_violations': {
+        'src/Domain/User.php': ['PHP001'],
+        'src/App/Service.php': ['PHP003', 'PHP005']
+    },
+    'patterns': {'missing_final': 3},
+    'tool_failure_count': 2,
+    'subagent_count': 1
+}
+with open(sys.argv[1], 'w') as f:
+    json.dump(state, f)
+" "${CLAUDE_PLUGIN_DATA}/session-state.json" 2>/dev/null
+
+# Test: pre-compact-save outputs systemMessage with violation summary
+result=$(echo '{}' | bash "$ROOT_DIR/hooks/pre-compact-save.sh" 2>/dev/null)
+if echo "$result" | jq -e '.systemMessage' >/dev/null 2>&1; then
+    log_pass "pre-compact-save: outputs valid JSON with systemMessage"
+else
+    log_fail "pre-compact-save output" "no systemMessage in output: $result"
+fi
+
+# Test: pre-compact-save preserves compact_count in state
+if python3 -c "
+import json, sys
+with open(sys.argv[1]) as f:
+    state = json.load(f)
+assert state.get('compact_count') == 1, f'Expected compact_count=1, got {state.get(\"compact_count\")}'
+assert 'last_compact' in state, 'Missing last_compact timestamp'
+assert 'pre_compact_summary' in state, 'Missing pre_compact_summary'
+" "${CLAUDE_PLUGIN_DATA}/session-state.json" 2>/dev/null; then
+    log_pass "pre-compact-save: writes compact_count, last_compact, pre_compact_summary"
+else
+    log_fail "pre-compact-save state" "missing compaction metadata"
+fi
+
+# Test: pre-compact-save grammar — singular forms
+python3 -c "
+import json, sys
+state = {
+    'blocked_violations': {'src/Foo.php': ['PHP001']},
+    'patterns': {},
+    'tool_failure_count': 1,
+    'subagent_count': 0
+}
+with open(sys.argv[1], 'w') as f:
+    json.dump(state, f)
+" "${CLAUDE_PLUGIN_DATA}/session-state.json" 2>/dev/null
+result=$(echo '{}' | bash "$ROOT_DIR/hooks/pre-compact-save.sh" 2>/dev/null)
+if echo "$result" | grep -q "1 active violation across 1 file" && echo "$result" | grep -q "1 tool failure"; then
+    log_pass "pre-compact-save: correct singular grammar (1 file, 1 violation, 1 failure)"
+else
+    log_fail "pre-compact-save grammar" "singular forms incorrect: $result"
+fi
+
+# Test: pre-compact-save exits 0 with empty session state
+rm -f "${CLAUDE_PLUGIN_DATA}/session-state.json"
+echo '{}' | bash "$ROOT_DIR/hooks/pre-compact-save.sh" 2>/dev/null
+if [[ $? -eq 0 ]]; then
+    log_pass "pre-compact-save: exits 0 with no session state"
+else
+    log_fail "pre-compact-save empty" "non-zero exit"
+fi
+
+# --- post-compact-verify.sh behavioral tests ---
+
+# Setup: simulate state after pre-compact-save
+python3 -c "
+import json, sys
+state = {
+    'compact_count': 1,
+    'pre_compact_summary': '3 active violations across 2 files | 1 tool failure this session',
+    'blocked_violations': {
+        'src/Domain/User.php': ['PHP001'],
+        'src/App/Service.php': ['PHP003', 'PHP005']
+    },
+    'tool_failure_count': 1
+}
+with open(sys.argv[1], 'w') as f:
+    json.dump(state, f)
+" "${CLAUDE_PLUGIN_DATA}/session-state.json" 2>/dev/null
+
+# Test: post-compact-verify outputs recovery message
+result=$(echo '{}' | bash "$ROOT_DIR/hooks/post-compact-verify.sh" 2>/dev/null)
+if echo "$result" | jq -e '.systemMessage' >/dev/null 2>&1 && echo "$result" | grep -q "STATE OK"; then
+    log_pass "post-compact-verify: outputs systemMessage with STATE OK"
+else
+    log_fail "post-compact-verify output" "missing systemMessage or STATE OK: $result"
+fi
+
+# Test: post-compact-verify reports compact count
+if echo "$result" | grep -q "Compaction #1"; then
+    log_pass "post-compact-verify: includes compaction count"
+else
+    log_fail "post-compact-verify count" "missing compaction count: $result"
+fi
+
+# Test: post-compact-verify exits 0 with no session state
+rm -f "${CLAUDE_PLUGIN_DATA}/session-state.json"
+echo '{}' | bash "$ROOT_DIR/hooks/post-compact-verify.sh" 2>/dev/null
+if [[ $? -eq 0 ]]; then
+    log_pass "post-compact-verify: exits 0 with no session state"
+else
+    log_fail "post-compact-verify empty" "non-zero exit"
+fi
+
+# --- craftsman-validate sanitization test ---
+
+# Test: craftsman-validate uses jq (not string interpolation)
+if grep -q 'jq -n --arg' "$ROOT_DIR/bin/craftsman-validate"; then
+    log_pass "craftsman-validate: uses jq --arg for safe input"
+else
+    log_fail "craftsman-validate sanitization" "still using string interpolation"
 fi
 
 # =============================================================================
