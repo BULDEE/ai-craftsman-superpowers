@@ -8,6 +8,12 @@ model: haiku
 effort: low
 memory: project
 maxTurns: 20
+allowedTools:
+  - Read
+  - Glob
+  - Grep
+  - Edit
+  - Write
 ---
 
 # Doc Writer Agent

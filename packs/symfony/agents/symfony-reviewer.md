@@ -6,8 +6,13 @@ description: |
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Glob, Grep, Bash
 maxTurns: 15
+allowedTools:
+  - Read
+  - Glob
+  - Grep
+  - Bash
+  - Edit
 skills:
   - craftsman:challenge
 ---
