@@ -19,7 +19,9 @@ MCP allows external services to expose tools that Claude can use:
 
 **Purpose**: Semantic search over indexed documents.
 
-**Location**: `ai-pack/mcp/knowledge-rag/`
+**Location**: `packs/ai-ml/mcp/knowledge-rag/`
+
+**Activation**: Conditional — requires `ai-ml` in the `packs` plugin setting. Without it, the MCP runs as a no-op server (valid protocol, zero tools, zero errors).
 
 ### Tools Provided
 
@@ -69,40 +71,21 @@ List all indexed documents.
 ...
 ```
 
-### Configuration
+### Activation
 
-**Global** (`~/.claude/settings.local.json`):
-```json
-{
-  "mcpServers": {
-    "knowledge-rag": {
-      "command": "node",
-      "args": ["/path/to/ai-pack/mcp/knowledge-rag/dist/src/index.js"]
-    }
-  }
-}
-```
+The MCP server is bundled with the plugin and activated conditionally via the `packs` user setting:
 
-**Per-project** (`~/.claude.json`):
-```json
-{
-  "projects": {
-    "/path/to/project": {
-      "mcpServers": {
-        "knowledge-rag": {
-          "command": "node",
-          "args": ["/path/to/dist/index.js"]
-        }
-      }
-    }
-  }
-}
-```
+1. Set `packs` to include `ai-ml` in your Claude Code plugin config
+2. Restart Claude Code — the launcher (`start.mjs`) auto-installs dependencies and builds TypeScript on first run
+3. The MCP tools `search_knowledge` and `list_knowledge_sources` become available
+
+Without `ai-ml` in `packs`, the server responds with valid MCP protocol but exposes zero tools.
 
 ### Architecture
 
 ```
 knowledge-rag/
+├── start.mjs              # Conditional launcher (no-op or real server)
 ├── src/
 │   ├── index.ts           # MCP server entry (stdio)
 │   ├── tools/
@@ -114,7 +97,7 @@ knowledge-rag/
 │       └── provider.ts      # Ollama integration
 ├── scripts/
 │   └── index-pdfs.ts      # One-time indexing
-└── dist/src/              # Compiled output
+└── dist/src/              # Compiled output (auto-built by start.mjs)
     └── index.js           # Entry point
 
 # Database locations (auto-detected):
@@ -122,11 +105,11 @@ knowledge-rag/
 # Global:  ~/.claude/ai-craftsman-superpowers/knowledge/knowledge.db
 ```
 
-### Setup
+### Manual Setup (if auto-bootstrap fails)
 
 ```bash
 # Install dependencies
-cd ai-pack/mcp/knowledge-rag
+cd packs/ai-ml/mcp/knowledge-rag
 npm install
 
 # Build
