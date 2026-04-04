@@ -9,8 +9,7 @@ effort: medium
 memory: project
 maxTurns: 30
 skills:
-  - craftsman:entity
-  - craftsman:usecase
+  - craftsman:scaffold
   - craftsman:spec
   - craftsman:test
 ---
