@@ -13,16 +13,7 @@ CLI="$ROOT_DIR/ci/craftsman-ci.sh"
 # Reuse core fixtures where applicable (moved from tests/hooks/ to tests/core/ in v2.5.0)
 HOOK_FIXTURES="$ROOT_DIR/tests/core/fixtures"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
-TESTS_PASSED=0
-TESTS_FAILED=0
-
-log_pass() { echo -e "  ${GREEN}+${NC} $1"; TESTS_PASSED=$((TESTS_PASSED + 1)); }
-log_fail() { echo -e "  ${RED}x${NC} $1: $2"; TESTS_FAILED=$((TESTS_FAILED + 1)); }
+source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
 # =============================================================================
 # Guard: CLI must exist and be executable
@@ -578,10 +569,4 @@ fi
 # =============================================================================
 # Summary
 # =============================================================================
-echo ""
-echo "==================================="
-echo -e " ${GREEN}Passed:${NC} $TESTS_PASSED"
-echo -e " ${RED}Failed:${NC} $TESTS_FAILED"
-echo "==================================="
-
-[[ $TESTS_FAILED -eq 0 ]] && exit 0 || exit 1
+test_summary

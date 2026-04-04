@@ -4,7 +4,7 @@
 
 Claude Code plugin that transforms Claude into a disciplined Senior Software Craftsman. DDD, Clean Architecture, TDD methodology enforced through hooks, commands, agents, and a rules engine.
 
-**Current version:** 2.9.1
+**Current version:** 3.2.0
 **Stack:** Bash (hooks/CI), Markdown (commands/agents/templates), Python (metrics helpers), YAML (config)
 
 ## Development Rules
@@ -13,6 +13,7 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
 - Hook command output MUST be valid JSON (`jq -n` pattern).
 - Agent hook prompts use `$ARGUMENTS` for tool input injection.
 - The `metrics-query.py` helper MUST be used for all SQLite writes (parameterized queries). NEVER use string interpolation in SQL.
+- All writes to `session-state.json` MUST use atomic writes (`tempfile.mkstemp() + os.rename()`). Known TOCTOU window between read and rename when multiple async hooks fire simultaneously — acceptable at current hook frequencies but do not add file-locking without benchmarking first.
 - CI adapters follow the `adapter_detect/run/annotate/comment/exit` interface.
 - All commands MUST have `description`, `effort` (quick/medium/heavy) in frontmatter.
 - Templates MUST have: top-level heading, `## Mission` section, `## Context Files` section.
@@ -41,7 +42,7 @@ Records every violation fix users make and injects correction trends at next ses
 Enterprise-ready rule customization: Global → Project → Directory overrides. Short form (`PHP001: warn`) and long form (custom rules with regex, message, severity, languages, paths). Legacy code coexists with strict new code via directory-level relaxation. Python-backed YAML parser with bash 3.2 shell compatibility.
 
 ### 3. Cognitive Bias Detector
-Real-time detection of acceleration bias, scope creep, and over-optimization in user prompts. Bilingual FR/EN pattern matching on UserPromptSubmit hook. Non-blocking warnings that encourage reflection before action. Currently regex-based — semantic analysis planned for v3.
+Real-time detection of acceleration bias, scope creep, and over-optimization in user prompts. Context-aware bilingual FR/EN pattern matching on UserPromptSubmit hook — requires imperative verb context to reduce false positives. Non-blocking warnings that encourage reflection before action.
 
 ### 4. Real-Time Quality Gate
 3-level progressive validation on every Write/Edit:
@@ -61,12 +62,14 @@ SQLite-backed tracking of violations, corrections, and sessions. 7-day and 30-da
 ```
 hooks/              → Real-time validation (SessionStart → PostToolUse → Stop → SessionEnd)
 hooks/lib/          → Shared libraries (pack-loader, config, rules-engine, metrics, static-analysis)
-commands/           → Core user-invoked workflows (15 commands)
-agents/             → Core agents (5) + pack symlinks
-knowledge/          → Core methodology (DDD, Clean Architecture, patterns)
-packs/              → Loadable language packs
+commands/           → Core user-invoked workflows (20 skills)
+agents/             → Core agents (11) + pack symlinks
+knowledge/          → Core methodology (DDD, Clean Architecture, Clean Code, Refactoring, Design Patterns)
+packs/              → Loadable language packs (5 packs)
   symfony/          → PHP/Symfony pack (validators, agents, knowledge, templates)
   react/            → React/TypeScript pack (validators, agents, knowledge, templates)
+  python/           → Python pack (validators, knowledge, anti-patterns)
+  bash/             → Bash/Shell pack (validators, knowledge, anti-patterns)
   ai-ml/            → AI/ML pack (agents, knowledge, commands)
 ci/                 → CI pipeline integration (adapter pattern)
 ```

@@ -26,8 +26,8 @@ pack_validate_typescript() {
         add_violation "TS002" "Default export found — use named exports"
     fi
 
-    # TS003: No non-null assertion (!) — exclude != and !==
-    if grep -qE "[a-zA-Z0-9_\)]+\![^=\.]" "$file" 2>/dev/null; then
+    # TS003: No non-null assertion (!) — exclude !=, !==, !., logical NOT (!expr), and end-of-line
+    if grep -qE "[a-zA-Z0-9_\)]\!([^=\.!(]|$)" "$file" 2>/dev/null; then
         add_violation "TS003" "Non-null assertion (!) found — handle null explicitly"
     fi
 

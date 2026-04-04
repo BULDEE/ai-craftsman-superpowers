@@ -5,12 +5,11 @@ description: |
   TanStack Query, Tailwind, shadcn/ui, Recharts, and component architecture.
   Use for frontend reviews, component refactoring, or feature implementation.
 model: sonnet
-effort: high
+effort: medium
 memory: project
 maxTurns: 30
 skills:
-  - craftsman:component
-  - craftsman:hook
+  - craftsman:scaffold
   - craftsman:spec
   - craftsman:test
 ---

@@ -5,6 +5,95 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] — 2026-04-04
+
+### Added
+- **Python Pack** (`packs/python/`) — full language pack with 6 rules: PY001 (naming), PY002 (function length), PY003 (type hints), PY004 (bare except), PY005 (mutable defaults), WARN-PY001 (parameter count). Canonical examples and anti-pattern documentation included.
+- **Bash Pack** (`packs/bash/`) — full language pack with 6 rules: SH001 (safety options), SH002 (function length), SH003 (variable naming), SH004 (eval security), SH005 (unquoted variables), WARN-SH001 (local declarations). Closes the 83% Bash codebase blind spot.
+- **Knowledge: Clean Code** (`knowledge/clean-code.md`) — naming, functions, comments, error handling, SOLID reference
+- **Knowledge: Refactoring Techniques** (`knowledge/refactoring-techniques.md`) — code smells catalog, composing methods, moving features, simplifying conditionals. Reference: refactoring.guru
+- **Knowledge: Design Patterns** (`knowledge/design-patterns.md`) — 23 GoF patterns (creational, structural, behavioral) with Python examples and selection guide. Reference: refactoring.guru
+- **Symfony Knowledge Base** — 8 new methodology documents extracted from production projects (Metrikia, Qualia):
+  - `ddd-cqrs-architecture.md` — Full DDD+CQRS layer architecture with Symfony & API Platform
+  - `ddd-domain-design.md` — Entities as aggregates, value objects, domain events, bounded contexts
+  - `api-platform-patterns.md` — State Providers/Processors, pagination, cache invalidation, serialization groups
+  - `messenger-patterns.md` — Async processing, idempotency, retry strategy, message versioning
+  - `symfony-best-practices.md` — Configuration hierarchy, services, controllers, security, testing
+  - `repository-composition.md` — Interface Segregation for repositories (7 focused interfaces per aggregate)
+  - `anti-patterns/anemic-domain.md` — Behavioral methods vs getter/setter entities
+  - `anti-patterns/service-locator.md` — Constructor injection vs ContainerInterface::get()
+- 15 new tests: 8 Python pack tests + 7 Bash pack tests
+- `craftsman-ignore: SH001` support for sourced library files (validators loaded via `source` must not have `set -euo pipefail`)
+
+### Changed
+- Python validation migrated from inline code in `post-write-check.sh` to proper pack architecture (`packs/python/hooks/python-validator.sh`)
+- `post-write-check.sh` now delegates to `pack_run_validators` for Python and Bash — same pattern as PHP/TypeScript
+- Plugin now validates **all 4 language families** it touches: PHP, TypeScript, Python, Bash
+- Knowledge base expanded from 5 to 45 documents across 5 packs + core
+- Bias detector patterns made context-aware — requires imperative verb context, eliminates false positives on "quick", "fast"
+- Rules engine refactored: extracted `_rules_find_directory_override`, `_rules_store_rule_fields` (SRP compliance)
+
+### Fixed
+- 4 phantom skill references in agents: `craftsman:entity`, `craftsman:usecase`, `craftsman:component`, `craftsman:hook` → unified to `craftsman:scaffold`
+- 13 command skills missing `name:` field in frontmatter
+- 8 agent effort level mismatches between plugin.json and .md files
+- README version badge 3.0.0 → 3.2.0
+
+## [3.1.0] — 2026-04-04
+
+### Added
+- `hooks/lib/session_state.py` — shared Python module (Clean Code compliant) with 13 commands: read, write, merge, append, increment, check-flag, record-violation, detect-patterns, pre-compact, post-compact, get-previous-violations, read-session-metrics
+- **Python validation in core** (PY001: naming, PY002: function length) — the plugin now validates its own Python code
+- `tests/lib/test-helpers.sh` — centralized test infrastructure (log_pass/log_fail, assertions, test_summary)
+- `tests/core/test-session-state-lib.sh` — 20 unit tests for session state module
+- PostCompact hook — verifies session state recovery after context compaction
+- 3 new examples: refactor (extract Value Object), verify (pre-commit), healthcheck (plugin diagnostic)
+- Superpowers plugin combination guide in README with recommended development flow
+
+### Fixed
+- **CRITICAL**: Non-atomic writes in `post-write-check.sh` — session-state.json could be corrupted when multiple hooks fire simultaneously. Now uses `tempfile.mkstemp() + os.rename()`.
+- **Python Clean Code violations** in `session_state.py` — renamed all abbreviations (`fp`->`file_path`, `dir_b`->`directory`, `d`->`parent_directory`, etc.), extracted magic numbers to constants, split long functions
+- `bias-detector.sh` output changed from raw text to JSON `{systemMessage}` format for proper Claude Code integration
+- `bin/craftsman-validate` — replaced string interpolation with `jq --arg` to prevent shell injection
+- ADR numbering: unified from dual scheme (0001-0009 + 001-004) to consistent 0001-0012
+- Removed ADR-0013 (documentation verification) — was a process rule, not an architectural decision
+- `test-adapters.sh` — version assertion matched stale v2.1.0 instead of mock report's v2.6.0
+
+### Changed
+- Migrated **all** session-state operations to shared `session_state.py` module — 8 hooks refactored, ~150 lines of inline Python eliminated
+- Refactored 19 test files to use shared `test-helpers.sh`, eliminating ~400 lines of duplicated test boilerplate
+- **Hook event validation refactored** — extracted hardcoded hook event list from `session-start.sh` and `test-hooks.sh` into centralized `hooks/lib/hook-events.sh` configuration. Single source of truth for all 25 valid Claude Code hook event types. Fixes Issue #4.
+- **Agent metadata synchronized** — all 9 agent .md files now have `allowedTools` arrays, `isolation` fields, and consistent `effort` values matching `plugin.json`. Fixes Issue #3.
+- Stale documentation counts corrected: "15 commands" → "20 skills", "5 agents" → "11 agents"
+- README examples section expanded from 6 to 11 entries
+- README ADRs section expanded from 11 to 12 with consistent numbering
+
+## [3.0.0] — 2026-04-04
+
+### BREAKING — Paradigm Shift: Passive → Proactive
+
+The plugin now actively suggests the right command at the right time. Claude reads the routing table at session start and proposes craftsman commands when the context matches.
+
+### Added
+- **Proactive Command Discovery** — routing table injected into session-start systemMessage
+- `hooks/lib/routing-table.sh` — dynamic routing table adapted to loaded packs
+- `/craftsman:healthcheck` — global plugin diagnostic (system deps, config, runtime, AI/ML)
+- `/craftsman:knowledge` — knowledge base management (add, sync, list, status, remove)
+- Incremental indexing — hash-based sync replaces full rebuild (SHA256 per file)
+- Healthcheck summary injected into session-start output
+- `hooks/lib/healthcheck.sh` shared library for health checks
+
+### Fixed
+- Config key `ai` renamed to `ai-ml` in setup template to match pack directory
+- All command descriptions now include explicit trigger conditions for discovery
+- Removed unused `packs/ai-ml/mcp/knowledge-rag/data/` directory
+
+### Changed
+- `index-pdfs.ts` refactored to CLI with modes: sync, add, remove, status, list, rebuild
+- VectorStore gains incremental methods: deleteBySource, getSourceHash, getAllSourceHashes
+- DB schema migration: sources table gains `file_hash` and `file_size` columns (auto-migrated)
+- session-start.sh output now includes healthcheck summary + command routing table
+
 ## [2.9.1] - 2026-04-04
 
 ### Fixed

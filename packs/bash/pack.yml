@@ -1,0 +1,21 @@
+name: bash
+version: "1.0.0"
+description: "Bash/Shell craftsman pack — safety, naming, function discipline, shellcheck patterns"
+compatibility:
+  core: ">=3.1.0"
+  stack: ["*"]
+
+rules:
+  builtin: ["SH001", "SH002", "SH003", "SH004", "SH005", "WARN-SH001"]
+
+hooks:
+  validators: ["hooks/bash-validator.sh"]
+
+commands:
+  scaffold_types: []
+
+agents: []
+
+knowledge: ["knowledge/"]
+
+templates: []

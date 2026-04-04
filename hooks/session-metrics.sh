@@ -7,6 +7,9 @@
 # =============================================================================
 set -uo pipefail
 
+# Non-blocking: session metrics are best-effort
+trap 'echo "WARNING: session-metrics.sh failed at line $LINENO" >&2; exit 0' ERR
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
 
@@ -34,17 +37,8 @@ AGENT_COUNT=0
 TEAM_TYPE=""
 COMPLETED_TASKS_COUNT=0
 if [[ -f "$SESSION_STATE" ]]; then
-    STATE_DATA=$(python3 -c "
-import json, sys
-with open(sys.argv[1]) as f:
-    state = json.load(f)
-agent_count = state.get('agent_invocations', 0)
-team_type = state.get('team_type', '')
-completed_tasks = len(state.get('completed_tasks', []))
-print(agent_count)
-print(team_type)
-print(completed_tasks)
-" "$SESSION_STATE" 2>/dev/null) || true
+    STATE_DATA=$(python3 "$SCRIPT_DIR/lib/session_state.py" read-session-metrics \
+        "$SESSION_STATE" 2>/dev/null) || true
 
     if [[ -n "$STATE_DATA" ]]; then
         AGENT_COUNT=$(echo "$STATE_DATA" | sed -n '1p')

@@ -147,41 +147,36 @@ _rules_parse_config() {
 
     local rule_id
     for rule_id in $rule_ids; do
-        # Check if short form (severity only) or long form (custom rule)
-        local rule_json
-        rule_json=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"]" 2>/dev/null)
-
-        local sev
-        sev=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"].severity // empty" 2>/dev/null)
-        if [[ -n "$sev" ]]; then
-            _rules_set "severity" "$rule_id" "$sev"
-        fi
-
-        local pat
-        pat=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"].pattern // empty" 2>/dev/null)
-        if [[ -n "$pat" ]]; then
-            _rules_set "pattern" "$rule_id" "$pat"
-        fi
-
-        local msg
-        msg=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"].message // empty" 2>/dev/null)
-        if [[ -n "$msg" ]]; then
-            _rules_set "message" "$rule_id" "$msg"
-        fi
-
-        local langs
-        langs=$(printf '%s' "$json_output" | jq -r '.rules["'"$rule_id"'"].languages // empty | if type == "array" then join(",") else empty end' 2>/dev/null)
-        if [[ -n "$langs" ]]; then
-            _rules_set "languages" "$rule_id" "$langs"
-        else
-            # Check for empty array explicitly
-            local langs_type
-            langs_type=$(printf '%s' "$json_output" | jq -r '.rules["'"$rule_id"'"].languages | type' 2>/dev/null)
-            if [[ "$langs_type" == "array" ]]; then
-                _rules_set "languages" "$rule_id" ""
-            fi
-        fi
+        _rules_store_rule_fields "$json_output" "$rule_id"
     done
+}
+
+# Store all fields (severity, pattern, message, languages) for a single rule from JSON
+_rules_store_rule_fields() {
+    local json_output="$1"
+    local rule_id="$2"
+
+    local severity
+    severity=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"].severity // empty" 2>/dev/null)
+    [[ -n "$severity" ]] && _rules_set "severity" "$rule_id" "$severity"
+
+    local pattern
+    pattern=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"].pattern // empty" 2>/dev/null)
+    [[ -n "$pattern" ]] && _rules_set "pattern" "$rule_id" "$pattern"
+
+    local message
+    message=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"].message // empty" 2>/dev/null)
+    [[ -n "$message" ]] && _rules_set "message" "$rule_id" "$message"
+
+    local languages
+    languages=$(printf '%s' "$json_output" | jq -r '.rules["'"$rule_id"'"].languages // empty | if type == "array" then join(",") else empty end' 2>/dev/null)
+    if [[ -n "$languages" ]]; then
+        _rules_set "languages" "$rule_id" "$languages"
+    else
+        local languages_type
+        languages_type=$(printf '%s' "$json_output" | jq -r '.rules["'"$rule_id"'"].languages | type' 2>/dev/null)
+        [[ "$languages_type" == "array" ]] && _rules_set "languages" "$rule_id" ""
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -355,53 +350,70 @@ rules_severity() {
 # Like rules_severity but with directory-level .craft-rules.yml override.
 # Walks up from file's directory looking for .craft-rules.yml, stops at project root.
 # ---------------------------------------------------------------------------
-rules_severity_for_file() {
+# Walk directories from file up to project root, looking for .craft-rules.yml override.
+# Prints the overridden severity if found, prints nothing if no directory override exists.
+_rules_find_directory_override() {
     local file_path="$1"
     local rule_id="$2"
 
-    local dir
-    dir=$(dirname "$file_path")
+    local current_directory
+    current_directory=$(dirname "$file_path")
 
-    # Walk up from file dir to project root looking for .craft-rules.yml
-    while [[ -n "$dir" ]]; do
-        # Sanitize dir for cache key (replace / with __)
-        local dir_key
-        dir_key=$(echo "$dir" | sed 's|/|__|g')
+    while [[ -n "$current_directory" ]]; do
+        local directory_key
+        directory_key=$(echo "$current_directory" | sed 's|/|__|g')
 
-        # Check cache first
-        local cached
-        cached=$(_rules_get "dir_cache" "${dir_key}:${rule_id}")
-        if [[ -n "$cached" ]]; then
-            echo "$cached"
+        local cached_severity
+        cached_severity=$(_rules_get "dir_cache" "${directory_key}:${rule_id}")
+        if [[ -n "$cached_severity" ]]; then
+            echo "$cached_severity"
             return 0
         fi
 
-        # Parse .craft-rules.yml if it exists and hasn't been parsed
-        if [[ -f "$dir/.craft-rules.yml" ]]; then
-            # Check if we've already parsed this directory
-            if ! _rules_has "dir_parsed" "$dir_key"; then
-                _rules_parse_dir_config "$dir/.craft-rules.yml" "$dir_key"
-                _rules_set "dir_parsed" "$dir_key" "1"
+        if [[ -f "$current_directory/.craft-rules.yml" ]]; then
+            if ! _rules_has "dir_parsed" "$directory_key"; then
+                _rules_parse_dir_config "$current_directory/.craft-rules.yml" "$directory_key"
+                _rules_set "dir_parsed" "$directory_key" "1"
             fi
 
-            # Check again after parsing
-            cached=$(_rules_get "dir_cache" "${dir_key}:${rule_id}")
-            if [[ -n "$cached" ]]; then
-                echo "$cached"
+            cached_severity=$(_rules_get "dir_cache" "${directory_key}:${rule_id}")
+            if [[ -n "$cached_severity" ]]; then
+                echo "$cached_severity"
                 return 0
             fi
         fi
 
-        # Stop at project root
-        if [[ "$dir" == "$_RULES_PROJECT_DIR" ]] || [[ "$dir" == "/" ]]; then
-            break
-        fi
-
-        # Go up one level
-        dir=$(dirname "$dir")
+        [[ "$current_directory" == "$_RULES_PROJECT_DIR" || "$current_directory" == "/" ]] && break
+        current_directory=$(dirname "$current_directory")
     done
+    return 1
+}
 
-    # Fall back to project-level severity
+# Find the nearest directory containing .craft-rules.yml for a file path.
+# Prints the directory path, or nothing if no override directory exists.
+_rules_find_override_directory() {
+    local file_path="$1"
+    local current_directory
+    current_directory=$(dirname "$file_path")
+
+    while [[ -n "$current_directory" ]]; do
+        [[ -f "$current_directory/.craft-rules.yml" ]] && { echo "$current_directory"; return 0; }
+        [[ "$current_directory" == "$_RULES_PROJECT_DIR" || "$current_directory" == "/" ]] && break
+        current_directory=$(dirname "$current_directory")
+    done
+    return 1
+}
+
+rules_severity_for_file() {
+    local file_path="$1"
+    local rule_id="$2"
+
+    local directory_severity
+    directory_severity=$(_rules_find_directory_override "$file_path" "$rule_id") && {
+        echo "$directory_severity"
+        return 0
+    }
+
     rules_severity "$rule_id"
 }
 
@@ -461,52 +473,29 @@ rules_explain() {
     local rule_id="$1"
     local file_path="${2:-}"
 
-    # If file_path provided, check directory overrides first
+    # Check directory overrides first (if file path provided)
     if [[ -n "$file_path" ]]; then
-        local dir
-        dir=$(dirname "$file_path")
-
-        while [[ -n "$dir" ]]; do
-            local dir_key
-            dir_key=$(echo "$dir" | sed 's|/|__|g')
-
-            # Parse if needed
-            if [[ -f "$dir/.craft-rules.yml" ]]; then
-                if ! _rules_has "dir_parsed" "$dir_key"; then
-                    _rules_parse_dir_config "$dir/.craft-rules.yml" "$dir_key"
-                    _rules_set "dir_parsed" "$dir_key" "1"
-                fi
-
-                local cached
-                cached=$(_rules_get "dir_cache" "${dir_key}:${rule_id}")
-                if [[ -n "$cached" ]]; then
-                    echo "$rule_id: $cached (source: directory override $dir/.craft-rules.yml)"
-                    return 0
-                fi
-            fi
-
-            if [[ "$dir" == "$_RULES_PROJECT_DIR" ]] || [[ "$dir" == "/" ]]; then
-                break
-            fi
-            dir=$(dirname "$dir")
-        done
+        local directory_severity
+        directory_severity=$(_rules_find_directory_override "$file_path" "$rule_id") && {
+            local override_directory
+            override_directory=$(_rules_find_override_directory "$file_path")
+            echo "$rule_id: $directory_severity (source: directory override ${override_directory}/.craft-rules.yml)"
+            return 0
+        }
     fi
 
     # Check project-level explicit config
-    local sev
-    sev=$(_rules_get "severity" "$rule_id")
-    if [[ -n "$sev" ]]; then
-        # Determine if from project or global
-        if [[ -f "$_RULES_PROJECT_DIR/.craft-config.yml" ]]; then
-            echo "$rule_id: $sev (source: project $_RULES_PROJECT_DIR/.craft-config.yml)"
-        else
-            echo "$rule_id: $sev (source: global ~/.claude/.craft-config.yml)"
-        fi
+    local configured_severity
+    configured_severity=$(_rules_get "severity" "$rule_id")
+    if [[ -n "$configured_severity" ]]; then
+        local config_source="global ~/.claude/.craft-config.yml"
+        [[ -f "$_RULES_PROJECT_DIR/.craft-config.yml" ]] && config_source="project $_RULES_PROJECT_DIR/.craft-config.yml"
+        echo "$rule_id: $configured_severity (source: $config_source)"
         return 0
     fi
 
     # Default severity from strictness
-    local default_sev
-    default_sev=$(_rules_default_severity "$rule_id")
-    echo "$rule_id: $default_sev (source: default strictness '$_RULES_STRICTNESS')"
+    local default_severity
+    default_severity=$(_rules_default_severity "$rule_id")
+    echo "$rule_id: $default_severity (source: default strictness '$_RULES_STRICTNESS')"
 }
