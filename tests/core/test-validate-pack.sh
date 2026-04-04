@@ -8,14 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 VALIDATE_SCRIPT="${ROOT_DIR}/scripts/validate-pack.sh"
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-TESTS_PASSED=0
-TESTS_FAILED=0
-
-log_pass() { echo -e "  ${GREEN}✓${NC} $1"; TESTS_PASSED=$((TESTS_PASSED + 1)); }
-log_fail() { echo -e "  ${RED}✗${NC} $1: $2"; TESTS_FAILED=$((TESTS_FAILED + 1)); }
+source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
 # Temp directory — cleaned up on exit
 TEST_TMP="$(mktemp -d /tmp/craftsman_validate_pack_XXXXXX)"

@@ -7,14 +7,7 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-TESTS_PASSED=0
-TESTS_FAILED=0
-
-log_pass() { echo -e "  ${GREEN}✓${NC} $1"; TESTS_PASSED=$((TESTS_PASSED + 1)); }
-log_fail() { echo -e "  ${RED}✗${NC} $1: $2"; TESTS_FAILED=$((TESTS_FAILED + 1)); }
+source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
 assert_eq() {
     local label="$1" expected="$2" actual="$3"
@@ -291,9 +284,4 @@ assert_eq "LRU: key5 still present" "val5" "$result"
 # =============================================================================
 rm -rf "$CLAUDE_PLUGIN_DATA"
 
-echo ""
-echo "==================================="
-echo -e " ${GREEN}Passed:${NC} $TESTS_PASSED"
-echo -e " ${RED}Failed:${NC} $TESTS_FAILED"
-echo "==================================="
-[[ $TESTS_FAILED -eq 0 ]] && exit 0 || exit 1
+test_summary

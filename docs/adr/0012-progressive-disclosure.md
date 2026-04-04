@@ -1,4 +1,4 @@
-# ADR-003: Progressive Disclosure for Skills
+# ADR-0012: Progressive Disclosure for Skills
 
 ## Status
 

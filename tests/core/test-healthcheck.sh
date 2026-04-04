@@ -15,11 +15,7 @@ trap 'rm -rf "$CLAUDE_PLUGIN_DATA"' EXIT
 source "$ROOT_DIR/hooks/lib/config.sh"
 source "$ROOT_DIR/hooks/lib/pack-loader.sh"
 
-TESTS_PASSED=0
-TESTS_FAILED=0
-
-log_pass() { echo "  ✓ $1"; (( TESTS_PASSED++ )); }
-log_fail() { echo "  ✗ $1"; (( TESTS_FAILED++ )); }
+source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
 echo "=== Healthcheck Library Tests ==="
 

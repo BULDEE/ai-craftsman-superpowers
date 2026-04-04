@@ -25,32 +25,12 @@ ERROR=$(echo "$INPUT" | jq -r '.error // empty' 2>/dev/null)
 SESSION_STATE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
 
 if $HAS_PYTHON3; then
-    python3 -c "
-import json, os, sys, datetime, tempfile
-sf = sys.argv[1]
-tool = sys.argv[2]
-error = sys.argv[3][:200]
-os.makedirs(os.path.dirname(sf), exist_ok=True)
-try:
-    with open(sf) as f:
-        state = json.load(f)
-except (FileNotFoundError, json.JSONDecodeError):
-    state = {}
-failures = state.setdefault('tool_failures', [])
-failures.append({
-    'tool': tool,
-    'error': error,
-    'timestamp': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-})
-if len(failures) > 50:
-    failures[:] = failures[-50:]
-state['tool_failure_count'] = state.get('tool_failure_count', 0) + 1
-d = os.path.dirname(sf)
-fd, tmp = tempfile.mkstemp(dir=d, suffix='.tmp')
-with os.fdopen(fd, 'w') as f:
-    json.dump(state, f)
-os.rename(tmp, sf)
-" "$SESSION_STATE" "$TOOL_NAME" "${ERROR:-unknown}" 2>/dev/null || true
+    LIB_DIR="${SCRIPT_DIR}/lib"
+    TIMESTAMP=$(python3 -c "import datetime; print(datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'))")
+    ITEM=$(jq -n --arg t "$TOOL_NAME" --arg e "${ERROR:0:200}" --arg ts "$TIMESTAMP" \
+        '{tool: $t, error: $e, timestamp: $ts}')
+    python3 "$LIB_DIR/session_state.py" append "$SESSION_STATE" tool_failures "$ITEM" 50 2>/dev/null || true
+    python3 "$LIB_DIR/session_state.py" increment "$SESSION_STATE" tool_failure_count 2>/dev/null || true
 fi
 
 exit 0

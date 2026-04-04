@@ -405,10 +405,11 @@ See [`/docs/adr`](docs/adr/) for Architecture Decision Records:
 - [ADR-0005: Knowledge-First Architecture](docs/adr/0005-knowledge-first-architecture.md)
 - [ADR-0006: Project-Specific Knowledge](docs/adr/0006-project-specific-knowledge.md)
 - [ADR-0007: Commands over Skills](docs/adr/0007-commands-over-skills.md)
-- [ADR-001: Model Tiering Strategy](docs/adr/001-model-tiering.md)
-- [ADR-002: Context Fork Strategy](docs/adr/002-context-fork-strategy.md)
-- [ADR-003: Progressive Disclosure](docs/adr/003-progressive-disclosure.md)
-- [ADR-004: Official Documentation Verification](docs/adr/004-official-documentation-verification.md)
+- [ADR-0008: Inline SQLite over Bash Expansion](docs/adr/0008-inline-sqlite-over-bash-expansion.md)
+- [ADR-0009: Command Hooks over Agent Hooks](docs/adr/0009-command-hooks-over-agent-hooks.md)
+- [ADR-0010: Model Tiering Strategy](docs/adr/0010-model-tiering.md)
+- [ADR-0011: Context Fork Strategy](docs/adr/0011-context-fork-strategy.md)
+- [ADR-0012: Progressive Disclosure](docs/adr/0012-progressive-disclosure.md)
 
 ## Examples
 
@@ -418,8 +419,13 @@ See [`/examples`](examples/) for detailed usage examples:
 - [Debug: Memory Leak](examples/debug/01-memory-leak.md)
 - [Challenge: Code Review](examples/challenge/01-code-review.md)
 - [Plan: Migration](examples/plan/01-migration-microservices.md)
+- [Refactor: Extract Value Object](examples/refactor/01-extract-value-object.md)
 - [Git: Safe Commit](examples/git/01-safe-commit.md)
 - [Test: Testing Strategy](examples/test/01-testing-strategy.md)
+- [Verify: Pre-Commit Verification](examples/verify/01-pre-commit-verification.md)
+- [Healthcheck: Plugin Diagnostic](examples/healthcheck/01-plugin-diagnostic.md)
+- [Team: Fullstack Feature](examples/team/01-feature-fullstack.md)
+- [Parallel: Code Review](examples/parallel/01-parallel-review.md)
 
 ## Architecture
 
@@ -435,6 +441,36 @@ packs/              → Loadable language packs
   ai-ml/            → AI/ML pack (agents, knowledge, commands)
 ci/                 → CI pipeline integration (adapter pattern)
 ```
+
+## Using with Superpowers Plugin
+
+Craftsman and [Superpowers](https://github.com/anthropics/claude-code-plugins/tree/main/superpowers) are complementary. Superpowers provides workflow orchestration (brainstorming, planning, TDD, subagent-driven development). Craftsman provides domain-specific quality enforcement (DDD rules, architectural validation, correction learning).
+
+**Recommended development flow:**
+
+```
+1. /superpowers:brainstorming     → Design the solution collaboratively
+2. /superpowers:writing-plans     → Create implementation plan
+3. /superpowers:subagent-driven-development → Execute with fresh subagents
+   ├── Craftsman hooks fire on every Write/Edit (real-time quality gate)
+   ├── /craftsman:design           → DDD modeling when domain entities appear
+   └── /craftsman:challenge        → Architecture review at milestones
+4. /craftsman:verify              → Evidence-based verification before commit
+5. /superpowers:finishing-a-development-branch → PR and merge
+```
+
+**What each plugin handles:**
+
+| Concern | Superpowers | Craftsman |
+|---------|-------------|-----------|
+| Workflow orchestration | Brainstorming, planning, TDD | - |
+| Code quality enforcement | - | Hooks, rules engine, correction learning |
+| Architecture validation | - | Layer boundaries, DDD patterns |
+| Bias detection | - | Acceleration, scope creep, over-optimization |
+| CI pipeline | - | Multi-provider adapter pattern |
+| Subagent management | Dispatch, review loops | Quality gate on subagent output |
+
+Both plugins load simultaneously. No configuration needed — hooks.json events do not conflict.
 
 ## Philosophy
 

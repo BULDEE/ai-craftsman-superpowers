@@ -8,11 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MCP_DIR="$ROOT_DIR/packs/ai-ml/mcp/knowledge-rag"
 
-TESTS_PASSED=0
-TESTS_FAILED=0
-
-log_pass() { echo "  ✓ $1"; (( TESTS_PASSED++ )); }
-log_fail() { echo "  ✗ $1"; (( TESTS_FAILED++ )); }
+source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
 echo "=== Knowledge CLI Tests ==="
 

@@ -16,11 +16,7 @@ source "$ROOT_DIR/hooks/lib/config.sh"
 source "$ROOT_DIR/hooks/lib/pack-loader.sh"
 pack_loader_init 2>/dev/null || true
 
-TESTS_PASSED=0
-TESTS_FAILED=0
-
-log_pass() { echo "  ✓ $1"; (( TESTS_PASSED++ )); }
-log_fail() { echo "  ✗ $1"; (( TESTS_FAILED++ )); }
+source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
 echo "=== Routing Table Tests ==="
 

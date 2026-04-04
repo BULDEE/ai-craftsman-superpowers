@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] — 2026-04-04
+
+### Added
+- `hooks/lib/session_state.py` — shared Python module (Clean Code compliant) with 13 commands: read, write, merge, append, increment, check-flag, record-violation, detect-patterns, pre-compact, post-compact, get-previous-violations, read-session-metrics
+- **Python validation in core** (PY001: naming, PY002: function length) — the plugin now validates its own Python code
+- `tests/lib/test-helpers.sh` — centralized test infrastructure (log_pass/log_fail, assertions, test_summary)
+- `tests/core/test-session-state-lib.sh` — 20 unit tests for session state module
+- PostCompact hook — verifies session state recovery after context compaction
+- 3 new examples: refactor (extract Value Object), verify (pre-commit), healthcheck (plugin diagnostic)
+- Superpowers plugin combination guide in README with recommended development flow
+
+### Fixed
+- **CRITICAL**: Non-atomic writes in `post-write-check.sh` — session-state.json could be corrupted when multiple hooks fire simultaneously. Now uses `tempfile.mkstemp() + os.rename()`.
+- **Python Clean Code violations** in `session_state.py` — renamed all abbreviations (`fp`->`file_path`, `dir_b`->`directory`, `d`->`parent_directory`, etc.), extracted magic numbers to constants, split long functions
+- `bias-detector.sh` output changed from raw text to JSON `{systemMessage}` format for proper Claude Code integration
+- `bin/craftsman-validate` — replaced string interpolation with `jq --arg` to prevent shell injection
+- ADR numbering: unified from dual scheme (0001-0009 + 001-004) to consistent 0001-0012
+- Removed ADR-0013 (documentation verification) — was a process rule, not an architectural decision
+- `test-adapters.sh` — version assertion matched stale v2.1.0 instead of mock report's v2.6.0
+
+### Changed
+- Migrated **all** session-state operations to shared `session_state.py` module — 8 hooks refactored, ~150 lines of inline Python eliminated
+- Refactored 19 test files to use shared `test-helpers.sh`, eliminating ~400 lines of duplicated test boilerplate
+- Stale documentation counts corrected: "15 commands" → "20 skills", "5 agents" → "11 agents"
+- README examples section expanded from 6 to 11 entries
+- README ADRs section expanded from 11 to 12 with consistent numbering
+
 ## [3.0.0] — 2026-04-04
 
 ### BREAKING — Paradigm Shift: Passive → Proactive
