@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.1] - 2026-04-04
+
+### Fixed
+- Conflict detector now also checks `~/.mcp.json` — a stale home-level entry with invalid path silently overrode the plugin-managed MCP server
+
 ## [2.9.0] - 2026-04-04
 
 ### Fixed
