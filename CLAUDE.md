@@ -42,7 +42,7 @@ Records every violation fix users make and injects correction trends at next ses
 Enterprise-ready rule customization: Global → Project → Directory overrides. Short form (`PHP001: warn`) and long form (custom rules with regex, message, severity, languages, paths). Legacy code coexists with strict new code via directory-level relaxation. Python-backed YAML parser with bash 3.2 shell compatibility.
 
 ### 3. Cognitive Bias Detector
-Real-time detection of acceleration bias, scope creep, and over-optimization in user prompts. Bilingual FR/EN pattern matching on UserPromptSubmit hook. Non-blocking warnings that encourage reflection before action. Currently regex-based — semantic analysis planned for v3.
+Real-time detection of acceleration bias, scope creep, and over-optimization in user prompts. Context-aware bilingual FR/EN pattern matching on UserPromptSubmit hook — requires imperative verb context to reduce false positives. Non-blocking warnings that encourage reflection before action.
 
 ### 4. Real-Time Quality Gate
 3-level progressive validation on every Write/Edit:

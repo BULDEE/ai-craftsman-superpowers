@@ -114,7 +114,7 @@ Records every violation fix users make and injects correction trends at next ses
 Enterprise-ready rule customization: Global → Project → Directory overrides. Short form (`PHP001: warn`) and long form (custom rules with regex, message, severity, languages, paths). Legacy code coexists with strict new code via directory-level relaxation. Python-backed YAML parser with bash 3.2 shell compatibility.
 
 ### 3. **Cognitive Bias Detector**
-Real-time detection of acceleration bias, scope creep, and over-optimization in user prompts. Bilingual FR/EN pattern matching on UserPromptSubmit hook. Non-blocking warnings that encourage reflection before action. Currently regex-based — semantic analysis planned for v4.
+Real-time detection of acceleration bias, scope creep, and over-optimization in user prompts. Context-aware bilingual FR/EN pattern matching on UserPromptSubmit hook — requires imperative verb context to reduce false positives. Non-blocking warnings that encourage reflection before action.
 
 ### 4. **Real-Time Quality Gate**
 3-level progressive validation on every Write/Edit:
@@ -207,11 +207,11 @@ All commands are explicitly invoked with `/craftsman:command-name`. See [ADR-000
 
 Hooks automatically detect and warn about cognitive biases:
 
-| Bias | Trigger | Protection |
+| Bias | Trigger (context-aware) | Protection |
 |------|---------|------------|
-| **Acceleration** | "vite", "quick", "just do it" | STOP - Design first |
-| **Scope Creep** | "et aussi", "while we're at it" | STOP - Is this in scope? |
-| **Over-Optimization** | "abstraire", "generalize" | STOP - YAGNI |
+| **Acceleration** | "fais ça vite", "just do it", "skip the design" | STOP - Design first |
+| **Scope Creep** | "et aussi ajoutons", "let's also add" | STOP - Is this in scope? |
+| **Over-Optimization** | "abstraire ce pattern", "make it generic" | STOP - YAGNI |
 
 ### Semantic Intelligence (v1.3.0+)
 
@@ -273,6 +273,16 @@ Hooks validate your code automatically with **3-level analysis**:
 | TS001 | TypeScript | No `any` types |
 | TS002 | TypeScript | Named exports only |
 | TS003 | TypeScript | No non-null assertions (`!`) |
+| PY001 | Python | No short variable names (min 3 chars) |
+| PY002 | Python | Function max 25 lines |
+| PY003 | Python | Return type hints required |
+| PY004 | Python | No bare `except:` |
+| PY005 | Python | No mutable default arguments |
+| SH001 | Bash | `set -u` required (not in sourced libs) |
+| SH002 | Bash | Function max 30 lines |
+| SH003 | Bash | No short variable names |
+| SH004 | Bash | No `eval` usage |
+| SH005 | Bash | No unquoted variables in file ops |
 | LAYER001 | PHP | Domain cannot import Infrastructure |
 | LAYER002 | PHP | Domain cannot import Presentation |
 | LAYER003 | PHP | Application cannot import Presentation |
