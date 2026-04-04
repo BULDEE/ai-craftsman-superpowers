@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
-[![Version](https://img.shields.io/badge/Version-2.8.1-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-2.8.2-blue)](CHANGELOG.md)
 [![Commands](https://img.shields.io/badge/Commands-15-orange)]()
 [![Agents](https://img.shields.io/badge/Agents-11-red)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -338,6 +338,7 @@ Each scaffolder offers template selection before generating code:
 The plugin includes an **optional** MCP server for RAG (Retrieval-Augmented Generation) over local documents.
 
 > **Note:** The plugin is fully functional without the MCP. This is a power-user feature.
+> The MCP server is **conditional** — it only activates when the `ai-ml` pack is explicitly enabled in your plugin config. Users without it get zero errors.
 
 ### Prerequisites
 
@@ -347,38 +348,22 @@ The plugin includes an **optional** MCP server for RAG (Retrieval-Augmented Gene
 ### Setup
 
 ```bash
-# 1. Install Ollama
+# 1. Enable the ai-ml pack in your plugin config
+# Set packs: "ai-ml" (or "symfony,react,ai-ml") in Claude Code plugin settings
+
+# 2. Install Ollama
 brew install ollama && ollama pull nomic-embed-text
 ollama serve  # Keep running
 
-# 2. Build MCP server
-cd ~/.claude/plugins/marketplaces/ai-craftsman-superpowers/ai-pack/mcp/knowledge-rag
-npm install && npm run build
+# 3. Restart Claude Code — the MCP server auto-installs and builds on first run
 
-# 3. Create knowledge directory & add documents
+# 4. Create knowledge directory & add documents
 mkdir -p ~/.claude/ai-craftsman-superpowers/knowledge
 cp ~/your-docs/*.pdf ~/.claude/ai-craftsman-superpowers/knowledge/
 
-# 4. Index knowledge base
+# 5. Index knowledge base (from plugin cache directory)
+cd ~/.claude/plugins/cache/ai-craftsman-superpowers/craftsman/*/packs/ai-ml/mcp/knowledge-rag
 npm run index:ollama
-
-# 5. Configure Claude Code
-# Add to ~/.claude/settings.local.json:
-```
-
-```json
-{
-  "mcpServers": {
-    "knowledge-rag": {
-      "command": "node",
-      "args": ["~/.claude/plugins/marketplaces/ai-craftsman-superpowers/ai-pack/mcp/knowledge-rag/dist/src/index.js"]
-    }
-  }
-}
-```
-
-```bash
-# 6. Restart Claude Code
 ```
 
 See [Local RAG Setup Guide](docs/guides/local-rag-ollama.md) and [MCP Reference](docs/reference/mcp-servers.md) for detailed instructions.

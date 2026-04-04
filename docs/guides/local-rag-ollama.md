@@ -454,7 +454,7 @@ your-project/
 ```bash
 # From your project directory
 cd /path/to/your-project
-npx tsx /path/to/ai-pack/mcp/knowledge-rag/scripts/index-pdfs.ts
+npx tsx /path/to/packs/ai-ml/mcp/knowledge-rag/scripts/index-pdfs.ts
 
 # Output:
 # Mode: PROJECT knowledge base
@@ -473,7 +473,7 @@ npx tsx /path/to/ai-pack/mcp/knowledge-rag/scripts/index-pdfs.ts
 When no project knowledge exists, the MCP uses the plugin's global knowledge:
 
 ```
-ai-pack/knowledge/
+packs/ai-ml/knowledge/
 ├── agent-3p-pattern.md
 ├── mlops-principles.md
 ├── rag-architecture.md
@@ -483,16 +483,16 @@ ai-pack/knowledge/
 ### Detection Priority
 
 1. **Project** - `.claude/ai-craftsman-superpowers/knowledge/` in cwd
-2. **Global** - `ai-pack/knowledge/` in plugin installation
+2. **Global** - `packs/ai-ml/knowledge/` in plugin installation
 
 See [ADR-0006: Project-Specific Knowledge](../adr/0006-project-specific-knowledge.md) for rationale.
 
 ## Using the MCP Server
 
-The `ai-pack/mcp/knowledge-rag` MCP server provides RAG over the knowledge base:
+The `packs/ai-ml/mcp/knowledge-rag` MCP server provides RAG over the knowledge base:
 
 ```bash
-cd ai-pack/mcp/knowledge-rag
+cd packs/ai-ml/mcp/knowledge-rag
 
 # Install
 npm install
@@ -507,7 +507,7 @@ npm run index:ollama
 npm run test
 ```
 
-See [ai-pack/mcp/knowledge-rag/README.md](../../ai-pack/mcp/knowledge-rag/README.md) for full MCP integration.
+See [knowledge-rag README](../../packs/ai-ml/mcp/knowledge-rag/README.md) for full MCP integration.
 
 ## References
 

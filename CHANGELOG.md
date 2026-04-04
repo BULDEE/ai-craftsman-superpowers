@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.2] - 2026-04-04
+
+### Fixed
+- knowledge-rag MCP server fails for all users with "Failed to reconnect" because `dist/` and `node_modules/` are gitignored and never built during plugin installation
+- MCP server now conditional on `ai-ml` pack activation via `CLAUDE_PLUGIN_OPTION_packs` — users without `ai-ml` get a no-op MCP server (valid protocol, zero tools, zero errors)
+- Auto-bootstrap: when `ai-ml` pack is enabled, `start.mjs` launcher auto-installs dependencies and builds TypeScript on first run
+- Fixed stale path references in docs (`ai-pack/` → `packs/ai-ml/`)
+
 ## [2.8.1] - 2026-04-01
 
 ### Fixed
