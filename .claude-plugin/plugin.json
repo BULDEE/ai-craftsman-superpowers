@@ -255,8 +255,7 @@
       "effort": "medium",
       "memory": "project",
       "skills": [
-        "craftsman:entity",
-        "craftsman:usecase",
+        "craftsman:scaffold",
         "craftsman:spec",
         "craftsman:test"
       ],
@@ -293,8 +292,7 @@
       "effort": "medium",
       "memory": "project",
       "skills": [
-        "craftsman:component",
-        "craftsman:hook",
+        "craftsman:scaffold",
         "craftsman:spec",
         "craftsman:test"
       ],
