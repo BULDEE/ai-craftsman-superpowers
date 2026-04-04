@@ -88,12 +88,8 @@ echo "$PROMPT" | grep -iEq "$OVER_OPT_PATTERNS" && warn_over_optimization || tru
 if echo "$PROMPT" | grep -iEq "$DOMAIN_MODELING_PATTERNS"; then
     design_used=false
     if [[ -f "$SESSION_STATE" ]]; then
-        design_used=$(python3 -c "
-import json, sys
-with open(sys.argv[1]) as f:
-    state = json.load(f)
-print('true' if state.get('design_used', False) else 'false')
-" "$SESSION_STATE" 2>/dev/null) || design_used=false
+        LIB_DIR="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/hooks/lib"
+        design_used=$(python3 "$LIB_DIR/session_state.py" check-flag "$SESSION_STATE" design_used 2>/dev/null) || design_used=false
     fi
     if [[ "$design_used" != "true" ]]; then
         warn_missing_design

@@ -60,37 +60,9 @@ _write_session_state() {
     done <<< "$(echo -e "$CRITICAL_VIOLATIONS")"
     rules_json="${rules_json}]"
 
-    # Merge into existing session state (including cross-file pattern tracking)
-    if [[ -f "$SESSION_STATE" ]]; then
-        python3 -c "
-import json, sys
-sf, fp, dir_b, rj = sys.argv[1], sys.argv[2], sys.argv[3], json.loads(sys.argv[4])
-with open(sf) as f:
-    state = json.load(f)
-state.setdefault('blocked_violations', {})[fp] = rj
-
-# Cross-file pattern tracking: group rule violations by directory
-patterns = state.setdefault('patterns', {})
-for rule in rj:
-    dir_patterns = patterns.setdefault(rule, {})
-    files_in_dir = dir_patterns.setdefault(dir_b, [])
-    if fp not in files_in_dir:
-        files_in_dir.append(fp)
-
-with open(sf, 'w') as f:
-    json.dump(state, f)
-" "$SESSION_STATE" "$file_pattern" "$dir_bucket" "$rules_json" 2>&1 || echo "WARNING: session state write failed" >&2
-    else
-        python3 -c "
-import json, sys
-sf, fp, dir_b, rj = sys.argv[1], sys.argv[2], sys.argv[3], json.loads(sys.argv[4])
-patterns = {}
-for rule in rj:
-    patterns.setdefault(rule, {}).setdefault(dir_b, []).append(fp)
-with open(sf, 'w') as f:
-    json.dump({'blocked_violations': {fp: rj}, 'patterns': patterns}, f)
-" "$SESSION_STATE" "$file_pattern" "$dir_bucket" "$rules_json" 2>&1 || echo "WARNING: session state init failed" >&2
-    fi
+    # Atomically record violation with cross-file pattern tracking
+    python3 "$SCRIPT_DIR/lib/session_state.py" record-violation \
+        "$SESSION_STATE" "$file_pattern" "$dir_bucket" "$rules_json" 2>&1 || echo "WARNING: session state write failed" >&2
 }
 
 # Detect cross-file patterns: same rule in 3+ files → suggest project-wide fix
@@ -98,26 +70,7 @@ _detect_cross_file_patterns() {
     $HAS_PYTHON3 || return 0
     [[ ! -f "$SESSION_STATE" ]] && return
 
-    python3 -c "
-import json, sys
-with open(sys.argv[1]) as f:
-    state = json.load(f)
-patterns = state.get('patterns', {})
-suggestions = []
-for rule, dir_map in patterns.items():
-    # Count total unique files across all dirs for this rule
-    all_files = set()
-    for files in dir_map.values():
-        all_files.update(files)
-    if len(all_files) >= 3:
-        suggestions.append('PATTERN:' + rule + ':' + str(len(all_files)) + ' files')
-    # Check per-directory grouping
-    for dir_b, files in dir_map.items():
-        if len(files) >= 2 and dir_b not in ('', '.'):
-            suggestions.append('DIR_PATTERN:' + rule + ':' + dir_b + ':' + str(len(files)) + ' files')
-for s in suggestions:
-    print(s)
-" "$SESSION_STATE" 2>&1 || echo "WARNING: cross-file pattern detection failed" >&2
+    python3 "$SCRIPT_DIR/lib/session_state.py" detect-patterns "$SESSION_STATE" 2>&1 || echo "WARNING: cross-file pattern detection failed" >&2
 }
 
 _check_corrections() {
@@ -129,13 +82,8 @@ _check_corrections() {
     [[ ! -f "$SESSION_STATE" ]] && return
 
     local prev_rules
-    prev_rules=$(python3 -c "
-import json, sys
-with open(sys.argv[1]) as f:
-    state = json.load(f)
-rules = state.get('blocked_violations', {}).get(sys.argv[2], [])
-print(' '.join(rules))
-" "$SESSION_STATE" "$file_pattern" 2>/dev/null) || return
+    prev_rules=$(python3 "$SCRIPT_DIR/lib/session_state.py" get-previous-violations \
+        "$SESSION_STATE" "$file_pattern" 2>/dev/null) || return
 
     [[ -z "$prev_rules" ]] && return
 
@@ -290,6 +238,35 @@ case "$EXT" in
             _run_static_analysis "$FILE_PATH"
         fi
         ;;
+    py)
+        # Python clean code validation (core — no pack required)
+        # PY001: Single-char or 2-char variable names (excluding conventional: i, j, k, x, y, f, e, n, ok, id)
+        while IFS= read -r line_num; do
+            [[ -z "$line_num" ]] && continue
+            add_warning "PY001" "line ${line_num}: Single/double-char variable name — use descriptive names"
+        done < <(grep -nE '^\s+(for\s+|)[a-z]{1,2}\s*[=,]' "$FILE_PATH" 2>/dev/null \
+            | grep -vE '\b(i|j|k|x|y|f|e|n|ok|id|os|re|io|db)\b\s*[=,]' \
+            | grep -vE '(import|from|#|def |class )' \
+            | cut -d: -f1)
+        # PY002: Function longer than 25 lines (SRP indicator)
+        if $HAS_PYTHON3; then
+            while IFS= read -r warning_msg; do
+                [[ -z "$warning_msg" ]] && continue
+                add_warning "PY002" "$warning_msg"
+            done < <(python3 -c "
+import ast, sys
+try:
+    tree = ast.parse(open(sys.argv[1]).read())
+except SyntaxError:
+    sys.exit(0)
+for node in ast.walk(tree):
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        body_lines = node.end_lineno - node.lineno
+        if body_lines > 25:
+            print(f'line {node.lineno}: function {node.name}() is {body_lines} lines — consider extracting')
+" "$FILE_PATH" 2>/dev/null)
+        fi
+        ;;
 esac
 
 # =============================================================================
@@ -303,6 +280,7 @@ _validate_custom_rules() {
         php) language="php" ;;
         ts|tsx) language="typescript" ;;
         js|jsx) language="javascript" ;;
+        py) language="python" ;;
         *) return ;;
     esac
 

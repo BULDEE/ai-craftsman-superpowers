@@ -4,12 +4,9 @@
 # =============================================================================
 set -uo pipefail
 
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-PASS=0
-FAIL=0
-
-log_pass() { echo "  $(tput setaf 2)✓$(tput sgr0) $1"; ((PASS++)); }
-log_fail() { echo "  $(tput setaf 1)✗$(tput sgr0) $1 — $2"; ((FAIL++)); }
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
 echo "=== Agent Hook Gate Tests ==="
 
@@ -114,10 +111,4 @@ done
 # Cleanup
 rm -rf "/tmp/craftsman-agent-test-$$"
 
-echo ""
-echo "==================================="
-echo " Passed: $PASS"
-echo " Failed: $FAIL"
-echo "==================================="
-
-[[ $FAIL -eq 0 ]] || exit 1
+test_summary

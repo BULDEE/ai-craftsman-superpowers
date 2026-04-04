@@ -15,16 +15,7 @@ mkdir -p "$CLAUDE_PLUGIN_DATA"
 # Cleanup
 trap 'rm -rf "$CLAUDE_PLUGIN_DATA"' EXIT
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
-TESTS_PASSED=0
-TESTS_FAILED=0
-
-log_pass() { echo -e "  ${GREEN}✓${NC} $1"; TESTS_PASSED=$((TESTS_PASSED + 1)); }
-log_fail() { echo -e "  ${RED}✗${NC} $1: $2"; TESTS_FAILED=$((TESTS_FAILED + 1)); }
+source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
 # Helper to run session-metrics hook
 run_session_metrics() {
@@ -145,13 +136,4 @@ else
     log_fail "Session state should be removed after session end" "still exists"
 fi
 
-# =============================================================================
-# Summary
-# =============================================================================
-echo ""
-echo "==================================="
-printf " ${GREEN}Passed:${NC} %d\n" "$TESTS_PASSED"
-printf " ${RED}Failed:${NC} %d\n" "$TESTS_FAILED"
-echo "==================================="
-
-[[ $TESTS_FAILED -eq 0 ]] && exit 0 || exit 1
+test_summary

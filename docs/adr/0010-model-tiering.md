@@ -1,4 +1,4 @@
-# ADR-001: Model Tiering Strategy
+# ADR-0010: Model Tiering Strategy
 
 ## Status
 

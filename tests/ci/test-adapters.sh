@@ -10,15 +10,7 @@ ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 ADAPTER_BASE="$ROOT_DIR/ci/adapters/adapter.sh"
 CI_DIR="$ROOT_DIR/ci"
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-
-TESTS_PASSED=0
-TESTS_FAILED=0
-
-log_pass() { echo -e "  ${GREEN}+${NC} $1"; TESTS_PASSED=$((TESTS_PASSED + 1)); }
-log_fail() { echo -e "  ${RED}x${NC} $1: $2"; TESTS_FAILED=$((TESTS_FAILED + 1)); }
+source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
 # =============================================================================
 # Guard: adapter.sh must exist
@@ -332,10 +324,10 @@ else
 fi
 
 # Clean report: footer present
-if echo "$comment" | grep -q "craftsman v2.1.0"; then
+if echo "$comment" | grep -q "craftsman v2.6.0"; then
     log_pass "Clean report: footer has version"
 else
-    log_fail "Clean report footer" "expected 'craftsman v2.1.0'"
+    log_fail "Clean report footer" "expected 'craftsman v2.6.0'"
 fi
 
 # Violations report: status = Failed
@@ -549,10 +541,4 @@ fi
 # =============================================================================
 # Summary
 # =============================================================================
-echo ""
-echo "==================================="
-echo -e " ${GREEN}Passed:${NC} $TESTS_PASSED"
-echo -e " ${RED}Failed:${NC} $TESTS_FAILED"
-echo "==================================="
-
-[[ $TESTS_FAILED -eq 0 ]] && exit 0 || exit 1
+test_summary

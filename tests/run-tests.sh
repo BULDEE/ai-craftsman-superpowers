@@ -316,7 +316,7 @@ test_adrs() {
     fi
 
     # Test 2: Core ADRs exist
-    local core_adrs=("001-model-tiering.md" "002-context-fork-strategy.md")
+    local core_adrs=("0010-model-tiering.md" "0011-context-fork-strategy.md")
     for adr in "${core_adrs[@]}"; do
         if [[ -f "$adr_dir/$adr" ]]; then
             log_pass "ADR exists: $adr"
@@ -470,6 +470,21 @@ test_session_metrics() {
         fi
     else
         log_skip "Session metrics tests (tests/core/test-session-metrics.sh not found)"
+    fi
+
+    echo ""
+    log_info "Testing session state library (unit)"
+
+    local state_lib_test="$SCRIPT_DIR/core/test-session-state-lib.sh"
+
+    if [[ -f "$state_lib_test" ]]; then
+        if bash "$state_lib_test" > /dev/null 2>&1; then
+            log_pass "Session state library tests pass"
+        else
+            log_fail "Session state library tests failed — run tests/core/test-session-state-lib.sh for details"
+        fi
+    else
+        log_skip "Session state library tests (tests/core/test-session-state-lib.sh not found)"
     fi
 }
 
