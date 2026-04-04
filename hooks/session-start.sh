@@ -12,6 +12,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
 source "${SCRIPT_DIR}/lib/pack-loader.sh"
+source "${SCRIPT_DIR}/lib/healthcheck.sh"
 
 # Check required dependencies
 _check_dependencies() {
@@ -107,6 +108,10 @@ if [[ ! -f "${HOME}/.claude/.craft-config.yml" ]] && [[ ! -f "${PWD}/.craft-conf
 elif [[ ! -f "${PWD}/.craft-config.yml" ]]; then
     WARNINGS="${WARNINGS} | No project .craft-config.yml found. Run /craftsman:setup to configure this project."
 fi
+
+# Healthcheck summary
+HC_SUMMARY=$(hc_summary 2>/dev/null || echo "Healthcheck: unavailable")
+MSG="${MSG} | ${HC_SUMMARY}"
 
 jq -n --arg msg "${MSG}${WARNINGS}" '{
     systemMessage: $msg
