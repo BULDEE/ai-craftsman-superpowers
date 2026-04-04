@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { readFile, stat } from "node:fs/promises";
+import { stat } from "node:fs/promises";
+import { createReadStream } from "node:fs";
 
 export interface FileHash {
   readonly hash: string;
@@ -7,9 +8,13 @@ export interface FileHash {
 }
 
 export async function hashFile(filePath: string): Promise<FileHash> {
-  const buffer = await readFile(filePath);
-  const hash = createHash("sha256").update(buffer).digest("hex");
   const stats = await stat(filePath);
+  const hash = createHash("sha256");
+  const stream = createReadStream(filePath);
 
-  return { hash, size: stats.size };
+  for await (const chunk of stream) {
+    hash.update(chunk);
+  }
+
+  return { hash: hash.digest("hex"), size: stats.size };
 }

@@ -57,10 +57,17 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     return data.embedding;
   }
 
-  async embedBatch(texts: string[]): Promise<number[][]> {
-    const results = await Promise.all(
-      texts.map((text) => this.embed(text))
-    );
+  async embedBatch(texts: string[], concurrency: number = 10): Promise<number[][]> {
+    const results: number[][] = [];
+
+    for (let i = 0; i < texts.length; i += concurrency) {
+      const batch = texts.slice(i, i + concurrency);
+      const batchResults = await Promise.all(
+        batch.map((text) => this.embed(text))
+      );
+      results.push(...batchResults);
+    }
+
     return results;
   }
 }
