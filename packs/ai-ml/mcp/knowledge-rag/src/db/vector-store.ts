@@ -123,7 +123,7 @@ export class VectorStore {
     this.migrate();
   }
 
-  migrate(): void {
+  private migrate(): void {
     const columns = this.db.pragma("table_info(sources)") as Array<{ name: string }>;
     const hasHash = columns.some((c) => c.name === "file_hash");
 
@@ -138,7 +138,7 @@ export class VectorStore {
   getSourceHash(sourceName: string): string | null {
     const stmt = this.db.prepare("SELECT file_hash FROM sources WHERE name = ?");
     const row = stmt.get(sourceName) as { file_hash: string } | undefined;
-    return row?.file_hash || null;
+    return row?.file_hash ?? null;
   }
 
   updateSourceHash(sourceName: string, hash: string, size: number): void {
@@ -150,10 +150,16 @@ export class VectorStore {
 
   deleteBySource(sourceName: string): number {
     const countStmt = this.db.prepare("SELECT COUNT(*) as count FROM chunks WHERE source = ?");
-    const { count } = countStmt.get(sourceName) as { count: number };
+    const row = countStmt.get(sourceName) as { count: number } | undefined;
+    const count = row?.count ?? 0;
 
-    this.db.prepare("DELETE FROM chunks WHERE source = ?").run(sourceName);
-    this.db.prepare("DELETE FROM sources WHERE name = ?").run(sourceName);
+    const deleteChunks = this.db.prepare("DELETE FROM chunks WHERE source = ?");
+    const deleteSource = this.db.prepare("DELETE FROM sources WHERE name = ?");
+    const transaction = this.db.transaction((name: string) => {
+      deleteChunks.run(name);
+      deleteSource.run(name);
+    });
+    transaction(sourceName);
 
     this.embeddingsCache = null;
     return count;
