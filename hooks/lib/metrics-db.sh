@@ -14,8 +14,7 @@ METRICS_DB_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
 METRICS_DB="${METRICS_DB_DIR}/metrics.db"
 METRICS_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-metrics_init() {
-    mkdir -p "$METRICS_DB_DIR"
+_metrics_create_core_tables() {
     sqlite3 "$METRICS_DB" <<'SQL'
 CREATE TABLE IF NOT EXISTS violations (
     id INTEGER PRIMARY KEY,
@@ -41,7 +40,11 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE INDEX IF NOT EXISTS idx_violations_project ON violations(project_hash, timestamp);
 CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_hash, timestamp);
+SQL
+}
 
+_metrics_create_corrections_table() {
+    sqlite3 "$METRICS_DB" <<'SQL'
 CREATE TABLE IF NOT EXISTS corrections (
     id INTEGER PRIMARY KEY,
     timestamp TEXT NOT NULL DEFAULT (datetime('now')),
@@ -54,10 +57,9 @@ CREATE TABLE IF NOT EXISTS corrections (
 
 CREATE INDEX IF NOT EXISTS idx_corrections_project ON corrections(project_hash, timestamp);
 SQL
+}
 
-    # Migration v1.2.1: widen severity CHECK to include 'info'
-    # SQLite CHECK constraints are immutable on existing tables.
-    # If the old table exists without 'info', recreate it preserving data.
+_metrics_migrate_severity_info() {
     local has_info
     has_info=$(sqlite3 "$METRICS_DB" "SELECT sql FROM sqlite_master WHERE name='violations';" 2>/dev/null)
     if [[ -n "$has_info" ]] && ! echo "$has_info" | grep -q "'info'"; then
@@ -78,6 +80,13 @@ DROP TABLE violations_old;
 CREATE INDEX IF NOT EXISTS idx_violations_project ON violations(project_hash, timestamp);
 MIGRATE
     fi
+}
+
+metrics_init() {
+    mkdir -p "$METRICS_DB_DIR"
+    _metrics_create_core_tables
+    _metrics_create_corrections_table
+    _metrics_migrate_severity_info
 }
 
 metrics_project_hash() {

@@ -98,14 +98,8 @@ _pack_stack_compatible() {
     return 1
 }
 
-# Source hook scripts from the pack and register its scaffold types.
-_load_pack() {
+_register_pack_validators() {
     local pack_dir="$1"
-    local pack_name
-    pack_name=$(_pack_yml_value "name" "$pack_dir/pack.yml")
-    [[ -z "$pack_name" ]] && return
-
-    # Source validator scripts
     local validators
     validators=$(_pack_yml_nested_array "hooks" "validators" "$pack_dir/pack.yml")
     while IFS= read -r v; do
@@ -117,27 +111,49 @@ _load_pack() {
             _PACK_VALIDATORS="${_PACK_VALIDATORS}${vpath}\n"
         fi
     done <<< "$validators"
+}
 
-    # Source static analysis tool scripts
+_register_pack_sa_tools() {
+    local pack_dir="$1"
     local sa_tools
     sa_tools=$(_pack_yml_nested_array "static_analysis" "tools" "$pack_dir/pack.yml")
-    while IFS= read -r t; do
-        [[ -z "$t" ]] && continue
-        local tpath="$pack_dir/$t"
+    while IFS= read -r tool_entry; do
+        [[ -z "$tool_entry" ]] && continue
+        local tpath="$pack_dir/$tool_entry"
         if [[ -f "$tpath" ]]; then
             # shellcheck disable=SC1090
             source "$tpath"
             _PACK_SA_TOOLS="${_PACK_SA_TOOLS}${tpath}\n"
         fi
     done <<< "$sa_tools"
+}
 
-    # Register scaffold types as "pack_name:type"
+_register_pack_scaffolds() {
+    local pack_dir="$1"
+    local pack_name="$2"
     local scaffold_types
     scaffold_types=$(_pack_yml_nested_array "commands" "scaffold_types" "$pack_dir/pack.yml")
-    while IFS= read -r st; do
-        [[ -z "$st" ]] && continue
-        _PACK_SCAFFOLD_TYPES="${_PACK_SCAFFOLD_TYPES}${pack_name}:${st}\n"
+    while IFS= read -r scaffold_type; do
+        [[ -z "$scaffold_type" ]] && continue
+        _PACK_SCAFFOLD_TYPES="${_PACK_SCAFFOLD_TYPES}${pack_name}:${scaffold_type}\n"
     done <<< "$scaffold_types"
+}
+
+_register_pack_components() {
+    local pack_dir="$1"
+    local pack_name="$2"
+    _register_pack_validators "$pack_dir"
+    _register_pack_sa_tools "$pack_dir"
+    _register_pack_scaffolds "$pack_dir" "$pack_name"
+}
+
+_load_pack() {
+    local pack_dir="$1"
+    local pack_name
+    pack_name=$(_pack_yml_value "name" "$pack_dir/pack.yml")
+    [[ -z "$pack_name" ]] && return
+
+    _register_pack_components "$pack_dir" "$pack_name"
 
     _LOADED_PACKS="${_LOADED_PACKS}${pack_name}\n"
 }
@@ -205,13 +221,23 @@ pack_loaded() {
     printf '%b' "$_LOADED_PACKS" | grep -v '^$'
 }
 
-# Clean stale pack symlinks from agents/ and commands/, then recreate them
-# for all currently loaded packs.
+_sync_symlink_type() {
+    local pack_dir="$1"
+    local type_dir="$2"
+    local target_dir="$3"
+    [[ ! -d "$pack_dir/$type_dir" ]] && return
+    for src_file in "$pack_dir/$type_dir/"*.md; do
+        [[ ! -f "$src_file" ]] && continue
+        local basename
+        basename=$(basename "$src_file")
+        ln -sf "$src_file" "$target_dir/$basename"
+    done
+}
+
 pack_sync_symlinks() {
     local root="${CLAUDE_PLUGIN_ROOT:-$(pwd)}"
     local packs_dir="${_PACKS_DIR:-$root/packs}"
 
-    # Remove only symlinks — never touch real files
     for f in "$root/agents/"*.md; do
         [[ -L "$f" ]] && rm -- "$f"
     done
@@ -219,28 +245,11 @@ pack_sync_symlinks() {
         [[ -L "$f" ]] && rm -- "$f"
     done
 
-    # Create symlinks for every loaded pack
     local pack_name
     while IFS= read -r pack_name; do
         [[ -z "$pack_name" ]] && continue
         local pack_dir="$packs_dir/$pack_name"
-
-        if [[ -d "$pack_dir/agents" ]]; then
-            for agent_file in "$pack_dir/agents/"*.md; do
-                [[ ! -f "$agent_file" ]] && continue
-                local basename
-                basename=$(basename "$agent_file")
-                ln -sf "$agent_file" "$root/agents/$basename"
-            done
-        fi
-
-        if [[ -d "$pack_dir/commands" ]]; then
-            for cmd_file in "$pack_dir/commands/"*.md; do
-                [[ ! -f "$cmd_file" ]] && continue
-                local basename
-                basename=$(basename "$cmd_file")
-                ln -sf "$cmd_file" "$root/commands/$basename"
-            done
-        fi
+        _sync_symlink_type "$pack_dir" "agents" "$root/agents"
+        _sync_symlink_type "$pack_dir" "commands" "$root/commands"
     done <<< "$(pack_loaded)"
 }

@@ -10,14 +10,8 @@
 #   routing_table   # Returns the routing block string
 # =============================================================================
 
-routing_table() {
-    local packs
-    packs=$(pack_loaded 2>/dev/null || echo "")
-
-    local routes=""
-
-    # Core commands (always available)
-    routes="${routes}
+_register_core_routes() {
+    echo "
 - Bug, error, crash, test failure, unexpected behavior → /craftsman:debug
 - 2+ independent tasks, multi-agent work, backend+frontend feature → /craftsman:team
 - New entity, value object, aggregate, domain modeling → /craftsman:design
@@ -28,8 +22,11 @@ routing_table() {
 - Git commit, branch, merge, workflow → /craftsman:git
 - Check plugin health, diagnose issues → /craftsman:healthcheck
 - Before claiming work is done → /craftsman:verify"
+}
 
-    # AI-ML pack commands
+_register_pack_routes() {
+    local packs="$1"
+    local routes=""
     if echo "$packs" | grep -q "ai-ml"; then
         routes="${routes}
 - Manage knowledge base, add/sync documents → /craftsman:knowledge
@@ -37,30 +34,36 @@ routing_table() {
 - Design AI agent, autonomous workflow → /craftsman:agent-design
 - ML pipeline audit, production readiness → /craftsman:mlops"
     fi
-
-    # Symfony pack context
     if echo "$packs" | grep -q "symfony"; then
         routes="${routes}
 - Scaffold PHP entity, use case, repository → /craftsman:scaffold"
     fi
-
-    # React pack context
     if echo "$packs" | grep -q "react"; then
         routes="${routes}
 - Scaffold React component, hook, branded type → /craftsman:scaffold"
     fi
+    echo "$routes"
+}
 
-    # Superpowers synergy detection
-    local sp_note=""
+_detect_superpowers_synergy() {
     if [[ -d "${HOME}/.claude/plugins/cache/claude-plugins-official/superpowers" ]] || \
        [[ -d "${HOME}/.claude/plugins/superpowers" ]]; then
-        sp_note="
+        echo "
 SYNERGY: Superpowers plugin detected. Craftsman quality gates activate automatically on Superpowers workflows.
 - Use Superpowers for workflow: brainstorming → writing-plans → subagent-driven-development
 - Craftsman hooks validate every Write/Edit in real-time (Level 1-3 quality gates)
 - Correction learning tracks patterns across subagent work
 - Use /craftsman:challenge after implementation for architecture review"
     fi
+}
 
+routing_table() {
+    local packs
+    packs=$(pack_loaded 2>/dev/null || echo "")
+    local routes=""
+    routes="${routes}$(_register_core_routes)"
+    routes="${routes}$(_register_pack_routes "$packs")"
+    local sp_note=""
+    sp_note=$(_detect_superpowers_synergy)
     echo "CRAFTSMAN COMMANDS — Suggest these when context matches (do NOT auto-execute, propose to user):${routes}${sp_note}"
 }

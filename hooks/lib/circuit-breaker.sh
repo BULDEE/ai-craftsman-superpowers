@@ -94,23 +94,10 @@ cb_record_success() {
     _cb_write "$channel" "$updated"
 }
 
-cb_record_failure() {
+_cb_check_threshold() {
     local channel="$1"
-    local file
-    file=$(_cb_state_file "$channel")
-    [[ -f "$file" ]] || return 1
-
-    local current_state now
-    current_state=$(cb_state "$channel")
-    now=$(date +%s)
-
-    if [[ "$current_state" == "half-open" ]]; then
-        local updated
-        updated=$(jq --argjson now "$now" \
-            '.state = "open" | .opened_at = $now' "$file")
-        _cb_write "$channel" "$updated"
-        return 0
-    fi
+    local file="$2"
+    local now="$3"
 
     local new_failures threshold
     new_failures=$(jq '.failures + 1' "$file")
@@ -131,6 +118,27 @@ cb_record_failure() {
         --argjson oa "$opened_at_val" \
         '.failures = $nf | .state = $ns | .last_failure = $now | .opened_at = $oa' "$file")
     _cb_write "$channel" "$updated"
+}
+
+cb_record_failure() {
+    local channel="$1"
+    local file
+    file=$(_cb_state_file "$channel")
+    [[ -f "$file" ]] || return 1
+
+    local current_state now
+    current_state=$(cb_state "$channel")
+    now=$(date +%s)
+
+    if [[ "$current_state" == "half-open" ]]; then
+        local updated
+        updated=$(jq --argjson now "$now" \
+            '.state = "open" | .opened_at = $now' "$file")
+        _cb_write "$channel" "$updated"
+        return 0
+    fi
+
+    _cb_check_threshold "$channel" "$file" "$now"
 }
 
 cb_reset() {

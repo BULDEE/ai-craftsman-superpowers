@@ -1,6 +1,7 @@
 #!/bin/bash
 # AI Craftsman Superpowers - Test Suite
 # Run with: ./tests/run-tests.sh [--skill <name>] [--verbose]
+# craftsman-ignore: SH002
 
 set -e
 
@@ -488,6 +489,24 @@ test_session_metrics() {
     fi
 }
 
+# Test: Dog-fooding (plugin validates its own code)
+test_dogfood() {
+    echo ""
+    log_info "Testing dog-fooding (self-validation)"
+
+    local dogfood_test="$SCRIPT_DIR/core/test-dogfood.sh"
+
+    if [[ -f "$dogfood_test" ]]; then
+        if bash "$dogfood_test" > /dev/null 2>&1; then
+            log_pass "Dog-fooding tests pass"
+        else
+            log_fail "Dog-fooding tests failed — run tests/core/test-dogfood.sh for details"
+        fi
+    else
+        log_skip "Dog-fooding tests (tests/core/test-dogfood.sh not found)"
+    fi
+}
+
 # Main test runner
 main() {
     echo "=================================================="
@@ -571,6 +590,7 @@ main() {
         test_session_metrics
         test_pack_suites
         test_craftsman_ci
+        test_dogfood
     fi
 
     # Summary

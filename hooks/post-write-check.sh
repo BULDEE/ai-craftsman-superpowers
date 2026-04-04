@@ -152,37 +152,41 @@ file_has_ignore() {
     return 1
 }
 
+_record_violation_output() {
+    local rule="$1"
+    local message="$2"
+    local severity="$3"
+
+    if [[ "$severity" == "block" ]]; then
+        CRITICAL_VIOLATIONS="${CRITICAL_VIOLATIONS}${rule}: ${message}\n"
+        ((CRITICAL_COUNT++)) || true
+    else
+        WARNING_VIOLATIONS="${WARNING_VIOLATIONS}${rule}: ${message}\n"
+        ((WARNING_COUNT++)) || true
+    fi
+}
+
 add_violation() {
     local rule="$1"
     local message="$2"
     local file_path="${3:-$FILE_PATH}"
     local ignored=0
 
-    # Check rules engine severity
     local severity
     severity=$(rules_severity_for_file "$file_path" "$rule")
 
-    # If ignored by rules engine, skip entirely
     if [[ "$severity" == "ignore" ]]; then
         return
     fi
 
-    # Check craftsman-ignore in file
     if file_has_ignore "$rule"; then
         ignored=1
     fi
 
     if [[ $ignored -eq 0 ]]; then
-        if [[ "$severity" == "block" ]]; then
-            CRITICAL_VIOLATIONS="${CRITICAL_VIOLATIONS}${rule}: ${message}\n"
-            ((CRITICAL_COUNT++)) || true
-        else
-            WARNING_VIOLATIONS="${WARNING_VIOLATIONS}${rule}: ${message}\n"
-            ((WARNING_COUNT++)) || true
-        fi
+        _record_violation_output "$rule" "$message" "$severity"
     fi
 
-    # Always record in metrics
     local metric_severity="critical"
     [[ "$severity" == "warn" ]] && metric_severity="warning"
     metrics_record_violation "$rule" "$FILE_PATTERN" "$metric_severity" $((1 - ignored)) "$ignored" 2>/dev/null || true
