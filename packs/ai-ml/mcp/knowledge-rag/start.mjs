@@ -12,11 +12,14 @@
 
 import { createInterface } from "node:readline";
 import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { homedir } from "node:os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+checkForConflictingConfig();
 
 const packs = (process.env.CLAUDE_PLUGIN_OPTION_packs || "")
   .split(",")
@@ -30,47 +33,61 @@ if (!packs.includes("ai-ml")) {
 }
 
 // ---------------------------------------------------------------------------
-// No-op MCP server — valid JSON-RPC/MCP protocol, zero capabilities
+// Detect conflicting "knowledge-rag" entries in ~/.claude.json
+// ---------------------------------------------------------------------------
+function checkForConflictingConfig() {
+  try {
+    const claudeJsonPath = join(homedir(), ".claude.json");
+    if (!existsSync(claudeJsonPath)) return;
+
+    const raw = readFileSync(claudeJsonPath, "utf8");
+    if (!raw.includes('"knowledge-rag"')) return;
+
+    const data = JSON.parse(raw);
+    const projects = data.projects || {};
+
+    for (const [projectPath, config] of Object.entries(projects)) {
+      const mcpServers = config?.mcpServers || {};
+      if ("knowledge-rag" in mcpServers) {
+        console.error(
+          `[knowledge-rag] WARNING: Conflicting MCP config detected in ~/.claude.json`
+        );
+        console.error(
+          `[knowledge-rag]   Project "${projectPath}" has a manual "knowledge-rag" MCP entry.`
+        );
+        console.error(
+          `[knowledge-rag]   This conflicts with the plugin-managed server and may cause failures.`
+        );
+        console.error(
+          `[knowledge-rag]   Fix: Remove the "knowledge-rag" key from mcpServers in ~/.claude.json`
+        );
+      }
+    }
+  } catch {
+    // Non-critical check — do not block startup
+  }
+}
+
+// ---------------------------------------------------------------------------
+// No-op MCP server — valid JSON-RPC/MCP protocol (NDJSON), zero capabilities
 // ---------------------------------------------------------------------------
 function runNoopServer() {
   const { stdin, stdout } = process;
   stdin.setEncoding("utf8");
 
-  let buffer = "";
+  const rl = createInterface({ input: stdin });
 
-  stdin.on("data", (chunk) => {
-    buffer += chunk;
-    drain();
-  });
+  rl.on("line", (line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
 
-  function drain() {
-    while (true) {
-      const headerEnd = buffer.indexOf("\r\n\r\n");
-      if (headerEnd === -1) return;
-
-      const header = buffer.substring(0, headerEnd);
-      const match = header.match(/Content-Length:\s*(\d+)/i);
-      if (!match) {
-        buffer = buffer.substring(headerEnd + 4);
-        continue;
-      }
-
-      const contentLength = parseInt(match[1], 10);
-      const bodyStart = headerEnd + 4;
-
-      if (buffer.length < bodyStart + contentLength) return;
-
-      const body = buffer.substring(bodyStart, bodyStart + contentLength);
-      buffer = buffer.substring(bodyStart + contentLength);
-
-      try {
-        const request = JSON.parse(body);
-        handleRequest(request);
-      } catch {
-        // Malformed JSON — skip
-      }
+    try {
+      const request = JSON.parse(trimmed);
+      handleRequest(request);
+    } catch {
+      // Malformed JSON — skip
     }
-  }
+  });
 
   function handleRequest(request) {
     if (request.method === "initialize") {
@@ -90,8 +107,7 @@ function runNoopServer() {
 
   function respond(id, result) {
     const payload = JSON.stringify({ jsonrpc: "2.0", id, result });
-    const message = `Content-Length: ${Buffer.byteLength(payload)}\r\n\r\n${payload}`;
-    stdout.write(message);
+    stdout.write(payload + "\n");
   }
 }
 
@@ -102,14 +118,20 @@ async function bootstrapAndRun() {
   const nodeModules = join(__dirname, "node_modules");
   const distIndex = join(__dirname, "dist", "src", "index.js");
 
-  if (!existsSync(nodeModules)) {
-    console.error("[knowledge-rag] Installing dependencies...");
-    execSync("npm install --silent", { cwd: __dirname, stdio: "ignore" });
-  }
+  try {
+    if (!existsSync(nodeModules)) {
+      console.error("[knowledge-rag] Installing dependencies...");
+      execSync("npm install --silent", { cwd: __dirname, stdio: "pipe" });
+    }
 
-  if (!existsSync(distIndex)) {
-    console.error("[knowledge-rag] Building TypeScript...");
-    execSync("npm run build --silent", { cwd: __dirname, stdio: "ignore" });
+    if (!existsSync(distIndex)) {
+      console.error("[knowledge-rag] Building TypeScript...");
+      execSync("npm run build --silent", { cwd: __dirname, stdio: "pipe" });
+    }
+  } catch (err) {
+    console.error(`[knowledge-rag] Bootstrap failed: ${err.message}`);
+    if (err.stderr) console.error(`[knowledge-rag] stderr: ${err.stderr}`);
+    process.exit(1);
   }
 
   await import(distIndex);
