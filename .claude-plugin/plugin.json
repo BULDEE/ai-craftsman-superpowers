@@ -76,7 +76,255 @@
     "knowledge-rag": {
       "type": "stdio",
       "command": "node",
-      "args": ["packs/ai-ml/mcp/knowledge-rag/start.mjs"]
+      "args": [
+        "packs/ai-ml/mcp/knowledge-rag/start.mjs"
+      ]
+    }
+  },
+  "skills": {
+    "craftsman:agent-design": {
+      "path": "commands/agent-design.md",
+      "description": "Design AI agents using the 3P pattern (Perceive/Plan/Perform). Use when building autonomous AI agents or workflows.",
+      "effort": "heavy"
+    },
+    "craftsman:challenge": {
+      "path": "commands/challenge.md",
+      "description": "Senior architecture review and code challenge. Use when reviewing code or PRs for quality, auditing architecture decisions, or responding to code review comments.",
+      "effort": "medium"
+    },
+    "craftsman:ci": {
+      "path": "commands/ci.md",
+      "description": "CI/CD pipeline integration. Use when setting up or checking CI quality gates, exporting rules to GitHub Actions/GitLab CI/Bitbucket/Jenkins, or verifying pipeline alignment with local rules.",
+      "effort": "medium"
+    },
+    "craftsman:debug": {
+      "path": "commands/debug.md",
+      "description": "Systematic debugging using ReAct pattern. Use when encountering bugs, errors, unexpected behavior, test failures, or performance issues. Never guess - investigate methodically.",
+      "effort": "medium"
+    },
+    "craftsman:design": {
+      "path": "commands/design.md",
+      "description": "Senior Domain-Driven Design methodology. Use for creating entities, value objects, aggregates, or designing domain models. Follows a 4-phase process (Understand, Challenge, Recommend, Implement).",
+      "effort": "medium"
+    },
+    "craftsman:git": {
+      "path": "commands/git.md",
+      "description": "Safe git workflow with destructive command protection. Use when committing changes, creating branches, managing git workflow, or handling merge conflicts.",
+      "effort": "quick"
+    },
+    "craftsman:healthcheck": {
+      "path": "commands/healthcheck.md",
+      "description": "Run a comprehensive diagnostic of your Craftsman plugin installation and runtime. Use when troubleshooting plugin issues, after setup, or when session-start reports warnings.",
+      "effort": "quick"
+    },
+    "craftsman:knowledge": {
+      "path": "commands/knowledge.md",
+      "description": "Manage the AI/Architecture knowledge base \u2014 add, sync, list, status, remove documents. Use when needing to update indexed sources or check knowledge base health.",
+      "effort": "quick"
+    },
+    "craftsman:metrics": {
+      "path": "commands/metrics.md",
+      "description": "Quality metrics dashboard. Use when reviewing violation trends, session history, or correction patterns from the local SQLite database.",
+      "effort": "quick"
+    },
+    "craftsman:mlops": {
+      "path": "commands/mlops.md",
+      "description": "Audit ML projects for production readiness. Use when reviewing ML pipelines, deployments, or infrastructure against MLOps best practices.",
+      "effort": "heavy"
+    },
+    "craftsman:parallel": {
+      "path": "commands/parallel.md",
+      "description": "Parallel agent orchestration for independent tasks. Use when facing 2+ independent tasks that operate on different files/domains and can be parallelized for efficiency.",
+      "effort": "heavy"
+    },
+    "craftsman:plan": {
+      "path": "commands/plan.md",
+      "description": "Structured planning for multi-step tasks. Use when starting features requiring 3+ steps, migrating or refactoring large codebases, or when task complexity clearly exceeds a single change.",
+      "effort": "heavy"
+    },
+    "craftsman:rag": {
+      "path": "commands/rag.md",
+      "description": "Design RAG (Retrieval-Augmented Generation) pipelines. Use when building knowledge bases, document Q&A, or semantic search systems.",
+      "effort": "heavy"
+    },
+    "craftsman:refactor": {
+      "path": "commands/refactor.md",
+      "description": "Systematic refactoring with behavior preservation. Use when improving existing code structure, reducing technical debt, or when code smells are detected.",
+      "effort": "medium"
+    },
+    "craftsman:scaffold": {
+      "path": "commands/scaffold.md",
+      "description": "Unified scaffolder for all pack types. Use when creating new entities, use cases, components, hooks, API resources, or custom packs. Types loaded from active packs.",
+      "effort": "medium"
+    },
+    "craftsman:setup": {
+      "path": "commands/setup.md",
+      "description": "Interactive setup and onboarding. Use on first run, when changing stack/packs, or when healthcheck reports config issues.",
+      "effort": "medium"
+    },
+    "craftsman:spec": {
+      "path": "commands/spec.md",
+      "description": "Specification-first development (BDD/TDD). Use when implementing new features, creating new components, or when requirements need clarification through tests.",
+      "effort": "medium"
+    },
+    "craftsman:team": {
+      "path": "commands/team.md",
+      "description": "Multi-agent orchestration with native Claude Code teams. Use when facing 2+ independent tasks needing parallel work, full-stack features requiring backend+frontend agents, code reviews needing multiple specialist perspectives, or security audits.",
+      "effort": "heavy"
+    },
+    "craftsman:test": {
+      "path": "commands/test.md",
+      "description": "Pragmatic testing following Fowler/Martin principles. Use when writing or reviewing tests, deciding what to test, or improving test coverage strategically.",
+      "effort": "medium"
+    },
+    "craftsman:verify": {
+      "path": "commands/verify.md",
+      "description": "Evidence-based verification before claiming completion. Use before committing, creating PRs, or claiming a task is done. Never claim success without proof.",
+      "effort": "quick"
+    }
+  },
+  "agents": {
+    "ai-engineer": {
+      "path": "agents/ai-engineer.md",
+      "name": "ai-engineer",
+      "description": "|",
+      "model": "sonnet",
+      "memory": "project",
+      "skills": [
+        "craftsman:rag",
+        "craftsman:agent-design",
+        "craftsman:mlops"
+      ]
+    },
+    "api-craftsman": {
+      "path": "agents/api-craftsman.md",
+      "name": "api-craftsman",
+      "description": "|",
+      "model": "sonnet",
+      "memory": "project",
+      "allowedTools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Agent",
+        "Edit",
+        "Write"
+      ],
+      "skills": [
+        "craftsman:spec",
+        "craftsman:test"
+      ]
+    },
+    "architect": {
+      "path": "agents/architect.md",
+      "name": "architect",
+      "description": "|",
+      "model": "sonnet",
+      "memory": "project",
+      "allowedTools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Agent"
+      ],
+      "skills": [
+        "craftsman:design",
+        "craftsman:challenge"
+      ]
+    },
+    "backend-craftsman": {
+      "path": "agents/backend-craftsman.md",
+      "name": "backend-craftsman",
+      "description": "|",
+      "model": "sonnet",
+      "memory": "project",
+      "skills": [
+        "craftsman:entity",
+        "craftsman:usecase",
+        "craftsman:spec",
+        "craftsman:test"
+      ]
+    },
+    "doc-writer": {
+      "path": "agents/doc-writer.md",
+      "name": "doc-writer",
+      "description": "|",
+      "model": "haiku",
+      "memory": "project"
+    },
+    "frontend-craftsman": {
+      "path": "agents/frontend-craftsman.md",
+      "name": "frontend-craftsman",
+      "description": "|",
+      "model": "sonnet",
+      "memory": "project",
+      "skills": [
+        "craftsman:component",
+        "craftsman:hook",
+        "craftsman:spec",
+        "craftsman:test"
+      ]
+    },
+    "react-reviewer": {
+      "path": "agents/react-reviewer.md",
+      "name": "react-reviewer",
+      "description": "|",
+      "model": "sonnet",
+      "memory": "project",
+      "skills": [
+        "craftsman:challenge"
+      ]
+    },
+    "security-pentester": {
+      "path": "agents/security-pentester.md",
+      "name": "security-pentester",
+      "description": "|",
+      "model": "sonnet",
+      "memory": "project"
+    },
+    "symfony-reviewer": {
+      "path": "agents/symfony-reviewer.md",
+      "name": "symfony-reviewer",
+      "description": "|",
+      "model": "sonnet",
+      "memory": "project",
+      "skills": [
+        "craftsman:challenge"
+      ]
+    },
+    "team-lead": {
+      "path": "agents/team-lead.md",
+      "name": "team-lead",
+      "description": "|",
+      "model": "sonnet",
+      "memory": "user",
+      "allowedTools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Agent",
+        "TeamCreate",
+        "TaskCreate",
+        "TaskList",
+        "TaskUpdate",
+        "SendMessage"
+      ],
+      "skills": [
+        "craftsman:plan",
+        "craftsman:challenge",
+        "craftsman:verify",
+        "craftsman:team"
+      ]
+    },
+    "ui-ux-director": {
+      "path": "agents/ui-ux-director.md",
+      "name": "ui-ux-director",
+      "description": "|",
+      "model": "sonnet",
+      "memory": "project"
     }
   }
 }
