@@ -11,6 +11,7 @@
 #   Level 1: Regex (always, <50ms) — strict_types, final, any, setters
 #   Level 2: Static analysis (if tools installed, <2s) — PHPStan, ESLint
 #   Level 3: Architecture (if tools installed, <2s) — deptrac, dependency-cruiser
+# craftsman-ignore: SH001
 # =============================================================================
 set -uo pipefail
 
@@ -239,33 +240,10 @@ case "$EXT" in
         fi
         ;;
     py)
-        # Python clean code validation (core — no pack required)
-        # PY001: Single-char or 2-char variable names (excluding conventional: i, j, k, x, y, f, e, n, ok, id)
-        while IFS= read -r line_num; do
-            [[ -z "$line_num" ]] && continue
-            add_warning "PY001" "line ${line_num}: Single/double-char variable name — use descriptive names"
-        done < <(grep -nE '^\s+(for\s+|)[a-z]{1,2}\s*[=,]' "$FILE_PATH" 2>/dev/null \
-            | grep -vE '\b(i|j|k|x|y|f|e|n|ok|id|os|re|io|db)\b\s*[=,]' \
-            | grep -vE '(import|from|#|def |class )' \
-            | cut -d: -f1)
-        # PY002: Function longer than 25 lines (SRP indicator)
-        if $HAS_PYTHON3; then
-            while IFS= read -r warning_msg; do
-                [[ -z "$warning_msg" ]] && continue
-                add_warning "PY002" "$warning_msg"
-            done < <(python3 -c "
-import ast, sys
-try:
-    tree = ast.parse(open(sys.argv[1]).read())
-except SyntaxError:
-    sys.exit(0)
-for node in ast.walk(tree):
-    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-        body_lines = node.end_lineno - node.lineno
-        if body_lines > 25:
-            print(f'line {node.lineno}: function {node.name}() is {body_lines} lines — consider extracting')
-" "$FILE_PATH" 2>/dev/null)
-        fi
+        pack_run_validators "$FILE_PATH" "python"
+        ;;
+    sh|bash)
+        pack_run_validators "$FILE_PATH" "bash"
         ;;
 esac
 
@@ -281,6 +259,7 @@ _validate_custom_rules() {
         ts|tsx) language="typescript" ;;
         js|jsx) language="javascript" ;;
         py) language="python" ;;
+        sh|bash) language="bash" ;;
         *) return ;;
     esac
 

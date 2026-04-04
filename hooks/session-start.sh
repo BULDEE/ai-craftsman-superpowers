@@ -14,6 +14,7 @@ source "${SCRIPT_DIR}/lib/metrics-db.sh"
 source "${SCRIPT_DIR}/lib/pack-loader.sh"
 source "${SCRIPT_DIR}/lib/healthcheck.sh"
 source "${SCRIPT_DIR}/lib/routing-table.sh"
+source "${SCRIPT_DIR}/lib/hook-events.sh"
 
 _init_packs() {
     pack_loader_init
@@ -80,9 +81,10 @@ WARNINGS=""
 # Validate hooks.json schema — catch unsupported events early
 HOOKS_FILE="${SCRIPT_DIR}/hooks.json"
 if [[ -f "$HOOKS_FILE" ]]; then
+    SUPPORTED_EVENTS=$(hook_events_python_set)
     _unsupported=$(python3 -c "
 import json, sys
-supported = {'SessionStart','PreToolUse','PostToolUse','PostToolUseFailure','UserPromptSubmit','PermissionRequest','PermissionDenied','Notification','SubagentStart','SubagentStop','TaskCreated','TaskCompleted','TeammateIdle','InstructionsLoaded','ConfigChange','CwdChanged','FileChanged','WorktreeCreate','WorktreeRemove','PreCompact','PostCompact','Elicitation','ElicitationResult','Stop','StopFailure','SessionEnd'}
+supported = ${SUPPORTED_EVENTS}
 try:
     data = json.load(open(sys.argv[1]))
     actual = set(data.get('hooks', {}).keys())

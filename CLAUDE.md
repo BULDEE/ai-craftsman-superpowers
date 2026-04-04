@@ -4,7 +4,7 @@
 
 Claude Code plugin that transforms Claude into a disciplined Senior Software Craftsman. DDD, Clean Architecture, TDD methodology enforced through hooks, commands, agents, and a rules engine.
 
-**Current version:** 3.1.0
+**Current version:** 3.2.0
 **Stack:** Bash (hooks/CI), Markdown (commands/agents/templates), Python (metrics helpers), YAML (config)
 
 ## Development Rules
@@ -64,10 +64,12 @@ hooks/              → Real-time validation (SessionStart → PostToolUse → S
 hooks/lib/          → Shared libraries (pack-loader, config, rules-engine, metrics, static-analysis)
 commands/           → Core user-invoked workflows (20 skills)
 agents/             → Core agents (11) + pack symlinks
-knowledge/          → Core methodology (DDD, Clean Architecture, patterns)
-packs/              → Loadable language packs
+knowledge/          → Core methodology (DDD, Clean Architecture, Clean Code, Refactoring, Design Patterns)
+packs/              → Loadable language packs (5 packs)
   symfony/          → PHP/Symfony pack (validators, agents, knowledge, templates)
   react/            → React/TypeScript pack (validators, agents, knowledge, templates)
+  python/           → Python pack (validators, knowledge, anti-patterns)
+  bash/             → Bash/Shell pack (validators, knowledge, anti-patterns)
   ai-ml/            → AI/ML pack (agents, knowledge, commands)
 ci/                 → CI pipeline integration (adapter pattern)
 ```

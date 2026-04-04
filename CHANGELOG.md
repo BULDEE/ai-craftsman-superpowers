@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] — 2026-04-04
+
+### Added
+- **Python Pack** (`packs/python/`) — full language pack with 6 rules: PY001 (naming), PY002 (function length), PY003 (type hints), PY004 (bare except), PY005 (mutable defaults), WARN-PY001 (parameter count). Canonical examples and anti-pattern documentation included.
+- **Bash Pack** (`packs/bash/`) — full language pack with 6 rules: SH001 (safety options), SH002 (function length), SH003 (variable naming), SH004 (eval security), SH005 (unquoted variables), WARN-SH001 (local declarations). Closes the 83% Bash codebase blind spot.
+- **Knowledge: Clean Code** (`knowledge/clean-code.md`) — naming, functions, comments, error handling, SOLID reference
+- **Knowledge: Refactoring Techniques** (`knowledge/refactoring-techniques.md`) — code smells catalog, composing methods, moving features, simplifying conditionals. Reference: refactoring.guru
+- **Knowledge: Design Patterns** (`knowledge/design-patterns.md`) — 23 GoF patterns (creational, structural, behavioral) with Python examples and selection guide. Reference: refactoring.guru
+- 15 new tests: 8 Python pack tests + 7 Bash pack tests
+- `craftsman-ignore: SH001` support for sourced library files (validators loaded via `source` must not have `set -euo pipefail`)
+
+### Changed
+- Python validation migrated from inline code in `post-write-check.sh` to proper pack architecture (`packs/python/hooks/python-validator.sh`)
+- `post-write-check.sh` now delegates to `pack_run_validators` for Python and Bash — same pattern as PHP/TypeScript
+- Plugin now validates **all 4 language families** it touches: PHP, TypeScript, Python, Bash
+- Knowledge base expanded from 5 to 8 documents (added clean-code, refactoring-techniques, design-patterns)
+
 ## [3.1.0] — 2026-04-04
 
 ### Added
@@ -28,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Migrated **all** session-state operations to shared `session_state.py` module — 8 hooks refactored, ~150 lines of inline Python eliminated
 - Refactored 19 test files to use shared `test-helpers.sh`, eliminating ~400 lines of duplicated test boilerplate
+- **Hook event validation refactored** — extracted hardcoded hook event list from `session-start.sh` and `test-hooks.sh` into centralized `hooks/lib/hook-events.sh` configuration. Single source of truth for all 25 valid Claude Code hook event types. Fixes Issue #4.
+- **Agent metadata synchronized** — all 9 agent .md files now have `allowedTools` arrays, `isolation` fields, and consistent `effort` values matching `plugin.json`. Fixes Issue #3.
 - Stale documentation counts corrected: "15 commands" → "20 skills", "5 agents" → "11 agents"
 - README examples section expanded from 6 to 11 entries
 - README ADRs section expanded from 11 to 12 with consistent numbering
