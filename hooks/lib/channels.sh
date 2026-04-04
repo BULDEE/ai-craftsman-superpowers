@@ -43,56 +43,68 @@ CHANNEL_CALL_SOURCE=""
 # Parse nested YAML values like: channels.sentry.circuit_threshold
 # Supports indent-based nesting (2-space indent).
 # =============================================================================
+_channels_extract_yml_value() {
+    local key="$1" line="$2"
+    if [[ "$line" =~ ^[[:space:]]+${key}:[[:space:]]+(.+) ]]; then
+        local val="${BASH_REMATCH[1]}"
+        val="${val%%#*}"
+        val="${val// /}"
+        val="${val//\"/}"
+        val="${val//\'/}"
+        echo "$val"
+        return 0
+    fi
+    return 1
+}
+
+_channels_parse_line() {
+    local section="$1" key="$2" line="$3"
+    local in_channels="$4" in_section="$5"
+
+    if [[ "$in_channels" == "true" ]]; then
+        if [[ "$line" =~ ^[a-z] ]]; then
+            echo "false false"
+            return 1
+        fi
+        if [[ "$line" =~ ^[[:space:]]{2}${section}: ]]; then
+            echo "true true"
+            return 1
+        fi
+        if [[ "$in_section" == "true" ]]; then
+            if [[ "$line" =~ ^[[:space:]]{2}[a-z] ]] && ! [[ "$line" =~ ^[[:space:]]{4} ]]; then
+                echo "true false"
+                return 1
+            fi
+            if _channels_extract_yml_value "$key" "$line"; then
+                return 0
+            fi
+        fi
+    fi
+    echo "$in_channels $in_section"
+    return 1
+}
+
 _channels_parse_nested_yml() {
     local section="$1" key="$2" file="$3"
     [[ -f "$file" ]] || return 1
 
     local in_channels=false in_section=false
     while IFS= read -r line; do
-        # Skip comments and empty lines
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
         [[ -z "${line// /}" ]] && continue
-
-        # Detect "channels:" (top-level)
         if [[ "$line" =~ ^channels: ]]; then
             in_channels=true
             continue
         fi
-
-        if $in_channels; then
-            # If we hit another top-level key, stop
-            if [[ "$line" =~ ^[a-z] ]]; then
-                in_channels=false
-                continue
-            fi
-
-            # Detect section (e.g., "  sentry:")
-            if [[ "$line" =~ ^[[:space:]]{2}${section}: ]]; then
-                in_section=true
-                continue
-            fi
-
-            # If in section, look for key
-            if $in_section; then
-                # If we hit another section at same indent level, stop
-                if [[ "$line" =~ ^[[:space:]]{2}[a-z] ]] && ! [[ "$line" =~ ^[[:space:]]{4} ]]; then
-                    in_section=false
-                    continue
-                fi
-                # Match "    key: value"
-                if [[ "$line" =~ ^[[:space:]]+${key}:[[:space:]]+(.+) ]]; then
-                    local val="${BASH_REMATCH[1]}"
-                    val="${val%%#*}"
-                    val="${val// /}"
-                    val="${val//\"/}"
-                    val="${val//\'/}"
-                    echo "$val"
-                    return 0
-                fi
-            fi
+        local result
+        result=$(_channels_parse_line "$section" "$key" "$line" "$in_channels" "$in_section")
+        if [[ $? -eq 0 ]]; then
+            echo "$result"
+            return 0
         fi
+        in_channels="${result%% *}"
+        in_section="${result##* }"
     done < "$file"
-
     return 1
 }
 
@@ -148,6 +160,35 @@ channel_available() {
 #
 # Returns cached/stale content on stdout, or empty if live call needed.
 # =============================================================================
+_channel_call_serve_stale() {
+    local channel="$1" cache_key="$2"
+    if $_CACHE_AVAILABLE; then
+        local stale
+        stale=$(cache_get_stale "$channel" "$cache_key")
+        if [[ -n "$stale" ]]; then
+            CHANNEL_CALL_SOURCE="stale"
+            echo "$stale"
+            return 0
+        fi
+    fi
+    CHANNEL_CALL_SOURCE="stale"
+    return 0
+}
+
+_channel_call_serve_cached() {
+    local channel="$1" cache_key="$2"
+    if $_CACHE_AVAILABLE; then
+        local cached
+        cached=$(cache_get "$channel" "$cache_key")
+        if [[ -n "$cached" ]]; then
+            CHANNEL_CALL_SOURCE="cached"
+            echo "$cached"
+            return 0
+        fi
+    fi
+    return 1
+}
+
 channel_call() {
     local channel="$1" cache_key="${2:-default}"
     CHANNEL_CALL_SOURCE=""
@@ -163,33 +204,15 @@ channel_call() {
         state=$(cb_state "$channel")
     fi
 
-    # Circuit OPEN: serve stale cache
     if [[ "$state" == "open" ]]; then
-        if $_CACHE_AVAILABLE; then
-            local stale
-            stale=$(cache_get_stale "$channel" "$cache_key")
-            if [[ -n "$stale" ]]; then
-                CHANNEL_CALL_SOURCE="stale"
-                echo "$stale"
-                return 0
-            fi
-        fi
-        CHANNEL_CALL_SOURCE="stale"
+        _channel_call_serve_stale "$channel" "$cache_key"
         return 0
     fi
 
-    # Circuit CLOSED or HALF-OPEN: check fresh cache first
-    if $_CACHE_AVAILABLE; then
-        local cached
-        cached=$(cache_get "$channel" "$cache_key")
-        if [[ -n "$cached" ]]; then
-            CHANNEL_CALL_SOURCE="cached"
-            echo "$cached"
-            return 0
-        fi
+    if _channel_call_serve_cached "$channel" "$cache_key"; then
+        return 0
     fi
 
-    # No cache hit: caller handles live call
     CHANNEL_CALL_SOURCE="live"
     return 0
 }
@@ -225,39 +248,45 @@ channel_reset() {
 # Format: "sentry:closed " or "sentry:open (cooldown Xm Ys remaining) "
 # Falls back to "sentry:enabled " when circuit breaker is not available.
 # =============================================================================
-channel_status_summary() {
-    local summary=""
-
-    if channel_available "sentry"; then
-        if $_CB_AVAILABLE; then
-            local state
-            state=$(cb_state "sentry")
-            if [[ "$state" == "open" ]]; then
-                local file opened_at cooldown now remaining remaining_m remaining_s
-                file=$(_cb_state_file "sentry" 2>/dev/null)
-                if [[ -n "$file" ]] && [[ -f "$file" ]]; then
-                    opened_at=$(jq -r '.opened_at // empty' "$file" 2>/dev/null)
-                    cooldown=$(jq -r '.cooldown_seconds' "$file" 2>/dev/null)
-                    now=$(date +%s)
-                    if [[ -n "$opened_at" ]] && [[ "$opened_at" != "null" ]]; then
-                        remaining=$(( (opened_at + cooldown) - now ))
-                        [[ $remaining -lt 0 ]] && remaining=0
-                        remaining_m=$(( remaining / 60 ))
-                        remaining_s=$(( remaining % 60 ))
-                        summary="${summary}sentry:open (cooldown ${remaining_m}m ${remaining_s}s remaining) "
-                    else
-                        summary="${summary}sentry:open "
-                    fi
-                else
-                    summary="${summary}sentry:open "
-                fi
-            else
-                summary="${summary}sentry:${state} "
-            fi
-        else
-            summary="${summary}sentry:enabled "
+_channel_format_open_cooldown() {
+    local channel="$1"
+    local file opened_at cooldown now remaining remaining_m remaining_s
+    file=$(_cb_state_file "$channel" 2>/dev/null)
+    if [[ -n "$file" ]] && [[ -f "$file" ]]; then
+        opened_at=$(jq -r '.opened_at // empty' "$file" 2>/dev/null)
+        cooldown=$(jq -r '.cooldown_seconds' "$file" 2>/dev/null)
+        now=$(date +%s)
+        if [[ -n "$opened_at" ]] && [[ "$opened_at" != "null" ]]; then
+            remaining=$(( (opened_at + cooldown) - now ))
+            [[ $remaining -lt 0 ]] && remaining=0
+            remaining_m=$(( remaining / 60 ))
+            remaining_s=$(( remaining % 60 ))
+            echo "${channel}:open (cooldown ${remaining_m}m ${remaining_s}s remaining) "
+            return 0
         fi
     fi
+    echo "${channel}:open "
+}
 
+_channel_format_status() {
+    local channel="$1"
+    if ! $_CB_AVAILABLE; then
+        echo "${channel}:enabled "
+        return 0
+    fi
+    local state
+    state=$(cb_state "$channel")
+    if [[ "$state" == "open" ]]; then
+        _channel_format_open_cooldown "$channel"
+        return 0
+    fi
+    echo "${channel}:${state} "
+}
+
+channel_status_summary() {
+    local summary=""
+    if channel_available "sentry"; then
+        summary="${summary}$(_channel_format_status "sentry")"
+    fi
     echo "$summary"
 }

@@ -11,7 +11,7 @@ import sqlite3
 import sys
 
 
-def _format_table(headers, rows):
+def _format_table(headers: list[str], rows: list[tuple]) -> str:
     """Format rows as aligned columns with headers (mimics sqlite3 -header -column)."""
     widths = [len(h) for h in headers]
     for row in rows:
@@ -26,38 +26,42 @@ def _format_table(headers, rows):
     return "\n".join(lines)
 
 
-def main():
+def _parse_args() -> tuple[str, str, list[str]]:
     if len(sys.argv) < 3:
         print("Usage: metrics-query.py <db_path> <query> [params...]", file=sys.stderr)
         sys.exit(1)
+    return sys.argv[1], sys.argv[2], sys.argv[3:]
 
-    db_path = sys.argv[1]
-    query = sys.argv[2]
-    params = sys.argv[3:]
 
+def _execute_query(db_path: str, query: str, params: list[str]) -> None:
     conn = sqlite3.connect(db_path)
     try:
         cur = conn.cursor()
         cur.execute(query, params)
-
         query_type = query.strip().split()[0].upper() if query.strip() else ""
-
         if query_type == "SELECT":
-            rows = cur.fetchall()
-            if rows and cur.description:
-                headers = [d[0] for d in cur.description]
-                # Single column, single row (e.g. COUNT(*)): print bare value
-                if len(headers) == 1 and len(rows) == 1:
-                    print(rows[0][0] if rows[0][0] is not None else 0)
-                else:
-                    print(_format_table(headers, rows))
-            elif not rows and cur.description and len(cur.description) == 1:
-                # COUNT with no matching rows
-                print(0)
+            _print_select_results(cur)
         else:
             conn.commit()
     finally:
         conn.close()
+
+
+def _print_select_results(cur: sqlite3.Cursor) -> None:
+    rows = cur.fetchall()
+    if rows and cur.description:
+        headers = [d[0] for d in cur.description]
+        if len(headers) == 1 and len(rows) == 1:
+            print(rows[0][0] if rows[0][0] is not None else 0)
+        else:
+            print(_format_table(headers, rows))
+    elif not rows and cur.description and len(cur.description) == 1:
+        print(0)
+
+
+def main() -> None:
+    db_path, query, params = _parse_args()
+    _execute_query(db_path, query, params)
 
 
 if __name__ == "__main__":

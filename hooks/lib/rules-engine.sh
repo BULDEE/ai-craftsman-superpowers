@@ -37,39 +37,39 @@ _RULES_PROJECT_DIR=""
 _RULES_STRICTNESS="strict"
 
 _rules_store_dir() {
-    local ns="$1"
-    echo "$_RULES_STORE/$ns"
+    local namespace="$1"
+    echo "$_RULES_STORE/$namespace"
 }
 
 _rules_set() {
-    local ns="$1" key="$2" value="$3"
+    local namespace="$1" key="$2" value="$3"
     local dir
-    dir="$(_rules_store_dir "$ns")"
+    dir="$(_rules_store_dir "$namespace")"
     mkdir -p "$dir"
     printf '%s' "$value" > "$dir/$key"
 }
 
 _rules_get() {
-    local ns="$1" key="$2"
+    local namespace="$1" key="$2"
     local file
-    file="$(_rules_store_dir "$ns")/$key"
+    file="$(_rules_store_dir "$namespace")/$key"
     if [[ -f "$file" ]]; then
         cat "$file"
     fi
 }
 
 _rules_keys() {
-    local ns="$1"
+    local namespace="$1"
     local dir
-    dir="$(_rules_store_dir "$ns")"
+    dir="$(_rules_store_dir "$namespace")"
     if [[ -d "$dir" ]]; then
         ls "$dir" 2>/dev/null
     fi
 }
 
 _rules_has() {
-    local ns="$1" key="$2"
-    [[ -f "$(_rules_store_dir "$ns")/$key" ]]
+    local namespace="$1" key="$2"
+    [[ -f "$(_rules_store_dir "$namespace")/$key" ]]
 }
 
 # ---------------------------------------------------------------------------
@@ -116,23 +116,10 @@ _rules_yaml_parser_path() {
 # ---------------------------------------------------------------------------
 # Parse .craft-config.yml via Python yaml-parser.py → populate stores from JSON
 # ---------------------------------------------------------------------------
-_rules_parse_config() {
-    local file="$1"
-    local source_label="$2"  # "global" or "project"
+_rules_apply_parsed_config() {
+    local json_output="$1"
+    local source_label="$2"
 
-    [[ ! -f "$file" ]] && return 0
-
-    local parser_path
-    parser_path="$(_rules_yaml_parser_path)"
-    local json_output
-    json_output=$(python3 "$parser_path" "$file" "config") || json_output="{}"
-
-    # Empty or invalid → skip
-    if [[ -z "$json_output" ]] || [[ "$json_output" == "{}" ]]; then
-        return 0
-    fi
-
-    # Parse strictness
     local val
     val=$(printf '%s' "$json_output" | jq -r '.strictness // empty' 2>/dev/null)
     if [[ -n "$val" ]]; then
@@ -141,7 +128,6 @@ _rules_parse_config() {
         fi
     fi
 
-    # Parse rules
     local rule_ids
     rule_ids=$(printf '%s' "$json_output" | jq -r '.rules // {} | keys[]' 2>/dev/null)
 
@@ -149,6 +135,24 @@ _rules_parse_config() {
     for rule_id in $rule_ids; do
         _rules_store_rule_fields "$json_output" "$rule_id"
     done
+}
+
+_rules_parse_config() {
+    local file="$1"
+    local source_label="$2"
+
+    [[ ! -f "$file" ]] && return 0
+
+    local parser_path
+    parser_path="$(_rules_yaml_parser_path)"
+    local json_output
+    json_output=$(python3 "$parser_path" "$file" "config") || json_output="{}"
+
+    if [[ -z "$json_output" ]] || [[ "$json_output" == "{}" ]]; then
+        return 0
+    fi
+
+    _rules_apply_parsed_config "$json_output" "$source_label"
 }
 
 # Store all fields (severity, pattern, message, languages) for a single rule from JSON
@@ -214,27 +218,29 @@ _rules_parse_dir_config() {
 # Validate custom rules: pattern, severity, languages
 # Invalid rules get severity forced to "ignore" + stderr warning
 # ---------------------------------------------------------------------------
-_rules_validate_custom() {
+_rules_validate_pattern() {
     local rule_id="$1"
-    local valid=1
-
-    # Must have a pattern
     local pattern
     pattern=$(_rules_get "pattern" "$rule_id")
     if [[ -z "$pattern" ]]; then
-        valid=0
         echo "[rules-engine] WARNING: Rule $rule_id has no pattern, setting to ignore" >&2
-    else
-        # Validate regex: grep -E returns 2 for invalid regex
-        local grep_ret=0
-        echo "test" | grep -E "$pattern" >/dev/null 2>&1 || grep_ret=$?
-        if [[ $grep_ret -eq 2 ]]; then
-            valid=0
-            echo "[rules-engine] WARNING: Rule $rule_id has invalid regex pattern '$pattern', setting to ignore" >&2
-        fi
+        return 1
     fi
+    local grep_ret=0
+    echo "test" | grep -E "$pattern" >/dev/null 2>&1 || grep_ret=$?
+    if [[ $grep_ret -eq 2 ]]; then
+        echo "[rules-engine] WARNING: Rule $rule_id has invalid regex pattern '$pattern', setting to ignore" >&2
+        return 1
+    fi
+    return 0
+}
 
-    # Severity must be block|warn|ignore
+_rules_match_custom_rule() {
+    local rule_id="$1"
+    local valid=1
+
+    _rules_validate_pattern "$rule_id" || valid=0
+
     local severity
     severity=$(_rules_get "severity" "$rule_id")
     if [[ -n "$severity" ]] && [[ ! "$severity" =~ ^(block|warn|ignore)$ ]]; then
@@ -242,13 +248,20 @@ _rules_validate_custom() {
         echo "[rules-engine] WARNING: Rule $rule_id has invalid severity '$severity', setting to ignore" >&2
     fi
 
-    # Languages must be non-empty
     local languages
     languages=$(_rules_get "languages" "$rule_id")
     if [[ -z "$languages" ]]; then
         valid=0
         echo "[rules-engine] WARNING: Rule $rule_id has no languages, setting to ignore" >&2
     fi
+
+    echo "$valid"
+}
+
+_rules_validate_custom() {
+    local rule_id="$1"
+    local valid
+    valid=$(_rules_match_custom_rule "$rule_id")
 
     if [[ $valid -eq 0 ]]; then
         _rules_set "severity" "$rule_id" "ignore"
@@ -293,36 +306,38 @@ _rules_default_severity() {
 # rules_init "$project_dir" ["$global_dir"]
 # Load and merge config from global → project
 # ---------------------------------------------------------------------------
+_rules_load_config_file() {
+    local project_dir="$1"
+    local global_dir="${2:-}"
+
+    if [[ -n "${CLAUDE_PLUGIN_OPTION_strictness:-}" ]]; then
+        _RULES_STRICTNESS="$CLAUDE_PLUGIN_OPTION_strictness"
+    fi
+
+    if [[ -n "$global_dir" ]] && [[ -f "$global_dir/.craft-config.yml" ]]; then
+        _rules_parse_config "$global_dir/.craft-config.yml" "global"
+    fi
+
+    if [[ -f "$project_dir/.craft-config.yml" ]]; then
+        _rules_parse_config "$project_dir/.craft-config.yml" "project"
+    fi
+}
+
 rules_init() {
     local project_dir="$1"
     local global_dir="${2:-}"
 
     _rules_ensure_store
     _RULES_PROJECT_DIR="$project_dir"
-    _RULES_STRICTNESS="strict"  # default
+    _RULES_STRICTNESS="strict"
 
-    # 0. Check CLAUDE_PLUGIN_OPTION_strictness env var (lower priority than config files)
-    if [[ -n "${CLAUDE_PLUGIN_OPTION_strictness:-}" ]]; then
-        _RULES_STRICTNESS="$CLAUDE_PLUGIN_OPTION_strictness"
-    fi
+    _rules_load_config_file "$project_dir" "$global_dir"
 
-    # 1. Load global config if exists (overrides env var)
-    if [[ -n "$global_dir" ]] && [[ -f "$global_dir/.craft-config.yml" ]]; then
-        _rules_parse_config "$global_dir/.craft-config.yml" "global"
-    fi
-
-    # 2. Load project config, deep merge over global (highest priority)
-    if [[ -f "$project_dir/.craft-config.yml" ]]; then
-        _rules_parse_config "$project_dir/.craft-config.yml" "project"
-    fi
-
-    # 3. Validate custom rules (those with a pattern or languages key)
     local rule_id
     for rule_id in $(_rules_keys "pattern"); do
         _rules_validate_custom "$rule_id"
     done
 
-    # Also validate rules that have languages but no pattern yet checked
     for rule_id in $(_rules_keys "languages"); do
         if ! _rules_has "pattern" "$rule_id"; then
             _rules_validate_custom "$rule_id"
@@ -352,12 +367,29 @@ rules_severity() {
 # ---------------------------------------------------------------------------
 # Walk directories from file up to project root, looking for .craft-rules.yml override.
 # Prints the overridden severity if found, prints nothing if no directory override exists.
-_rules_find_directory_override() {
-    local file_path="$1"
-    local rule_id="$2"
+_rules_check_directory_override() {
+    local current_directory="$1"
+    local directory_key="$2"
+    local rule_id="$3"
 
-    local current_directory
-    current_directory=$(dirname "$file_path")
+    if [[ -f "$current_directory/.craft-rules.yml" ]]; then
+        if ! _rules_has "dir_parsed" "$directory_key"; then
+            _rules_parse_dir_config "$current_directory/.craft-rules.yml" "$directory_key"
+            _rules_set "dir_parsed" "$directory_key" "1"
+        fi
+        local cached_severity
+        cached_severity=$(_rules_get "dir_cache" "${directory_key}:${rule_id}")
+        if [[ -n "$cached_severity" ]]; then
+            echo "$cached_severity"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+_rules_search_parent_dirs() {
+    local current_directory="$1"
+    local rule_id="$2"
 
     while [[ -n "$current_directory" ]]; do
         local directory_key
@@ -370,23 +402,25 @@ _rules_find_directory_override() {
             return 0
         fi
 
-        if [[ -f "$current_directory/.craft-rules.yml" ]]; then
-            if ! _rules_has "dir_parsed" "$directory_key"; then
-                _rules_parse_dir_config "$current_directory/.craft-rules.yml" "$directory_key"
-                _rules_set "dir_parsed" "$directory_key" "1"
-            fi
-
-            cached_severity=$(_rules_get "dir_cache" "${directory_key}:${rule_id}")
-            if [[ -n "$cached_severity" ]]; then
-                echo "$cached_severity"
-                return 0
-            fi
-        fi
+        cached_severity=$(_rules_check_directory_override "$current_directory" "$directory_key" "$rule_id") && {
+            echo "$cached_severity"
+            return 0
+        }
 
         [[ "$current_directory" == "$_RULES_PROJECT_DIR" || "$current_directory" == "/" ]] && break
         current_directory=$(dirname "$current_directory")
     done
     return 1
+}
+
+_rules_find_directory_override() {
+    local file_path="$1"
+    local rule_id="$2"
+
+    local current_directory
+    current_directory=$(dirname "$file_path")
+
+    _rules_search_parent_dirs "$current_directory" "$rule_id"
 }
 
 # Find the nearest directory containing .craft-rules.yml for a file path.
