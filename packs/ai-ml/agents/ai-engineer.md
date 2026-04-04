@@ -5,7 +5,7 @@ description: |
   LLM integration (Claude, OpenAI), prompt engineering, AI agents (Symfony AI, LangChain),
   and MLOps practices. Use for AI feature reviews, RAG audits, or AI system design.
 model: sonnet
-effort: high
+effort: medium
 memory: project
 maxTurns: 30
 skills:

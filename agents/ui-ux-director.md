@@ -5,7 +5,7 @@ description: |
   data visualization, accessibility WCAG 2.1 AA, and design token systems.
   Use for design reviews, a11y audits, or UX improvements.
 model: sonnet
-effort: high
+effort: medium
 memory: project
 maxTurns: 20
 ---

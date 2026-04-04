@@ -1,4 +1,5 @@
 ---
+name: challenge
 description: Senior architecture review and code challenge. Use when reviewing code or PRs for quality, auditing architecture decisions, or responding to code review comments.
 effort: medium
 ---

@@ -4,7 +4,7 @@ description: |
   React/TypeScript specialist for reviewing frontend applications.
   Use when reviewing React components, hooks, or TypeScript code.
 model: sonnet
-effort: high
+effort: medium
 memory: project
 tools: Read, Glob, Grep, Bash
 maxTurns: 15

@@ -5,7 +5,7 @@ description: |
   messaging (RabbitMQ/Redis), and DDD tactical patterns.
   Use for backend code reviews, refactoring, performance audits, or feature implementation.
 model: sonnet
-effort: high
+effort: medium
 memory: project
 maxTurns: 30
 skills:

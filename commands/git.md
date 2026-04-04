@@ -1,4 +1,5 @@
 ---
+name: git
 description: Safe git workflow with destructive command protection. Use when committing changes, creating branches, managing git workflow, or handling merge conflicts.
 effort: quick
 ---
