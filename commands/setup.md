@@ -251,7 +251,7 @@ packs:
   core: true
   symfony: {true/false}
   react: {true/false}
-  ai: {true/false}
+  ai-ml: {true/false}
 
 stack:
   php_version: "{version}"
