@@ -4,8 +4,8 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
-[![Version](https://img.shields.io/badge/Version-2.9.1-blue)](CHANGELOG.md)
-[![Commands](https://img.shields.io/badge/Commands-15-orange)]()
+[![Version](https://img.shields.io/badge/Version-3.0.0-blue)](CHANGELOG.md)
+[![Commands](https://img.shields.io/badge/Commands-20-orange)]()
 [![Agents](https://img.shields.io/badge/Agents-11-red)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -114,7 +114,7 @@ Records every violation fix users make and injects correction trends at next ses
 Enterprise-ready rule customization: Global → Project → Directory overrides. Short form (`PHP001: warn`) and long form (custom rules with regex, message, severity, languages, paths). Legacy code coexists with strict new code via directory-level relaxation. Python-backed YAML parser with bash 3.2 shell compatibility.
 
 ### 3. **Cognitive Bias Detector**
-Real-time detection of acceleration bias, scope creep, and over-optimization in user prompts. Bilingual FR/EN pattern matching on UserPromptSubmit hook. Non-blocking warnings that encourage reflection before action. Currently regex-based — semantic analysis planned for v3.
+Real-time detection of acceleration bias, scope creep, and over-optimization in user prompts. Bilingual FR/EN pattern matching on UserPromptSubmit hook. Non-blocking warnings that encourage reflection before action. Currently regex-based — semantic analysis planned for v4.
 
 ### 4. **Real-Time Quality Gate**
 3-level progressive validation on every Write/Edit:
@@ -128,7 +128,7 @@ Graceful degradation: works with zero tools installed (Level 1 only).
 Same rules engine runs in hooks (real-time) AND CI (pipeline) with zero drift — CI sources the same pack validators as hooks. 4 providers: GitHub Actions, GitLab CI, Bitbucket Pipelines, Jenkins. Adapter pattern: detect → run → annotate → comment → exit.
 
 ### 6. **Metrics & Trend Analysis**
-SQLite-backed tracking of violations, corrections, and sessions. 7-day and 30-day trend views. Data-driven quality improvement: identify most-violated rules and adjust strictness. Currently per-machine — team metrics sync planned for v3.
+SQLite-backed tracking of violations, corrections, and sessions. 7-day and 30-day trend views. Data-driven quality improvement: identify most-violated rules and adjust strictness. Currently per-machine — team metrics sync planned for v4.
 
 ---
 
@@ -426,8 +426,8 @@ See [`/examples`](examples/) for detailed usage examples:
 ```
 hooks/              → Real-time validation (SessionStart → PostToolUse → Stop → SessionEnd)
 hooks/lib/          → Shared libraries (pack-loader, config, rules-engine, metrics, static-analysis)
-commands/           → Core user-invoked workflows (15 commands)
-agents/             → Core agents (5) + pack symlinks
+commands/           → Core user-invoked workflows (20 skills)
+agents/             → Core agents (11) + pack symlinks
 knowledge/          → Core methodology (DDD, Clean Architecture, patterns)
 packs/              → Loadable language packs
   symfony/          → PHP/Symfony pack (validators, agents, knowledge, templates)
@@ -464,9 +464,9 @@ This plugin prioritizes transparency and safety:
 | Component | Behavior | Modifies Files? |
 |-----------|----------|-----------------|
 | Commands | Prompt templates | Only when instructed |
-| Reviewer Agents | Code analysis (5 agents) | Never (read-only) |
+| Reviewer Agents | Code analysis (11 agents) | Never (read-only) |
 | Craftsman Agents | Implementation (7 agents) | When instructed |
-| Command Hooks | Validation scripts (6 scripts) | Never (read-only, except metrics DB) |
+| Command Hooks | Validation scripts (15 scripts) | Never (read-only, except metrics DB + session state) |
 | Agent Hooks | Semantic analysis (4 agents, Haiku) | Never (read-only) |
 
 **Hooks use exit codes** — Bias detection warns (exit 0). Code rule violations **block** (exit 2) to enforce quality standards. See [Hooks Reference](docs/reference/hooks.md).

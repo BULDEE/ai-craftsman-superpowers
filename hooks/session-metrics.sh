@@ -7,6 +7,9 @@
 # =============================================================================
 set -uo pipefail
 
+# Non-blocking: session metrics are best-effort
+trap 'echo "WARNING: session-metrics.sh failed at line $LINENO" >&2; exit 0' ERR
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
 

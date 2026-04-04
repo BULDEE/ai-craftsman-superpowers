@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Craftsman Validate — run post-write validation on a file from terminal.
+# Usage: craftsman-validate <file-path>
+# Invokable as bare command in Bash tool while plugin is enabled.
+FILE="${1:?Usage: craftsman-validate <file-path>}"
+jq -n --arg fp "$FILE" '{"tool_input":{"file_path":$fp}}' | bash "$(cd "$(dirname "$0")/.." && pwd)/hooks/post-write-check.sh"

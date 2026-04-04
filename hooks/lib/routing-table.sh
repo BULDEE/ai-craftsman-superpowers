@@ -50,5 +50,17 @@ routing_table() {
 - Scaffold React component, hook, branded type → /craftsman:scaffold"
     fi
 
-    echo "CRAFTSMAN COMMANDS — Suggest these when context matches (do NOT auto-execute, propose to user):${routes}"
+    # Superpowers synergy detection
+    local sp_note=""
+    if [[ -d "${HOME}/.claude/plugins/cache/claude-plugins-official/superpowers" ]] || \
+       [[ -d "${HOME}/.claude/plugins/superpowers" ]]; then
+        sp_note="
+SYNERGY: Superpowers plugin detected. Craftsman quality gates activate automatically on Superpowers workflows.
+- Use Superpowers for workflow: brainstorming → writing-plans → subagent-driven-development
+- Craftsman hooks validate every Write/Edit in real-time (Level 1-3 quality gates)
+- Correction learning tracks patterns across subagent work
+- Use /craftsman:challenge after implementation for architecture review"
+    fi
+
+    echo "CRAFTSMAN COMMANDS — Suggest these when context matches (do NOT auto-execute, propose to user):${routes}${sp_note}"
 }

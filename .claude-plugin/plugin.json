@@ -187,8 +187,9 @@
     "ai-engineer": {
       "path": "agents/ai-engineer.md",
       "name": "ai-engineer",
-      "description": "|",
+      "description": "Senior AI/ML engineer — deep expertise in RAG pipelines, LLM integration, prompt engineering, AI agents, and MLOps. Use for AI feature reviews, RAG audits, or AI system design.",
       "model": "sonnet",
+      "effort": "medium",
       "memory": "project",
       "skills": [
         "craftsman:rag",
@@ -208,8 +209,9 @@
     "api-craftsman": {
       "path": "agents/api-craftsman.md",
       "name": "api-craftsman",
-      "description": "|",
+      "description": "Senior API architect — deep expertise in API Platform 4, REST/HATEOAS, OpenAPI, JSON-LD/Hydra, and API security. Use for API design reviews or RESTful architecture decisions.",
       "model": "sonnet",
+      "effort": "medium",
       "memory": "project",
       "allowedTools": [
         "Read",
@@ -228,8 +230,10 @@
     "architect": {
       "path": "agents/architect.md",
       "name": "architect",
-      "description": "|",
+      "description": "Senior software architect — deep expertise in DDD, CQRS, Clean Architecture, Event-Driven Architecture. Validates dependency direction, bounded contexts, aggregate boundaries. Use for architecture reviews, design validation, or system design sessions.",
       "model": "sonnet",
+      "effort": "high",
+      "isolation": "worktree",
       "memory": "project",
       "allowedTools": [
         "Read",
@@ -246,8 +250,9 @@
     "backend-craftsman": {
       "path": "agents/backend-craftsman.md",
       "name": "backend-craftsman",
-      "description": "|",
+      "description": "Senior PHP/Symfony craftsman — deep expertise in Symfony 7/8, API Platform 4, Doctrine ORM, messaging, and DDD tactical patterns. Use for backend code reviews, refactoring, or feature implementation.",
       "model": "sonnet",
+      "effort": "medium",
       "memory": "project",
       "skills": [
         "craftsman:entity",
@@ -268,8 +273,9 @@
     "doc-writer": {
       "path": "agents/doc-writer.md",
       "name": "doc-writer",
-      "description": "|",
+      "description": "Senior technical writer — generates and reviews API docs (OpenAPI), ADRs, READMEs, runbooks. Verifies documentation accuracy against code. Use for documentation audits or technical writing.",
       "model": "haiku",
+      "effort": "low",
       "memory": "project",
       "allowedTools": [
         "Read",
@@ -282,8 +288,9 @@
     "frontend-craftsman": {
       "path": "agents/frontend-craftsman.md",
       "name": "frontend-craftsman",
-      "description": "|",
+      "description": "Senior React/TypeScript craftsman — deep expertise in React 19, TypeScript 5, TanStack Query, Tailwind, shadcn/ui, and component architecture. Use for frontend reviews, refactoring, or feature implementation.",
       "model": "sonnet",
+      "effort": "medium",
       "memory": "project",
       "skills": [
         "craftsman:component",
@@ -304,8 +311,9 @@
     "react-reviewer": {
       "path": "agents/react-reviewer.md",
       "name": "react-reviewer",
-      "description": "|",
+      "description": "React/TypeScript specialist for reviewing frontend applications. Use when reviewing React components, hooks, or TypeScript code quality.",
       "model": "sonnet",
+      "effort": "medium",
       "memory": "project",
       "skills": [
         "craftsman:challenge"
@@ -321,8 +329,10 @@
     "security-pentester": {
       "path": "agents/security-pentester.md",
       "name": "security-pentester",
-      "description": "|",
+      "description": "Security specialist for finding vulnerabilities in code. Use when auditing security, reviewing authentication, or checking for OWASP issues.",
       "model": "sonnet",
+      "effort": "high",
+      "isolation": "worktree",
       "memory": "project",
       "allowedTools": [
         "Read",
@@ -335,8 +345,9 @@
     "symfony-reviewer": {
       "path": "agents/symfony-reviewer.md",
       "name": "symfony-reviewer",
-      "description": "|",
+      "description": "Symfony/PHP specialist for reviewing backend applications. Use when reviewing PHP/Symfony code, Doctrine entities, or Symfony services.",
       "model": "sonnet",
+      "effort": "medium",
       "memory": "project",
       "skills": [
         "craftsman:challenge"
@@ -352,8 +363,9 @@
     "team-lead": {
       "path": "agents/team-lead.md",
       "name": "team-lead",
-      "description": "|",
+      "description": "CTO & Tech Lead clone — orchestrates specialized teams across all projects. Use as team lead for multi-agent tasks: reviews, implementations, audits. Proactively delegates, challenges decisions, and consolidates deliverables.",
       "model": "sonnet",
+      "effort": "high",
       "memory": "user",
       "allowedTools": [
         "Read",
@@ -377,8 +389,9 @@
     "ui-ux-director": {
       "path": "agents/ui-ux-director.md",
       "name": "ui-ux-director",
-      "description": "|",
+      "description": "UI/UX director and design system guardian — deep expertise in SaaS dashboard UX, data visualization, accessibility WCAG 2.1 AA, and design token systems. Use for design reviews, a11y audits, or UX improvements.",
       "model": "sonnet",
+      "effort": "medium",
       "memory": "project",
       "allowedTools": [
         "Read",

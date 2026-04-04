@@ -80,7 +80,7 @@ hc_check_packs() {
 }
 
 hc_check_metrics_db() {
-    local db_path="${CLAUDE_PLUGIN_DATA:-/tmp}/metrics.db"
+    local db_path="${METRICS_DB:-${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db}"
     if [[ -f "$db_path" ]]; then
         local sessions violations
         sessions=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM sessions;" 2>/dev/null || echo "0")
@@ -150,6 +150,23 @@ hc_check_knowledge() {
     fi
 }
 
+hc_check_superpowers() {
+    local sp_dir=""
+    for d in "${HOME}/.claude/plugins/cache/claude-plugins-official/superpowers"/* "${HOME}/.claude/plugins/superpowers"; do
+        [[ -d "$d" ]] && sp_dir="$d" && break
+    done
+
+    if [[ -n "$sp_dir" ]]; then
+        local version="unknown"
+        if [[ -f "${sp_dir}/plugin.json" ]]; then
+            version=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('version','?'))" "${sp_dir}/plugin.json" 2>/dev/null || echo "?")
+        fi
+        _hc_record "superpowers" "ok" "v${version} — synergy active"
+    else
+        _hc_record "superpowers" "ok" "not installed (optional)"
+    fi
+}
+
 # --- Aggregate ---
 
 hc_run_all() {
@@ -167,6 +184,7 @@ hc_run_all() {
     hc_check_channels
     hc_check_ollama
     hc_check_knowledge
+    hc_check_superpowers
 }
 
 hc_summary() {

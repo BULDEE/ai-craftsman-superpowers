@@ -6,7 +6,10 @@
 # SECURITY: This script only reads stdin and outputs warnings to stdout.
 #           It does NOT modify files, execute commands, or access network.
 # =============================================================================
-set -euo pipefail
+set -uo pipefail
+
+# Non-blocking: if hook crashes, pass silently
+trap 'exit 0' ERR
 
 SESSION_STATE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
 
@@ -29,17 +32,17 @@ fi
 # Acceleration bias: rushing without thinking
 # FR: vite, rapide, rapidement, pas le temps, code direct
 # EN: no time, just do it, skip, quick, hurry, asap, urgent
-ACCELERATION_PATTERNS="(vite|rapide|rapidement|pas le temps|no time|just do it|code direct|skip|quick|hurry|asap|urgent)"
+ACCELERATION_PATTERNS="\b(vite|rapide|rapidement|pas le temps|no time|just do it|code direct|skip the|quick|hurry|asap|urgent)\b"
 
 # Scope creep: adding features beyond scope
 # FR: et aussi, tant qu'on y est, ajoutons, en plus
 # EN: while we're at it, also add, let's also, and also
-SCOPE_CREEP_PATTERNS="(et aussi|tant qu'on y est|ajoutons|en plus|while we're at it|also add|let's also|and also)"
+SCOPE_CREEP_PATTERNS="\b(et aussi|tant qu'on y est|ajoutons|en plus|while we're at it|also add|let's also|and also)\b"
 
 # Over-optimization: premature abstraction
 # FR: abstraire, généraliser
 # EN: generalize, abstract, make it configurable, future-proof
-OVER_OPT_PATTERNS="(abstraire|généraliser|generalize|abstract|make it configurable|future-proof)"
+OVER_OPT_PATTERNS="\b(abstraire|généraliser|generalize|make it abstract|make it configurable|future-proof)\b"
 
 # Workflow enforcement: domain modeling without /craftsman:design
 # FR: crée une entité|value object|agrégat
@@ -50,57 +53,30 @@ DOMAIN_MODELING_PATTERNS="(create (a |an |the )?(entity|value object|aggregate|d
 # Detection & Warnings
 # =============================================================================
 
+WARNINGS=""
+
+add_warning() {
+    if [[ -n "$WARNINGS" ]]; then
+        WARNINGS="${WARNINGS} | $1"
+    else
+        WARNINGS="$1"
+    fi
+}
+
 warn_acceleration() {
-    cat << 'EOF'
-
-⚠️  BIAS DETECTED: Acceleration
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-You may be rushing. Consider:
-  • What behavior is expected?
-  • Should we use /craftsman:design first?
-  • What test would verify this works?
-
-EOF
+    add_warning "Acceleration bias: You may be rushing. Consider: What behavior is expected? Should we use /craftsman:design first? What test would verify this works?"
 }
 
 warn_scope_creep() {
-    cat << 'EOF'
-
-⚠️  BIAS DETECTED: Scope Creep
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Adding features beyond scope. Consider:
-  • Is this in the original requirement?
-  • Should this be a separate task?
-  • YAGNI: You Aren't Gonna Need It
-
-EOF
+    add_warning "Scope Creep bias: Adding features beyond scope. Is this in the original requirement? Should this be a separate task? YAGNI."
 }
 
 warn_over_optimization() {
-    cat << 'EOF'
-
-⚠️  BIAS DETECTED: Over-Optimization
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Premature abstraction detected. Consider:
-  • Do we have 3+ use cases for this?
-  • Make it work → make it right → make it fast
-  • Concrete code > complex abstraction
-
-EOF
+    add_warning "Over-Optimization bias: Premature abstraction. Do we have 3+ use cases? Make it work first. Concrete code > complex abstraction."
 }
 
 warn_missing_design() {
-    cat << 'EOF'
-
-⚠️  WORKFLOW SUGGESTION: Domain Modeling
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-You are creating domain objects without running /craftsman:design first.
-Consider:
-  • Run /craftsman:design to model the domain properly
-  • Define bounded contexts and aggregate boundaries first
-  • Identify Value Objects before writing entities
-
-EOF
+    add_warning "Workflow: Domain modeling without /craftsman:design. Run /craftsman:design to model the domain properly before creating entities."
 }
 
 # Check each pattern
@@ -122,6 +98,13 @@ print('true' if state.get('design_used', False) else 'false')
     if [[ "$design_used" != "true" ]]; then
         warn_missing_design
     fi
+fi
+
+# Output structured JSON if warnings were collected
+if [[ -n "$WARNINGS" ]]; then
+    jq -n --arg msg "$WARNINGS" '{
+        systemMessage: $msg
+    }'
 fi
 
 # Always exit 0 (warning only, never block)
