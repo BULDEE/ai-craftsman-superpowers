@@ -1,6 +1,6 @@
 import { readdir, readFile, copyFile } from "node:fs/promises";
-import { join, extname, basename } from "node:path";
-import { existsSync } from "node:fs";
+import { join, extname, basename, resolve } from "node:path";
+import { existsSync, statSync } from "node:fs";
 import pdf from "pdf-parse";
 
 import { VectorStore } from "../db/vector-store.js";
@@ -47,7 +47,7 @@ async function checkOllamaRunning(): Promise<boolean> {
   }
 }
 
-function listSupportedFiles(dir: string, files: string[]): string[] {
+function listSupportedFiles(files: string[]): string[] {
   return files.filter((f) => SUPPORTED_EXTENSIONS.has(extname(f).toLowerCase()));
 }
 
@@ -156,7 +156,7 @@ export async function sync(store: VectorStore): Promise<SyncReport> {
 
   const embeddings = OllamaEmbeddingProvider.create();
   const allFiles = await readdir(knowledgeDir);
-  const supportedFiles = listSupportedFiles(knowledgeDir, allFiles);
+  const supportedFiles = listSupportedFiles(allFiles);
   const existingHashes = store.getAllSourceHashes();
 
   const added: string[] = [];
@@ -222,7 +222,7 @@ export async function addFile(store: VectorStore, sourcePath: string): Promise<{
   const fileName = basename(sourcePath);
   const destPath = join(location.knowledgeDir, fileName);
 
-  if (sourcePath !== destPath) {
+  if (resolve(sourcePath) !== resolve(destPath)) {
     await copyFile(sourcePath, destPath);
   }
 
@@ -254,7 +254,7 @@ export async function status(store: VectorStore): Promise<StatusReport> {
   const ollamaRunning = await checkOllamaRunning();
 
   const allFiles = existsSync(location.knowledgeDir) ? await readdir(location.knowledgeDir) : [];
-  const supportedFiles = listSupportedFiles(location.knowledgeDir, allFiles);
+  const supportedFiles = listSupportedFiles(allFiles);
 
   const pending: Array<{ file: string; reason: "new" | "modified" }> = [];
   const filesSeen = new Set<string>();
@@ -281,21 +281,12 @@ export async function status(store: VectorStore): Promise<StatusReport> {
 
   let dbSizeBytes = 0;
   try {
-    const { statSync } = await import("node:fs");
     dbSizeBytes = statSync(location.dbPath).size;
   } catch {
     // DB file may not exist yet
   }
 
-  let lastSync: string | null = null;
-  try {
-    const sources = store.listSources();
-    if (sources.length > 0) {
-      lastSync = "available";
-    }
-  } catch {
-    // ignore
-  }
+  const lastSync: string | null = null;
 
   return { totalSources: stats.totalSources, totalChunks: stats.totalChunks, dbSizeBytes, pending, orphans, ollamaRunning, lastSync };
 }
