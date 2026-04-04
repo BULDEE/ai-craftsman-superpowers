@@ -33,9 +33,14 @@ if (!packs.includes("ai-ml")) {
 }
 
 // ---------------------------------------------------------------------------
-// Detect conflicting "knowledge-rag" entries in ~/.claude.json
+// Detect conflicting "knowledge-rag" entries in ~/.claude.json and ~/.mcp.json
 // ---------------------------------------------------------------------------
 function checkForConflictingConfig() {
+  checkClaudeJson();
+  checkMcpJson();
+}
+
+function checkClaudeJson() {
   try {
     const claudeJsonPath = join(homedir(), ".claude.json");
     if (!existsSync(claudeJsonPath)) return;
@@ -64,7 +69,34 @@ function checkForConflictingConfig() {
       }
     }
   } catch {
-    // Non-critical check — do not block startup
+    // Non-critical — do not block startup
+  }
+}
+
+function checkMcpJson() {
+  try {
+    const mcpJsonPath = join(homedir(), ".mcp.json");
+    if (!existsSync(mcpJsonPath)) return;
+
+    const raw = readFileSync(mcpJsonPath, "utf8");
+    if (!raw.includes('"knowledge-rag"')) return;
+
+    const data = JSON.parse(raw);
+    const mcpServers = data?.mcpServers || {};
+
+    if ("knowledge-rag" in mcpServers) {
+      console.error(
+        `[knowledge-rag] WARNING: Conflicting MCP config detected in ~/.mcp.json`
+      );
+      console.error(
+        `[knowledge-rag]   A manual "knowledge-rag" entry overrides the plugin-managed server.`
+      );
+      console.error(
+        `[knowledge-rag]   Fix: Remove the "knowledge-rag" key from ~/.mcp.json`
+      );
+    }
+  } catch {
+    // Non-critical — do not block startup
   }
 }
 
