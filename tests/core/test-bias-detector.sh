@@ -123,10 +123,10 @@ fi
 result=$(run_bias "the quick brown fox jumps over the lazy dog")
 exit_code="${result%%|*}"
 output="${result#*|}"
-if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qi "Acceleration"; then
-    log_pass "'the quick brown fox' triggers acceleration (known: 'quick' matches regex)"
+if [[ "$exit_code" == "0" ]] && [[ -z "$output" || ! "$output" =~ "Acceleration" ]]; then
+    log_pass "'the quick brown fox' no false positive (context-aware patterns)"
 else
-    log_fail "'the quick brown fox' should match 'quick' pattern" "exit=$exit_code"
+    log_fail "'the quick brown fox' should NOT detect acceleration" "got output: $output"
 fi
 
 result=$(run_bias "the brown fox jumps over the lazy dog")

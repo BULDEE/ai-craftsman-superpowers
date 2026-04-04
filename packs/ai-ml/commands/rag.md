@@ -1,4 +1,5 @@
 ---
+name: rag
 description: Design RAG (Retrieval-Augmented Generation) pipelines. Use when building knowledge bases, document Q&A, or semantic search systems.
 effort: heavy
 ---

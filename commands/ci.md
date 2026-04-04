@@ -1,4 +1,5 @@
 ---
+name: ci
 description: "CI/CD pipeline integration. Use when setting up or checking CI quality gates, exporting rules to GitHub Actions/GitLab CI/Bitbucket/Jenkins, or verifying pipeline alignment with local rules."
 effort: medium
 ---

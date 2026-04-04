@@ -5,7 +5,7 @@ description: |
   OpenAPI specification, JSON-LD/Hydra, and API security (OAuth2, JWT).
   Use for API design reviews, API Platform configuration, or RESTful architecture decisions.
 model: sonnet
-effort: high
+effort: medium
 memory: project
 maxTurns: 30
 allowedTools:

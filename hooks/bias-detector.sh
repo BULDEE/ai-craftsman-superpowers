@@ -30,19 +30,17 @@ fi
 # =============================================================================
 
 # Acceleration bias: rushing without thinking
-# FR: vite, rapide, rapidement, pas le temps, code direct
-# EN: no time, just do it, skip, quick, hurry, asap, urgent
-ACCELERATION_PATTERNS="\b(vite|rapide|rapidement|pas le temps|no time|just do it|code direct|skip the|quick|hurry|asap|urgent)\b"
+# Context-aware: requires imperative verb context or explicit rush indicators
+# Reduced false positives: "quick fix" alone won't trigger, "just do it quick" will
+ACCELERATION_PATTERNS="(fais.{0,10}vite|code direct|pas le temps|no time|just do it|skip the (design|test|review)|hurry up|asap|do it now|juste code|sans (réfléchir|tester|design))"
 
 # Scope creep: adding features beyond scope
-# FR: et aussi, tant qu'on y est, ajoutons, en plus
-# EN: while we're at it, also add, let's also, and also
-SCOPE_CREEP_PATTERNS="\b(et aussi|tant qu'on y est|ajoutons|en plus|while we're at it|also add|let's also|and also)\b"
+# Context-aware: requires action verb + addition pattern
+SCOPE_CREEP_PATTERNS="(et (aussi|en plus) (ajoute|fais|met|ajoutons)|tant qu'on y est|while we're at it.*(add|change|also)|also add|let's also (add|do|change)|and also (add|do|implement)|ajoutons aussi|rajoute)"
 
 # Over-optimization: premature abstraction
-# FR: abstraire, généraliser
-# EN: generalize, abstract, make it configurable, future-proof
-OVER_OPT_PATTERNS="\b(abstraire|généraliser|generalize|make it abstract|make it configurable|future-proof)\b"
+# Context-aware: requires explicit generalization intent
+OVER_OPT_PATTERNS="(abstraire|généraliser|make it (abstract|configurable|generic|extensible)|future[- ]proof|pour (le futur|plus tard)|rends[- ]?(le )?(configurable|générique|abstrait))"
 
 # Workflow enforcement: domain modeling without /craftsman:design
 # FR: crée une entité|value object|agrégat
