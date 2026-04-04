@@ -8,6 +8,7 @@ description: |
 model: sonnet
 effort: high
 memory: project
+isolation: worktree
 maxTurns: 20
 allowedTools:
   - Read

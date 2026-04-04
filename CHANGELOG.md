@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.2] — 2026-04-04
+
+### Fixed
+- **Breaking plugin validation** — `skills` and `agents` fields in `plugin.json` used inline objects incompatible with Claude Code v2.1.92 schema. Removed inline definitions; Claude Code now auto-discovers from `commands/` and `agents/` directories.
+- **Agent frontmatter completeness** — migrated `allowedTools`, `isolation`, and `skills` metadata from `plugin.json` into each agent's YAML frontmatter (10 files). Fixed `tools:` → `allowedTools:` in react-reviewer, symfony-reviewer, security-pentester.
+
 ## [3.2.1] — 2026-04-04
 
 ### Fixed

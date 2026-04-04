@@ -8,6 +8,11 @@ model: sonnet
 effort: medium
 memory: project
 maxTurns: 20
+allowedTools:
+  - Read
+  - Glob
+  - Grep
+  - Write
 ---
 
 # UI/UX Director Agent

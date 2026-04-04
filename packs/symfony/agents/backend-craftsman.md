@@ -8,6 +8,14 @@ model: sonnet
 effort: medium
 memory: project
 maxTurns: 30
+allowedTools:
+  - Read
+  - Glob
+  - Grep
+  - Bash
+  - Agent
+  - Edit
+  - Write
 skills:
   - craftsman:scaffold
   - craftsman:spec
