@@ -27,6 +27,17 @@ export class OllamaEmbeddingProvider implements EmbeddingProvider {
     this.dimensions = dimensions;
   }
 
+  static async checkRunning(): Promise<boolean> {
+    try {
+      const response = await fetch("http://localhost:11434/api/tags", {
+        signal: AbortSignal.timeout(2000),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
   static create(
     model?: string,
     baseUrl?: string
