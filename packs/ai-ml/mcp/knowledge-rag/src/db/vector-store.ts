@@ -119,6 +119,55 @@ export class VectorStore {
         indexed_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    this.migrate();
+  }
+
+  migrate(): void {
+    const columns = this.db.pragma("table_info(sources)") as Array<{ name: string }>;
+    const hasHash = columns.some((c) => c.name === "file_hash");
+
+    if (!hasHash) {
+      this.db.exec(`
+        ALTER TABLE sources ADD COLUMN file_hash TEXT NOT NULL DEFAULT '';
+        ALTER TABLE sources ADD COLUMN file_size INTEGER NOT NULL DEFAULT 0;
+      `);
+    }
+  }
+
+  getSourceHash(sourceName: string): string | null {
+    const stmt = this.db.prepare("SELECT file_hash FROM sources WHERE name = ?");
+    const row = stmt.get(sourceName) as { file_hash: string } | undefined;
+    return row?.file_hash || null;
+  }
+
+  updateSourceHash(sourceName: string, hash: string, size: number): void {
+    const stmt = this.db.prepare(
+      "UPDATE sources SET file_hash = ?, file_size = ?, indexed_at = CURRENT_TIMESTAMP WHERE name = ?"
+    );
+    stmt.run(hash, size, sourceName);
+  }
+
+  deleteBySource(sourceName: string): number {
+    const countStmt = this.db.prepare("SELECT COUNT(*) as count FROM chunks WHERE source = ?");
+    const { count } = countStmt.get(sourceName) as { count: number };
+
+    this.db.prepare("DELETE FROM chunks WHERE source = ?").run(sourceName);
+    this.db.prepare("DELETE FROM sources WHERE name = ?").run(sourceName);
+
+    this.embeddingsCache = null;
+    return count;
+  }
+
+  getAllSourceHashes(): Map<string, { hash: string; size: number }> {
+    const stmt = this.db.prepare("SELECT name, file_hash, file_size FROM sources");
+    const rows = stmt.all() as Array<{ name: string; file_hash: string; file_size: number }>;
+
+    const map = new Map<string, { hash: string; size: number }>();
+    for (const row of rows) {
+      map.set(row.name, { hash: row.file_hash, size: row.file_size });
+    }
+    return map;
   }
 
   insertChunk(
@@ -141,12 +190,12 @@ export class VectorStore {
     return result.lastInsertRowid as number;
   }
 
-  insertSource(name: string, path: string, pages: number): void {
+  insertSource(name: string, path: string, pages: number, fileHash: string = "", fileSize: number = 0): void {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO sources (name, path, pages, indexed_at)
-      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+      INSERT OR REPLACE INTO sources (name, path, pages, file_hash, file_size, indexed_at)
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `);
-    stmt.run(name, path, pages);
+    stmt.run(name, path, pages, fileHash, fileSize);
   }
 
   search(queryEmbedding: number[], topK: number = 5, sources?: string[]): SearchResult[] {
