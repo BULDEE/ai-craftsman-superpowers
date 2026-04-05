@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.4] — 2026-04-05
+
+### Fixed
+- **Pre-push hook "No stderr output"** — Added stderr message alongside JSON output so Claude Code displays a clear, actionable block reason instead of the cryptic "No stderr output" error.
+- **`/craftsman:verify` never sets verified flag** — Root cause: the `set-verified` instruction was buried at line 266 of a 289-line skill file. Claude skipped it when focused on specific verification questions. Moved to "MANDATORY" section immediately after the verdict, before any optional content.
+- **Symlink regression in v3.3.3** — Edit tool resolved `commands/knowledge.md` symlink target to absolute path. Restored to relative `../packs/ai-ml/commands/knowledge.md`.
+- **CI secrets scanner false positive** — Removed `local paths in git history` check from scanner. Filesystem paths are not security secrets (no access granted). Current files are already validated by `scan_local_paths`. Only API keys/tokens warrant history scanning.
+
 ## [3.3.3] — 2026-04-05
 
 ### Fixed

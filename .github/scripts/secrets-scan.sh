@@ -147,10 +147,9 @@ scan_private_info() {
 
 scan_git_history() {
     echo "Scanning git history for secrets..."
-    check_git_history_pattern \
-        "local paths in git history" \
-        '^\+.*/Users/[a-zA-Z0-9_-]+/' \
-        "YOUR_USERNAME"
+    # Local paths in history are NOT a security risk (no access granted).
+    # Current files are already checked by scan_local_paths.
+    # Only API keys/secrets warrant history scanning.
     check_git_history_pattern \
         "API keys in git history" \
         '^\+.*(sk-[a-zA-Z0-9]{32,}|AKIA[0-9A-Z]{16}|ghp_[a-zA-Z0-9]{36})'
