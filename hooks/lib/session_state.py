@@ -22,6 +22,7 @@ Commands:
     post-compact <state_path>                                      - Verify state recovery after compaction
     get-previous-violations <state_path> <file>                    - Get previously blocked rules for a file
     read-session-metrics <state_path>                              - Read agent/team/task counts for metrics
+    set-verified                                                   - Set verified=true (auto-resolves path via bridge file)
 """
 
 import json
@@ -259,6 +260,34 @@ def handle_read_session_metrics(arguments: list[str]) -> None:
     print(completed_task_count)
 
 
+def _resolve_session_state_path() -> str:
+    """Resolve session-state.json path via the bridge file written by session-start.sh.
+
+    The bridge file is the single source of truth, ensuring skills running in the
+    Bash tool (without CLAUDE_PLUGIN_DATA) use the same path as hooks.
+    """
+    bridge = os.path.expanduser('~/.claude/craftsman-session-state-path')
+    if os.path.isfile(bridge):
+        with open(bridge) as bridge_file:
+            return bridge_file.read().strip()
+    return os.path.join(
+        os.environ.get('CLAUDE_PLUGIN_DATA', os.path.expanduser('~/.claude/plugins/data/craftsman')),
+        'session-state.json',
+    )
+
+
+def handle_set_verified(arguments: list[str]) -> None:
+    """Set verified=true in session state. Resolves path via bridge file automatically."""
+    import datetime
+
+    state_path = _resolve_session_state_path()
+    state = read_state(state_path)
+    state['verified'] = True
+    state['verified_at'] = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    write_state_atomically(state_path, state)
+    print(f'verified=true at {state_path}')
+
+
 COMMAND_HANDLERS = {
     'read': handle_read,
     'read-json': handle_read_json,
@@ -273,6 +302,7 @@ COMMAND_HANDLERS = {
     'post-compact': handle_post_compact,
     'get-previous-violations': handle_get_previous_violations,
     'read-session-metrics': handle_read_session_metrics,
+    'set-verified': handle_set_verified,
 }
 
 if __name__ == '__main__':

@@ -51,6 +51,17 @@ fi
 SESSION_STATE_PATH="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
 printf '%s' "$SESSION_STATE_PATH" > "${HOME}/.claude/craftsman-session-state-path" 2>/dev/null || true
 
+# Generate a self-contained verify wrapper at a well-known path.
+# Skills run via the Bash tool without CLAUDE_PLUGIN_ROOT, so they cannot
+# locate session_state.py directly. This wrapper bakes in the resolved path
+# at session start, making the verify skill a one-liner call.
+cat > "${HOME}/.claude/craftsman-set-verified.sh" <<WRAPPER
+#!/usr/bin/env bash
+set -uo pipefail
+exec python3 "${SCRIPT_DIR}/lib/session_state.py" set-verified
+WRAPPER
+chmod +x "${HOME}/.claude/craftsman-set-verified.sh" 2>/dev/null || true
+
 # Detect project type from filesystem
 detect_project_type() {
     local has_php=false has_ts=false
