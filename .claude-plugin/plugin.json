@@ -1,7 +1,7 @@
 {
   "name": "craftsman",
   "description": "Senior craftsman methodology for AI-assisted development. DDD, Clean Architecture, TDD, and systematic workflows that transform Claude into a disciplined software engineer.",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "author": {
     "name": "Alexandre Mallet",
     "email": "contact@woprrr.dev",
@@ -70,12 +70,6 @@
       "title": "Sentry Token",
       "description": "Sentry auth token (stored securely in keychain)",
       "sensitive": true
-    },
-    "mjolnir": {
-      "type": "boolean",
-      "title": "Mjolnir Companion",
-      "description": "Enable the Norse forge companion. Short stoic reactions on quality events (violations, corrections, push).",
-      "default": true
     }
   },
   "mcpServers": {

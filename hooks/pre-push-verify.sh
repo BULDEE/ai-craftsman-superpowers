@@ -13,7 +13,6 @@ trap 'echo "WARNING: pre-push-verify.sh failed at line $LINENO" >&2; exit 0' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/config.sh"
-source "${SCRIPT_DIR}/lib/mjolnir.sh"
 
 # Resolve the session-state path via the bridge file written by session-start.sh.
 # This ensures the hook reads the same file that skills write, even though skills
@@ -51,20 +50,13 @@ if _check_verified "$SESSION_STATE"; then
 fi
 
 if [[ "$VERIFIED" == "true" ]]; then
-    MJ_LINE=$(mjolnir_line "push_success")
-    if [[ -n "$MJ_LINE" ]]; then
-        jq -n --arg mj "$MJ_LINE" '{
-            systemMessage: $mj
-        }'
-    fi
     exit 0
 fi
 
-MJ_LINE=$(mjolnir_line "verify_fail")
-jq -n --arg mj "$MJ_LINE" '{
+jq -n '{
     hookSpecificOutput: {
         hookEventName: "PreToolUse",
-        additionalContext: ("BLOCKED: Run /craftsman:verify before pushing. This ensures all standards are met and the session is verified." + (if $mj != "" then "\n" + $mj else "" end))
+        additionalContext: "BLOCKED: Run /craftsman:verify before pushing. This ensures all standards are met and the session is verified."
     }
 }'
 exit 2
