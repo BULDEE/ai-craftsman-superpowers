@@ -489,6 +489,42 @@ test_session_metrics() {
     fi
 }
 
+# Test: Workflow command (content validation)
+test_workflow_command() {
+    echo ""
+    log_info "Testing workflow command (content)"
+
+    local workflow_test="$SCRIPT_DIR/core/test-workflow-command.sh"
+
+    if [[ -f "$workflow_test" ]]; then
+        if bash "$workflow_test" > /dev/null 2>&1; then
+            log_pass "Workflow command tests pass"
+        else
+            log_fail "Workflow command tests failed — run tests/core/test-workflow-command.sh for details"
+        fi
+    else
+        log_skip "Workflow command tests (tests/core/test-workflow-command.sh not found)"
+    fi
+}
+
+# Test: Quick setup (content validation)
+test_quick_setup() {
+    echo ""
+    log_info "Testing quick setup mode (content)"
+
+    local quick_test="$SCRIPT_DIR/core/test-quick-setup.sh"
+
+    if [[ -f "$quick_test" ]]; then
+        if bash "$quick_test" > /dev/null 2>&1; then
+            log_pass "Quick setup tests pass"
+        else
+            log_fail "Quick setup tests failed — run tests/core/test-quick-setup.sh for details"
+        fi
+    else
+        log_skip "Quick setup tests (tests/core/test-quick-setup.sh not found)"
+    fi
+}
+
 # Test: Dog-fooding (plugin validates its own code)
 test_dogfood() {
     echo ""
@@ -590,6 +626,8 @@ main() {
         test_session_metrics
         test_pack_suites
         test_craftsman_ci
+        test_workflow_command
+        test_quick_setup
         test_dogfood
     fi
 
