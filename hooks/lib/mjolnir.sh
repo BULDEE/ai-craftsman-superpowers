@@ -32,7 +32,7 @@ mjolnir_pick() {
         verify_pass)          pool=("${_MJ_VERIFY_PASS[@]}") ;;
         verify_fail)          pool=("${_MJ_VERIFY_FAIL[@]}") ;;
         push_success)         pool=("${_MJ_PUSH_SUCCESS[@]}") ;;
-        *)                    return 0 ;;
+        *)                    return 1 ;;
     esac
     local count=${#pool[@]}
     [[ $count -eq 0 ]] && return 0
