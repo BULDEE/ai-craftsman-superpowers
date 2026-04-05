@@ -70,6 +70,12 @@
       "title": "Sentry Token",
       "description": "Sentry auth token (stored securely in keychain)",
       "sensitive": true
+    },
+    "mjolnir": {
+      "type": "boolean",
+      "title": "Mjolnir Companion",
+      "description": "Enable the Norse forge companion. Short stoic reactions on quality events (violations, corrections, push).",
+      "default": true
     }
   },
   "mcpServers": {
