@@ -15,6 +15,11 @@ mkdir -p "$CLAUDE_PLUGIN_DATA"
 
 source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
+# Backup bridge file — session-start.sh overwrites it with test paths
+_BRIDGE="${HOME}/.claude/craftsman-session-state-path"
+_BRIDGE_BAK="${_BRIDGE}.test-backup"
+[[ -f "$_BRIDGE" ]] && cp "$_BRIDGE" "$_BRIDGE_BAK"
+
 echo ""
 echo "=== Session Start Hook Tests ==="
 
@@ -63,6 +68,9 @@ else
     log_fail "Should warn about missing config" "got: $msg2"
 fi
 export HOME="$ORIGINAL_HOME"
+
+# Restore bridge file
+[[ -f "$_BRIDGE_BAK" ]] && mv "$_BRIDGE_BAK" "$_BRIDGE"
 
 # Cleanup
 rm -rf "$CLAUDE_PLUGIN_DATA" "/tmp/craftsman-fake-home-$$"
