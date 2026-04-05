@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
 [![Version](https://img.shields.io/badge/Version-3.3.5-blue)](CHANGELOG.md)
-[![Commands](https://img.shields.io/badge/Commands-20-orange)]()
+[![Commands](https://img.shields.io/badge/Commands-21-orange)]()
 [![Agents](https://img.shields.io/badge/Agents-11-red)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
@@ -99,6 +99,13 @@ I need to migrate our API to microservices.
 # Review code for architecture issues
 /craftsman:challenge
 [paste your code]
+
+# Run the full development workflow (design → spec → plan → implement → test → verify → commit)
+/craftsman:workflow
+I need to add a forgot password feature.
+
+# Quick setup (zero questions, smart defaults)
+/craftsman:setup --quick
 ```
 
 See [`/examples`](examples/) for detailed usage examples with expected outputs.
@@ -161,6 +168,7 @@ All commands are explicitly invoked with `/craftsman:command-name`. See [ADR-000
 | `/craftsman:plan` | Structured planning & execution with checkpoints |
 | `/craftsman:challenge` | Senior architecture review and code challenge |
 | `/craftsman:verify` | Evidence-based verification before completion claims |
+| `/craftsman:workflow` | Flexible development pipeline (design → spec → plan → implement → test → verify → commit) |
 | `/craftsman:spec` | Specification-first development (TDD/BDD) |
 | `/craftsman:refactor` | Systematic refactoring with behavior preservation |
 | `/craftsman:test` | Pragmatic testing following Fowler/Martin principles |
@@ -192,7 +200,7 @@ All commands are explicitly invoked with `/craftsman:command-name`. See [ADR-000
 |---------|---------|
 | `/craftsman:scaffold` | Unified scaffolder for all types (entity, usecase, component, hook, api-resource, pack) |
 | `/craftsman:metrics` | Display quality metrics dashboard (violations, trends, sessions) |
-| `/craftsman:setup` | Interactive setup wizard (DISC profile, stack, packs) |
+| `/craftsman:setup` | Interactive setup wizard (DISC profile, stack, packs). Use `--quick` for zero-question auto-setup |
 | `/craftsman:team` | Create and manage agent teams for collaborative tasks |
 
 ### CI/CD Integration
@@ -420,6 +428,8 @@ See [`/docs/adr`](docs/adr/) for Architecture Decision Records:
 - [ADR-0010: Model Tiering Strategy](docs/adr/0010-model-tiering.md)
 - [ADR-0011: Context Fork Strategy](docs/adr/0011-context-fork-strategy.md)
 - [ADR-0012: Progressive Disclosure](docs/adr/0012-progressive-disclosure.md)
+- [ADR-0013: Workflow Orchestrator](docs/adr/0013-workflow-orchestrator.md)
+- [ADR-0014: Quick Setup Mode](docs/adr/0014-quick-setup-mode.md)
 
 ## Examples
 
@@ -436,6 +446,9 @@ See [`/examples`](examples/) for detailed usage examples:
 - [Healthcheck: Plugin Diagnostic](examples/healthcheck/01-plugin-diagnostic.md)
 - [Team: Fullstack Feature](examples/team/01-feature-fullstack.md)
 - [Parallel: Code Review](examples/parallel/01-parallel-review.md)
+- [Setup: Quick Setup](examples/setup/01-quick-setup.md)
+- [Workflow: Feature Development](examples/workflow/01-feature-workflow.md)
+- [Workflow: Resume from Implement](examples/workflow/02-workflow-from-implement.md)
 
 ## Architecture
 
