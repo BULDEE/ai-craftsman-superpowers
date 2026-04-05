@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] — 2026-04-05
+
+### Added
+- **Mjolnir Companion** — Norse forge hammer that reacts to quality events with short stoic English sentences. Injected via hook outputs on violations, corrections, verify, and push. Configurable on/off via `userConfig.mjolnir` (default: on).
+- **`/craftsman:mjolnir`** — Forge status command showing session violations, corrections, and a contextual replique.
+- **`hooks/lib/mjolnir.sh`** — Shared replique library with random selection and config check.
+
 ## [3.2.4] — 2026-04-05
 
 ### Fixed
