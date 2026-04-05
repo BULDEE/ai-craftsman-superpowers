@@ -271,15 +271,38 @@ After successful verification, update session state to allow git push:
 Use the **Bash** tool to update session state:
 ```
 python3 -c "
-import json, os, datetime
-sf = os.path.join(os.environ.get('CLAUDE_PLUGIN_DATA', os.path.expanduser('~/.claude/plugins/data/craftsman')), 'session-state.json')
+import json, os, datetime, tempfile
+
+# Resolve state file path via the bridge written by session-start.sh hook.
+# The bridge file is the single source of truth for the path, ensuring skills
+# (which run in the Bash tool without CLAUDE_PLUGIN_DATA) write to the same
+# file that hooks read.
+bridge = os.path.expanduser('~/.claude/craftsman-session-state-path')
+if os.path.isfile(bridge):
+    with open(bridge) as b:
+        sf = b.read().strip()
+else:
+    # Bridge absent (session-start hook never ran): fall back to CLAUDE_PLUGIN_DATA
+    # if set (unlikely in Bash tool context), otherwise use the legacy default.
+    sf = os.path.join(
+        os.environ.get('CLAUDE_PLUGIN_DATA', os.path.expanduser('~/.claude/plugins/data/craftsman')),
+        'session-state.json'
+    )
+
+os.makedirs(os.path.dirname(sf), exist_ok=True)
 try:
-    with open(sf) as f: state = json.load(f)
-except: state = {}
+    with open(sf) as f:
+        state = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    state = {}
 state['verified'] = True
 state['verified_at'] = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-with open(sf, 'w') as f: json.dump(state, f)
-print('Session state updated: verified=true')
+# Atomic write to avoid partial reads by concurrent hooks
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(sf), suffix='.tmp')
+with os.fdopen(fd, 'w') as t:
+    json.dump(state, t)
+os.rename(tmp, sf)
+print('Session state updated: verified=true at ' + sf)
 "
 ```
 If the command fails, say "Session state update skipped".

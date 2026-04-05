@@ -167,6 +167,33 @@ hc_check_superpowers() {
     fi
 }
 
+hc_check_session_bridge() {
+    local bridge="${HOME}/.claude/craftsman-session-state-path"
+
+    if [[ ! -f "$bridge" ]]; then
+        _hc_record "session-bridge" "warn" "missing — restart session to create"
+        return
+    fi
+
+    local target
+    target=$(< "$bridge")
+
+    if [[ -z "$target" ]]; then
+        _hc_record "session-bridge" "error" "empty — restart session to fix"
+        return
+    fi
+
+    local target_dir
+    target_dir=$(dirname "$target")
+
+    if [[ ! -d "$target_dir" ]]; then
+        _hc_record "session-bridge" "warn" "target dir missing: ${target_dir}"
+        return
+    fi
+
+    _hc_record "session-bridge" "ok" "$target"
+}
+
 # --- Aggregate ---
 
 hc_run_all() {
@@ -185,6 +212,7 @@ hc_run_all() {
     hc_check_ollama
     hc_check_knowledge
     hc_check_superpowers
+    hc_check_session_bridge
 }
 
 hc_summary() {

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.3] — 2026-04-05
+
+### Fixed
+- **Session state bridge desync** — `/craftsman:verify` wrote `verified=true` to a different path than `pre-push-verify.sh` read, because `CLAUDE_PLUGIN_DATA` is unavailable in Bash tool context. Added bridge file pattern: `session-start.sh` writes the canonical path to `~/.claude/craftsman-session-state-path`, both `verify.md` and `pre-push-verify.sh` resolve via the bridge.
+
+### Added
+- **Healthcheck: session-bridge** — `hc_check_session_bridge()` verifies the bridge file exists, is non-empty, and points to a valid directory. Catches post-reinstall issues.
+
 ## [3.2.2] — 2026-04-04
 
 ### Fixed

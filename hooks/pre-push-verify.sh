@@ -14,7 +14,16 @@ trap 'echo "WARNING: pre-push-verify.sh failed at line $LINENO" >&2; exit 0' ERR
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/config.sh"
 
-SESSION_STATE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
+# Resolve the session-state path via the bridge file written by session-start.sh.
+# This ensures the hook reads the same file that skills write, even though skills
+# run via the Bash tool and never receive CLAUDE_PLUGIN_DATA from the framework.
+# Falls back to CLAUDE_PLUGIN_DATA (hook context) when the bridge file is absent.
+_BRIDGE_FILE="${HOME}/.claude/craftsman-session-state-path"
+if [[ -f "$_BRIDGE_FILE" ]]; then
+    SESSION_STATE=$(< "$_BRIDGE_FILE")
+else
+    SESSION_STATE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
+fi
 
 # Read tool input from stdin
 INPUT=$(cat)
@@ -26,10 +35,18 @@ if [[ -z "$COMMAND" ]] || ! echo "$COMMAND" | grep -qE "git\s+push"; then
 fi
 
 # Check if /craftsman:verify was run in this session
+LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib"
+_check_verified() {
+    local file="$1"
+    [[ -f "$file" ]] || return 1
+    local result
+    result=$(python3 "$LIB_DIR/session_state.py" check-flag "$file" verified 2>/dev/null) || return 1
+    [[ "$result" == "true" ]]
+}
+
 VERIFIED=false
-if [[ -f "$SESSION_STATE" ]]; then
-    LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib"
-    VERIFIED=$(python3 "$LIB_DIR/session_state.py" check-flag "$SESSION_STATE" verified 2>/dev/null) || VERIFIED=false
+if _check_verified "$SESSION_STATE"; then
+    VERIFIED=true
 fi
 
 if [[ "$VERIFIED" == "true" ]]; then
