@@ -64,6 +64,43 @@ else
     log_fail "hc_json should produce valid JSON: $json"
 fi
 
+# Test: hc_check_session_bridge warns when bridge file is missing
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+_ORIG_HOME="$HOME"
+export HOME="/tmp/craftsman-test-bridge-$$"
+mkdir -p "$HOME/.claude"
+hc_check_session_bridge
+if [[ "${_HC_STATUSES[0]}" == "warn" ]]; then
+    log_pass "hc_check_session_bridge warns when bridge missing"
+else
+    log_fail "hc_check_session_bridge should warn when missing: ${_HC_STATUSES[0]}"
+fi
+
+# Test: hc_check_session_bridge errors when bridge file is empty
+printf '' > "$HOME/.claude/craftsman-session-state-path"
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+hc_check_session_bridge
+if [[ "${_HC_STATUSES[0]}" == "error" ]]; then
+    log_pass "hc_check_session_bridge errors when bridge empty"
+else
+    log_fail "hc_check_session_bridge should error when empty: ${_HC_STATUSES[0]}"
+fi
+
+# Test: hc_check_session_bridge ok when bridge points to valid dir
+mkdir -p "$HOME/.claude/plugins/data/craftsman"
+printf '%s' "$HOME/.claude/plugins/data/craftsman/session-state.json" > "$HOME/.claude/craftsman-session-state-path"
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+hc_check_session_bridge
+if [[ "${_HC_STATUSES[0]}" == "ok" ]]; then
+    log_pass "hc_check_session_bridge ok when bridge valid"
+else
+    log_fail "hc_check_session_bridge should be ok when valid: ${_HC_STATUSES[0]}"
+fi
+
+# Cleanup bridge test
+rm -rf "$HOME"
+export HOME="$_ORIG_HOME"
+
 echo ""
 echo "Results: ${TESTS_PASSED} passed, ${TESTS_FAILED} failed"
 [[ $TESTS_FAILED -eq 0 ]] && exit 0 || exit 1

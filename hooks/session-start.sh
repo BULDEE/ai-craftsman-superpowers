@@ -43,6 +43,14 @@ if $HAS_PYTHON3; then
     metrics_init 2>/dev/null || echo "WARNING: Metrics DB init failed" >&2
 fi
 
+# Write the canonical session-state path to a stable bridge file so that
+# skills running via the Bash tool (where CLAUDE_PLUGIN_DATA is unavailable)
+# can find the same state file that hooks use.
+# The bridge file is intentionally placed outside the plugin data directory
+# so it is independent of the plugin slug and survives renames.
+SESSION_STATE_PATH="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
+printf '%s' "$SESSION_STATE_PATH" > "${HOME}/.claude/craftsman-session-state-path" 2>/dev/null || true
+
 # Detect project type from filesystem
 detect_project_type() {
     local has_php=false has_ts=false
