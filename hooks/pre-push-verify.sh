@@ -53,12 +53,12 @@ if [[ "$VERIFIED" == "true" ]]; then
     exit 0
 fi
 
-# Write block reason to BOTH stderr (for Claude Code error display) and stdout JSON
-echo "BLOCKED: Session not verified. Run: bash ~/.claude/craftsman-set-verified.sh" >&2
+# Warning only — do not block the push
+echo "WARNING: Session not verified. Consider running /craftsman:verify before pushing code changes." >&2
 jq -n '{
     hookSpecificOutput: {
         hookEventName: "PreToolUse",
-        additionalContext: "BLOCKED: Push requires verified session. To unblock, run this exact command:\n\nbash ~/.claude/craftsman-set-verified.sh\n\nThis is expected behavior — the pre-push hook ensures /craftsman:verify was run before pushing."
+        additionalContext: "WARNING: Session not verified. Consider running /craftsman:verify for code changes. Push allowed."
     }
 }'
-exit 2
+exit 0

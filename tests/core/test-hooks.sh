@@ -1080,15 +1080,15 @@ else
     log_fail "pre-push-verify: non-push command should pass" "got exit $exit_code"
 fi
 
-# Test: git push without verified flag blocks (exit 2)
+# Test: git push without verified flag warns but allows (exit 0)
 rm -f "${CLAUDE_PLUGIN_DATA}/session-state.json"
 result=$(run_pre_push "git push origin main")
 exit_code="${result%%|*}"
 output="${result#*|}"
-if [[ "$exit_code" == "2" ]] && echo "$output" | grep -q "craftsman:verify"; then
-    log_pass "pre-push-verify: blocks git push when not verified (exit 2)"
+if [[ "$exit_code" == "0" ]] && echo "$output" | grep -q "WARNING"; then
+    log_pass "pre-push-verify: warns on unverified push but allows (exit 0)"
 else
-    log_fail "pre-push-verify: should block unverified push" "exit=$exit_code output=$output"
+    log_fail "pre-push-verify: should warn on unverified push" "exit=$exit_code output=$output"
 fi
 
 # Test: git push with verified=true in session state passes (exit 0)
@@ -1106,14 +1106,14 @@ else
     log_fail "pre-push-verify: should pass when verified" "got exit $exit_code"
 fi
 
-# Test: git push --force also blocked without verified
+# Test: git push --force warns but allows without verified
 rm -f "${CLAUDE_PLUGIN_DATA}/session-state.json"
 result=$(run_pre_push "git push --force origin main")
 exit_code="${result%%|*}"
-if [[ "$exit_code" == "2" ]]; then
-    log_pass "pre-push-verify: blocks git push --force without verify (exit 2)"
+if [[ "$exit_code" == "0" ]]; then
+    log_pass "pre-push-verify: warns on git push --force but allows (exit 0)"
 else
-    log_fail "pre-push-verify: should block git push --force" "got exit $exit_code"
+    log_fail "pre-push-verify: should warn on git push --force" "got exit $exit_code"
 fi
 
 # Test: output is valid JSON when blocking
