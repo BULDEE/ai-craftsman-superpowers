@@ -1,9 +1,9 @@
 {
   "name": "ai-craftsman-superpowers",
-  "version": "3.3.2",
+  "version": "3.3.3",
   "owner": {
     "name": "Alexandre Mallet",
-    "email": "alexandre.mallet@buldee.com"
+    "email": "contact@buldee.com"
   },
   "metadata": {
     "description": "Senior craftsman methodology for Claude Code. DDD, Clean Architecture, TDD, Rule Engine, Multi-CI."
@@ -11,11 +11,11 @@
   "plugins": [
     {
       "name": "craftsman",
-      "version": "3.3.2",
+      "version": "3.3.3",
       "description": "Core craftsman methodology - DDD design, systematic debugging, structured planning, architecture review, and safe git workflows.",
       "author": {
         "name": "Alexandre Mallet",
-        "email": "alexandre.mallet@buldee.com"
+        "email": "contact@buldee.com"
       },
       "source": "./",
       "category": "development",

@@ -1,5 +1,4 @@
 ---
-name: metrics
 description: "Quality metrics dashboard. Use when reviewing violation trends, session history, or correction patterns from the local SQLite database."
 effort: quick
 ---

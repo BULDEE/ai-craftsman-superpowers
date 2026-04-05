@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.3] — 2026-04-05
+
+### Fixed
+- **Command namespace regression** — Removed explicit `name:` fields from 20 command frontmatter files. Claude Code uses the `name:` value as-is in autocomplete, bypassing automatic `craftsman:` prefix. Without `name:`, Claude Code derives from filename and correctly shows `/craftsman:setup` instead of `/setup`. Aligns with official plugin conventions (vercel, metrikia, stripe all omit `name:`).
+
 ## [3.3.2] — 2026-04-05
 
 ### Fixed

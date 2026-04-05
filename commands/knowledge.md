@@ -1,1 +1,1 @@
-../packs/ai-ml/commands/knowledge.md
+/Users/woprrr/Dev/ai-craftsman-superpowers/packs/ai-ml/commands/knowledge.md

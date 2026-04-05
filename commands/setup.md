@@ -1,5 +1,4 @@
 ---
-name: setup
 description: "Interactive setup and onboarding. Use on first run, when changing stack/packs, or when healthcheck reports config issues."
 effort: medium
 ---
