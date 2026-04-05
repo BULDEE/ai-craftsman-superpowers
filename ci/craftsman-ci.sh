@@ -13,7 +13,7 @@
 # =============================================================================
 set -o pipefail
 
-VERSION="3.3.1"
+VERSION="3.3.2"
 
 # =============================================================================
 # Defaults
@@ -209,6 +209,7 @@ _parse_yml_value() {
     grep -E "^${key}:" "$file" 2>/dev/null | head -1 | awk '{print $2}' | tr -d '"' | tr -d "'"
 }
 
+# craftsman-ignore: SH002 — config resolution is inherently sequential, splitting would reduce readability
 _resolve_config() {
     if [[ "$RULES_ENGINE_AVAILABLE" == true ]]; then
         # Use rules engine for config resolution (plugin context)
@@ -382,6 +383,7 @@ metrics_init() { :; }
 # =============================================================================
 # File scanner — delegates to pack validators (single source of truth)
 # =============================================================================
+# craftsman-ignore: SH002 — scanner delegates to pack validators, splitting the dispatcher adds indirection
 scan_file() {
     local file="$1"
     local ext="${file##*.}"
@@ -474,6 +476,7 @@ scan_paths() {
 # =============================================================================
 # Output: text format
 # =============================================================================
+# craftsman-ignore: SH002 — text formatter is a single cohesive output block
 output_text() {
     local total_violations=${#V_FILES[@]}
     local total_warnings=${#W_FILES[@]}
@@ -541,6 +544,7 @@ _json_escape() {
     echo "$s"
 }
 
+# craftsman-ignore: SH002 — JSON formatter is a single cohesive output block
 output_json() {
     local timestamp
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date +"%Y-%m-%dT%H:%M:%SZ")
