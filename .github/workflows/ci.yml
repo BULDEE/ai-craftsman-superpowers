@@ -80,6 +80,8 @@ jobs:
 
           VALID_HOOK_EVENTS = [
               "SessionStart", "PreToolUse", "PostToolUse",
+              "PostToolUseFailure", "SubagentStop",
+              "PreCompact", "PostCompact",
               "UserPromptSubmit", "FileChanged", "Notification",
               "InstructionsLoaded", "Stop", "SessionEnd"
           ]
