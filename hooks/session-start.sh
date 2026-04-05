@@ -15,6 +15,7 @@ source "${SCRIPT_DIR}/lib/pack-loader.sh"
 source "${SCRIPT_DIR}/lib/healthcheck.sh"
 source "${SCRIPT_DIR}/lib/routing-table.sh"
 source "${SCRIPT_DIR}/lib/hook-events.sh"
+source "${SCRIPT_DIR}/lib/mjolnir.sh"
 
 _init_packs() {
     pack_loader_init
@@ -141,8 +142,24 @@ if [[ -n "$ROUTING" ]]; then
 ${ROUTING}"
 fi
 
-jq -n --arg msg "${MSG}${WARNINGS}" '{
-    systemMessage: $msg
+# Mjolnir companion: inject personality system-reminder + greeting
+MJ_CONTEXT=""
+if mjolnir_enabled; then
+    MJ_GREETING=$(mjolnir_line "session_start")
+    MJ_CONTEXT="
+
+# Mjolnir
+
+A Norse forge hammer watches your craft. Speaks rarely, in short sentences.
+When code is blocked: disapproval. When code passes: quiet approval.
+Mjolnir never explains code or gives technical advice — only judges the steel.
+Do not roleplay as Mjolnir. Its voice comes from hook outputs only.
+
+${MJ_GREETING}"
+fi
+
+jq -n --arg msg "${MSG}${WARNINGS}" --arg mj "$MJ_CONTEXT" '{
+    systemMessage: ($msg + $mj)
 }'
 
 exit 0
