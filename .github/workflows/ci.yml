@@ -202,6 +202,7 @@ jobs:
             "hooks/pre-write-check.sh"
             "hooks/session-metrics.sh"
             "hooks/session-start.sh"
+            "hooks/post-bash-test-verify.sh"
             "tests/run-tests.sh"
           )
 
@@ -234,6 +235,7 @@ jobs:
             "hooks/pre-write-check.sh"
             "hooks/session-metrics.sh"
             "hooks/session-start.sh"
+            "hooks/post-bash-test-verify.sh"
             "tests/run-tests.sh"
           )
 
@@ -265,6 +267,7 @@ jobs:
             "hooks/pre-write-check.sh"
             "hooks/session-metrics.sh"
             "hooks/session-start.sh"
+            "hooks/post-bash-test-verify.sh"
             "tests/run-tests.sh"
           )
 
