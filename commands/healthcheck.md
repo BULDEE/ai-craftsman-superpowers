@@ -1,5 +1,4 @@
 ---
-name: healthcheck
 description: "Run a comprehensive diagnostic of your Craftsman plugin installation and runtime. Use when troubleshooting plugin issues, after setup, or when session-start reports warnings."
 effort: quick
 ---
