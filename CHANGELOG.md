@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.0] — 2026-04-05
+
+### Added
+- **`/craftsman:workflow` — Development Pipeline Orchestrator** — Flexible 7-step methodology: design → spec → plan → implement → test → verify → commit. Supports `--from <step>` to start at any point, `--skip <step>` to bypass steps, and `[Y/skip/stop]` gates between each step. Combines structured guidance with craftsman freedom — the workflow suggests, the craftsman decides. See [ADR-0013](docs/adr/0013-workflow-orchestrator.md).
+- **`/craftsman:setup --quick` — Zero-Question Auto-Setup** — Auto-detects stack (composer.json/package.json), extracts name from `git config`, and generates `.craft-config.yml` with smart defaults (strict mode, all biases ON, standard DDD paths). 30-second onboarding. Existing config protected unless `--force` is used. See [ADR-0014](docs/adr/0014-quick-setup-mode.md).
+- **ADR-0013** — Flexible Workflow Orchestrator design decision
+- **ADR-0014** — Quick Setup Mode design decision
+- **Examples** — Quick setup example, two workflow examples (full pipeline, --from resume)
+
 ## [3.3.5] — 2026-04-05
 
 ### Fixed
