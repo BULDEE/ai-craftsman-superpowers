@@ -21,7 +21,9 @@ _register_core_routes() {
 - Improving existing code, tech debt, code smells → /craftsman:refactor
 - Git commit, branch, merge, workflow → /craftsman:git
 - Check plugin health, diagnose issues → /craftsman:healthcheck
-- Before claiming work is done → /craftsman:verify"
+- Before claiming work is done → /craftsman:verify
+- Full development cycle, new feature, guided methodology → /craftsman:workflow
+- First time setup, quick onboarding → /craftsman:setup --quick"
 }
 
 _register_pack_routes() {
