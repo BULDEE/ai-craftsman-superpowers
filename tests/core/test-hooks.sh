@@ -352,7 +352,7 @@ stack: fullstack
 YAML
 result=$(run_session_start)
 output="${result#*|}"
-if ! echo "$output" | grep -q "setup"; then
+if ! echo "$output" | grep -q "Run /craftsman:setup to configure"; then
     log_pass "SessionStart silent about setup when config exists"
 else
     log_fail "SessionStart should not suggest setup" "$output"
