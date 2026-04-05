@@ -26,7 +26,6 @@ source "${SCRIPT_DIR}/lib/static-analysis.sh"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/rules-engine.sh"
 source "${SCRIPT_DIR}/lib/pack-loader.sh"
-source "${SCRIPT_DIR}/lib/mjolnir.sh"
 rules_init "$PWD" "${HOME}/.claude"
 
 # Python3 availability — skip correction learning features if missing
@@ -96,8 +95,6 @@ _check_corrections() {
             metrics_record_correction "$prev_rule" "$file_pattern" "ignored" "craftsman-ignore added" 2>/dev/null || true
         else
             metrics_record_correction "$prev_rule" "$file_pattern" "fixed" "" 2>/dev/null || true
-            MJ_CORRECTION=$(mjolnir_line "violation_corrected")
-            [[ -n "$MJ_CORRECTION" ]] && echo "$MJ_CORRECTION" >&2
         fi
     done
 }
@@ -317,15 +314,13 @@ if [[ $CRITICAL_COUNT -gt 0 ]]; then
         done <<< "$PATTERN_SUGGESTIONS"
     fi
 
-    MJ_LINE=$(mjolnir_line "violation_blocked")
     jq -n --arg violations "$(echo -e "$CRITICAL_VIOLATIONS")" \
            --arg count "$CRITICAL_COUNT" \
            --arg patterns "$(echo -e "$pattern_msg")" \
-           --arg mj "$MJ_LINE" \
     '{
         hookSpecificOutput: {
             hookEventName: "PostToolUse",
-            additionalContext: ("BLOCKED: " + $count + " critical violation(s):\n" + $violations + "\nFix these before proceeding. Use // craftsman-ignore: <rule> to suppress if justified." + (if $patterns != "" then "\n" + $patterns else "" end) + (if $mj != "" then "\n" + $mj else "" end))
+            additionalContext: ("BLOCKED: " + $count + " critical violation(s):\n" + $violations + "\nFix these before proceeding. Use // craftsman-ignore: <rule> to suppress if justified." + (if $patterns != "" then "\n" + $patterns else "" end))
         }
     }'
     exit 2

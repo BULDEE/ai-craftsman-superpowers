@@ -489,24 +489,6 @@ test_session_metrics() {
     fi
 }
 
-# Test: Mjolnir companion library (unit tests)
-test_mjolnir() {
-    echo ""
-    log_info "Testing Mjolnir companion library (unit)"
-
-    local mjolnir_test="$SCRIPT_DIR/core/test-mjolnir.sh"
-
-    if [[ -f "$mjolnir_test" ]]; then
-        if bash "$mjolnir_test" > /dev/null 2>&1; then
-            log_pass "Mjolnir library tests pass"
-        else
-            log_fail "Mjolnir library tests failed — run tests/core/test-mjolnir.sh for details"
-        fi
-    else
-        log_skip "Mjolnir library tests (tests/core/test-mjolnir.sh not found)"
-    fi
-}
-
 # Test: Dog-fooding (plugin validates its own code)
 test_dogfood() {
     echo ""
@@ -606,7 +588,6 @@ main() {
         test_bias_detector
         test_correction_learning
         test_session_metrics
-        test_mjolnir
         test_pack_suites
         test_craftsman_ci
         test_dogfood

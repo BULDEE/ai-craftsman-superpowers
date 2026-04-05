@@ -5,12 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.3.0] — 2026-04-05
+## [3.3.1] — 2026-04-05
 
-### Added
-- **Mjolnir Companion** — Norse forge hammer that reacts to quality events with short stoic English sentences. Injected via hook outputs on violations, corrections, verify, and push. Configurable on/off via `userConfig.mjolnir` (default: on).
-- **`/craftsman:mjolnir`** — Forge status command showing session violations, corrections, and a contextual replique.
-- **`hooks/lib/mjolnir.sh`** — Shared replique library with random selection and config check.
+### Removed
+- **Mjolnir companion** — The Norse forge companion (persona injection, quality event reactions, `/craftsman:mjolnir` status command, and configuration toggle) has been removed. Claude Code does not expose a native companion API for plugins, making the feature purely text-based with no visual sidebar presence. The atmospheric value did not justify the added complexity.
+
+### Improved
+- **`/craftsman:plan` — Git-First Assessment (Phase 0)** — The planning skill now starts with a mandatory git-history evaluation. Before designing file-by-file task breakdowns, it checks whether the scope maps to identifiable commits that can be reverted or cherry-picked. Prevents over-engineering when a simple `git revert` achieves the same result more safely.
 
 ## [3.2.4] — 2026-04-05
 
