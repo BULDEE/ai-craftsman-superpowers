@@ -269,6 +269,11 @@ fi
 echo ""
 echo "=== SessionStart Hook Tests ==="
 
+# Backup bridge file — session-start.sh overwrites it with test paths
+_BRIDGE="${HOME}/.claude/craftsman-session-state-path"
+_BRIDGE_BAK="${_BRIDGE}.test-backup"
+[[ -f "$_BRIDGE" ]] && cp "$_BRIDGE" "$_BRIDGE_BAK"
+
 run_session_start() {
     local output
     output=$(echo '{}' | bash "$ROOT_DIR/hooks/session-start.sh" 2>/dev/null)
@@ -362,6 +367,9 @@ if [[ "$exit_code" == "0" ]]; then
 else
     log_fail "SessionStart should always exit 0" "got exit $exit_code"
 fi
+
+# Restore bridge file after session-start tests
+[[ -f "$_BRIDGE_BAK" ]] && mv "$_BRIDGE_BAK" "$_BRIDGE"
 
 cd "$ORIGINAL_PWD"
 rm -rf "$SESSION_TEST_DIR"
@@ -1049,6 +1057,12 @@ fi
 echo ""
 echo "=== Pre-Push Verify Hook Tests ==="
 
+# Redirect bridge file to test session-state so the hook reads test data
+_BRIDGE="${HOME}/.claude/craftsman-session-state-path"
+_BRIDGE_BAK_PUSH="${_BRIDGE}.push-test-backup"
+[[ -f "$_BRIDGE" ]] && cp "$_BRIDGE" "$_BRIDGE_BAK_PUSH"
+printf '%s' "${CLAUDE_PLUGIN_DATA}/session-state.json" > "$_BRIDGE"
+
 run_pre_push() {
     local command="$1"
     local output
@@ -1111,6 +1125,9 @@ if echo "$output" | jq . >/dev/null 2>&1; then
 else
     log_fail "pre-push-verify: output should be valid JSON" "$output"
 fi
+
+# Restore bridge file after pre-push tests
+[[ -f "$_BRIDGE_BAK_PUSH" ]] && mv "$_BRIDGE_BAK_PUSH" "$_BRIDGE"
 
 # =============================================================================
 # Bias Detector Workflow Enforcement Tests
