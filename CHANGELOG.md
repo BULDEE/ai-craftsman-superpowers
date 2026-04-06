@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.4] — 2026-04-06
+
+### Fixed
+- **Hook blocking messages now visible to users** — When `post-write-check.sh` or `pre-write-check.sh` blocks a write, a human-readable violation summary is now emitted on stderr (displayed in Claude Code UI). Previously only JSON was written to stdout, resulting in an unhelpful "No stderr output" message.
+
 ## [3.4.3] — 2026-04-05
 
 ### Changed
