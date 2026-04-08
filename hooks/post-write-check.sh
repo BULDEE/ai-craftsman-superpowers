@@ -316,9 +316,9 @@ if [[ $CRITICAL_COUNT -gt 0 ]]; then
 
     # Human-readable message on stderr (shown in Claude Code UI)
     echo "🚫 BLOCKED by AI Craftsman — ${CRITICAL_COUNT} violation(s):" >&2
-    echo -e "$CRITICAL_VIOLATIONS" | while IFS= read -r vline; do
+    while IFS= read -r vline; do
         [[ -n "$vline" ]] && echo "  ✗ $vline" >&2
-    done
+    done <<< "$(echo -e "$CRITICAL_VIOLATIONS")"
     echo "Fix these or add: // craftsman-ignore: <RULE_ID>" >&2
     if [[ -n "$pattern_msg" ]]; then
         echo -e "$pattern_msg" >&2
