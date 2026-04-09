@@ -228,9 +228,10 @@ _sync_symlink_type() {
     [[ ! -d "$pack_dir/$type_dir" ]] && return
     for src_file in "$pack_dir/$type_dir/"*.md; do
         [[ ! -f "$src_file" ]] && continue
-        local basename
+        local basename rel_path
         basename=$(basename "$src_file")
-        ln -sf "$src_file" "$target_dir/$basename"
+        rel_path=$(realpath --relative-to="$target_dir" "$src_file")
+        ln -sf "$rel_path" "$target_dir/$basename"
     done
 }
 
