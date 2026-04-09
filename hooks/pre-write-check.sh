@@ -107,9 +107,9 @@ if [[ $VIOLATION_COUNT -gt 0 ]]; then
     if [[ "$local_should_block" == true ]]; then
         # Human-readable message on stderr (shown in Claude Code UI)
         echo "🚫 BLOCKED by AI Craftsman — ${VIOLATION_COUNT} violation(s) detected before write:" >&2
-        echo -e "$VIOLATIONS" | while IFS= read -r vline; do
+        while IFS= read -r vline; do
             [[ -n "$vline" ]] && echo "  ✗ $vline" >&2
-        done
+        done <<< "$(echo -e "$VIOLATIONS")"
         echo "Fix these before writing. Use // craftsman-ignore: <RULE_ID> to suppress." >&2
 
         # Structured JSON on stdout (consumed by Claude AI)

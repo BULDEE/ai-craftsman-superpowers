@@ -144,7 +144,7 @@ bash ~/.claude/craftsman-set-verified.sh
 
 If the wrapper is missing, fall back to:
 ```
-bash -c 'BRIDGE="${HOME}/.claude/craftsman-session-state-path"; if [ -f "$BRIDGE" ]; then SF=$(cat "$BRIDGE"); else SF="${HOME}/.claude/plugins/data/craftsman/session-state.json"; fi; mkdir -p "$(dirname "$SF")"; python3 -c "
+bash -c 'BRIDGE="${HOME}/.claude/craftsman-session-state-path"; if [ ! -f "$BRIDGE" ]; then echo "ERROR: bridge file $BRIDGE not found — session-start may not have run" >&2; exit 1; fi; SF=$(cat "$BRIDGE"); mkdir -p "$(dirname "$SF")"; python3 -c "
 import json,os,datetime,tempfile; sf=\"$SF\"
 try:
  with open(sf) as f: s=json.load(f)
