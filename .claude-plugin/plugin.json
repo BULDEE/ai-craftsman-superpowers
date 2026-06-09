@@ -1,7 +1,7 @@
 {
   "name": "craftsman",
   "description": "Senior craftsman methodology for AI-assisted development. DDD, Clean Architecture, TDD, and systematic workflows that transform Claude into a disciplined software engineer.",
-  "version": "3.4.4",
+  "version": "3.4.5",
   "author": {
     "name": "Alexandre Mallet",
     "email": "contact@woprrr.dev",
@@ -77,7 +77,7 @@
       "type": "stdio",
       "command": "node",
       "args": [
-        "packs/ai-ml/mcp/knowledge-rag/start.mjs"
+        "${CLAUDE_PLUGIN_ROOT}/packs/ai-ml/mcp/knowledge-rag/start.mjs"
       ]
     }
   }
