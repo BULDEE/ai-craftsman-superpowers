@@ -6,7 +6,7 @@ compatibility:
   stack: ["react", "fullstack"]
 
 rules:
-  builtin: ["TS001", "TS002", "TS003", "WARN-TS001", "LAYER001"]
+  builtin: ["TS001", "TS002", "TS003", "WARN-TS001", "LAYER001", "NEST001", "LOC001", "GOD001", "PARAM001"]
   static_analysis: ["ESLINT001", "ESLINT002", "ESLINT003", "ESLINT004"]
 
 hooks:

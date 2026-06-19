@@ -6,7 +6,7 @@ compatibility:
   stack: ["python", "ai-ml", "fullstack"]
 
 rules:
-  builtin: ["PY001", "PY002", "PY003", "PY004", "PY005", "WARN-PY001"]
+  builtin: ["PY001", "PY002", "PY003", "PY004", "PY005", "WARN-PY001", "NEST001", "GOD001"]
 
 hooks:
   validators: ["hooks/python-validator.sh"]

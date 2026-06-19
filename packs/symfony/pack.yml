@@ -6,7 +6,7 @@ compatibility:
   stack: ["symfony", "fullstack"]
 
 rules:
-  builtin: ["PHP001", "PHP002", "PHP003", "PHP004", "PHP005", "WARN-PHP001", "LAYER001", "LAYER002", "LAYER003"]
+  builtin: ["PHP001", "PHP002", "PHP003", "PHP004", "PHP005", "WARN-PHP001", "LAYER001", "LAYER002", "LAYER003", "NEST001", "LOC001", "GOD001", "PARAM001", "CTRL001"]
   static_analysis: ["PHPSTAN001", "PHPSTAN002", "PHPSTAN003", "PHPSTAN004", "PHPSTAN005", "DEPTRAC001"]
 
 hooks:

@@ -25,6 +25,6 @@ case "$EXT" in
 esac
 
 jq -n --arg file "$FILE_PATH" '{
-    systemMessage: ("DDD VERIFICATION REQUEST: Check the file " + $file + " for: (1) Layer violations — Domain must not import Infrastructure or Presentation, (2) Aggregate boundary violations — no cross-aggregate state mutation, (3) Missing Value Objects — primitive types where a VO should exist, (4) Naming — flag generic names like Manager/Helper/Utils in Domain layer. Report only semantic issues that regex cannot catch. Be concise.")
+    systemMessage: ("DDD VERIFICATION REQUEST: Check the file " + $file + " for: (1) Layer violations — Domain must not import Infrastructure or Presentation, (2) Aggregate boundary violations — no cross-aggregate state mutation, (3) Missing Value Objects — primitive types where a VO should exist, (4) Naming — flag generic names like Manager/Helper/Utils in Domain layer, (5) God class — a class mixing unrelated responsibilities (persistence + formatting + business rules, or several independent feature toggles plus a state machine); judge by responsibility cohesion NOT raw line count, a rich aggregate of many small cohesive behaviours is fine, (6) Controller logic leak — orchestration or business rules inline in a Controller instead of an Application UseCase. The structural hooks (NEST001/LOC001/GOD001/PARAM001/CTRL001) already flag size and nesting heuristically; your job is the semantic call regex cannot make. Report only real issues and propose a concrete DDD refactor (extract value object/service, guard clauses, split responsibility). Be concise.")
 }'
 exit 0

@@ -85,6 +85,55 @@ _check_warn_py001() {
     fi
 }
 
+_check_god001() {
+    local file="$1"
+    command -v python3 >/dev/null 2>&1 || return 0
+    local message
+    while IFS= read -r message; do
+        [[ -z "$message" ]] && continue
+        add_violation "GOD001" "$message"
+    done < <(python3 -c "
+import ast, sys
+try:
+    tree = ast.parse(open(sys.argv[1]).read())
+except SyntaxError:
+    sys.exit(0)
+for node in ast.walk(tree):
+    if isinstance(node, ast.ClassDef):
+        span = (node.end_lineno or node.lineno) - node.lineno
+        if span > 300:
+            print(f'line {node.lineno}: class {node.name} spans {span} lines (max 300): too many responsibilities, extract collaborators')
+" "$file" 2>/dev/null)
+}
+
+_check_nest001() {
+    local file="$1"
+    command -v python3 >/dev/null 2>&1 || return 0
+    local message
+    while IFS= read -r message; do
+        [[ -z "$message" ]] && continue
+        add_violation "NEST001" "$message"
+    done < <(python3 -c "
+import ast, sys
+CTRL = (ast.If, ast.For, ast.While, ast.With, ast.AsyncFor, ast.AsyncWith, ast.Try)
+def depth(node, level=0):
+    here = level + 1 if isinstance(node, CTRL) else level
+    best = here
+    for child in ast.iter_child_nodes(node):
+        best = max(best, depth(child, here))
+    return best
+try:
+    tree = ast.parse(open(sys.argv[1]).read())
+except SyntaxError:
+    sys.exit(0)
+for node in ast.walk(tree):
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        deepest = max((depth(child, 0) for child in ast.iter_child_nodes(node)), default=0)
+        if deepest >= 3:
+            print(f'line {node.lineno}: function {node.name}() nests control flow {deepest} levels deep: extract a method or use guard clauses')
+" "$file" 2>/dev/null)
+}
+
 pack_validate_python() {
     local file="$1"
     _check_py001 "$file"
@@ -93,4 +142,6 @@ pack_validate_python() {
     _check_py004 "$file"
     _check_py005 "$file"
     _check_warn_py001 "$file"
+    _check_god001 "$file"
+    _check_nest001 "$file"
 }
