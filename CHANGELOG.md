@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.5.0] - 2026-06-19
 
 ### Added
 - **Structural quality rules (NEST001, LOC001, GOD001, PARAM001, CTRL001).** The real-time gate previously enforced only `final`/`strict_types`/`no-any`/`no-setters`/layer imports, so the documented craftsmanship rules ("one level of indentation", "max 3 params", "no god class") were aspirational but unenforced, and deep `if/if/if` pyramids plus god classes drifted in. A new brace-aware analyzer (`hooks/lib/structural_metrics.py`, no fragile regex) feeds `hooks/lib/structural.sh`, wired into `post-write-check.sh` and the `php`/`typescript`/`python` pack validators:
