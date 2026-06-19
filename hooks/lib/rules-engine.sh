@@ -271,30 +271,28 @@ _rules_validate_custom() {
 # ---------------------------------------------------------------------------
 # Compute default severity for a rule based on strictness
 # ---------------------------------------------------------------------------
+# Rules that always warn regardless of strictness.
+# WARN*/PHP005 are advisory by nature. The structural rules
+# (NEST001/LOC001/GOD001/PARAM001/CTRL001) ship advisory-first so teams can
+# measure real noise on an existing codebase before escalating. LOC001 stays
+# advisory permanently; drop NEST001/GOD001/PARAM001/CTRL001 from this list to
+# let strict-mode block them once the codebase is clean.
+_rules_is_advisory() {
+    case "$1" in
+        WARN*|PHP005|NEST001|LOC001|GOD001|PARAM001|CTRL001) return 0 ;;
+    esac
+    return 1
+}
+
 _rules_default_severity() {
     local rule_id="$1"
-
-    # WARN* and PHP005 always warn
-    case "$rule_id" in
-        WARN*|PHP005) echo "warn"; return 0 ;;
-    esac
+    _rules_is_advisory "$rule_id" && { echo "warn"; return 0; }
 
     case "$_RULES_STRICTNESS" in
-        strict)
-            echo "block"
-            ;;
-        moderate)
-            case "$rule_id" in
-                LAYER*) echo "block" ;;
-                *)      echo "warn" ;;
-            esac
-            ;;
-        relaxed)
-            echo "warn"
-            ;;
-        *)
-            echo "block"
-            ;;
+        strict)   echo "block" ;;
+        relaxed)  echo "warn" ;;
+        moderate) case "$rule_id" in LAYER*) echo "block" ;; *) echo "warn" ;; esac ;;
+        *)        echo "block" ;;
     esac
 }
 

@@ -26,6 +26,7 @@ source "${SCRIPT_DIR}/lib/static-analysis.sh"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/rules-engine.sh"
 source "${SCRIPT_DIR}/lib/pack-loader.sh"
+source "${SCRIPT_DIR}/lib/structural.sh"
 rules_init "$PWD" "${HOME}/.claude"
 
 # Python3 availability — skip correction learning features if missing
