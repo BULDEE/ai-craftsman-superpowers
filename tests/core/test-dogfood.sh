@@ -95,17 +95,33 @@ echo "=== Dogfood: Python files (hooks/lib/*.py) ==="
 python_total=0
 python_pass=0
 
+# Advisory (warn-first) rules do not gate self-validation, mirroring the SH001
+# exemption for sourced libs: they ship as warnings by design (see
+# rules-engine.sh _rules_is_advisory). A file-level craftsman-ignore is honored
+# too, matching the production gate.
+ADVISORY_RULES="NEST001 LOC001 GOD001 PARAM001 CTRL001"
+
 for file in "$ROOT_DIR"/hooks/lib/*.py; do
     [[ ! -f "$file" ]] && continue
     basename="$(basename "$file")"
     reset_violations
     pack_validate_python "$file"
+
+    blocking_count=0
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        rule="${line%%:*}"
+        case " $ADVISORY_RULES " in *" $rule "*) continue ;; esac
+        grep -qE "craftsman-ignore:[^#]*\b${rule}\b" "$file" 2>/dev/null && continue
+        ((blocking_count++)) || true
+    done < <(echo -e "$VIOLATIONS")
+
     python_total=$((python_total + 1))
-    if [[ "$VIOLATION_COUNT" -eq 0 ]]; then
+    if [[ "$blocking_count" -eq 0 ]]; then
         log_pass "python self-validate: $basename"
         python_pass=$((python_pass + 1))
     else
-        log_fail "python self-validate: $basename" "${VIOLATION_COUNT} violation(s)"
+        log_fail "python self-validate: $basename" "${blocking_count} violation(s) (excl. advisory + craftsman-ignore)"
     fi
 done
 
