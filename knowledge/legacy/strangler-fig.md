@@ -69,6 +69,20 @@ For each slice you strangle:
 
 Step 7 is the one teams skip. A strangler that never removes the host is just added complexity.
 
+## A Worked Cutover
+
+Goal: replace a legacy monolithic `OrderService.calculateShipping()` (tangled, no tests) with a new `ShippingCalculator` module, without a freeze.
+
+1. **Abstraction.** Introduce `ShippingPolicy` and route the monolith's one call site through it. `LegacyShippingPolicy` simply delegates to the old method, so behavior is unchanged and `main` stays green.
+2. **Net.** Characterize the legacy output for a spread of orders (domestic, international, oversized, free-shipping). These become the parity oracle.
+3. **New slice, dormant.** Build `NewShippingPolicy` behind a flag defaulting off, translating legacy order rows through an ACL into a clean `ShippingRequest`.
+4. **Shadow.** Run the new policy in parallel for real traffic, log both results, and diff. Fix mismatches until they are zero for a week.
+5. **Divert.** Flip the flag for 1% of orders, then 10%, then 50%, watching the parity metric and error rate at each step.
+6. **Commit.** Flip to 100%; keep `LegacyShippingPolicy` and the flag for one rollback window.
+7. **Delete.** Remove the legacy method, the flag, and once nothing else reads the legacy shape, the ACL.
+
+At every step the system ships and can roll back. The old code is gone only when the new code has demonstrably carried production load.
+
 ## At the Architecture Level and the Code Level
 
 Strangler fig is usually described for replacing a whole legacy system, but the same shape works inside a class. The **bubble** from [[legacy/legacy-techniques]] is a strangler at the code level: a new well-designed class that progressively takes over a legacy God Class, forwarding what it has not yet absorbed. Same philosophy, smaller radius: grow the new, fade the old, never rewrite in one shot.

@@ -57,6 +57,20 @@ The hotspot map is the Eisenhower matrix applied to code: **Important = Complexi
 
 When two hotspots compete, rank by **return on investment**: expected reduction in future change-cost divided by the effort to refactor. A greedy pass down that ROI-ordered list clears the biggest bottleneck first and keeps the campaign delivering value even if it is cut short. Refactoring is effectively infinite; the goal is not to finish, it is to spend a bounded budget where it pays back most.
 
+## A Worked Hotspot Ranking
+
+Suppose the churn command and a complexity tool give you this for a Symfony backend:
+
+| File | Complexity | Churn (12mo) | Quadrant | Verdict |
+|------|-----------|--------------|----------|---------|
+| `Application/Checkout/CheckoutHandler.php` | 48 | 61 | top-right | **Refactor first** |
+| `Domain/Pricing/PriceCalculator.php` | 39 | 44 | top-right | **Refactor second** |
+| `Infrastructure/Legacy/TaxEngine.php` | 71 | 3 | top-left | Ignore (nobody touches it) |
+| `Infrastructure/Meta/AdsClient.php` | 12 | 52 | bottom-right | Fine (simple, stable enough) |
+| `Domain/Catalog/Sku.php` | 6 | 4 | bottom-left | Leave alone |
+
+The campaign plan writes itself: `CheckoutHandler` and `PriceCalculator` are the only two worth a deliberate effort now. `TaxEngine` is scary (71 complexity) but irrelevant this quarter because it barely changes; spending days on it would be pure vanity metric. You attack `CheckoutHandler` first: characterize it, extract its use case from the controller, break the god method into intention-revealing steps, and ship each in a reviewable PR. When a feature later forces you into `TaxEngine`, that is the moment to clean it, not before.
+
 ## Executing a Campaign
 
 - **Safety net first.** Every hotspot you touch gets a characterization net before you change it ([[legacy/characterization-testing]]). No net, no refactor.
