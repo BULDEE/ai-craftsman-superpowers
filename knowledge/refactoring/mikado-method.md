@@ -2,7 +2,7 @@
 
 > "You can't anticipate what needs to be done first, but you regularly check where you are going so you can adapt to whatever comes up."
 
-The Mikado Method (Ola Ellnestam & Daniel Brolund, popularized for legacy work by Nicolas Carlo) is how you make a large change in a codebase full of **unknown unknowns** without ever leaving it broken. Instead of a big risky branch, you discover the graph of prerequisites one timebox at a time, and you only ever commit code that works.
+The Mikado Method is how you make a large change in a codebase full of **unknown unknowns** without ever leaving it broken. Instead of a big risky branch, you discover the graph of prerequisites one timebox at a time, and you only ever commit code that works.
 
 ## When to Use It
 
@@ -155,7 +155,7 @@ Plain refactoring assumes you can see the target and the path. Mikado is for whe
 
 ## Origins
 
-The method comes from Ola Ellnestam and Daniel Brolund's *The Mikado Method*, named after the pick-up-sticks game where you remove one stick without disturbing the pile. Nicolas Carlo popularized its pairing with the Parking (an idea from Philippe Bourgau) for day-to-day legacy work.
+The method is named after the pick-up-sticks game where you remove one stick without disturbing the pile. Its pairing with the Parking (a place to note discovered prerequisites you are not tackling yet) makes it practical for day-to-day legacy work.
 
 ## Tooling and Overkill
 

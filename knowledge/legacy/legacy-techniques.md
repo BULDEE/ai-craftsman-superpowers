@@ -1,8 +1,8 @@
 # Legacy Code Techniques
 
-> "To me, legacy code is simply code without tests." - Michael Feathers
+> Legacy code is simply code without tests.
 >
-> "A seam is a place where you can alter behavior in your program without editing in that place." - Michael Feathers
+> A seam is a place where you can alter behavior in your program without editing in that place.
 
 Legacy code is not old code; it is code you are **afraid to change** because nothing tells you when you break it. The way out is always the same loop: get a safety net around the part you must touch, make the change, then refactor. This file is the toolbox for the hardest step, getting untestable code under test *without* first breaking it. It pairs with [[legacy/characterization-testing]] (the net) and [[refactoring/mikado-method]] (the map).
 

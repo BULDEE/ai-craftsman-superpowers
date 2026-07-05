@@ -2,7 +2,7 @@
 
 > "Working code is a low bar." - the whole point of tests is to keep code *changeable*, not merely working today.
 
-A test suite is an asset only if it stays fast, trustworthy, and cheap to maintain. More than half of test-automation efforts fail not for lack of tests but because the suite grows too complex and too expensive to maintain (All4Test / Chrysocode, ADTF 2020). Strategy is deciding **what** to test, **at which level**, and **how** to keep it maintainable.
+A test suite is an asset only if it stays fast, trustworthy, and cheap to maintain. More than half of test-automation efforts fail not for lack of tests but because the suite grows too complex and too expensive to maintain. Strategy is deciding **what** to test, **at which level**, and **how** to keep it maintainable.
 
 ## The Pyramid (and the Trophy)
 
@@ -68,7 +68,7 @@ def test_checkout_charges_the_cart_total():
 
 ## Test Doubles
 
-A **test double** stands in for a real collaborator. Know the five kinds and pick the least powerful that does the job (Meszaros):
+A **test double** stands in for a real collaborator. Know the five kinds and pick the least powerful that does the job:
 
 | Double | Purpose | Verifies |
 |--------|---------|----------|
@@ -103,7 +103,7 @@ Rule of thumb: if your test needs three mocks and asserts on call order, the des
 
 ## End-to-End Tests That Survive
 
-E2E tests are the most expensive and the most fragile. Three practices keep them maintainable (ADTF 2020):
+E2E tests are the most expensive and the most fragile. Three practices keep them maintainable:
 
 **1. Describe behavior, not the UI.** A scenario should speak of user intentions, not tabs, buttons, or checkboxes. The UI can then change with only the step implementation updated, at no test-maintenance cost.
 

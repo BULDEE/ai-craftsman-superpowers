@@ -1,6 +1,6 @@
 # Characterization Testing
 
-> "A characterization test documents the actual behavior of a piece of code." - Michael Feathers
+> A characterization test documents the actual behavior of a piece of code, not the behavior it was supposed to have.
 
 When you must change code that has **no tests**, you cannot start from the specification: you do not yet know what the code is supposed to do, only what it *does*. A characterization test pins that current behavior so you can refactor underneath it with confidence. It is the entry point to any legacy rescue: get a net, then change the code.
 
@@ -8,12 +8,12 @@ When you must change code that has **no tests**, you cannot start from the speci
 
 The same idea appears under several labels; they are interchangeable:
 
-| Name | Popularized by |
+| Name | Where you see it |
 |------|----------------|
-| Characterization Test | Michael Feathers, *Working Effectively with Legacy Code* |
+| Characterization Test | the legacy-rescue literature |
 | Golden Master | the oldest name |
-| Snapshot Test | Facebook's Jest |
-| Approval Test | approvaltests.com (the most actively maintained libraries) |
+| Snapshot Test | JavaScript test runners like Jest |
+| Approval Test | the approval-testing libraries |
 
 The mindset differs from TDD: you are **not** asserting the *correct* answer, you are recording the *current* one, even if it is wrong. Bugs get frozen too, on purpose: your job right now is to not change behavior, not to fix it.
 
@@ -100,7 +100,7 @@ def add_player(name, track=lambda _obj: None):
 
 def test_add_player_records_state(verify):
     seen = []
-    add_player("Nicolas", track=lambda obj: seen.append(str(obj)))
+    add_player("Alice", track=lambda obj: seen.append(str(obj)))
     verify("\n".join(seen))
 ```
 

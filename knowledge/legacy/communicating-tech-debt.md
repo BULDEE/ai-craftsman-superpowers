@@ -1,6 +1,6 @@
 # Communicating Technical Debt
 
-> "Focus on the code, not the coder." - Nicolas Carlo
+> Focus on the code, not the coder.
 
 Refactoring is often blocked not by difficulty but by a failure to communicate. Managers and clients do not fund "code quality"; they fund outcomes. This file is the craft of translating technical debt into business language a decision-maker will act on, and of telling a stakeholder the truth about their codebase without blame or alarm.
 
@@ -70,7 +70,7 @@ The single most persuasive artifact for non-technical stakeholders is a picture,
 
 The message compresses to one sentence a manager grasps instantly: **"Refactor the big red bubbles first: these are your top productivity blockers, based on the last 12 months of actual work."** Because it is grounded in real churn, not abstract complexity, it reads as ROI rather than perfectionism.
 
-Tools: `code-forensics` and CodeScene (both built on Adam Tornhill's code-maat) generate these in minutes from git history. This is the same churn-times-complexity data as [[refactoring/refactoring-campaigns]], drawn for an executive audience instead of an engineering one.
+Tools: behavioral-analysis tools like CodeScene, and open equivalents, generate these in minutes from git history. This is the same churn-times-complexity data as [[refactoring/refactoring-campaigns]], drawn for an executive audience instead of an engineering one.
 
 Building one takes minutes, not a project:
 

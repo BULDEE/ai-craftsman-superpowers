@@ -2,9 +2,9 @@
 
 > "Source code dependencies must point only inward, toward higher-level policies." - Robert C. Martin
 >
-> "If you think good architecture is expensive, try bad architecture." - Brian Foote & Joseph Yoder
+> If you think good architecture is expensive, try bad architecture.
 
-Clean Architecture is one actionable synthesis of Hexagonal (Ports & Adapters, Cockburn), DCI (Coplien & Reenskaug), and BCE (Jacobson). They share one objective: **separation of concerns by layering**, with at least one layer for business rules and another for interfaces. The payoff is measured in the cost of change: a good architecture keeps the decisions that are expensive to reverse (database, framework, delivery mechanism) at the edges, where they can be replaced with a minimum of fuss.
+Clean Architecture is one actionable synthesis of the layered-architecture family: Hexagonal (Ports & Adapters), DCI, and BCE. They share one objective: **separation of concerns by layering**, with at least one layer for business rules and another for interfaces. The payoff is measured in the cost of change: a good architecture keeps the decisions that are expensive to reverse (database, framework, delivery mechanism) at the edges, where they can be replaced with a minimum of fuss.
 
 ## The Five Properties of a Clean System
 

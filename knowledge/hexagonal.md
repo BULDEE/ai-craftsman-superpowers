@@ -1,8 +1,8 @@
 # Hexagonal Architecture (Ports & Adapters)
 
-> "Allow an application to equally be driven by users, programs, automated test or batch scripts, and to be developed and tested in isolation from its eventual run-time devices and databases." - Alistair Cockburn
+> An application should be driven equally by users, programs, automated tests, or batch scripts, and be developed and tested in isolation from its eventual run-time devices and databases.
 
-Hexagonal Architecture (Cockburn, also adopted by Freeman & Pryce in *Growing Object-Oriented Software, Guided by Tests*) is the same idea as [[clean-architecture]] seen from the outside in. Instead of concentric circles it draws one **application hexagon** surrounded by **adapters**, joined at **ports**. The hexagon has no favoured side: the UI and the database are both just adapters plugged into ports.
+Hexagonal Architecture is the same idea as [[clean-architecture]] seen from the outside in. Instead of concentric circles it draws one **application hexagon** surrounded by **adapters**, joined at **ports**. The hexagon has no favoured side: the UI and the database are both just adapters plugged into ports.
 
 ## The Core Idea
 
@@ -15,7 +15,7 @@ The hexagon shape carries no meaning beyond "more than four sides": it is a remi
 
 ## The Problem It Solves
 
-Cockburn named the pattern to escape a recurring trap: business logic that leaks into the UI and gets entangled with the database, so the application can only ever be driven by one screen and tested against one live database. The symptoms are familiar: logic duplicated between a web controller and a batch job, a test suite that needs a running database, a rewrite forced by swapping a vendor. Ports & Adapters removes the asymmetry: the application is driven identically whether the driver is a person, another program, an automated test, or a batch script, and it is developed and tested in isolation from its eventual devices and databases.
+The pattern exists to escape a recurring trap: business logic that leaks into the UI and gets entangled with the database, so the application can only ever be driven by one screen and tested against one live database. The symptoms are familiar: logic duplicated between a web controller and a batch job, a test suite that needs a running database, a rewrite forced by swapping a vendor. Ports & Adapters removes the asymmetry: the application is driven identically whether the driver is a person, another program, an automated test, or a batch script, and it is developed and tested in isolation from its eventual devices and databases.
 
 ## Two Kinds of Ports
 
@@ -90,7 +90,7 @@ The controller's only job is **translation**: turn an HTTP request into a comman
 
 ## Configurable Dependency: Wiring the Hexagon
 
-The application never chooses its own adapters. A single **composition root** (Cockburn's "configurator", the `Main` component in Clean Architecture) decides which adapter plugs into which port at startup. This is the only place that names both the port and the concrete adapter.
+The application never chooses its own adapters. A single **composition root** (the `Main` component in Clean Architecture) decides which adapter plugs into which port at startup. This is the only place that names both the port and the concrete adapter.
 
 ```php
 // Composition root - the ONLY place that knows both sides.

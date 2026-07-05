@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# test-knowledge-integrity.sh — Integrity of the core knowledge base (v3.6.0)
+# test-knowledge-integrity.sh - Integrity of the core knowledge base (v3.6.0+)
 # Verifies new files exist, deprecation stubs are in place, no em-dashes leak,
 # and every [[wiki-link]] resolves to a real knowledge file.
 # =============================================================================
@@ -23,6 +23,7 @@ EXPECTED_FILES=(
     "hexagonal.md"
     "tdd.md"
     "testing-strategy.md"
+    "tooling-integration.md"
     "ddd/ddd-domain-design.md"
     "ddd/ddd-cqrs-architecture.md"
     "legacy/legacy-techniques.md"

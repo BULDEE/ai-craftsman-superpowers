@@ -1,6 +1,6 @@
 # Code Smells: The Judgment Layer
 
-> "A smell is a hint that something might be wrong, not a rule that something is." - after Kent Beck & Martin Fowler
+> "A smell is a hint that something might be wrong, not a rule that something is." - Martin Fowler
 
 The [[refactoring-techniques]] catalogue tells you *how* to change code. This file is about *whether* you should: the judgment layer for the smells that are not clear-cut. Each one below is a signal to think, not an automatic defect. Treating smells as absolute rules produces its own mess (needless indirection, dogmatic splits); the craft is knowing when the smell is real.
 

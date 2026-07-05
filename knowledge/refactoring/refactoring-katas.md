@@ -1,6 +1,6 @@
 # Refactoring Katas: Deliberate Practice
 
-> "The emphasis is on how you work, not just what you accomplish." - Nicolas Carlo
+> The emphasis is on how you work, not just what you accomplish.
 
 Refactoring is a motor skill: you get good at it by repetition under constraints, the way musicians and martial artists do. A **kata** is a small, self-contained coding exercise you repeat deliberately to build the reflexes you will need on real legacy code. This file is the curriculum and the practice method.
 
@@ -65,7 +65,7 @@ Doing the kata is not practicing; *deliberate* practice has structure:
 - **Work without references** once you know the path; struggling to recall the technique is what builds the memory.
 - **Reflect.** Take notes on what worked and what stalled. Understanding *why* a move succeeded is the improvement.
 
-For beginners, first watch a worked example (Sandro Mancuso's Trip Service walkthrough is the classic) to see the solution path, then reproduce it from memory.
+For beginners, first watch a worked example (a recorded Trip Service walkthrough is the classic) to see the solution path, then reproduce it from memory.
 
 ## A Practice Progression
 

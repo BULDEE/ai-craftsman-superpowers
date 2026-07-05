@@ -6,7 +6,7 @@ A refactoring **campaign** is a deliberate, multi-file improvement effort, not a
 
 ## Where to Start: Hotspots
 
-Not all technical debt is worth the same. The best signal for *where* to spend refactoring effort combines two dimensions (Adam Tornhill's behavioral analysis, via Nicolas Carlo):
+Not all technical debt is worth the same. The best signal for *where* to spend refactoring effort combines two dimensions drawn from behavioral code analysis:
 
 - **Complexity**: how hard the code is to understand and change.
 - **Churn**: how often it actually changes.
@@ -117,7 +117,7 @@ Each move (Extract Function, Move Statements, Introduce Parameter Object) ships 
 
 ## Beyond Hotspots: X-Ray Techniques
 
-Churn-times-complexity finds the *files* worth refactoring. Behavioral code analysis (Adam Tornhill, *Software Design X-Rays*) goes further, mining git history for signals a single snapshot cannot show:
+Churn-times-complexity finds the *files* worth refactoring. Behavioral code analysis goes further, mining git history for signals a single snapshot cannot show:
 
 | Technique | What it reveals | Action |
 |-----------|-----------------|--------|
@@ -131,7 +131,7 @@ Two rules from the same source sharpen prioritization:
 - **The trend matters more than the threshold.** A file whose complexity is *rising* release over release is a better target than one that is merely large and stable.
 - **Coupled things should be co-located.** If `OrderService` and `InvoicePrinter` always change together but live in different modules, that temporal coupling is a design smell to fix, not a coincidence.
 
-A hard caveat, also from Tornhill: **never use these metrics to evaluate individuals.** Knowledge maps and churn are for finding risk and asking for help, not for ranking people; misusing them destroys the trust the analysis depends on. See [[legacy/taking-over-legacy]] for the who-to-ask side of the same data.
+A hard caveat: **never use these metrics to evaluate individuals.** Knowledge maps and churn are for finding risk and asking for help, not for ranking people; misusing them destroys the trust the analysis depends on. See [[legacy/taking-over-legacy]] for the who-to-ask side of the same data.
 
 ## Executing a Campaign
 

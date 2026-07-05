@@ -2,7 +2,7 @@
 
 > "You must write a failing test before you write any production code." - Robert C. Martin, The Three Laws of TDD
 
-TDD, introduced by Kent Beck in the late 1990s, is a pillar of Extreme Programming and of the craft. It is **not a testing technique**: it is a design and development technique whose tests are a happy side effect. The point is to fix the goal (a failing test that encodes the expected behavior) *before* writing the code, then reach that goal with the least code possible.
+TDD, which rose to prominence with Extreme Programming in the late 1990s, is a pillar of the craft. It is **not a testing technique**: it is a design and development technique whose tests are a happy side effect. The point is to fix the goal (a failing test that encodes the expected behavior) *before* writing the code, then reach that goal with the least code possible.
 
 ## Why It Works
 

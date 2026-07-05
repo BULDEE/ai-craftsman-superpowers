@@ -1,6 +1,6 @@
 # Taking Over a Legacy Codebase
 
-> "Make it better, not perfect. Improve the system by 1% and let it compound." - Nicolas Carlo
+> Make it better, not perfect. Improve the system by 1% and let it compound.
 
 Inheriting an unfamiliar, undocumented, under-tested codebase is the most common and most daunting legacy situation. This file is the playbook for the first days: how to gain a foothold, build understanding without drowning, and find the humans who still hold the context. It feeds the `/craftsman:legacy audit` flow.
 
@@ -20,7 +20,7 @@ Momentum comes from solving foundational problems one at a time, not everything 
 | 2. Get the tests running | A green (or any) suite is your first safety signal |
 | 3. Get it deploying | Understanding the release path demystifies the system |
 | 4. Take notes as you go | Your newcomer perspective is a fresh, perishable asset |
-| 5. Read the classics | Feathers' *Working Effectively with Legacy Code* expands your toolbox beyond intuition |
+| 5. Study the technique catalogue | [[legacy/legacy-techniques]] expands your toolbox beyond intuition |
 
 Capture notes in plain markdown or short ADRs ([[legacy/communicating-tech-debt]] links to why ADRs earn maintainer esteem): terminology, gotchas, "why is it like this" answers. What is obvious to you now will be invisible in a month.
 
