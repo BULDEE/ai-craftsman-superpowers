@@ -383,6 +383,52 @@ final class Order
     }
 }
 
+## GoF Catalog Quick Reference
+
+The patterns above are the ones you reach for most, shown in depth. The rest of the Gang of Four catalog, one line of intent plus the smell each one fixes:
+
+| Pattern | Category | Intent | Smell it fixes |
+|---------|----------|--------|----------------|
+| Abstract Factory | Creational | Create families of related objects without naming concretes | `new` of related concretes scattered across the code |
+| Singleton | Creational | One instance, global access (use sparingly - often an anti-pattern) | Uncontrolled duplication of a shared resource |
+| Prototype | Creational | Clone objects without coupling to their concrete class | Complex re-construction of near-identical objects |
+| Facade | Structural | A simple interface over a complex subsystem | Callers wiring up many collaborators themselves |
+| Composite | Structural | Treat individual objects and trees uniformly | Type-checking to handle leaf vs. group |
+| Proxy | Structural | A stand-in that controls access (lazy, cache, guard) | Access/caching logic mixed into the real object |
+| Bridge | Structural | Split abstraction from implementation, vary independently | A class exploding along two orthogonal axes |
+| Flyweight | Structural | Share common state across many objects | Memory blown by many near-identical objects |
+| Template Method | Behavioral | Algorithm skeleton in a base, steps overridden | Duplicated algorithm with minor per-case differences |
+| Chain of Responsibility | Behavioral | Pass a request along handlers until one handles it | A giant conditional dispatching to handlers |
+| Iterator | Behavioral | Traverse a collection without exposing its shape | Callers depending on the internal structure |
+| Mediator | Behavioral | Route object communication through one mediator | A web of direct object-to-object coupling |
+| Memento | Behavioral | Capture and restore state without exposing internals | Undo/redo reaching into private fields |
+| Visitor | Behavioral | Separate an operation from the objects it runs on | New operations forcing edits to every element class |
+
+## Pattern Selection Guide
+
+| Problem | Pattern |
+|---------|---------|
+| Create objects flexibly | Factory Method, Abstract Factory |
+| Object construction is complex | Builder |
+| Use an incompatible interface | Adapter |
+| Add behavior dynamically | Decorator |
+| Complex subsystem needs a simple API | Facade |
+| Algorithm should be swappable | Strategy |
+| Behavior depends on state | State |
+| Decouple event producer/consumer | Observer |
+| Undo/redo | Command + Memento |
+| Processing pipeline | Chain of Responsibility |
+
+## Anti-Patterns to Avoid
+
+| Anti-Pattern | Problem | Solution |
+|--------------|---------|----------|
+| God Object | One class does everything | Extract classes by responsibility (`GOD001`) - see [[anti-patterns/god-object]] |
+| Spaghetti Code | No clear structure | Extract Method, Move Method - see [[refactoring-techniques]] |
+| Golden Hammer | One pattern for everything | Choose the pattern by the problem |
+| Premature Optimization | Optimizing before profiling | YAGNI; measure first |
+| Cargo Cult | Patterns applied without understanding | Understand the WHY before the pattern |
+
 ## References
 
 | Resource | Focus |
@@ -390,5 +436,5 @@ final class Order
 | [refactoring.guru/design-patterns](https://refactoring.guru/design-patterns) | Visual catalog with examples in multiple languages |
 | [martinfowler.com/eaaCatalog](https://martinfowler.com/eaaCatalog/) | Patterns of Enterprise Application Architecture |
 
-> "Each pattern describes a problem which occurs over and over again in our environment, and then describes the core of the solution to that problem." — Christopher Alexander
+> "Each pattern describes a problem which occurs over and over again in our environment, and then describes the core of the solution to that problem." - Christopher Alexander
 ```
