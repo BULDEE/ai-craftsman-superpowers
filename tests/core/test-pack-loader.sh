@@ -17,6 +17,7 @@ source "$ROOT_DIR/hooks/lib/pack-loader.sh"
 TEST_PACKS_DIR="/tmp/craftsman-pack-loader-tests-$$"
 mkdir -p "$TEST_PACKS_DIR"
 
+# craftsman-ignore: SH002 — heredoc-heavy test fixture builder, splitting hurts readability
 _make_pack() {
     local pack_name="$1"
     local stack_line="$2"         # e.g. '["symfony", "fullstack"]' or '["*"]'
@@ -225,6 +226,21 @@ if [[ -L "$SYMLINK_ROOT/commands/my-command.md" ]]; then
     log_pass "Symlink created for pack command: my-command.md"
 else
     log_fail "Symlink creation" "commands/my-command.md symlink missing"
+fi
+
+# Symlinks must RESOLVE, not just exist. On BSD/macOS, realpath lacks
+# --relative-to: the old code silently produced empty-target symlinks
+# that pass -L but fail -e.
+if [[ -e "$SYMLINK_ROOT/agents/my-agent.md" ]]; then
+    log_pass "Agent symlink target resolves (non-empty, valid)"
+else
+    log_fail "Agent symlink broken" "target: '$(readlink "$SYMLINK_ROOT/agents/my-agent.md")'"
+fi
+
+if [[ -e "$SYMLINK_ROOT/commands/my-command.md" ]]; then
+    log_pass "Command symlink target resolves (non-empty, valid)"
+else
+    log_fail "Command symlink broken" "target: '$(readlink "$SYMLINK_ROOT/commands/my-command.md")'"
 fi
 
 if [[ ! -e "$SYMLINK_ROOT/agents/stale-agent.md" ]]; then

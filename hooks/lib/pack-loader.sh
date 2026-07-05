@@ -221,6 +221,23 @@ pack_loaded() {
     printf '%b' "$_LOADED_PACKS" | grep -v '^$'
 }
 
+# Portable relative path: GNU realpath --relative-to is absent on BSD/macOS
+# (it fails and yields an empty string, producing empty-target symlinks).
+# Fallback chain: GNU realpath -> python3 os.path.relpath -> absolute path.
+_pack_relpath() {
+    local target_dir="$1"
+    local src_file="$2"
+    local rel
+    rel=$(realpath --relative-to="$target_dir" "$src_file" 2>/dev/null)
+    if [[ -z "$rel" ]]; then
+        rel=$(python3 -c 'import os, sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "$src_file" "$target_dir" 2>/dev/null)
+    fi
+    if [[ -z "$rel" ]]; then
+        rel="$src_file"
+    fi
+    printf '%s' "$rel"
+}
+
 _sync_symlink_type() {
     local pack_dir="$1"
     local type_dir="$2"
@@ -230,7 +247,7 @@ _sync_symlink_type() {
         [[ ! -f "$src_file" ]] && continue
         local basename rel_path
         basename=$(basename "$src_file")
-        rel_path=$(realpath --relative-to="$target_dir" "$src_file")
+        rel_path=$(_pack_relpath "$target_dir" "$src_file")
         ln -sf "$rel_path" "$target_dir/$basename"
     done
 }
