@@ -116,6 +116,12 @@ FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 # Exit silently if no file path or file doesn't exist
 [[ -z "$FILE_PATH" || ! -f "$FILE_PATH" ]] && exit 0
 
+# Write/Edit exposure counter: one line per validated write. Read by
+# session-metrics.sh at SessionEnd into sessions.writes_count (denominator
+# for violations-per-write benchmarks). Append is atomic enough for hook
+# concurrency; no locking needed.
+echo "1" >> "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-writes" 2>/dev/null || true
+
 # Get file extension
 EXT="${FILE_PATH##*.}"
 FILE_PATTERN=$(metrics_file_pattern "$FILE_PATH")

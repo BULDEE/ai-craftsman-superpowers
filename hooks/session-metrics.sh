@@ -41,6 +41,15 @@ if [[ "$SESSION_DURATION" -le 0 ]]; then
     SESSION_DURATION=3600
 fi
 
+# Write/Edit exposure counter: one line appended per validated Write/Edit
+# by post-write-check.sh. Denominator for violations-per-write benchmarks.
+WRITES_FILE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-writes"
+WRITES_COUNT=0
+if [[ -f "$WRITES_FILE" ]]; then
+    WRITES_COUNT=$(wc -l < "$WRITES_FILE" 2>/dev/null | tr -d ' ')
+    [[ "$WRITES_COUNT" =~ ^[0-9]+$ ]] || WRITES_COUNT=0
+fi
+
 # Count violations from this session (window = session duration)
 PROJECT_HASH=$(metrics_project_hash)
 DURATION_PARAM="-${SESSION_DURATION} seconds"
@@ -78,8 +87,8 @@ if [[ -n "$TEAM_TYPE" ]]; then
     SKILLS_JSON="[\"team:${TEAM_TYPE}\"]"
 fi
 
-# Record session with agent/team stats
-metrics_record_session "${SESSION_DURATION:-0}" "$SKILLS_JSON" "$AGENTS_JSON" "$BLOCKED" "$WARNED" 2>/dev/null || true
+# Record session with agent/team stats and write exposure
+metrics_record_session "${SESSION_DURATION:-0}" "$SKILLS_JSON" "$AGENTS_JSON" "$BLOCKED" "$WARNED" "$WRITES_COUNT" 2>/dev/null || true
 
 # Output summary as systemMessage (non-blocking)
 SUMMARY_PARTS=()
@@ -100,7 +109,7 @@ if [[ ${#SUMMARY_PARTS[@]} -gt 0 ]]; then
     }'
 fi
 
-# Clear session state for correction learning + start-time marker
-rm -f "$SESSION_STATE" "$START_TS_FILE"
+# Clear session state for correction learning + start-time marker + writes counter
+rm -f "$SESSION_STATE" "$START_TS_FILE" "$WRITES_FILE"
 
 exit 0

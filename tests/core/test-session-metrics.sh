@@ -191,4 +191,35 @@ else
     log_fail "Start marker should be removed" "still exists"
 fi
 
+# =============================================================================
+# Test 6: Write/Edit exposure counter (benchmark denominator)
+# -----------------------------------------------------------------------------
+# post-write-check.sh appends one line to session-writes per validated
+# Write/Edit; session-metrics.sh records the count in sessions.writes_count.
+# Without this denominator, violations-per-session cannot distinguish
+# "learning effect" from "less code written".
+# =============================================================================
+echo ""
+echo "--- Write/Edit Exposure Counter ---"
+
+echo "$(( $(date +%s) - 30 ))" > "$CLAUDE_PLUGIN_DATA/session-start-ts"
+printf 'w\nw\nw\n' > "$CLAUDE_PLUGIN_DATA/session-writes"
+
+run_session_metrics '{"session_id":"abc","cwd":"/tmp","hook_event_name":"SessionEnd","reason":"other"}' > /dev/null 2>&1
+
+LAST_WRITES=$(python3 "$ROOT_DIR/hooks/lib/metrics-query.py" "$METRICS_DB" \
+    "SELECT writes_count FROM sessions ORDER BY id DESC LIMIT 1" 2>/dev/null)
+
+if [[ "${LAST_WRITES:-0}" == "3" ]]; then
+    log_pass "writes_count recorded from session-writes file (3)"
+else
+    log_fail "writes_count should be 3" "got '${LAST_WRITES}'"
+fi
+
+if [[ ! -f "$CLAUDE_PLUGIN_DATA/session-writes" ]]; then
+    log_pass "Writes counter file cleaned up after session end"
+else
+    log_fail "session-writes should be removed" "still exists"
+fi
+
 test_summary

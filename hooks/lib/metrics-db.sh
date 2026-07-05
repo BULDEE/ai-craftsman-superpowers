@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     skills_used TEXT,
     agents_spawned TEXT,
     violations_blocked INTEGER DEFAULT 0,
-    violations_warned INTEGER DEFAULT 0
+    violations_warned INTEGER DEFAULT 0,
+    writes_count INTEGER DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_violations_project ON violations(project_hash, timestamp);
@@ -82,11 +83,22 @@ MIGRATE
     fi
 }
 
+# Add writes_count to sessions tables created before the column existed.
+# ALTER TABLE ADD COLUMN is idempotent-guarded via pragma inspection.
+_metrics_migrate_writes_count() {
+    local has_col
+    has_col=$(sqlite3 "$METRICS_DB" "SELECT COUNT(*) FROM pragma_table_info('sessions') WHERE name='writes_count';" 2>/dev/null)
+    if [[ "$has_col" == "0" ]]; then
+        sqlite3 "$METRICS_DB" "ALTER TABLE sessions ADD COLUMN writes_count INTEGER DEFAULT 0;" 2>/dev/null
+    fi
+}
+
 metrics_init() {
     mkdir -p "$METRICS_DB_DIR"
     _metrics_create_core_tables
     _metrics_create_corrections_table
     _metrics_migrate_severity_info
+    _metrics_migrate_writes_count
 }
 
 metrics_project_hash() {
@@ -118,11 +130,12 @@ metrics_record_session() {
     local agents="$3"
     local blocked="$4"
     local warned="$5"
+    local writes="${6:-0}"
     local project_hash
     project_hash=$(metrics_project_hash)
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
-        "INSERT INTO sessions (project_hash, duration_seconds, skills_used, agents_spawned, violations_blocked, violations_warned) VALUES (?, ?, ?, ?, ?, ?)" \
-        "$project_hash" "$duration" "$skills" "$agents" "$blocked" "$warned"
+        "INSERT INTO sessions (project_hash, duration_seconds, skills_used, agents_spawned, violations_blocked, violations_warned, writes_count) VALUES (?, ?, ?, ?, ?, ?, ?)" \
+        "$project_hash" "$duration" "$skills" "$agents" "$blocked" "$warned" "$writes"
 }
 
 metrics_violations_7d() {

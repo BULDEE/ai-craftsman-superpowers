@@ -97,6 +97,18 @@ else
     log_fail "craftsman-ignore should suppress" "got exit $exit_code"
 fi
 
+# Test: each validated Write/Edit appends one line to the session-writes
+# exposure counter (denominator for violations-per-write benchmarks)
+rm -f "$CLAUDE_PLUGIN_DATA/session-writes"
+run_post_hook "$FIXTURES_DIR/valid-component.tsx" > /dev/null 2>&1
+run_post_hook "$FIXTURES_DIR/with-craftsman-ignore.php" > /dev/null 2>&1
+WRITES_LINES=$(wc -l < "$CLAUDE_PLUGIN_DATA/session-writes" 2>/dev/null | tr -d ' ')
+if [[ "${WRITES_LINES:-0}" == "2" ]]; then
+    log_pass "post-write-check increments session-writes counter (2 writes = 2 lines)"
+else
+    log_fail "session-writes counter" "expected 2 lines, got '${WRITES_LINES}'"
+fi
+
 # Test: Layer violation should block
 result=$(run_post_hook "$FIXTURES_DIR/invalid-layer-violation.php")
 exit_code="${result%%|*}"
