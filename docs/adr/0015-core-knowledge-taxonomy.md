@@ -46,6 +46,6 @@ Deprecated files become stubs pointing at the new location and are removed in v4
 
 ## References
 
-- [ADR-0005: Knowledge-First](0005-knowledge-first.md)
+- [ADR-0005: Knowledge-First Architecture](0005-knowledge-first-architecture.md)
 - [ADR-0012: Progressive Disclosure](0012-progressive-disclosure.md)
 - Roadmap: `docs/roadmap-v3.6-v4.0.md` (v3.6.0 Knowledge Foundation)
