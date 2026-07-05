@@ -115,6 +115,22 @@ Plain refactoring assumes you can see the target and the path. Mikado is for whe
 - This plugin's `/refactor` Mikado mode persists the graph across sessions (in `.craftsman/mikado.json`) so an interruption never loses it.
 - Do not automate the revert away or skip the timer: the discipline of letting go of code you wrote is the skill being built.
 
+## Cheat Sheet
+
+1. Write the goal at the top of a graph.
+2. Start a ~10 minute timer and attempt the goal (or current subgoal) directly.
+3. Timer rings, goal done? **Yes** -> commit, tick it off, optionally ship a PR, pick the next subgoal.
+4. **No** -> write down the blocking prerequisites as child nodes; drop anything unrelated into the Parking.
+5. `git reset --hard` to return to a working state; keep only the graph.
+6. Pick a subgoal (prefer a leaf) and go to step 2.
+7. Repeat until the goal at the top falls out for free.
+
+## On Letting Go
+
+The hardest part is step 5: throwing away code that "almost worked". It feels wasteful, but it is the whole point. The value you produced in a Discovery timebox is *knowledge*, captured in the graph, not the diff. If reverting feels painful, that is a signal you need to practice it more, not that the method is wrong: worst case you redo ten minutes of work, and next time you will take smaller, safer steps by reflex. Being able to let go of code you wrote is a craft skill in its own right, and it is what lets you move fast on code that would otherwise trap you.
+
+If you genuinely need a fragment of the reverted attempt, `git stash` it before resetting so it stays available for reference while your working tree returns to green.
+
 ## Related
 
 - [[refactoring-techniques]] - the safe moves each Mikado subgoal is usually made of.
