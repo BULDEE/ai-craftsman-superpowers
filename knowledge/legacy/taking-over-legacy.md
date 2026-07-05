@@ -24,6 +24,31 @@ Momentum comes from solving foundational problems one at a time, not everything 
 
 Capture notes in plain markdown or short ADRs ([[legacy/communicating-tech-debt]] links to why ADRs earn maintainer esteem): terminology, gotchas, "why is it like this" answers. What is obvious to you now will be invisible in a month.
 
+### A first-week template
+
+Keep a single running note file from day one; it is worth more than any wiki you inherit:
+
+```markdown
+# <Project> - Onboarding Notes
+
+## Run it
+- Setup: `make dev` (needed X, Y; gotcha: Z env var undocumented)
+- Tests: `npm test` (17 fail on a clean checkout - flaky? see below)
+- Deploy: pushes to main -> GitHub Actions -> staging
+
+## Vocabulary
+- "Booking" in code = "Reservation" in the UI (same thing, two names)
+
+## Map (what I understand so far)
+- Entry: OrderController -> PlaceOrder use case -> OrderRepository
+- Unknown: how pricing rules get loaded (TODO: trace)
+
+## Questions for the team
+- Who owns billing? (KnowledgeMap says: departed dev -> ask lead)
+```
+
+This note is a perishable asset: the confusion you feel today is exactly what the next hire will feel, and only you can capture it before it fades.
+
 ## Dive From the Edges, Not the Middle
 
 Attacking a large codebase from the center causes overwhelm. Start where you can *observe* the system working: its edges.
@@ -74,6 +99,21 @@ Two habits turn passive reading into active understanding:
 - **Refactor as you learn.** The moment you decode a cryptic name, rename it. Your fresh eyes make implicit logic explicit for the next newcomer; that clarity is cheapest to add now.
 - **Write the missing tests.** A characterization test on the code you are about to touch does three things at once: it teaches you the behavior, it de-risks your change, and it exposes design problems ([[legacy/characterization-testing]]). Testing existing code comprehends it faster and more safely than staring at it.
 
+## First Day, Roughly in Order
+
+A concrete sequence to avoid the paralysis of "where do I even start":
+
+| Hour | Do | Outcome |
+|------|-----|---------|
+| 1 | Clone, read the README, run the setup | It runs, or you have your first real question |
+| 2 | Run the tests; note what fails and how long they take | You know your safety signal and feedback speed |
+| 3 | Pick one real use case; find its input edge | A concrete foothold, not abstract wandering |
+| 4 | Debug from that edge to the output edge | One traced path you fully understand |
+| 5 | Generate a hotspot map and a knowledge map | Where the risk is, and who to ask about it |
+| 6 | Write down everything in your notes file | The perishable newcomer insight, captured |
+
+By the end of day one you have a running system, one understood path, a risk map, and a list of people to talk to. That is a foothold, and footholds compound.
+
 ## The Seven-Point Checklist
 
 1. Stay curious; ask people.
@@ -89,6 +129,20 @@ Two habits turn passive reading into active understanding:
 - `/craftsman:legacy audit` produces the hotspot and dependency picture that tells you *where* to point the edge-diving technique first.
 - The Knowledge Map complements the audit: hotspots say *what* is risky, the map says *who* to ask about it.
 - Notes and decisions belong in ADRs; the `doc-writer` agent can help formalize them.
+
+## Anti-Patterns of Taking Over
+
+| Anti-pattern | Consequence | Instead |
+|--------------|-------------|---------|
+| Proposing a rewrite in week one | You do not understand it yet; the rewrite will repeat its bugs | Understand a slice, refactor incrementally |
+| Reading the whole codebase before touching it | Overwhelm, no foothold, weeks lost | Trace one path from an edge |
+| Blaming the previous team | Burns the trust and context you need | Focus on the code, not the coder |
+| Fixing every mess you pass | You never finish your actual task | Note it, keep to the use case |
+| Not writing anything down | The freshest insight evaporates in a week | Keep a running notes file from hour one |
+
+## Rule
+
+> You cannot understand a legacy system by reading it; you understand it by running it, tracing one path from its edges, testing what you touch, and writing down what you learn. Make it better by 1%, not perfect.
 
 ## Related
 

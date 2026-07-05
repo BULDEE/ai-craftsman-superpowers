@@ -100,6 +100,21 @@ Defactoring is a **cognitive precursor** to refactoring: temporary mental scaffo
 + if (items.length === 0) return;
 ```
 
+## More Judgment-Call Smells
+
+A few classic Fowler smells that are also signals, not verdicts:
+
+- **Feature Envy.** A method that uses another object's data more than its own wants to *move* to that object (Move Method). Real when the pull is strong; a false alarm when the method legitimately coordinates several objects.
+- **Data Clumps.** The same three or four parameters travel together everywhere (`street, city, zip`). That clump is a value object waiting to be born (`Address`). Real once the clump appears three-plus times.
+- **Shotgun Surgery.** One conceptual change forces edits across many files. The behavior is scattered and wants to be gathered into one place. Real when the same change keeps rippling; distinguish from Divergent Change (one file changed for many unrelated reasons), which wants splitting instead.
+- **Comments explaining *what*.** A comment restating what the code does is a deodorant over an unclear name or a too-long method. Extract and rename until the comment is redundant, then delete it. Comments explaining *why* are fine.
+
+```php
+// Data clump smell -> the clump wants to be a value object.
+- function ship(string $street, string $city, string $zip, Order $order): void
++ function ship(Address $address, Order $order): void
+```
+
 ## Smells That Are Almost Always Real
 
 Not everything is a judgment call. These, this plugin flags or you should treat as near-certain defects:
