@@ -115,6 +115,24 @@ final readonly class PlaceOrder                 // Application use case
 
 Each move (Extract Function, Move Statements, Introduce Parameter Object) ships as its own green commit under the characterization net.
 
+## Beyond Hotspots: X-Ray Techniques
+
+Churn-times-complexity finds the *files* worth refactoring. Behavioral code analysis (Adam Tornhill, *Software Design X-Rays*) goes further, mining git history for signals a single snapshot cannot show:
+
+| Technique | What it reveals | Action |
+|-----------|-----------------|--------|
+| **X-Ray to function level** | Which *functions* inside a hot file actually churn (diffs parsed against function definitions) | Refactor the hot method, not the whole 2k-line file |
+| **Change (temporal) coupling** | Files that keep changing *together* over time | Co-locate them, or remove the hidden coupling / copy-paste |
+| **Code age** | Stable-old and brand-new code is healthy; constantly-patched code is not | Target the *unstable* code; leave stable old code alone |
+| **Knowledge distribution** | Contributor concentration per module (diffusion score) | Many minor contributors in 3 months = higher bug risk; consolidate ownership |
+
+Two rules from the same source sharpen prioritization:
+
+- **The trend matters more than the threshold.** A file whose complexity is *rising* release over release is a better target than one that is merely large and stable.
+- **Coupled things should be co-located.** If `OrderService` and `InvoicePrinter` always change together but live in different modules, that temporal coupling is a design smell to fix, not a coincidence.
+
+A hard caveat, also from Tornhill: **never use these metrics to evaluate individuals.** Knowledge maps and churn are for finding risk and asking for help, not for ranking people; misusing them destroys the trust the analysis depends on. See [[legacy/taking-over-legacy]] for the who-to-ask side of the same data.
+
 ## Executing a Campaign
 
 - **Safety net first.** Every hotspot you touch gets a characterization net before you change it ([[legacy/characterization-testing]]). No net, no refactor.
