@@ -51,6 +51,26 @@ After discovering subgoals over and over, you reach leaves that take under ten m
 - Each completed leaf makes its parents easier, like dominoes.
 - The codebase stays working the whole time, so you can **ship multiple times**: open intermediate PRs for the preparatory work. Deliver often to avoid the merge conflicts of a long-running branch. Delivering often is what makes you go faster.
 
+## A Worked Example
+
+Goal: **replace scattered `console.log()` calls with a proper injectable logger** in a legacy service. You try it directly and immediately hit a wall: the `Transaction` class logs inline, `Ticket` logs inline, there is no logger abstraction, and there are no tests. `git reset --hard`, and note what blocked you. After a few Discovery timeboxes the graph looks like this:
+
+```
+Replace console.log() with a logger   <- the goal (last thing to do)
+  |-- Wrap calls into ConsoleLogger
+  |     |-- Create Logger interface
+  |     |-- Create ConsoleLogger class
+  |-- Update the call sites
+  |     |-- Refactor Transaction to inject the logger  <- was a hidden prerequisite
+  |     |-- Migrate Ticket to use the Logger interface
+  |-- Expose the logger through configuration
+  |     |-- Import it from configuration
+  |     |-- Extract Logger into the common lib
+  |-- (safety net) Test create() / print() / cancel()   <- do these FIRST
+```
+
+Delivery works the leaves first: write the characterization tests, create the interface and `ConsoleLogger`, inject them into `Transaction` and `Ticket` one at a time (committing and shipping each), wire configuration, and only then flip the final `console.log` calls. Every step ships green; the goal at the top is reached last, almost trivially, because every prerequisite is already done.
+
 ## The Parking
 
 In legacy code you constantly spot unrelated messes near what you are changing. You cannot chase every one, but your brain keeps nagging. Create a **Parking**: a node deliberately *not* connected to the goal, where you dump stray thoughts, refactorings, and TODOs.
@@ -74,6 +94,20 @@ Mikado composes with the other legacy disciplines:
 - **Micro-committing**: inside a Delivery step, commit every couple of minutes so each subgoal is itself a chain of checkpoints. See [[refactoring/refactoring-campaigns]].
 - **Incremental refactoring**: many subgoals are safe, mechanical moves (extract, change signature, migrate callers). See [[refactoring-techniques]].
 - **Characterization tests**: on untested code, the first subgoals are often "get this under a test" before any change. See [[legacy/characterization-testing]].
+
+## Common Mistakes
+
+| Mistake | Consequence | Correction |
+|---------|-------------|------------|
+| Pushing through instead of reverting | You accumulate broken, intertwined changes with no way back | Timebox and `git reset --hard`; keep the graph, drop the code |
+| No timer | Discovery drifts into an hours-long tunnel | Start a ~10 minute timer every attempt |
+| Working from the root | You try the goal before its prerequisites exist; nothing completes | Always deliver from the leaves inward |
+| Chasing unrelated messes | You lose the goal in a swamp of side-quests | Put them in the Parking, decide later |
+| One giant final commit | Un-reviewable, un-revertable, un-bisectable | Commit each subgoal; ship intermediate PRs |
+
+## Mikado vs Just Refactoring
+
+Plain refactoring assumes you can see the target and the path. Mikado is for when you **cannot**: it is a discovery protocol layered on top of refactoring. Once Discovery has drawn the graph, each Delivery step is ordinary safe refactoring. Think of Mikado as the map-making, and [[refactoring-techniques]] as the walking.
 
 ## Tooling and Overkill
 
