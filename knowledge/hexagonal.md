@@ -13,6 +13,10 @@ Hexagonal Architecture (Cockburn, also adopted by Freeman & Pryce in *Growing Ob
 
 The hexagon shape carries no meaning beyond "more than four sides": it is a reminder that there are many ways in and many ways out, not just a UI on top and a database on the bottom.
 
+## The Problem It Solves
+
+Cockburn named the pattern to escape a recurring trap: business logic that leaks into the UI and gets entangled with the database, so the application can only ever be driven by one screen and tested against one live database. The symptoms are familiar: logic duplicated between a web controller and a batch job, a test suite that needs a running database, a rewrite forced by swapping a vendor. Ports & Adapters removes the asymmetry: the application is driven identically whether the driver is a person, another program, an automated test, or a batch script, and it is developed and tested in isolation from its eventual devices and databases.
+
 ## Two Kinds of Ports
 
 The symmetry of the pattern is its whole point. Ports come in two families:
@@ -83,6 +87,51 @@ class PlaceOrderController {
 ```
 
 The controller's only job is **translation**: turn an HTTP request into a command, and a result into a response. No business rule ever lives in an adapter.
+
+## Configurable Dependency: Wiring the Hexagon
+
+The application never chooses its own adapters. A single **composition root** (Cockburn's "configurator", the `Main` component in Clean Architecture) decides which adapter plugs into which port at startup. This is the only place that names both the port and the concrete adapter.
+
+```php
+// Composition root - the ONLY place that knows both sides.
+$payments = $isTestRun
+    ? new FakePaymentGateway()
+    : new StripePaymentGateway($stripeClient);
+
+$placeOrder = new PlaceOrder(
+    orders:   new DoctrineOrderRepository($entityManager),
+    payments: $payments,
+);
+```
+
+Because wiring is external, switching a driven adapter (Stripe to Adyen, Postgres to an in-memory fake) is a one-line change in one file. Nothing inside the hexagon is touched, and no test needs the real service.
+
+## Adding a Second Driving Adapter
+
+The payoff of a driving port is that a new entry point is free. Once `PlaceOrder` exists as a use case, exposing it over the CLI as well as HTTP costs one thin adapter and zero domain changes:
+
+```php
+// A second driving adapter for the SAME use case - no logic duplicated.
+final class PlaceOrderCommand extends Command
+{
+    public function __construct(private readonly PlaceOrder $placeOrder) { parent::__construct(); }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $orderId = ($this->placeOrder)(
+            new PlaceOrderCommandDto($input->getArgument('customer'), $input->getArgument('sku'), 1)
+        );
+        $output->writeln("Order {$orderId} placed");
+        return Command::SUCCESS;
+    }
+}
+```
+
+When the same rule must run from a web request, a queue consumer, and a nightly batch, hexagonal architecture is the difference between writing it once and writing it three times.
+
+## Ports for Messages and Events
+
+Ports are not only request/response. An **event** an aggregate publishes is a driven port (the app announces something happened); the messaging infrastructure is the adapter that delivers it. An incoming message on a queue is a driving adapter that translates the payload into a command, exactly like the HTTP controller. Keep the domain event a plain object; let the adapter serialize it. See [[event-driven]] for the delivery patterns.
 
 ## Testing at the Port
 
