@@ -18,8 +18,8 @@ Prefix parameters with `app.`: `app.contents_dir`, not `dir`.
 ## Services
 
 - **Autowiring + autoconfiguration** by default
-- **All services private** — no `$container->get()`
-- **No custom bundles** — use PHP namespaces for organization
+- **All services private** - no `$container->get()`
+- **No custom bundles** - use PHP namespaces for organization
 - YAML for service configuration
 
 ## Controllers
@@ -38,13 +38,13 @@ public function show(Post $post, PostRepository $repo): Response
 
 - Define as PHP classes (`PostType extends AbstractType`)
 - Add buttons in templates, not form classes
-- **Validation on entities/DTOs**, not form fields — enables reuse
+- **Validation on entities/DTOs**, not form fields - enables reuse
 - Single action for render + process
 
 ## Security
 
-- **Single firewall** — one entry point, multiple authenticators
-- `password_hashers: auto` — bcrypt by default
+- **Single firewall** - one entry point, multiple authenticators
+- `password_hashers: auto` - bcrypt by default
 - **Voters** for complex authorization logic, not security expressions
 
 ## Doctrine

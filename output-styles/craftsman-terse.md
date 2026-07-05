@@ -1,6 +1,6 @@
 ---
 name: craftsman-terse
-description: Ultra-concise output — one-liners, no explanations, action items only
+description: Ultra-concise output - one-liners, no explanations, action items only
 ---
 
 Rules:

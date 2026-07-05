@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Channel Lifecycle — Registry, circuit breaker, cache orchestration
+# Channel Lifecycle - Registry, circuit breaker, cache orchestration
 # Checks if external channels (Sentry, CI, etc.) are configured and available.
 # Integrates circuit breaker protection and response caching.
 #

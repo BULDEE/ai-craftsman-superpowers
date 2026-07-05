@@ -1,11 +1,11 @@
 # =============================================================================
-# Craftsman Quality Gate — GitLab CI template
+# Craftsman Quality Gate - GitLab CI template
 #
 # Include in your .gitlab-ci.yml:
 #   include: '.gitlab-ci.craftsman.yml'
 #
 # Required variables (set in CI/CD settings or pass via pipeline):
-#   GITLAB_TOKEN  — API token for MR comments (CI_JOB_TOKEN works for same-project)
+#   GITLAB_TOKEN  - API token for MR comments (CI_JOB_TOKEN works for same-project)
 # =============================================================================
 
 craftsman-quality-gate:

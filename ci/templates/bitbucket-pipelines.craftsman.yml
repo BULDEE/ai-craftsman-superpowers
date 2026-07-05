@@ -1,11 +1,11 @@
 # =============================================================================
-# Craftsman Quality Gate — Bitbucket Pipelines template
+# Craftsman Quality Gate - Bitbucket Pipelines template
 #
 # If you already have bitbucket-pipelines.yml, merge this step into your
 # existing pipeline definition.
 #
 # Required variables (set in Repository settings > Pipelines > Variables):
-#   BITBUCKET_TOKEN  — App password or OAuth token for PR comments and reports
+#   BITBUCKET_TOKEN  - App password or OAuth token for PR comments and reports
 # =============================================================================
 
 pipelines:

@@ -69,7 +69,7 @@ function checkClaudeJson() {
       }
     }
   } catch {
-    // Non-critical — do not block startup
+    // Non-critical - do not block startup
   }
 }
 
@@ -96,12 +96,12 @@ function checkMcpJson() {
       );
     }
   } catch {
-    // Non-critical — do not block startup
+    // Non-critical - do not block startup
   }
 }
 
 // ---------------------------------------------------------------------------
-// No-op MCP server — valid JSON-RPC/MCP protocol (NDJSON), zero capabilities
+// No-op MCP server - valid JSON-RPC/MCP protocol (NDJSON), zero capabilities
 // ---------------------------------------------------------------------------
 function runNoopServer() {
   const { stdin, stdout } = process;
@@ -117,7 +117,7 @@ function runNoopServer() {
       const request = JSON.parse(trimmed);
       handleRequest(request);
     } catch {
-      // Malformed JSON — skip
+      // Malformed JSON - skip
     }
   });
 
@@ -129,7 +129,7 @@ function runNoopServer() {
         serverInfo: { name: "knowledge-rag", version: "0.0.0" },
       });
     } else if (request.method === "notifications/initialized") {
-      // Notification — no response needed
+      // Notification - no response needed
     } else if (request.method === "tools/list") {
       respond(request.id, { tools: [] });
     } else if (request.id !== undefined) {

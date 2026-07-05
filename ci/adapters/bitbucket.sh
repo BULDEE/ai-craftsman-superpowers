@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# bitbucket.sh — Bitbucket Pipelines CI adapter
+# bitbucket.sh - Bitbucket Pipelines CI adapter
 #
 # Uses Bitbucket Reports API for annotations and PR comments API for commenting.
 # =============================================================================

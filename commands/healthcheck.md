@@ -3,7 +3,7 @@ description: "Run a comprehensive diagnostic of your Craftsman plugin installati
 effort: quick
 ---
 
-# /craftsman:healthcheck — Plugin Diagnostic
+# /craftsman:healthcheck - Plugin Diagnostic
 
 Run a full health check of your AI Craftsman Superpowers installation.
 

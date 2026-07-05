@@ -12,8 +12,8 @@ def add_item(item, items=[]):
     items.append(item)
     return items
 
-# First call: ['a'] — looks fine
-# Second call: ['a', 'b'] — shared state!
+# First call: ['a'] - looks fine
+# Second call: ['a', 'b'] - shared state!
 ```
 
 ## Good
@@ -28,4 +28,4 @@ def add_item(item, items=None):
 
 ## Rule
 
-**PY005** — Mutable default argument detected. Use `None` + conditional assignment.
+**PY005** - Mutable default argument detected. Use `None` + conditional assignment.

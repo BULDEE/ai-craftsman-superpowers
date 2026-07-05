@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# PHP Regex Validator — Symfony Pack
+# PHP Regex Validator - Symfony Pack
 # Provides pack_validate_php() for the pack-loader pipeline.
 #
 # Rules: PHP001-005, WARN-PHP001 (regex) + NEST001/LOC001/GOD001/PARAM001
@@ -31,7 +31,7 @@ _check_php003() {
     while IFS= read -r line; do
         echo "$line" | grep -qE "public function set[A-Z]" 2>/dev/null || continue
         if ! line_has_ignore "$line" "no-setter"; then
-            add_violation "PHP003" "Public setter found — use behavioral methods"
+            add_violation "PHP003" "Public setter found - use behavioral methods"
         else
             metrics_record_violation "PHP003" "$FILE_PATTERN" "critical" 0 1 2>/dev/null || true
         fi
@@ -41,7 +41,7 @@ _check_php003() {
 _check_php004() {
     local file="$1"
     if grep -q "new DateTime()" "$file" 2>/dev/null || grep -q "new \\\\DateTime()" "$file" 2>/dev/null; then
-        add_violation "PHP004" "new DateTime() found — inject Clock instead"
+        add_violation "PHP004" "new DateTime() found - inject Clock instead"
     fi
 }
 
@@ -55,7 +55,7 @@ _check_php005() {
 _check_warn_php001() {
     local file="$1"
     if grep -qE "function\s+\w+\(([^,]+,){3,}" "$file" 2>/dev/null; then
-        add_warning "WARN-PHP001" "Method with 4+ parameters — consider refactoring to object"
+        add_warning "WARN-PHP001" "Method with 4+ parameters - consider refactoring to object"
     fi
 }
 
@@ -73,7 +73,7 @@ _check_php_structure() {
     # Alternation starts with a non-dash token so grep/ugrep never reads the
     # leading "->" as an option flag.
     if grep -qE "EntityManagerInterface|->persist\(|->flush\(|->getRepository\(" "$file" 2>/dev/null; then
-        add_violation "CTRL001" "Controller performs persistence/EM work — move it into an Application UseCase"
+        add_violation "CTRL001" "Controller performs persistence/EM work - move it into an Application UseCase"
     fi
 }
 

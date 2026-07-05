@@ -1,6 +1,6 @@
 name: python
 version: "1.0.0"
-description: "Python craftsman pack — type hints, ruff/mypy integration, Django/FastAPI patterns"
+description: "Python craftsman pack - type hints, ruff/mypy integration, Django/FastAPI patterns"
 compatibility:
   core: ">=2.6.0"
   stack: ["python"]

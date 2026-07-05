@@ -7,8 +7,8 @@
  * and https://api-platform.com/docs/core/state-processors/
  *
  * Key characteristics:
- * - ProviderInterface::provide() — returns object|array|null (MUST)
- * - ProcessorInterface::process() — returns mixed (MUST)
+ * - ProviderInterface::provide() - returns object|array|null (MUST)
+ * - ProcessorInterface::process() - returns mixed (MUST)
  * - CollectionOperationInterface used to distinguish item vs collection (CONFIRMED AP4)
  * - final class (MUST)
  * - declare(strict_types=1) (MUST)
@@ -17,7 +17,7 @@
 declare(strict_types=1);
 
 // ============================================================
-// State Provider — Item + Collection
+// State Provider - Item + Collection
 // Source: https://api-platform.com/docs/core/state-providers/
 // ============================================================
 
@@ -46,7 +46,7 @@ final class BookProvider implements ProviderInterface
 }
 
 // ============================================================
-// State Provider — Decorator Pattern (wrap built-in provider)
+// State Provider - Decorator Pattern (wrap built-in provider)
 // Source: https://api-platform.com/docs/core/state-providers/
 // ============================================================
 
@@ -77,7 +77,7 @@ final class BookRepresentationProvider implements ProviderInterface
 }
 
 // ============================================================
-// State Processor — CRUD
+// State Processor - CRUD
 // Source: https://api-platform.com/docs/core/state-processors/
 // ============================================================
 
@@ -115,7 +115,7 @@ final class BookProcessor implements ProcessorInterface
 }
 
 // ============================================================
-// API Resource (DTO-first approach — AP4 recommended pattern)
+// API Resource (DTO-first approach - AP4 recommended pattern)
 // Source: https://api-platform.com/docs/core/dto/
 // ============================================================
 

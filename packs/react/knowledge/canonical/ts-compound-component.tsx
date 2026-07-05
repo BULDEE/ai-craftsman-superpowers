@@ -5,7 +5,7 @@
  *         https://react.dev/reference/react/createContext
  *
  * Key characteristics:
- * - createContext + use(Context) — React 19 modern pattern
+ * - createContext + use(Context) - React 19 modern pattern
  * - use(Context) preferred over useContext(): works in conditionals/loops
  * - Named exports only (no default export)
  * - readonly props throughout
@@ -28,12 +28,12 @@ interface AccordionContextValue {
   readonly toggle: (id: string) => void;
 }
 
-// null default means "not inside a provider" — caught at runtime
+// null default means "not inside a provider" - caught at runtime
 const AccordionContext = createContext<AccordionContextValue | null>(null);
 
 // Helper to enforce provider requirement
 function useAccordionContext(): AccordionContextValue {
-  // use() can be called inside conditionals/loops — unlike useContext()
+  // use() can be called inside conditionals/loops - unlike useContext()
   const context = use(AccordionContext);
   if (context === null) {
     throw new Error('useAccordionContext must be used within <Accordion>');
@@ -92,7 +92,7 @@ export function AccordionItem({
 }
 
 // ============================================================
-// Trigger Component — reads context, NOT passed as prop
+// Trigger Component - reads context, NOT passed as prop
 // ============================================================
 
 interface AccordionTriggerProps {
@@ -123,7 +123,7 @@ export function AccordionTrigger({
 }
 
 // ============================================================
-// Content Component — conditionally rendered
+// Content Component - conditionally rendered
 // ============================================================
 
 interface AccordionContentProps {
@@ -137,7 +137,7 @@ export function AccordionContent({
   children,
   className,
 }: AccordionContentProps): ReactNode {
-  // use(Context) CAN be called inside conditionals — but the hook itself
+  // use(Context) CAN be called inside conditionals - but the hook itself
   // must be called unconditionally. The conditional is on the result.
   const { openItemId } = useAccordionContext();
   const isOpen = openItemId === itemId;
@@ -161,7 +161,7 @@ export function AccordionContent({
 // ============================================================
 
 /*
-  // Clean, readable — no prop drilling
+  // Clean, readable - no prop drilling
   <Accordion defaultOpenId="item-1">
     <AccordionItem id="item-1">
       <AccordionTrigger itemId="item-1">What is React?</AccordionTrigger>

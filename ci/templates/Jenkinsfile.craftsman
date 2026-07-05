@@ -1,5 +1,5 @@
 // =============================================================================
-// Craftsman Quality Gate — Jenkins Pipeline template
+// Craftsman Quality Gate - Jenkins Pipeline template
 //
 // Usage:
 //   1. Copy this file as 'Jenkinsfile' or load it via shared library
@@ -51,7 +51,7 @@ pipeline {
             archiveArtifacts artifacts: 'craftsman-report.json,craftsman-comment.md', allowEmptyArchive: true
         }
         failure {
-            echo 'Craftsman Quality Gate failed — check violations in the console output or craftsman-comment.md'
+            echo 'Craftsman Quality Gate failed - check violations in the console output or craftsman-comment.md'
         }
     }
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Go Regex Validator — Go Pack
+# Go Regex Validator - Go Pack
 # Provides pack_validate_go() for the pack-loader pipeline.
 #
 # Rules: GO001-003, WARN-GO001
@@ -11,14 +11,14 @@ pack_validate_go() {
     local file="$1"
 
     # GO001: No naked returns in functions with named return values
-    # (simplified — real implementation would use AST)
+    # (simplified - real implementation would use AST)
     if grep -qE '^\s+return$' "$file" 2>/dev/null; then
         if grep -qE 'func.*\)\s*\(' "$file" 2>/dev/null; then
-            add_warning "GO001" "Naked return found — consider explicit returns for clarity"
+            add_warning "GO001" "Naked return found - consider explicit returns for clarity"
         fi
     fi
 
-    # GO002: Error not checked (simplistic regex — catches common pattern)
+    # GO002: Error not checked (simplistic regex - catches common pattern)
     local ln_num=0
     while IFS= read -r line; do
         ln_num=$((ln_num + 1))
@@ -36,7 +36,7 @@ pack_validate_go() {
 
     # GO003: No init() functions (prefer explicit initialization)
     if grep -qE '^func init\(\)' "$file" 2>/dev/null; then
-        add_violation "GO003" "init() function found — prefer explicit initialization"
+        add_violation "GO003" "init() function found - prefer explicit initialization"
     fi
 
     # WARN-GO001: Function too long (>50 lines)
@@ -52,7 +52,7 @@ pack_validate_go() {
         if [[ "$in_func" == true ]] && echo "$line" | grep -qE '^\}$' 2>/dev/null; then
             local func_len=$((ln_num - func_start))
             if [[ $func_len -gt 50 ]]; then
-                add_warning "WARN-GO001" "Function starting at line $func_start is $func_len lines — consider splitting"
+                add_warning "WARN-GO001" "Function starting at line $func_start is $func_len lines - consider splitting"
             fi
             in_func=false
         fi

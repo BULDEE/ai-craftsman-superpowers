@@ -41,7 +41,7 @@ Before generating ANY code, you MUST load and read the canonical example for the
 | component | `packs/react/knowledge/canonical/ts-react-component.tsx` |
 | hook | `packs/react/knowledge/canonical/ts-tanstack-hook.ts` |
 | api-resource | `packs/symfony/knowledge/canonical/php-state-provider.php` |
-| pack | *(generates new pack from convention — no canonical needed)* |
+| pack | *(generates new pack from convention - no canonical needed)* |
 
 ## Process
 

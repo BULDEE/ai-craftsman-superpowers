@@ -1,6 +1,6 @@
 name: react
 version: "1.0.0"
-description: "React/TypeScript craftsman pack — React 19, TanStack Query, Tailwind, shadcn/ui"
+description: "React/TypeScript craftsman pack - React 19, TanStack Query, Tailwind, shadcn/ui"
 compatibility:
   core: ">=2.4.0"
   stack: ["react", "fullstack"]

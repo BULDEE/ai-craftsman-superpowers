@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # =============================================================================
-# adapter.sh — Base contract, auto-detection, and unified comment formatter
+# adapter.sh - Base contract, auto-detection, and unified comment formatter
 #
 # Provides:
-#   adapter_auto_detect()     — detect CI provider from env vars
-#   adapter_load()            — source the appropriate provider adapter
-#   adapter_format_comment()  — generate markdown from JSON report
+#   adapter_auto_detect()     - detect CI provider from env vars
+#   adapter_load()            - source the appropriate provider adapter
+#   adapter_format_comment()  - generate markdown from JSON report
 #
 # All provider adapters implement the same contract:
-#   adapter_detect()    — return 0 if running in this CI
-#   adapter_run()       — run craftsman-ci.sh, produce report JSON
-#   adapter_annotate()  — emit provider-specific annotations
-#   adapter_comment()   — post/update PR comment via provider API
-#   adapter_exit()      — compute exit code from report
+#   adapter_detect()    - return 0 if running in this CI
+#   adapter_run()       - run craftsman-ci.sh, produce report JSON
+#   adapter_annotate()  - emit provider-specific annotations
+#   adapter_comment()   - post/update PR comment via provider API
+#   adapter_exit()      - compute exit code from report
 # =============================================================================
 set -uo pipefail
 

@@ -192,7 +192,7 @@ Duration: max(T1, T2, T3) = much faster than sequential
     └─────────────┘    └─────────────┘   └──────────────┘
 
 Timeline: Tasks flow through agents based on dependencies
-Duration: Critical path (T_total) — much faster than sequential
+Duration: Critical path (T_total) - much faster than sequential
 ```
 
 **Characteristics:**

@@ -10,7 +10,7 @@
 
 # ---------------------------------------------------------------------------
 # Internal: map PHPStan error to craftsman violation code
-# Format: "PHPSTAN<level>" — e.g. PHPSTAN001 for undefined var, PHPSTAN002 etc.
+# Format: "PHPSTAN<level>" - e.g. PHPSTAN001 for undefined var, PHPSTAN002 etc.
 # PHPStan raw format: "path/to/file.php:42:message"
 # ---------------------------------------------------------------------------
 _pack_sa_phpstan_map_error() {

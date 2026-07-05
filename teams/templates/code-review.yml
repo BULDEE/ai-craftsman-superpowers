@@ -3,7 +3,7 @@
 # Trigger: /craftsman:team create → select "code-review"
 
 name: code-review
-description: Comprehensive code review team — architecture + security + domain quality
+description: Comprehensive code review team - architecture + security + domain quality
 trigger: "Use when reviewing PRs, auditing code quality, or before major releases"
 
 agents:

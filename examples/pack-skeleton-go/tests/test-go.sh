@@ -7,7 +7,7 @@ TESTS_PASSED=0
 TESTS_FAILED=0
 
 log_pass() { echo "  ✓ $1"; ((TESTS_PASSED++)); }
-log_fail() { echo "  ✗ $1 — $2"; ((TESTS_FAILED++)); }
+log_fail() { echo "  ✗ $1 - $2"; ((TESTS_FAILED++)); }
 
 echo "=== Go Pack Tests ==="
 

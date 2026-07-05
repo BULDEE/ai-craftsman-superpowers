@@ -53,7 +53,7 @@ if [[ "$VERIFIED" == "true" ]]; then
     exit 0
 fi
 
-# Warning only — do not block the push
+# Warning only - do not block the push
 echo "WARNING: Session not verified. Consider running /craftsman:verify before pushing code changes." >&2
 jq -n '{
     hookSpecificOutput: {

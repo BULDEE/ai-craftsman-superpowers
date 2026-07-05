@@ -23,7 +23,7 @@ import type { User, UserId } from '@/domain/entities/User';
 import { userRepository } from '@/infrastructure/repositories/userRepository';
 
 // ============================================================
-// Server Component — async function, direct data access
+// Server Component - async function, direct data access
 // Source: https://react.dev/reference/rsc/server-components
 // ============================================================
 
@@ -36,7 +36,7 @@ export async function UserProfilePage({
 }: {
   readonly userId: UserId;
 }): Promise<ReactNode> {
-  // Direct backend access — no API layer needed
+  // Direct backend access - no API layer needed
   const user = await userRepository.findById(userId);
 
   if (!user) {
@@ -49,10 +49,10 @@ export async function UserProfilePage({
     <main className="container py-8">
       <h1 className="text-3xl font-bold">{user.name}</h1>
       <Suspense fallback={<ActivityFeedSkeleton />}>
-        {/* Async child component — streams independently */}
+        {/* Async child component - streams independently */}
         <UserActivityFeed userId={user.id} />
       </Suspense>
-      {/* Server Action form — real React 19, not Next.js-specific */}
+      {/* Server Action form - real React 19, not Next.js-specific */}
       <UpdateNameForm userId={user.id} currentName={user.name} />
     </main>
   );
@@ -68,7 +68,7 @@ async function UserActivityFeed({
 }: {
   readonly userId: UserId;
 }): Promise<ReactNode> {
-  // This component streams independently — parent shows faster
+  // This component streams independently - parent shows faster
   const activities = await userRepository.findRecentActivity(userId);
 
   return (
@@ -81,11 +81,11 @@ async function UserActivityFeed({
 }
 
 // ============================================================
-// Server Action — 'use server' directive inside async function
+// Server Action - 'use server' directive inside async function
 // Source: https://react.dev/reference/rsc/use-server
 // ============================================================
 
-// <form action={fn}> is real React 19 — works without JavaScript (progressive enhancement)
+// <form action={fn}> is real React 19 - works without JavaScript (progressive enhancement)
 // Automatic FormData as first argument
 // MUST call 'use server' at the very top of the async function body
 
@@ -98,7 +98,7 @@ function UpdateNameForm({
 }): ReactNode {
   async function updateName(formData: FormData): Promise<void> {
     'use server';
-    // Treat all arguments as untrusted — validate and authorize
+    // Treat all arguments as untrusted - validate and authorize
     const name = formData.get('name');
     if (typeof name !== 'string' || name.trim().length === 0) return;
     await userRepository.updateName(userId, name.trim());
@@ -118,7 +118,7 @@ function UpdateNameForm({
 }
 
 // ============================================================
-// Client Component — uses use() to read a Promise passed from Server
+// Client Component - uses use() to read a Promise passed from Server
 // Source: https://react.dev/reference/react/use
 // ============================================================
 
@@ -137,8 +137,8 @@ function UpdateNameForm({
 // }
 //
 // export function UserNameDisplay({ userPromise }: UserNameDisplayProps): ReactNode {
-//   // use() suspends until the promise resolves — wrap parent in <Suspense>
-//   // use() throws on rejection — wrap in <ErrorBoundary>
+//   // use() suspends until the promise resolves - wrap parent in <Suspense>
+//   // use() throws on rejection - wrap in <ErrorBoundary>
 //   // use() CAN be called inside conditionals (unlike useContext)
 //   const user = use(userPromise);
 //   return <span>{user.name}</span>;
@@ -163,7 +163,7 @@ function UpdateNameForm({
 
   SERVER ACTIONS (functions marked with 'use server')
   ✅ async functions only
-  ✅ <form action={fn}> — progressive enhancement
+  ✅ <form action={fn}> - progressive enhancement
   ✅ Callable from Client Components via startTransition
   ✅ Automatic FormData argument for forms
   ❌ React elements / JSX as return values
@@ -173,7 +173,7 @@ function UpdateNameForm({
   use() HOOK ON CLIENT
   ✅ Reads Promises and Context values
   ✅ Can be called inside conditionals and loops
-  ✅ Replaces useContext() — more flexible
+  ✅ Replaces useContext() - more flexible
   ❌ Cannot be called in try-catch blocks
   ❌ Cannot be called in event handlers
 */

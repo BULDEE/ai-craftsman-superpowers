@@ -3,14 +3,14 @@ description: "CI/CD pipeline integration. Use when setting up or checking CI qua
 effort: medium
 ---
 
-# /craftsman:ci — CI/CD Integration
+# /craftsman:ci - CI/CD Integration
 
 Integrate Craftsman quality gates into your CI/CD pipeline.
 
 ## Subcommands
 
-- `/craftsman:ci export` — Generate `.github/workflows/craftsman-quality-gate.yml`
-- `/craftsman:ci status` — Show current CI integration status
+- `/craftsman:ci export` - Generate `.github/workflows/craftsman-quality-gate.yml`
+- `/craftsman:ci status` - Show current CI integration status
 
 ---
 
@@ -42,15 +42,15 @@ Next steps:
 
 Check the following and report:
 
-1. **Workflow file** — Does `.github/workflows/craftsman-quality-gate.yml` exist?
+1. **Workflow file** - Does `.github/workflows/craftsman-quality-gate.yml` exist?
    - If yes: show `strictness` and `stack` from the embedded config, and the file's last modified date.
    - If no: suggest running `/craftsman:ci export`.
 
-2. **craftsman-ci CLI** — Does `ci/craftsman-ci.sh` exist and is it executable?
+2. **craftsman-ci CLI** - Does `ci/craftsman-ci.sh` exist and is it executable?
 
-3. **Config file** — Does `.craft-config.yml` exist?
+3. **Config file** - Does `.craft-config.yml` exist?
 
-4. **Stack detection** — Are `composer.json` / `package.json` / `deptrac.yaml` present?
+4. **Stack detection** - Are `composer.json` / `package.json` / `deptrac.yaml` present?
 
 Output a clear status table:
 
@@ -69,7 +69,7 @@ Run /craftsman:ci export to generate the workflow if missing.
 
 ## Constraints
 
-- Never modify `hooks/`, `agents/`, or `packs/` — CI is an additive integration layer.
+- Never modify `hooks/`, `agents/`, or `packs/` - CI is an additive integration layer.
 - The exported workflow uses the same rules as the hooks; they must never diverge.
-- If `ci/craftsman-ci.sh` is not present, warn the user — the workflow depends on it.
+- If `ci/craftsman-ci.sh` is not present, warn the user - the workflow depends on it.
 - All shell commands use `|| true` for optional tools (PHPStan, ESLint, deptrac) so the workflow degrades gracefully.

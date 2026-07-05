@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Subagent Quality Gate — SubagentStop Hook
+# Subagent Quality Gate - SubagentStop Hook
 # Validates code produced by subagents against craftsman rules.
 # Logs subagent activity in metrics for cross-agent pattern detection.
 #

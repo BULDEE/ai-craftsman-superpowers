@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# bump-version.sh — Update version across all project files
+# bump-version.sh - Update version across all project files
 #
 # Usage: ./scripts/bump-version.sh <new_version>
 # Example: ./scripts/bump-version.sh 2.3.0

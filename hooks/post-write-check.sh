@@ -8,9 +8,9 @@
 # OUTPUT: JSON with hookSpecificOutput or systemMessage
 #
 # Three validation levels:
-#   Level 1: Regex (always, <50ms) — strict_types, final, any, setters
-#   Level 2: Static analysis (if tools installed, <2s) — PHPStan, ESLint
-#   Level 3: Architecture (if tools installed, <2s) — deptrac, dependency-cruiser
+#   Level 1: Regex (always, <50ms) - strict_types, final, any, setters
+#   Level 2: Static analysis (if tools installed, <2s) - PHPStan, ESLint
+#   Level 3: Architecture (if tools installed, <2s) - deptrac, dependency-cruiser
 # craftsman-ignore: SH001
 # =============================================================================
 set -uo pipefail
@@ -29,7 +29,7 @@ source "${SCRIPT_DIR}/lib/pack-loader.sh"
 source "${SCRIPT_DIR}/lib/structural.sh"
 rules_init "$PWD" "${HOME}/.claude"
 
-# Python3 availability — skip correction learning features if missing
+# Python3 availability - skip correction learning features if missing
 HAS_PYTHON3=true
 command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
 
@@ -143,7 +143,7 @@ line_has_ignore() {
     if echo "$line" | grep -qE "craftsman-ignore:\s*[^#]*\b${rule}\b" 2>/dev/null; then
         return 0
     fi
-    # Blanket ignore (no specific rule — just "craftsman-ignore" with no colon or empty list)
+    # Blanket ignore (no specific rule - just "craftsman-ignore" with no colon or empty list)
     if echo "$line" | grep -qE "craftsman-ignore\s*$" 2>/dev/null; then
         return 0
     fi
@@ -208,7 +208,7 @@ add_warning() {
 }
 
 # =============================================================================
-# Static Analysis Helper — parses structured CODE:LINE:MESSAGE output
+# Static Analysis Helper - parses structured CODE:LINE:MESSAGE output
 # =============================================================================
 _run_static_analysis() {
     local file="$1"
@@ -232,7 +232,7 @@ _run_static_analysis() {
 }
 
 # =============================================================================
-# Run Validation — delegates to pack validators
+# Run Validation - delegates to pack validators
 # =============================================================================
 
 case "$EXT" in
@@ -299,7 +299,7 @@ _check_corrections "$FILE_PATH"
 # =============================================================================
 
 if [[ $CRITICAL_COUNT -gt 0 ]]; then
-    # Rules engine already routed block vs warn — CRITICAL_VIOLATIONS only contains blocking rules
+    # Rules engine already routed block vs warn - CRITICAL_VIOLATIONS only contains blocking rules
     _write_session_state "$FILE_PATH"
 
     # Check for cross-file patterns and append actionable suggestion
@@ -311,18 +311,18 @@ if [[ $CRITICAL_COUNT -gt 0 ]]; then
             if [[ "$ps_line" == PATTERN:* ]]; then
                 ps_rule=$(echo "$ps_line" | cut -d: -f2)
                 ps_count=$(echo "$ps_line" | cut -d: -f3)
-                pattern_msg="${pattern_msg}PROJECT-WIDE PATTERN: ${ps_rule} found in ${ps_count} — consider a project-wide fix or global craftsman-ignore.\n"
+                pattern_msg="${pattern_msg}PROJECT-WIDE PATTERN: ${ps_rule} found in ${ps_count} - consider a project-wide fix or global craftsman-ignore.\n"
             elif [[ "$ps_line" == DIR_PATTERN:* ]]; then
                 ps_rule=$(echo "$ps_line" | cut -d: -f2)
                 ps_dir=$(echo "$ps_line" | cut -d: -f3)
                 ps_count=$(echo "$ps_line" | cut -d: -f4)
-                pattern_msg="${pattern_msg}DIRECTORY PATTERN: ${ps_rule} in ${ps_dir}/ (${ps_count}) — apply fix directory-wide.\n"
+                pattern_msg="${pattern_msg}DIRECTORY PATTERN: ${ps_rule} in ${ps_dir}/ (${ps_count}) - apply fix directory-wide.\n"
             fi
         done <<< "$PATTERN_SUGGESTIONS"
     fi
 
     # Human-readable message on stderr (shown in Claude Code UI)
-    echo "🚫 BLOCKED by AI Craftsman — ${CRITICAL_COUNT} violation(s):" >&2
+    echo "🚫 BLOCKED by AI Craftsman - ${CRITICAL_COUNT} violation(s):" >&2
     while IFS= read -r vline; do
         [[ -n "$vline" ]] && echo "  ✗ $vline" >&2
     done <<< "$(echo -e "$CRITICAL_VIOLATIONS")"
@@ -354,7 +354,7 @@ if [[ $WARNING_COUNT -gt 0 ]]; then
             if [[ "$ps_line" == PATTERN:* ]]; then
                 ps_rule=$(echo "$ps_line" | cut -d: -f2)
                 ps_count=$(echo "$ps_line" | cut -d: -f3)
-                pattern_msg="${pattern_msg}PROJECT-WIDE PATTERN: ${ps_rule} found in ${ps_count} — consider a project-wide fix.\n"
+                pattern_msg="${pattern_msg}PROJECT-WIDE PATTERN: ${ps_rule} found in ${ps_count} - consider a project-wide fix.\n"
             elif [[ "$ps_line" == DIR_PATTERN:* ]]; then
                 ps_rule=$(echo "$ps_line" | cut -d: -f2)
                 ps_dir=$(echo "$ps_line" | cut -d: -f3)

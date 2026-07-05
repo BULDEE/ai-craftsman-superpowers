@@ -1,7 +1,7 @@
 ---
 name: ai-engineer
 description: |
-  Senior AI/ML engineer — deep expertise in RAG pipelines (pgvector, embeddings, chunking),
+  Senior AI/ML engineer - deep expertise in RAG pipelines (pgvector, embeddings, chunking),
   LLM integration (Claude, OpenAI), prompt engineering, AI agents (Symfony AI, LangChain),
   and MLOps practices. Use for AI feature reviews, RAG audits, or AI system design.
 model: sonnet

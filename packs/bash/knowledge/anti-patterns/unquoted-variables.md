@@ -30,4 +30,4 @@ But quoting consistently is safer and more readable.
 
 ## Rule
 
-**SH005** — Unquoted variable in file operation. Always quote `"$variable"`.
+**SH005** - Unquoted variable in file operation. Always quote `"$variable"`.

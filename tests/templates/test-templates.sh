@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# test-templates.sh — Template syntax and structure validation
+# test-templates.sh - Template syntax and structure validation
 #
 # Validates all pack templates for:
 #   - Required sections (Mission, Context Files)

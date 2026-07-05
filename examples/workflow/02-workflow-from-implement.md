@@ -20,19 +20,19 @@ I already designed and spec'd the caching layer. Ready to code.
 Starting Development Pipeline (from: implement)...
 
 Pipeline Progress:
-  [~] design    — Skipped (--from)
-  [~] spec      — Skipped (--from)
-  [~] plan      — Skipped (--from)
-  [ ] implement — Write code
-  [ ] test      — Run tests
-  [ ] verify    — Evidence check
-  [ ] commit    — Version control
+  [~] design    - Skipped (--from)
+  [~] spec      - Skipped (--from)
+  [~] plan      - Skipped (--from)
+  [ ] implement - Write code
+  [ ] test      - Run tests
+  [ ] verify    - Evidence check
+  [ ] commit    - Version control
 ```
 
 ### Step 4: Implement
 
 ```
-Step 4/7: IMPLEMENT — Write the code. Craftsman hooks validate in real-time.
+Step 4/7: IMPLEMENT - Write the code. Craftsman hooks validate in real-time.
 Go ahead and implement. Tell me when you're done.
 ```
 

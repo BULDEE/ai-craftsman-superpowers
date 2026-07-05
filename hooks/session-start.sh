@@ -34,7 +34,7 @@ _init_packs() {
 # Consume stdin (may be empty or JSON)
 cat > /dev/null 2>&1 || true
 
-# Python3 availability check — skip python-dependent features if missing
+# Python3 availability check - skip python-dependent features if missing
 HAS_PYTHON3=true
 command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
 
@@ -102,7 +102,7 @@ fi
 # Config mismatch warning
 WARNINGS=""
 
-# Validate hooks.json schema — catch unsupported events early
+# Validate hooks.json schema - catch unsupported events early
 HOOKS_FILE="${SCRIPT_DIR}/hooks.json"
 if [[ -f "$HOOKS_FILE" ]]; then
     SUPPORTED_EVENTS=$(hook_events_python_set)
@@ -127,7 +127,7 @@ if [[ "$DETECTED" != "other" && "$DETECTED" != "$STACK" ]]; then
     WARNINGS="${WARNINGS} | Warning: detected '${DETECTED}' but config says '${STACK}'. Run /craftsman:setup to update."
 fi
 
-# Auto-setup gate — check both global and project config
+# Auto-setup gate - check both global and project config
 if [[ ! -f "${HOME}/.claude/.craft-config.yml" ]] && [[ ! -f "${PWD}/.craft-config.yml" ]]; then
     WARNINGS="${WARNINGS} | First time? Run /craftsman:setup to configure your profile and project. The plugin works with defaults, but setup unlocks full customization."
 elif [[ ! -f "${PWD}/.craft-config.yml" ]]; then

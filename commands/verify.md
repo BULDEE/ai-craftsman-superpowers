@@ -104,14 +104,14 @@ Use the **Glob** tool to detect the stack:
 **Auto-run available checks:**
 
 For PHP projects, attempt in order (skip if tool not found):
-1. `vendor/bin/phpunit` — Unit tests
-2. `vendor/bin/phpstan analyse` — Static analysis
-3. `vendor/bin/php-cs-fixer fix --dry-run` — Code style
+1. `vendor/bin/phpunit` - Unit tests
+2. `vendor/bin/phpstan analyse` - Static analysis
+3. `vendor/bin/php-cs-fixer fix --dry-run` - Code style
 
 For Node projects, attempt in order:
-1. `npm test` or `npx vitest run` — Tests
-2. `npx tsc --noEmit` — Type checking
-3. `npm run lint` or `npx eslint .` — Linting
+1. `npm test` or `npx vitest run` - Tests
+2. `npx tsc --noEmit` - Type checking
+3. `npm run lint` or `npx eslint .` - Linting
 
 **Run each command via Bash tool and capture ACTUAL output as evidence.**
 Do NOT claim "tests pass" without showing the output.
@@ -144,7 +144,7 @@ bash ~/.claude/craftsman-set-verified.sh
 
 If the wrapper is missing, fall back to:
 ```
-bash -c 'BRIDGE="${HOME}/.claude/craftsman-session-state-path"; if [ ! -f "$BRIDGE" ]; then echo "ERROR: bridge file $BRIDGE not found — session-start may not have run" >&2; exit 1; fi; SF=$(cat "$BRIDGE"); mkdir -p "$(dirname "$SF")"; python3 -c "
+bash -c 'BRIDGE="${HOME}/.claude/craftsman-session-state-path"; if [ ! -f "$BRIDGE" ]; then echo "ERROR: bridge file $BRIDGE not found - session-start may not have run" >&2; exit 1; fi; SF=$(cat "$BRIDGE"); mkdir -p "$(dirname "$SF")"; python3 -c "
 import json,os,datetime,tempfile; sf=\"$SF\"
 try:
  with open(sf) as f: s=json.load(f)
@@ -158,7 +158,7 @@ os.rename(t,sf); print(\"verified=true at \"+sf)
 ```
 If both commands fail, say "Session state update skipped".
 
-This unblocks `git push` — the pre-push hook checks this flag.
+This unblocks `git push` - the pre-push hook checks this flag.
 
 ## Common Verification Commands
 

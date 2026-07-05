@@ -7,10 +7,10 @@
  * Source: https://symfony.com/doc/current/messenger.html
  *
  * Key characteristics:
- * - #[AsMessageHandler] attribute (MUST) — replaces manual services.yaml tag
+ * - #[AsMessageHandler] attribute (MUST) - replaces manual services.yaml tag
  * - final readonly class (MUST)
  * - Single __invoke() method typed to the message (MUST)
- * - No return value for async handlers (SHOULD) — dispatch() returns Envelope, not handler result
+ * - No return value for async handlers (SHOULD) - dispatch() returns Envelope, not handler result
  * - MessageBusInterface for dispatching (MUST)
  */
 
@@ -61,7 +61,7 @@ final readonly class SendNotificationHandler
 // ============================================================
 // CANONICAL EXAMPLE: Dispatching from Controller (v1.0)
 // ============================================================
-// dispatch() returns Envelope — NOT the handler's return value.
+// dispatch() returns Envelope - NOT the handler's return value.
 // For async transports, the handler runs in a worker process.
 //
 // use Symfony\Component\Messenger\MessageBusInterface;

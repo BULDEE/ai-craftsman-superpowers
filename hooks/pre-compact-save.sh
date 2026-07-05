@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Pre-Compact Context Preservation — PreCompact Hook
+# Pre-Compact Context Preservation - PreCompact Hook
 # Saves current violation state and session context before compaction.
 # Ensures correction learning and cross-file patterns survive compaction.
 #
@@ -26,7 +26,7 @@ if $HAS_PYTHON3 && [[ -f "$SESSION_STATE" ]]; then
 
     if [[ -n "$COMPACT_SUMMARY" ]]; then
         jq -n --arg summary "$COMPACT_SUMMARY" '{
-            systemMessage: ("Context compaction — Craftsman state preserved: " + $summary)
+            systemMessage: ("Context compaction - Craftsman state preserved: " + $summary)
         }'
     fi
 fi

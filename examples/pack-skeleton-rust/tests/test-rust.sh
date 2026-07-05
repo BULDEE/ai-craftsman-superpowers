@@ -7,7 +7,7 @@ TESTS_PASSED=0
 TESTS_FAILED=0
 
 log_pass() { echo "  ✓ $1"; ((TESTS_PASSED++)); }
-log_fail() { echo "  ✗ $1 — $2"; ((TESTS_FAILED++)); }
+log_fail() { echo "  ✗ $1 - $2"; ((TESTS_FAILED++)); }
 
 echo "=== Rust Pack Tests ==="
 
@@ -29,7 +29,7 @@ else
 fi
 
 # Test: RUST001 detects unwrap
-# Note: tmpfile must not contain "test" in path — validator skips test files
+# Note: tmpfile must not contain "test" in path - validator skips test files
 tmpfile=$(mktemp /tmp/prod_rust_XXXXXX)
 cat > "$tmpfile" << 'RUST'
 fn main() {

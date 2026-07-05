@@ -11,15 +11,15 @@ Accepted
 ## Context
 
 The PostToolUse `Write|Edit` hook group contained 3 hooks:
-1. `post-write-check.sh` (type `command`) — regex/static analysis validation
+1. `post-write-check.sh` (type `command`) - regex/static analysis validation
 2. DDD architecture verifier (type `agent`, model haiku)
 3. Sentry error context (type `agent`, model haiku)
 
 The 2 agent hooks included an "AGENT HOOKS GATE" in their prompt: the agent would check `CLAUDE_PLUGIN_OPTION_agent_hooks` and return empty if `false`. However, this gate was ineffective because:
 
-1. **Agent hooks launch before the gate executes** — if the agent fails to start (model unavailable, timeout, API error), the gate never runs and the hook errors immediately.
-2. **`hooks.json` has no conditional execution** — there is no `enabled`, `condition`, or `if` field. All hooks in a matcher group always run.
-3. **Users with `agent_hooks: false` still see errors** — two "PostToolUse:Edit hook error" messages on every Write/Edit, even though they explicitly disabled agent hooks.
+1. **Agent hooks launch before the gate executes** - if the agent fails to start (model unavailable, timeout, API error), the gate never runs and the hook errors immediately.
+2. **`hooks.json` has no conditional execution** - there is no `enabled`, `condition`, or `if` field. All hooks in a matcher group always run.
+3. **Users with `agent_hooks: false` still see errors** - two "PostToolUse:Edit hook error" messages on every Write/Edit, even though they explicitly disabled agent hooks.
 
 This caused a broken experience for every user who disabled agent hooks (or had no access to the Haiku model).
 
@@ -28,7 +28,7 @@ This caused a broken experience for every user who disabled agent hooks (or had 
 Replace the 2 `"type": "agent"` hooks with `"type": "command"` hooks that wrap the gate logic in bash scripts (`agent-ddd-verifier.sh`, `agent-sentry-context.sh`).
 
 Each wrapper script:
-1. Checks `CLAUDE_PLUGIN_OPTION_agent_hooks` — exits 0 silently if `false`
+1. Checks `CLAUDE_PLUGIN_OPTION_agent_hooks` - exits 0 silently if `false`
 2. Checks additional prerequisites (file extension, Sentry config, circuit breaker state)
 3. If all gates pass, emits a `systemMessage` JSON payload with the verification request for the main conversation Claude to handle
 
@@ -36,16 +36,16 @@ Each wrapper script:
 
 ### Positive
 
-- Zero errors when `agent_hooks=false` — the bash gate exits before any agent/API call
-- Zero errors when Haiku model is unavailable — no sub-agent is spawned
+- Zero errors when `agent_hooks=false` - the bash gate exits before any agent/API call
+- Zero errors when Haiku model is unavailable - no sub-agent is spawned
 - Sentry circuit breaker check runs in bash (cheap) instead of inside an agent (expensive)
 - Same gating logic, deterministic execution order
 
 ### Negative
 
-- When `agent_hooks=true`, verification runs in the main conversation context instead of a dedicated Haiku sub-agent — uses the main model's context window and tokens
-- No parallel sub-agent execution — DDD and Sentry checks are sequential within the main conversation
-- Loss of model tiering (Haiku for hooks, Opus/Sonnet for main) — all work uses the main model
+- When `agent_hooks=true`, verification runs in the main conversation context instead of a dedicated Haiku sub-agent - uses the main model's context window and tokens
+- No parallel sub-agent execution - DDD and Sentry checks are sequential within the main conversation
+- Loss of model tiering (Haiku for hooks, Opus/Sonnet for main) - all work uses the main model
 
 ### Neutral
 
@@ -70,7 +70,7 @@ A setup script reads `agent_hooks` and generates `hooks.json` with or without ag
 
 Add a command hook before the agent hooks that blocks execution if `agent_hooks=false`.
 
-**Rejected because:** hooks within the same matcher group run independently — one hook cannot cancel another. A blocking exit (code 2) would block the Write/Edit itself, not just the agent hooks.
+**Rejected because:** hooks within the same matcher group run independently - one hook cannot cancel another. A blocking exit (code 2) would block the Write/Edit itself, not just the agent hooks.
 
 ## References
 

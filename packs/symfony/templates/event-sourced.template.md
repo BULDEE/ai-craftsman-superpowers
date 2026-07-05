@@ -1,4 +1,4 @@
-# Agent: Backend {{CONTEXT}} Context — Event-Sourced Aggregate
+# Agent: Backend {{CONTEXT}} Context - Event-Sourced Aggregate
 
 > Template for event-sourced aggregates with projections, snapshots, and replay
 > Replace {{PLACEHOLDERS}} with actual values
@@ -857,7 +857,7 @@ final class DoctrineEventStore implements EventStoreInterface
 
     private function serialize(DomainEventInterface $event): array
     {
-        // Map event class to serializable array — implement per event type
+        // Map event class to serializable array - implement per event type
         return [];
     }
 
@@ -865,7 +865,7 @@ final class DoctrineEventStore implements EventStoreInterface
     {
         $payload = json_decode($row['payload'], true, 512, JSON_THROW_ON_ERROR);
 
-        // Map type string back to domain event class — implement per event type
+        // Map type string back to domain event class - implement per event type
         return match ($row['type']) {
             default => throw new \UnexpectedValueException(
                 sprintf('Unknown event type: %s', $row['type'])
@@ -1165,7 +1165,7 @@ final class Replay{{AGGREGATE_ROOT}}EventsCommand extends Command
             return;
         }
 
-        // Truncate + replay — implement full-scan in event store or use a dedicated method
+        // Truncate + replay - implement full-scan in event store or use a dedicated method
         $io->success('Replay complete.');
     }
 }
@@ -1359,13 +1359,13 @@ bin/console doctrine:migrations:status
 
 ## Do NOT
 
-- Expose setters on the aggregate — all mutation goes through behavioral methods that record events
+- Expose setters on the aggregate - all mutation goes through behavioral methods that record events
 - Modify `recordedEvents()` output after `clearRecordedEvents()` has been called
-- Load the aggregate from the read model — always reconstitute from the event store
-- Dispatch domain events directly from a handler — the repository's `save()` drives the projector
+- Load the aggregate from the read model - always reconstitute from the event store
+- Dispatch domain events directly from a handler - the repository's `save()` drives the projector
 - Skip the optimistic concurrency check in `DoctrineEventStore::append()`
-- Snapshot more often than `{{SNAPSHOT_THRESHOLD}}` events — snapshots are not free
-- Delete events from `{{CONTEXT_SNAKE}}_events` — the table is append-only by design
+- Snapshot more often than `{{SNAPSHOT_THRESHOLD}}` events - snapshots are not free
+- Delete events from `{{CONTEXT_SNAKE}}_events` - the table is append-only by design
 
 {{#each ANTI_PATTERNS}}
 - {{RULE}}

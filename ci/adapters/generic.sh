@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# generic.sh — Generic/fallback CI adapter
+# generic.sh - Generic/fallback CI adapter
 #
 # Works with Jenkins, CircleCI, local dev, or any unsupported CI.
 # Annotations go to stdout, comments are written to a markdown file.

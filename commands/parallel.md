@@ -118,7 +118,7 @@ Agent tool call:
   run_in_background: true  (for true parallelism)
 ```
 
-**Launch ALL independent agents in a SINGLE message** — this is how Claude Code achieves true parallel execution. Multiple Agent tool calls in one response = concurrent execution.
+**Launch ALL independent agents in a SINGLE message** - this is how Claude Code achieves true parallel execution. Multiple Agent tool calls in one response = concurrent execution.
 
 After dispatch, you'll be notified when each agent completes. Use SendMessage to check on agents if needed.
 
@@ -152,7 +152,7 @@ After dispatch, you'll be notified when each agent completes. Use SendMessage to
 **Launching 4 agents...**
 ```
 
-Then use the Agent tool 4 times in ONE response — all 4 will execute concurrently.
+Then use the Agent tool 4 times in ONE response - all 4 will execute concurrently.
 
 ### Phase 5: Result Aggregation
 

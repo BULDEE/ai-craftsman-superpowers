@@ -5,7 +5,7 @@
 
 ## Mission
 
-Build a production-ready multi-step form for {{FORM_DESCRIPTION}}. The form must handle wizard navigation, per-step validation, optimistic submission, draft autosave, and accessible progress tracking — all with React 19 patterns and strict TypeScript.
+Build a production-ready multi-step form for {{FORM_DESCRIPTION}}. The form must handle wizard navigation, per-step validation, optimistic submission, draft autosave, and accessible progress tracking - all with React 19 patterns and strict TypeScript.
 
 ## Context Files to Read
 
@@ -22,7 +22,7 @@ Build a production-ready multi-step form for {{FORM_DESCRIPTION}}. The form must
 // frontend/src/domain/{{context}}/types.ts
 import { z } from 'zod';
 
-// Branded primitives — never use raw string/number for domain IDs
+// Branded primitives - never use raw string/number for domain IDs
 export type {{Entity}}Id = string & { readonly _brand: '{{Entity}}Id' };
 
 export function make{{Entity}}Id(value: string): {{Entity}}Id {
@@ -49,7 +49,7 @@ export const step{{STEP_3_NAME}}Schema = z.object({
   {{/each}}
 });
 
-// Full form schema — intersection of all steps
+// Full form schema - intersection of all steps
 export const {{entity}}FormSchema = step{{STEP_1_NAME}}Schema
   .merge(step{{STEP_2_NAME}}Schema)
   .merge(step{{STEP_3_NAME}}Schema);
@@ -146,7 +146,7 @@ export async function submit{{Entity}}Form(
   }
 }
 
-// Stub — replace with real implementation
+// Stub - replace with real implementation
 async function create{{Entity}}(_data: {{Entity}}FormData): Promise<string> {
   throw new Error('Not implemented: create{{Entity}}');
 }
@@ -220,7 +220,7 @@ function saveDraft(data: Partial<{{Entity}}FormData>): void {
   try {
     localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
   } catch {
-    // Storage quota exceeded or private browsing — silently ignore
+    // Storage quota exceeded or private browsing - silently ignore
   }
 }
 
@@ -804,13 +804,13 @@ export function FileUploadField() {
         onClick={() => inputRef.current?.click()}
         role="button"
         tabIndex={0}
-        aria-label="Upload files — click or drag and drop"
+        aria-label="Upload files - click or drag and drop"
         onKeyDown={e => e.key === 'Enter' && inputRef.current?.click()}
         className="flex cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-border p-8 transition-colors hover:border-primary"
       >
         <p className="text-sm text-muted-foreground">Click or drag files here</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Accepted: {ACCEPTED_TYPES} — max {Math.round(MAX_SIZE_BYTES / 1024 / 1024)} MB
+          Accepted: {ACCEPTED_TYPES} - max {Math.round(MAX_SIZE_BYTES / 1024 / 1024)} MB
         </p>
       </div>
 
@@ -1112,11 +1112,11 @@ npm run lint
 
 ## Do NOT
 
-- Use `any` — Zod inference gives you exact types
-- Use non-null assertion (`!`) — handle null with early returns or optional chaining
-- Use default exports — named exports only for tree-shaking and refactor safety
-- Mutable properties — all interfaces use `readonly`
-- Skip `aria-invalid` / `aria-describedby` on inputs — required for screen reader error association
-- Call `URL.createObjectURL` without a corresponding `URL.revokeObjectURL` on removal — memory leak
-- Persist sensitive data in localStorage draft — only persist non-sensitive form state
-- Skip the `{{Entity}}FormErrorBoundary` wrapper on steps — async step renders can throw
+- Use `any` - Zod inference gives you exact types
+- Use non-null assertion (`!`) - handle null with early returns or optional chaining
+- Use default exports - named exports only for tree-shaking and refactor safety
+- Mutable properties - all interfaces use `readonly`
+- Skip `aria-invalid` / `aria-describedby` on inputs - required for screen reader error association
+- Call `URL.createObjectURL` without a corresponding `URL.revokeObjectURL` on removal - memory leak
+- Persist sensitive data in localStorage draft - only persist non-sensitive form state
+- Skip the `{{Entity}}FormErrorBoundary` wrapper on steps - async step renders can throw

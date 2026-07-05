@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Tool Failure Tracker — PostToolUseFailure Hook
+# Tool Failure Tracker - PostToolUseFailure Hook
 # Tracks tool execution failures in metrics for pattern detection.
 #
 # TRIGGERS: PostToolUseFailure (Write|Edit|Bash)

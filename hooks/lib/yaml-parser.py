@@ -218,7 +218,7 @@ def parse_yaml(file_path: str) -> dict:
     except ImportError:
         return parse_line_by_line(file_path)
     except Exception as e:
-        # PyYAML parse error — try fallback
+        # PyYAML parse error - try fallback
         print(
             f"[yaml-parser] WARNING: PyYAML failed: {e}, trying fallback",
             file=sys.stderr,

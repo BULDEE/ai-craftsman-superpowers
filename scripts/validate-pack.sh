@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# validate-pack.sh — Validates a pack directory against conventions.
+# validate-pack.sh - Validates a pack directory against conventions.
 #
 # Usage:
 #   validate-pack.sh <pack-dir> [--check-collisions <packs-root>]
@@ -40,7 +40,7 @@ if [[ -z "$PACK_DIR" ]]; then
 fi
 
 # =============================================================================
-# YAML parsing helpers (POSIX/macOS-compatible — uses [[:space:]] not \s)
+# YAML parsing helpers (POSIX/macOS-compatible - uses [[:space:]] not \s)
 # =============================================================================
 
 _yml_value() {

@@ -31,7 +31,7 @@ reset_violations() {
 }
 
 # =============================================================================
-# Bash Self-Validation — Hook scripts (executable, must pass all rules)
+# Bash Self-Validation - Hook scripts (executable, must pass all rules)
 # =============================================================================
 echo ""
 echo "=== Dogfood: Bash hook scripts (hooks/*.sh) ==="
@@ -54,7 +54,7 @@ for file in "$ROOT_DIR"/hooks/*.sh; do
 done
 
 # =============================================================================
-# Bash Self-Validation — Sourced libs (hooks/lib/*.sh)
+# Bash Self-Validation - Sourced libs (hooks/lib/*.sh)
 # Skip SH001 (no set -euo needed for sourced libs), check SH002-SH005
 # =============================================================================
 echo ""
@@ -87,7 +87,7 @@ for file in "$ROOT_DIR"/hooks/lib/*.sh; do
 done
 
 # =============================================================================
-# Python Self-Validation — hooks/lib/*.py
+# Python Self-Validation - hooks/lib/*.py
 # =============================================================================
 echo ""
 echo "=== Dogfood: Python files (hooks/lib/*.py) ==="

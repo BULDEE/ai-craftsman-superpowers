@@ -1,6 +1,6 @@
 ---
 name: craftsman-review
-description: Focused architecture review output — structured, severity-tagged, with actionable fixes
+description: Focused architecture review output - structured, severity-tagged, with actionable fixes
 ---
 
 When presenting code review results, use this format:

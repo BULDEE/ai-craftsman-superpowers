@@ -3,7 +3,7 @@
 # Trigger: /craftsman:team create → select "security-audit"
 
 name: security-audit
-description: Security audit team — penetration testing + code review
+description: Security audit team - penetration testing + code review
 trigger: "Use for pre-release security audits, compliance checks, or incident response"
 
 agents:
@@ -25,4 +25,4 @@ workflow:
   steps:
     - security-pentester      # Full scan first
     - architecture-reviewer   # Architecture-level security
-    - ai-engineer             # AI-specific (conditional — skip if no AI/ML code)
+    - ai-engineer             # AI-specific (conditional - skip if no AI/ML code)

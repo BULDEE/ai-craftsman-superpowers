@@ -34,10 +34,10 @@ This example walks through implementing a checkout system with payment processin
 ```
 How do you want to build your team?
 
-1. code-review     — Architecture + security + domain quality review
-2. feature         — Backend + frontend + post-implementation review
-3. security-audit  — Penetration testing + architecture security
-4. custom          — Interactive questionnaire
+1. code-review     - Architecture + security + domain quality review
+2. feature         - Backend + frontend + post-implementation review
+3. security-audit  - Penetration testing + architecture security
+4. custom          - Interactive questionnaire
 
 Your choice: 2 (feature)
 ```
@@ -305,10 +305,10 @@ interface PaymentRepositoryInterface {
 Design API endpoints for checkout process.
 
 Endpoints needed:
-1. POST /api/checkout/validate   — Validate cart & get checkout session
-2. POST /api/checkout/confirm    — Confirm order + create payment
-3. POST /api/checkout/webhook    — Stripe webhook (async payment result)
-4. GET /api/checkout/:orderId    — Get order/payment status
+1. POST /api/checkout/validate   - Validate cart & get checkout session
+2. POST /api/checkout/confirm    - Confirm order + create payment
+3. POST /api/checkout/webhook    - Stripe webhook (async payment result)
+4. GET /api/checkout/:orderId    - Get order/payment status
 
 Requirements:
 - Request/response schemas

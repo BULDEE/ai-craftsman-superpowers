@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Structural metrics wrapper — bridges structural_metrics.py to the validator
+# Structural metrics wrapper - bridges structural_metrics.py to the validator
 # pipeline. Provides structural_check_file() for pack validators.
 #
 # Rules emitted: NEST001, LOC001, GOD001, PARAM001 (severity routed by the

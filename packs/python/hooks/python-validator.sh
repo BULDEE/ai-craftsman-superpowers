@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Python Regex Validator — Python Pack
+# Python Regex Validator - Python Pack
 # Provides pack_validate_python() for the pack-loader pipeline.
 #
 # Rules: PY001-005, WARN-PY001
@@ -8,7 +8,7 @@
 #   These are provided by the orchestrator (post-write-check.sh) before sourcing.
 #
 # NOTE: This file is source'd by pack-loader, NOT executed directly.
-#   Do NOT add set -euo pipefail — it would affect the sourcing script.
+#   Do NOT add set -euo pipefail - it would affect the sourcing script.
 # craftsman-ignore: SH001
 # =============================================================================
 
@@ -17,7 +17,7 @@ _check_py001() {
     local line_number
     while IFS= read -r line_number; do
         [[ -z "$line_number" ]] && continue
-        add_violation "PY001" "line ${line_number}: Single/double-char variable name — use descriptive names"
+        add_violation "PY001" "line ${line_number}: Single/double-char variable name - use descriptive names"
     done < <(grep -nE '^\s+((for)\s+)?[a-z]{1,2}\s*[=,[:space:]]' "$file" 2>/dev/null \
         | grep -vE '\b(i|j|k|x|y|f|e|n|ok|id|os|re|io|db|if|in|is|or|as|do|to|up|no)\b\s*[=,[:space:]]' \
         | grep -vE '(import|from|#|def |class |return |elif )' \
@@ -41,7 +41,7 @@ for node in ast.walk(tree):
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
         body_lines = node.end_lineno - node.lineno
         if body_lines > 25:
-            print(f'line {node.lineno}: function {node.name}() is {body_lines} lines — consider extracting')
+            print(f'line {node.lineno}: function {node.name}() is {body_lines} lines - consider extracting')
 " "$file" 2>/dev/null)
 }
 
@@ -65,7 +65,7 @@ _check_py004() {
     local bare_except_line
     while IFS= read -r bare_except_line; do
         [[ -z "$bare_except_line" ]] && continue
-        add_violation "PY004" "line ${bare_except_line}: Bare 'except:' — catch specific exceptions"
+        add_violation "PY004" "line ${bare_except_line}: Bare 'except:' - catch specific exceptions"
     done < <(grep -nE '^\s*except\s*:' "$file" 2>/dev/null | cut -d: -f1)
 }
 
@@ -74,14 +74,14 @@ _check_py005() {
     local mutable_default_line
     while IFS= read -r mutable_default_line; do
         [[ -z "$mutable_default_line" ]] && continue
-        add_violation "PY005" "line ${mutable_default_line}: Mutable default argument — use None + assignment"
+        add_violation "PY005" "line ${mutable_default_line}: Mutable default argument - use None + assignment"
     done < <(grep -nE 'def\s+\w+\(.*=\s*(\[\]|\{\}|set\(\))' "$file" 2>/dev/null | cut -d: -f1)
 }
 
 _check_warn_py001() {
     local file="$1"
     if grep -qE 'def\s+\w+\(([^,]+,){3,}' "$file" 2>/dev/null; then
-        add_warning "WARN-PY001" "Function with 4+ parameters — consider refactoring to dataclass/object"
+        add_warning "WARN-PY001" "Function with 4+ parameters - consider refactoring to dataclass/object"
     fi
 }
 

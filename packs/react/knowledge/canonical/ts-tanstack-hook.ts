@@ -194,10 +194,10 @@ export function useDeleteUser(): UseMutationResult<void, Error, UserId> {
 //
 // Use when the component is already wrapped in <Suspense> and <ErrorBoundary>.
 // Key differences from useQuery:
-//   - data is ALWAYS defined (never undefined) — no loading state check needed
-//   - Suspends while loading — the parent <Suspense> fallback renders instead
-//   - Throws on error — an <ErrorBoundary> above MUST catch it
-//   - Does NOT return isPending or error — those are handled by boundaries
+//   - data is ALWAYS defined (never undefined) - no loading state check needed
+//   - Suspends while loading - the parent <Suspense> fallback renders instead
+//   - Throws on error - an <ErrorBoundary> above MUST catch it
+//   - Does NOT return isPending or error - those are handled by boundaries
 // ============================================================
 
 export function useUserSuspense(id: UserId): UseSuspenseQueryResult<User, Error> {

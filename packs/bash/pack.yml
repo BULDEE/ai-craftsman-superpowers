@@ -1,6 +1,6 @@
 name: bash
 version: "1.0.0"
-description: "Bash/Shell craftsman pack — safety, naming, function discipline, shellcheck patterns"
+description: "Bash/Shell craftsman pack - safety, naming, function discipline, shellcheck patterns"
 compatibility:
   core: ">=3.1.0"
   stack: ["*"]

@@ -28,4 +28,4 @@ except ConnectionError as network_error:
 
 ## Rule
 
-**PY004** — Bare `except:` found. Always catch specific exceptions.
+**PY004** - Bare `except:` found. Always catch specific exceptions.

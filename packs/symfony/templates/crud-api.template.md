@@ -720,13 +720,13 @@ php bin/console debug:router | grep {{URI_PREFIX}}
 
 ## Do NOT
 
-- Add a Domain layer — entities are Doctrine entities directly
-- Use Value Objects — use PHP native types on the entity
-- Create Command/Handler pairs — processors call the repository directly
-- Use DataProvider or DataPersister — those are API Platform v2/v3 patterns
-- Put business logic in processors — move it to behavioral methods on the entity
-- Use setters — use behavioral methods or the `create()` factory
-- Use `new DateTimeImmutable()` inside a class that can be unit tested — inject a Clock
+- Add a Domain layer - entities are Doctrine entities directly
+- Use Value Objects - use PHP native types on the entity
+- Create Command/Handler pairs - processors call the repository directly
+- Use DataProvider or DataPersister - those are API Platform v2/v3 patterns
+- Put business logic in processors - move it to behavioral methods on the entity
+- Use setters - use behavioral methods or the `create()` factory
+- Use `new DateTimeImmutable()` inside a class that can be unit tested - inject a Clock
 - Leave catch blocks empty
 
 {{#each ANTI_PATTERNS}}

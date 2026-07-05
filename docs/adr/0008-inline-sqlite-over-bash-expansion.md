@@ -12,9 +12,9 @@ Accepted
 
 Plugin commands (`challenge`, `debug`, `metrics`) use `!`bash ...`` shell expansion to execute `scripts/metrics-read.sh` during prompt loading. This syntax is executed by the Claude Code harness **before** the interactive conversation starts, meaning:
 
-1. **No interactive permission prompt** — the harness applies a strict allow/deny policy. If the bash pattern is not pre-authorized in the user's `settings.json`, the command fails immediately with `Shell command permission check failed`.
-2. **No plugin-level permission declaration** — the `plugin.json` manifest has no `permissions` field. A plugin cannot request bash permissions at install time.
-3. **Friction for users** — every user must manually add a bash permission rule before using `/craftsman:challenge`, `/craftsman:debug`, or `/craftsman:metrics`.
+1. **No interactive permission prompt** - the harness applies a strict allow/deny policy. If the bash pattern is not pre-authorized in the user's `settings.json`, the command fails immediately with `Shell command permission check failed`.
+2. **No plugin-level permission declaration** - the `plugin.json` manifest has no `permissions` field. A plugin cannot request bash permissions at install time.
+3. **Friction for users** - every user must manually add a bash permission rule before using `/craftsman:challenge`, `/craftsman:debug`, or `/craftsman:metrics`.
 
 This is a blocking issue for plugin adoption: commands fail on first use with no way to fix it without manual configuration.
 
@@ -30,7 +30,7 @@ The metrics database path (`~/.claude/plugins/data/craftsman/metrics.db`) and qu
 
 ### Positive
 
-- Commands work out-of-the-box for all users — zero manual permission configuration
+- Commands work out-of-the-box for all users - zero manual permission configuration
 - Permission is requested interactively on first use (standard Claude Code UX)
 - No additional infrastructure (no MCP server, no build step, no npm install)
 - Removes a runtime dependency on `metrics-read.sh` from commands (simpler plugin surface)
@@ -81,7 +81,7 @@ Use Python with stdlib `sqlite3` to avoid a build step.
 Keep `!`bash ...`` and document the permission rules users must add.
 
 **Rejected because:**
-- Friction at install time — bad UX for a plugin
+- Friction at install time - bad UX for a plugin
 - Users who skip the README get a cryptic error
 - Not scalable if more scripts are added
 

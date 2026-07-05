@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Project Structure Analyzer — command wrapper for agent hook
+# Project Structure Analyzer - command wrapper for agent hook
 # Checks agent_hooks gate BEFORE emitting any context.
 # When enabled, injects architectural context and correction trends.
 # =============================================================================

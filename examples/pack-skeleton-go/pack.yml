@@ -1,6 +1,6 @@
 name: go
 version: "1.0.0"
-description: "Go craftsman pack — error handling, interfaces, testing conventions"
+description: "Go craftsman pack - error handling, interfaces, testing conventions"
 compatibility:
   core: ">=2.6.0"
   stack: ["go"]

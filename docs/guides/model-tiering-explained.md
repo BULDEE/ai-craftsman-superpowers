@@ -32,9 +32,9 @@ Haiku is a lightweight model optimized for speed and cost.
 **Limitation:** Less capable at reasoning and creativity
 
 **Used in:**
-- `/craftsman:verify` — Validate code quality
-- `/craftsman:git` — Generate commit messages
-- Hooks/real-time validation — Rapid feedback
+- `/craftsman:verify` - Validate code quality
+- `/craftsman:git` - Generate commit messages
+- Hooks/real-time validation - Rapid feedback
 
 **Example:**
 ```bash
@@ -75,12 +75,12 @@ Sonnet is the default model. Fast enough and capable enough for most development
 - Cost-effective for frequent use
 
 **Used in:**
-- `/craftsman:design` — Domain modeling
-- `/craftsman:spec` — Test specifications
-- `/craftsman:scaffold` — Code generation
-- `/craftsman:test` — Test implementation
-- `/craftsman:refactor` — Refactoring
-- `/craftsman:debug` — Debugging
+- `/craftsman:design` - Domain modeling
+- `/craftsman:spec` - Test specifications
+- `/craftsman:scaffold` - Code generation
+- `/craftsman:test` - Test implementation
+- `/craftsman:refactor` - Refactoring
+- `/craftsman:debug` - Debugging
 
 **Example:**
 ```bash
@@ -121,9 +121,9 @@ Opus is the most capable model. Use for decision-making and high-stakes judgment
 - Strong judgment for design decisions
 
 **Used in:**
-- `/craftsman:challenge` — Architecture review (recommended)
-- `/craftsman:plan` — Strategic planning (recommended)
-- `/craftsman:parallel` — Agent orchestration (recommended)
+- `/craftsman:challenge` - Architecture review (recommended)
+- `/craftsman:plan` - Strategic planning (recommended)
+- `/craftsman:parallel` - Agent orchestration (recommended)
 - Pack-specific: `rag`, `mlops`, `agent-design` (recommended)
 
 > **Note:** Since commands no longer carry a `model:` frontmatter field (see [ADR-0007](../adr/0007-commands-over-skills.md)), model tiering is a recommendation, not an enforcement. The user's active model applies. Agent files (e.g., `team-lead`) do enforce their model via frontmatter.

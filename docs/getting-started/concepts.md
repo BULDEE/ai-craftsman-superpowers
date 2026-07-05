@@ -6,7 +6,7 @@ Understanding these concepts will help you get the most out of AI Craftsman Supe
 
 > "Weeks of coding can save hours of planning."
 
-A craftsman doesn't just write code—they:
+A craftsman doesn't just write code-they:
 
 1. **Understand** the problem before solving it
 2. **Challenge** assumptions and explore alternatives
@@ -93,23 +93,23 @@ This plugin encodes these practices into repeatable skills.
 
 ### 4. Agents (11 total)
 
-**What**: Specialized AI agents — 4 reviewers (read-only analysis) and 7 craftsmen (implementation).
+**What**: Specialized AI agents - 4 reviewers (read-only analysis) and 7 craftsmen (implementation).
 
 **Reviewers** (code analysis):
-- `symfony-reviewer` — Symfony/DDD best practices
-- `security-pentester` — Security vulnerability detection
-- `react-reviewer` — React patterns and hooks
-- `ai-engineer` — RAG/MLOps/Agent best practices
+- `symfony-reviewer` - Symfony/DDD best practices
+- `security-pentester` - Security vulnerability detection
+- `react-reviewer` - React patterns and hooks
+- `ai-engineer` - RAG/MLOps/Agent best practices
 
 **Craftsmen** (implementation, v1.5.0):
-- `team-lead` — Orchestrator (Sonnet, never codes)
-- `backend-craftsman` — PHP/Symfony expert
-- `frontend-craftsman` — React/TS expert (65 Vercel best practices)
-- `architect` — DDD validation (read-only)
-- `ai-engineer` — RAG, LLM, MCP design
-- `api-craftsman` — API Platform 4, REST/HATEOAS, OpenAPI
-- `ui-ux-director` — UX, WCAG 2.1 AA
-- `doc-writer` — Technical documentation (Haiku, cost-optimized)
+- `team-lead` - Orchestrator (Sonnet, never codes)
+- `backend-craftsman` - PHP/Symfony expert
+- `frontend-craftsman` - React/TS expert (65 Vercel best practices)
+- `architect` - DDD validation (read-only)
+- `ai-engineer` - RAG, LLM, MCP design
+- `api-craftsman` - API Platform 4, REST/HATEOAS, OpenAPI
+- `ui-ux-director` - UX, WCAG 2.1 AA
+- `doc-writer` - Technical documentation (Haiku, cost-optimized)
 
 ### 5. Hooks (8 events)
 
@@ -124,7 +124,7 @@ See [Hooks Reference](../reference/hooks.md) for details.
 
 **What**: External services that extend Claude's capabilities.
 
-**knowledge-rag** (optional) — Semantic search over indexed PDFs:
+**knowledge-rag** (optional) - Semantic search over indexed PDFs:
 
 ```
 User: "What are the MLOps principles?"
@@ -136,7 +136,7 @@ MCP Server: Returns relevant chunks from indexed PDFs
 Claude: Answers with grounded, accurate information
 ```
 
-**Sentry** (channel, v1.4.0) — Error context injection from Sentry when editing files with known issues. Configured via `plugin.json` channels.
+**Sentry** (channel, v1.4.0) - Error context injection from Sentry when editing files with known issues. Configured via `plugin.json` channels.
 
 ## The Bias Protection System
 

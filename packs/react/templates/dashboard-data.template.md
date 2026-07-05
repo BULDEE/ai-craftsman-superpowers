@@ -5,7 +5,7 @@
 
 ## Mission
 
-Build a production-ready data dashboard for `{{ENTITY_PLURAL}}` with server-side pagination, composable filters, multi-column sorting, CSV/JSON export, and Recharts visualizations — all backed by TanStack Query v5 and TanStack Table v8.
+Build a production-ready data dashboard for `{{ENTITY_PLURAL}}` with server-side pagination, composable filters, multi-column sorting, CSV/JSON export, and Recharts visualizations - all backed by TanStack Query v5 and TanStack Table v8.
 
 ## Context Files to Read
 
@@ -510,7 +510,7 @@ export function use{{Entity}}ColumnVisibility(): [
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
         } catch {
-          // Storage unavailable — state still updates in memory
+          // Storage unavailable - state still updates in memory
         }
         return next;
       });
@@ -1589,12 +1589,12 @@ export function {{Entity}}ChartsSection({ filters }: {{Entity}}ChartsSectionProp
 ```
 frontend/src/
 ├── domain/{{context}}/
-│   ├── types.ts           — {{Entity}}, {{Entity}}Filters, {{Entity}}Sort, {{Entity}}TableState
-│   ├── api.ts             — Response/params interfaces
-│   └── mappers.ts         — map{{Entity}}, map{{Entity}}ChartData
+│   ├── types.ts           - {{Entity}}, {{Entity}}Filters, {{Entity}}Sort, {{Entity}}TableState
+│   ├── api.ts             - Response/params interfaces
+│   └── mappers.ts         - map{{Entity}}, map{{Entity}}ChartData
 ├── application/{{context}}/
-│   ├── keys.ts            — TanStack Query key factory
-│   ├── api-client.ts      — fetch functions (list, stats, export)
+│   ├── keys.ts            - TanStack Query key factory
+│   ├── api-client.ts      - fetch functions (list, stats, export)
 │   ├── use{{Entity}}List.ts
 │   ├── use{{Entity}}Stats.ts
 │   ├── use{{Entity}}Export.ts
@@ -1825,12 +1825,12 @@ npm run lint
 
 ## Do NOT
 
-- Use `any` — use proper types or `unknown`
-- Use non-null assertion `!` — handle null explicitly
-- Use default exports — named exports only
-- Use `useEffect` for data fetching — use `useSuspenseQuery`
+- Use `any` - use proper types or `unknown`
+- Use non-null assertion `!` - handle null explicitly
+- Use default exports - named exports only
+- Use `useEffect` for data fetching - use `useSuspenseQuery`
 - Fetch data without an `<ErrorBoundary>` + `<Suspense>` wrapper
-- Store server state in `useState` — use TanStack Query
+- Store server state in `useState` - use TanStack Query
 - Do client-side pagination on server-fetched data
 - Access `localStorage` during SSR without a try/catch guard
-- Use `any` in column cell renderers — type the accessor properly
+- Use `any` in column cell renderers - type the accessor properly

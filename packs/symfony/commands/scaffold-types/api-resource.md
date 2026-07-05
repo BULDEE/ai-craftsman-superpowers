@@ -14,8 +14,8 @@ Use the **Read** tool to read `.craft-config.yml`. If the file does not exist, s
 Before generating ANY code, load the canonical examples:
 
 Use the **Read** tool to load canonical examples:
-- Read `packs/symfony/knowledge/canonical/php-state-provider.php` — if not found, say "Canonical not found"
-- Read `packs/symfony/knowledge/canonical/php-entity.php` — if not found, say "Canonical not found"
+- Read `packs/symfony/knowledge/canonical/php-state-provider.php` - if not found, say "Canonical not found"
+- Read `packs/symfony/knowledge/canonical/php-entity.php` - if not found, say "Canonical not found"
 
 ## Process
 
@@ -32,31 +32,31 @@ Ask the user:
 
 For a resource named `{Name}`:
 
-1. **Entity** — `src/Domain/Entity/{Name}.php`
+1. **Entity** - `src/Domain/Entity/{Name}.php`
    - `final class` with private constructor + factory
    - Domain events for state changes
    - Value Objects for domain primitives
 
-2. **API Resource DTO** — `src/Presentation/Api/Resource/{Name}Resource.php`
+2. **API Resource DTO** - `src/Presentation/Api/Resource/{Name}Resource.php`
    - `#[ApiResource]` with operations
    - `#[ApiFilter]` for configured filters
    - Serialization groups for read/write separation
 
-3. **State Provider** — `src/Infrastructure/Api/State/{Name}Provider.php`
+3. **State Provider** - `src/Infrastructure/Api/State/{Name}Provider.php`
    - Implements `ProviderInterface`
    - Uses repository for data access
    - Handles collection pagination and item lookup
 
-4. **State Processor** — `src/Infrastructure/Api/State/{Name}Processor.php`
+4. **State Processor** - `src/Infrastructure/Api/State/{Name}Processor.php`
    - Implements `ProcessorInterface`
    - Delegates to use cases / command bus
    - Returns proper HTTP status codes
 
-5. **Input DTOs** — `src/Presentation/Api/Dto/Create{Name}Input.php`, `Update{Name}Input.php`
+5. **Input DTOs** - `src/Presentation/Api/Dto/Create{Name}Input.php`, `Update{Name}Input.php`
    - Validation constraints
    - No logic, pure data carriers
 
-6. **Tests** — `tests/Functional/Api/{Name}Test.php`
+6. **Tests** - `tests/Functional/Api/{Name}Test.php`
    - Test each operation
    - Test validation errors
    - Test pagination

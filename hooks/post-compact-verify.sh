@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Post-Compact State Verification — PostCompact Hook
+# Post-Compact State Verification - PostCompact Hook
 # Verifies that session state survived compaction and injects recovery summary.
 # Pairs with pre-compact-save.sh to ensure correction learning continuity.
 #
@@ -25,7 +25,7 @@ if $HAS_PYTHON3 && [[ -f "$SESSION_STATE" ]]; then
 
     if [[ -n "$RECOVERY_MSG" ]]; then
         jq -n --arg msg "$RECOVERY_MSG" '{
-            systemMessage: ("Post-compaction verification — " + $msg)
+            systemMessage: ("Post-compaction verification - " + $msg)
         }'
     fi
 fi

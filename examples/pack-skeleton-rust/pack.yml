@@ -1,6 +1,6 @@
 name: rust
 version: "1.0.0"
-description: "Rust craftsman pack — ownership patterns, error handling, clippy integration"
+description: "Rust craftsman pack - ownership patterns, error handling, clippy integration"
 compatibility:
   core: ">=2.6.0"
   stack: ["rust"]

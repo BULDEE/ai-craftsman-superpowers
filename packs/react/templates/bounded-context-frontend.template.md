@@ -128,11 +128,11 @@ Server Components run on the server by default. Opt into client-side rendering o
 Rules:
 - Default to Server Components for data fetching and static markup
 - Use "use client" only for: onClick, useState, useEffect, browser APIs
-- Keep client bundles small — move data fetching up to Server Components
+- Keep client bundles small - move data fetching up to Server Components
 - Wrap independently-fetched child components in <Suspense> for streaming
 ```
 
-### useOptimistic — Instant UI feedback
+### useOptimistic - Instant UI feedback
 
 ```tsx
 'use client';
@@ -165,7 +165,7 @@ function {{Entity}}List({ items }: {{Entity}}ListProps) {
 }
 ```
 
-### useTransition — Non-blocking state updates
+### useTransition - Non-blocking state updates
 
 ```tsx
 'use client';
@@ -178,7 +178,7 @@ function {{Entity}}Search() {
 
   function handleSearch(query: string) {
     startTransition(() => {
-      // Marked as non-urgent — React can interrupt this
+      // Marked as non-urgent - React can interrupt this
       setResults(filterResults(query));
     });
   }
@@ -252,7 +252,7 @@ export function TabPanel({ id, children }: TabPanelProps) {
 // </Tabs>
 ```
 
-### Render Props (Modern — with useSuspenseQuery)
+### Render Props (Modern - with useSuspenseQuery)
 
 > **Important:** `useSuspenseQuery` throws on error. Always wrap usage in an `<ErrorBoundary>` alongside `<Suspense>`:
 > ```tsx

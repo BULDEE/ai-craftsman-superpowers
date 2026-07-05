@@ -1,9 +1,9 @@
 ---
-description: "Manage the AI/Architecture knowledge base — add, sync, list, status, remove documents. Use when needing to update indexed sources or check knowledge base health."
+description: "Manage the AI/Architecture knowledge base - add, sync, list, status, remove documents. Use when needing to update indexed sources or check knowledge base health."
 effort: quick
 ---
 
-# /craftsman:knowledge — Knowledge Base Management
+# /craftsman:knowledge - Knowledge Base Management
 
 Manage the knowledge base used by the `search_knowledge` MCP tool.
 
@@ -12,9 +12,9 @@ Manage the knowledge base used by the `search_knowledge` MCP tool.
 | Command | Description |
 |---------|-------------|
 | `/craftsman:knowledge add <path>` | Copy a file into the KB and index it |
-| `/craftsman:knowledge sync` | Incremental sync — index new/modified, remove orphans |
+| `/craftsman:knowledge sync` | Incremental sync - index new/modified, remove orphans |
 | `/craftsman:knowledge list` | List all indexed sources with stats |
-| `/craftsman:knowledge status` | Healthcheck — Ollama, DB, pending files |
+| `/craftsman:knowledge status` | Healthcheck - Ollama, DB, pending files |
 | `/craftsman:knowledge remove <source>` | Remove a source from the DB |
 
 ## Implementation

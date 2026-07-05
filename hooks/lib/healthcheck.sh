@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Healthcheck Library — Plugin health verification functions
+# Healthcheck Library - Plugin health verification functions
 #
 # Usage:
 #   source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/healthcheck.sh"
@@ -61,7 +61,7 @@ hc_check_config() {
     if [[ -f "${HOME}/.claude/.craft-config.yml" ]] || [[ -f "${PWD}/.craft-config.yml" ]]; then
         _hc_record "config" "ok" ".craft-config.yml"
     else
-        _hc_record "config" "warn" "missing — run /craftsman:setup"
+        _hc_record "config" "warn" "missing - run /craftsman:setup"
     fi
 }
 
@@ -111,7 +111,7 @@ hc_check_ollama() {
 
     local response
     response=$(curl -s --max-time 2 "http://localhost:11434/api/tags" 2>/dev/null) || {
-        _hc_record "ollama" "error" "not running — run: ollama serve"
+        _hc_record "ollama" "error" "not running - run: ollama serve"
         return
     }
 
@@ -143,10 +143,10 @@ hc_check_knowledge() {
         if [[ "$chunks" -gt 0 ]]; then
             _hc_record "knowledge" "ok" "${chunks} chunks / ${sources} sources"
         else
-            _hc_record "knowledge" "warn" "DB empty — run /craftsman:knowledge sync"
+            _hc_record "knowledge" "warn" "DB empty - run /craftsman:knowledge sync"
         fi
     else
-        _hc_record "knowledge" "error" "DB missing — run /craftsman:knowledge sync"
+        _hc_record "knowledge" "error" "DB missing - run /craftsman:knowledge sync"
     fi
 }
 
@@ -161,7 +161,7 @@ hc_check_superpowers() {
         if [[ -f "${sp_dir}/plugin.json" ]]; then
             version=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('version','?'))" "${sp_dir}/plugin.json" 2>/dev/null || echo "?")
         fi
-        _hc_record "superpowers" "ok" "v${version} — synergy active"
+        _hc_record "superpowers" "ok" "v${version} - synergy active"
     else
         _hc_record "superpowers" "ok" "not installed (optional)"
     fi
@@ -171,7 +171,7 @@ hc_check_session_bridge() {
     local bridge="${HOME}/.claude/craftsman-session-state-path"
 
     if [[ ! -f "$bridge" ]]; then
-        _hc_record "session-bridge" "warn" "missing — restart session to create"
+        _hc_record "session-bridge" "warn" "missing - restart session to create"
         return
     fi
 
@@ -179,7 +179,7 @@ hc_check_session_bridge() {
     target=$(< "$bridge")
 
     if [[ -z "$target" ]]; then
-        _hc_record "session-bridge" "error" "empty — restart session to fix"
+        _hc_record "session-bridge" "error" "empty - restart session to fix"
         return
     fi
 

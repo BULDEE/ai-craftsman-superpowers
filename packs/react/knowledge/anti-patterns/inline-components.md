@@ -7,7 +7,7 @@ Source: https://github.com/vercel-labs/agent-skills/blob/main/skills/react-best-
 Defining a component inside another component causes React to treat it as a **new component type on every render**. This forces full unmount+remount instead of re-render, destroying state and breaking animations.
 
 ```tsx
-// ❌ BAD — ListItem is recreated on every render of List
+// ❌ BAD - ListItem is recreated on every render of List
 function List({ items }: { readonly items: readonly string[] }): ReactNode {
   // This function is a NEW reference every render
   function ListItem({ text }: { readonly text: string }): ReactNode {
@@ -31,14 +31,14 @@ function List({ items }: { readonly items: readonly string[] }): ReactNode {
 
 ## Why It Breaks
 
-React identifies components by their **reference**. On every `List` render, `ListItem` is a new function reference. React sees an unknown component type, unmounts the old one, and mounts a fresh one — losing all internal state.
+React identifies components by their **reference**. On every `List` render, `ListItem` is a new function reference. React sees an unknown component type, unmounts the old one, and mounts a fresh one - losing all internal state.
 
 ## Solution
 
 Define all components **at module level** and pass data as props.
 
 ```tsx
-// ✅ GOOD — ListItem is defined once, at module level
+// ✅ GOOD - ListItem is defined once, at module level
 interface ListItemProps {
   readonly text: string;
 }

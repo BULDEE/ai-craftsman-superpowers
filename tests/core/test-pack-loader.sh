@@ -13,11 +13,11 @@ source "$SCRIPT_DIR/../lib/test-helpers.sh"
 source "$ROOT_DIR/hooks/lib/config.sh"
 source "$ROOT_DIR/hooks/lib/pack-loader.sh"
 
-# Fixture helper — creates a minimal pack in a temp packs dir
+# Fixture helper - creates a minimal pack in a temp packs dir
 TEST_PACKS_DIR="/tmp/craftsman-pack-loader-tests-$$"
 mkdir -p "$TEST_PACKS_DIR"
 
-# craftsman-ignore: SH002 — heredoc-heavy test fixture builder, splitting hurts readability
+# craftsman-ignore: SH002 - heredoc-heavy test fixture builder, splitting hurts readability
 _make_pack() {
     local pack_name="$1"
     local stack_line="$2"         # e.g. '["symfony", "fullstack"]' or '["*"]'
@@ -51,7 +51,7 @@ YAML
 }
 
 # =============================================================================
-# 1. Pack discovery — matching stack is loaded
+# 1. Pack discovery - matching stack is loaded
 # =============================================================================
 echo ""
 echo "=== Pack Discovery ==="
@@ -71,7 +71,7 @@ else
 fi
 
 # =============================================================================
-# 2. Stack compatibility filter — mismatched stack is skipped
+# 2. Stack compatibility filter - mismatched stack is skipped
 # =============================================================================
 echo ""
 echo "=== Stack Compatibility Filter ==="
@@ -97,7 +97,7 @@ else
 fi
 
 # =============================================================================
-# 3. Wildcard stack — loads for any stack
+# 3. Wildcard stack - loads for any stack
 # =============================================================================
 echo ""
 echo "=== Wildcard Stack ==="
@@ -127,7 +127,7 @@ else
 fi
 
 # =============================================================================
-# 4. Validator delegation — pack_run_validators calls sourced function
+# 4. Validator delegation - pack_run_validators calls sourced function
 # =============================================================================
 echo ""
 echo "=== Validator Delegation ==="
@@ -158,7 +158,7 @@ else
 fi
 
 # =============================================================================
-# 5. pack_list_scaffold_types — returns pack_name:type per loaded pack
+# 5. pack_list_scaffold_types - returns pack_name:type per loaded pack
 # =============================================================================
 echo ""
 echo "=== Scaffold Types ==="
@@ -182,7 +182,7 @@ else
 fi
 
 # =============================================================================
-# 6. pack_sync_symlinks — creates and cleans symlinks
+# 6. pack_sync_symlinks - creates and cleans symlinks
 # =============================================================================
 echo ""
 echo "=== Symlink Sync ==="
@@ -252,7 +252,7 @@ fi
 rm -rf "$SYMLINK_ROOT"
 
 # =============================================================================
-# 7. _pack_reset — clears all state
+# 7. _pack_reset - clears all state
 # =============================================================================
 echo ""
 echo "=== State Reset ==="

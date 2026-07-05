@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Rules Engine — 3-level config inheritance with custom rules
+# Rules Engine - 3-level config inheritance with custom rules
 # Resolves rule severity from: global → project → directory overrides
 #
 # Config format (.craft-config.yml):
@@ -14,7 +14,7 @@
 #       severity: block
 #       languages: [php]
 #
-# Directory override (.craft-rules.yml — rules section only):
+# Directory override (.craft-rules.yml - rules section only):
 #   rules:
 #     PHP002: ignore
 #

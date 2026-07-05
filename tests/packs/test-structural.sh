@@ -23,7 +23,7 @@ source "$ROOT_DIR/packs/react/hooks/typescript-validator.sh"
 source "$ROOT_DIR/hooks/lib/rules-engine.sh"
 
 if ! command -v python3 >/dev/null 2>&1; then
-    log_pass "python3 absent — structural checks fail-open (skipping detection asserts)"
+    log_pass "python3 absent - structural checks fail-open (skipping detection asserts)"
 else
     TMPD=$(mktemp -d)
     # PARAM001: method with > 3 params (constructor exempt)

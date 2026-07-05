@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Bash/Shell Regex Validator — Bash Pack
+# Bash/Shell Regex Validator - Bash Pack
 # Provides pack_validate_bash() for the pack-loader pipeline.
 #
 # Rules: SH001-005, WARN-SH001
@@ -8,7 +8,7 @@
 #   These are provided by the orchestrator (post-write-check.sh) before sourcing.
 #
 # NOTE: This file is source'd by pack-loader, NOT executed directly.
-#   Do NOT add set -euo pipefail — it would affect the sourcing script.
+#   Do NOT add set -euo pipefail - it would affect the sourcing script.
 # craftsman-ignore: SH001
 # =============================================================================
 
@@ -35,11 +35,11 @@ pack_validate_bash() {
     # Only check files with bash/sh shebang (not sourced libraries)
     if head -1 "$file" 2>/dev/null | grep -qE '^#!/' 2>/dev/null; then
         if [[ "$has_set_u" == false ]]; then
-            add_warning "SH001" "Missing 'set -u' (nounset) — unbound variables won't be caught"
+            add_warning "SH001" "Missing 'set -u' (nounset) - unbound variables won't be caught"
         fi
     fi
 
-    # SH002: Function longer than 30 lines (more lenient than Python — shell functions tend to be longer)
+    # SH002: Function longer than 30 lines (more lenient than Python - shell functions tend to be longer)
     if command -v python3 >/dev/null 2>&1; then
         local function_warning
         while IFS= read -r function_warning; do
@@ -59,7 +59,7 @@ for i, line in enumerate(lines, 1):
     if match and brace_depth == 0:
         func_name = match.group(1) or match.group(2)
         if current_func and (i - func_start) > 30:
-            print(f'line {func_start}: function {current_func}() is {i - func_start} lines — consider extracting')
+            print(f'line {func_start}: function {current_func}() is {i - func_start} lines - consider extracting')
         current_func = func_name
         func_start = i
         brace_depth = stripped.count('{') - stripped.count('}')
@@ -68,13 +68,13 @@ for i, line in enumerate(lines, 1):
         if brace_depth <= 0 and current_func:
             length = i - func_start + 1
             if length > 30:
-                print(f'line {func_start}: function {current_func}() is {length} lines — consider extracting')
+                print(f'line {func_start}: function {current_func}() is {length} lines - consider extracting')
             current_func = None
             brace_depth = 0
 if current_func:
     length = len(lines) - func_start + 1
     if length > 30:
-        print(f'line {func_start}: function {current_func}() is {length} lines — consider extracting')
+        print(f'line {func_start}: function {current_func}() is {length} lines - consider extracting')
 " "$file" 2>/dev/null)
     fi
 
@@ -83,17 +83,17 @@ if current_func:
     while IFS= read -r short_var_line; do
         [[ -z "$short_var_line" ]] && continue
         local lineno="${short_var_line%%:*}"
-        add_warning "SH003" "line ${lineno}: Short variable name — use descriptive names"
+        add_warning "SH003" "line ${lineno}: Short variable name - use descriptive names"
     done < <(grep -nE '^\s*[a-z]{1,2}=' "$file" 2>/dev/null \
         | grep -vE "^\s*${_SH_ALLOWED_SHORT_VARS}=" \
         | grep -vE '(^\s*#|^\s*if |^\s*for |^\s*while )' \
         | head -5)
 
-    # SH004: eval usage (security risk — command injection vector)
+    # SH004: eval usage (security risk - command injection vector)
     local eval_line
     while IFS= read -r eval_line; do
         [[ -z "$eval_line" ]] && continue
-        add_violation "SH004" "line ${eval_line}: 'eval' found — security risk, use alternatives"
+        add_violation "SH004" "line ${eval_line}: 'eval' found - security risk, use alternatives"
     done < <(grep -nE '^\s*eval\s' "$file" 2>/dev/null | cut -d: -f1)
 
     # SH005: Unquoted variable in dangerous contexts (rm, mv, cp, cat with variable paths)

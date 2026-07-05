@@ -1,6 +1,6 @@
 name: python
 version: "1.0.0"
-description: "Python craftsman pack — Clean Code, type hints, pytest, architectural patterns"
+description: "Python craftsman pack - Clean Code, type hints, pytest, architectural patterns"
 compatibility:
   core: ">=3.1.0"
   stack: ["python", "ai-ml", "fullstack"]

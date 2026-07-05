@@ -170,10 +170,10 @@ else
 fi
 
 # =============================================================================
-# Post-Write Hook — Config-Aware Tests
+# Post-Write Hook - Config-Aware Tests
 # =============================================================================
 echo ""
-echo "=== Post-Write Hook — Config-Aware Tests ==="
+echo "=== Post-Write Hook - Config-Aware Tests ==="
 
 # Test: stack=react skips PHP rules
 export CLAUDE_PLUGIN_OPTION_stack="react"
@@ -239,10 +239,10 @@ else
 fi
 
 # =============================================================================
-# Pre-Write Hook — Config-Aware Tests
+# Pre-Write Hook - Config-Aware Tests
 # =============================================================================
 echo ""
-echo "=== Pre-Write Hook — Config-Aware Tests ==="
+echo "=== Pre-Write Hook - Config-Aware Tests ==="
 
 # Test: stack=react skips PHP layer checks
 export CLAUDE_PLUGIN_OPTION_stack="react"
@@ -281,7 +281,7 @@ fi
 echo ""
 echo "=== SessionStart Hook Tests ==="
 
-# Backup bridge file — session-start.sh overwrites it with test paths
+# Backup bridge file - session-start.sh overwrites it with test paths
 _BRIDGE="${HOME}/.claude/craftsman-session-state-path"
 _BRIDGE_BAK="${_BRIDGE}.test-backup"
 [[ -f "$_BRIDGE" ]] && cp "$_BRIDGE" "$_BRIDGE_BAK"
@@ -387,7 +387,7 @@ cd "$ORIGINAL_PWD"
 rm -rf "$SESSION_TEST_DIR"
 
 # =============================================================================
-# FileChanged Hook Tests — wired in hooks.json with matcher *.php|*.ts|*.tsx
+# FileChanged Hook Tests - wired in hooks.json with matcher *.php|*.ts|*.tsx
 # =============================================================================
 echo ""
 echo "=== FileChanged Hook Tests ==="
@@ -485,7 +485,7 @@ echo "=== Agent Hook Schema Tests ==="
 
 HOOKS_FILE="$ROOT_DIR/hooks/hooks.json"
 
-# Test: PostToolUse has 1 command hook (post-write-check only — agent hooks moved to Stop)
+# Test: PostToolUse has 1 command hook (post-write-check only - agent hooks moved to Stop)
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
@@ -601,7 +601,7 @@ else
 fi
 
 # =============================================================================
-# New Hook Events Tests (v3.1 — PostToolUseFailure, FileChanged, SubagentStop, PreCompact)
+# New Hook Events Tests (v3.1 - PostToolUseFailure, FileChanged, SubagentStop, PreCompact)
 # =============================================================================
 echo ""
 echo "=== New Hook Events Tests ==="
@@ -648,7 +648,7 @@ else
     log_fail "SubagentStop hook" "missing or invalid"
 fi
 
-# Test: PreCompact event wired (non-async — must complete before compaction)
+# Test: PreCompact event wired (non-async - must complete before compaction)
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
@@ -696,7 +696,7 @@ for script in tool-failure-tracker.sh subagent-quality-gate.sh pre-compact-save.
     fi
 done
 
-# Test: PostCompact event wired (synchronous — verify state after compaction)
+# Test: PostCompact event wired (synchronous - verify state after compaction)
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
@@ -1262,7 +1262,7 @@ else
 fi
 
 # =============================================================================
-# Session Metrics — Agent and Team Tracking Tests
+# Session Metrics - Agent and Team Tracking Tests
 # =============================================================================
 echo ""
 echo "=== Session Metrics Agent/Team Tracking Tests ==="
@@ -1298,7 +1298,7 @@ fi
 
 # Test: session-metrics still exits 0
 result_exit=$(echo '{"session_duration_seconds": 10}' | bash "$ROOT_DIR/hooks/session-metrics.sh" 2>/dev/null; echo $?)
-# The echo $? trick — re-run cleanly
+# The echo $? trick - re-run cleanly
 if echo '{"session_duration_seconds": 0}' | bash "$ROOT_DIR/hooks/session-metrics.sh" > /dev/null 2>&1; then
     log_pass "session-metrics: still exits 0 with empty session state"
 else
@@ -1365,7 +1365,7 @@ else
 fi
 
 # =============================================================================
-# Behavioral Integration Tests — New Hook Scripts
+# Behavioral Integration Tests - New Hook Scripts
 # =============================================================================
 echo ""
 echo "=== Behavioral Integration Tests ==="
@@ -1553,7 +1553,7 @@ else
     log_fail "pre-compact-save state" "missing compaction metadata"
 fi
 
-# Test: pre-compact-save grammar — singular forms
+# Test: pre-compact-save grammar - singular forms
 python3 -c "
 import json, sys
 state = {

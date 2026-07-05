@@ -1,7 +1,7 @@
 ---
 name: backend-craftsman
 description: |
-  Senior PHP/Symfony craftsman — deep expertise in Symfony 7/8, API Platform 4, Doctrine ORM,
+  Senior PHP/Symfony craftsman - deep expertise in Symfony 7/8, API Platform 4, Doctrine ORM,
   messaging (RabbitMQ/Redis), and DDD tactical patterns.
   Use for backend code reviews, refactoring, performance audits, or feature implementation.
 model: sonnet

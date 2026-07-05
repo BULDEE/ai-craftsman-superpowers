@@ -1,4 +1,4 @@
-"""Canonical Python Repository — abstract interface in domain, implementation in infrastructure."""
+"""Canonical Python Repository - abstract interface in domain, implementation in infrastructure."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ class UserId:
 
 
 class UserRepository(Protocol):
-    """Domain contract for user persistence — no infrastructure details leak."""
+    """Domain contract for user persistence - no infrastructure details leak."""
 
     def find_by_id(self, user_id: UserId) -> User | None: ...
 
@@ -33,7 +33,7 @@ class UserRepository(Protocol):
 
 
 class InMemoryUserRepository:
-    """Test double — deterministic, no I/O."""
+    """Test double - deterministic, no I/O."""
 
     def __init__(self) -> None:
         self._storage: dict[UUID, User] = {}

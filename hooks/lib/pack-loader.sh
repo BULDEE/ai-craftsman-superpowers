@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Pack Loader — Discovers, validates, and loads packs based on stack config.
+# Pack Loader - Discovers, validates, and loads packs based on stack config.
 #
 # Usage:
 #   source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/pack-loader.sh"

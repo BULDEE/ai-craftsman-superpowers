@@ -132,7 +132,7 @@ else
     log_fail "External pack in mixed" "go not found: '$loaded'"
 fi
 
-# Test 5: No .craft-config.yml — only internal packs
+# Test 5: No .craft-config.yml - only internal packs
 echo ""
 echo "--- No config file ---"
 _pack_reset

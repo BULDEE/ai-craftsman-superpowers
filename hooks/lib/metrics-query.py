@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parameterized SQLite query helper — eliminates SQL injection in metrics-db.sh.
+"""Parameterized SQLite query helper - eliminates SQL injection in metrics-db.sh.
 
 Usage: metrics-query.py <db_path> <query> [param1] [param2] ...
 

@@ -26,4 +26,4 @@ echo "$ref"
 
 ## Rule
 
-**SH004** — `eval` found. Use arrays, indirect references, or `declare -n` instead.
+**SH004** - `eval` found. Use arrays, indirect references, or `declare -n` instead.

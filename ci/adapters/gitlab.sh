@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# gitlab.sh — GitLab CI adapter
+# gitlab.sh - GitLab CI adapter
 #
 # Uses GitLab Code Quality JSON report for annotations and GitLab API for PR comments.
 # =============================================================================

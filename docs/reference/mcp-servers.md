@@ -21,7 +21,7 @@ MCP allows external services to expose tools that Claude can use:
 
 **Location**: `packs/ai-ml/mcp/knowledge-rag/`
 
-**Activation**: Conditional — requires `ai-ml` in the `packs` plugin setting. Without it, the MCP runs as a no-op server (valid protocol, zero tools, zero errors).
+**Activation**: Conditional - requires `ai-ml` in the `packs` plugin setting. Without it, the MCP runs as a no-op server (valid protocol, zero tools, zero errors).
 
 ### Tools Provided
 
@@ -76,7 +76,7 @@ List all indexed documents.
 The MCP server is bundled with the plugin and activated conditionally via the `packs` user setting:
 
 1. Set `packs` to include `ai-ml` in your Claude Code plugin config
-2. Restart Claude Code — the launcher (`start.mjs`) auto-installs dependencies and builds TypeScript on first run
+2. Restart Claude Code - the launcher (`start.mjs`) auto-installs dependencies and builds TypeScript on first run
 3. The MCP tools `search_knowledge` and `list_knowledge_sources` become available
 
 Without `ai-ml` in `packs`, the server responds with valid MCP protocol but exposes zero tools.
@@ -225,8 +225,8 @@ Configure via plugin settings (`userConfig` in `plugin.json`):
 
 The `hooks/lib/channels.sh` library provides:
 
-- `channel_available()` — checks if a channel's MCP server is reachable
-- `channel_status_summary()` — returns active channel status for InstructionsLoaded hook
+- `channel_available()` - checks if a channel's MCP server is reachable
+- `channel_status_summary()` - returns active channel status for InstructionsLoaded hook
 
 Channels degrade gracefully: if Sentry is not configured or unreachable, the agent hook returns empty context silently.
 

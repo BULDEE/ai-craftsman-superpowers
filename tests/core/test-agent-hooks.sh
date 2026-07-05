@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Agent Hook Tests — validates gate logic and output for all agent hook scripts
+# Agent Hook Tests - validates gate logic and output for all agent hook scripts
 # =============================================================================
 set -uo pipefail
 

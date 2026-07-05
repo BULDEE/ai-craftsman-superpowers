@@ -1,6 +1,6 @@
 name: symfony
 version: "1.0.0"
-description: "PHP/Symfony craftsman pack — DDD, API Platform, Doctrine, Messenger"
+description: "PHP/Symfony craftsman pack - DDD, API Platform, Doctrine, Messenger"
 compatibility:
   core: ">=2.4.0"
   stack: ["symfony", "fullstack"]

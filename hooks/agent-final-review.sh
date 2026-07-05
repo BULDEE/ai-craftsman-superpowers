@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Final Review Agent — command wrapper for agent hook
+# Final Review Agent - command wrapper for agent hook
 # Checks agent_hooks + strictness gates BEFORE emitting any context.
 # When enabled, injects a final review request on Stop.
 # =============================================================================
@@ -22,7 +22,7 @@ CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null) || true
 
 FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l | tr -d ' ')
 
-MSG="FINAL REVIEW REQUEST: Review changes made during this session. Check ONLY: (1) Layer violations — Domain importing Infrastructure/Presentation, Application importing Presentation, (2) Missing tests — new classes in src/ without corresponding test in tests/, (3) Structural decay — a god class mixing unrelated responsibilities, deep if/if/if pyramids, or business logic leaking into a Controller. These are architecture issues, not cosmetic style: block for them. A rich aggregate of small cohesive behaviours is NOT a god class."
+MSG="FINAL REVIEW REQUEST: Review changes made during this session. Check ONLY: (1) Layer violations - Domain importing Infrastructure/Presentation, Application importing Presentation, (2) Missing tests - new classes in src/ without corresponding test in tests/, (3) Structural decay - a god class mixing unrelated responsibilities, deep if/if/if pyramids, or business logic leaking into a Controller. These are architecture issues, not cosmetic style: block for them. A rich aggregate of small cohesive behaviours is NOT a god class."
 
 if [[ "$FILE_COUNT" -gt 15 ]]; then
     MSG="${MSG}\n\n[ATOMIC COMMITS] This session modified ${FILE_COUNT} files. Craftsman practice: prefer small, focused commits (1-5 files each). Consider splitting this work into atomic commits before pushing."

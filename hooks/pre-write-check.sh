@@ -45,10 +45,10 @@ if config_php_enabled; then
     # PHP: Domain must not import Infrastructure
     if [[ "$FILE_PATH" == *"/Domain/"* ]] && [[ "$EXT" == "php" ]]; then
         if echo "$FILE_CONTENT" | grep -qE "use\s+App\\\\Infrastructure" 2>/dev/null; then
-            add_violation "LAYER001: Domain imports Infrastructure — DDD layer violation"
+            add_violation "LAYER001: Domain imports Infrastructure - DDD layer violation"
         fi
         if echo "$FILE_CONTENT" | grep -qE "use\s+App\\\\Presentation" 2>/dev/null; then
-            add_violation "LAYER002: Domain imports Presentation — DDD layer violation"
+            add_violation "LAYER002: Domain imports Presentation - DDD layer violation"
         fi
     fi
 
@@ -57,7 +57,7 @@ if config_php_enabled; then
         if echo "$FILE_CONTENT" | grep -qE "use\s+App\\\\Infrastructure" 2>/dev/null; then
             # Avoid duplicate if already caught by path check
             if [[ "$FILE_PATH" != *"/Domain/"* ]]; then
-                add_violation "LAYER001: Domain imports Infrastructure — DDD layer violation (detected via namespace)"
+                add_violation "LAYER001: Domain imports Infrastructure - DDD layer violation (detected via namespace)"
             fi
         fi
     fi
@@ -65,7 +65,7 @@ if config_php_enabled; then
     # PHP: Application must not import Presentation
     if [[ "$FILE_PATH" == *"/Application/"* ]] && [[ "$EXT" == "php" ]]; then
         if echo "$FILE_CONTENT" | grep -qE "use\s+App\\\\Presentation" 2>/dev/null; then
-            add_violation "LAYER003: Application imports Presentation — DDD layer violation"
+            add_violation "LAYER003: Application imports Presentation - DDD layer violation"
         fi
     fi
 
@@ -83,7 +83,7 @@ if config_ts_enabled; then
     # TypeScript: domain must not import infrastructure
     if [[ "$FILE_PATH" == *"/domain/"* ]] && [[ "$EXT" == "ts" || "$EXT" == "tsx" ]]; then
         if echo "$FILE_CONTENT" | grep -qE "from\s+['\"].*infrastructure" 2>/dev/null; then
-            add_violation "LAYER001: domain imports infrastructure — layer violation"
+            add_violation "LAYER001: domain imports infrastructure - layer violation"
         fi
     fi
 fi
@@ -106,7 +106,7 @@ if [[ $VIOLATION_COUNT -gt 0 ]]; then
 
     if [[ "$local_should_block" == true ]]; then
         # Human-readable message on stderr (shown in Claude Code UI)
-        echo "🚫 BLOCKED by AI Craftsman — ${VIOLATION_COUNT} violation(s) detected before write:" >&2
+        echo "🚫 BLOCKED by AI Craftsman - ${VIOLATION_COUNT} violation(s) detected before write:" >&2
         while IFS= read -r vline; do
             [[ -n "$vline" ]] && echo "  ✗ $vline" >&2
         done <<< "$(echo -e "$VIOLATIONS")"

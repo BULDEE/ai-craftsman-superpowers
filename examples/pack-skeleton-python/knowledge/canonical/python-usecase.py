@@ -1,5 +1,5 @@
 """
-Canonical Python Use Case — Command/Handler pattern.
+Canonical Python Use Case - Command/Handler pattern.
 Demonstrates: type hints, dataclass, explicit error handling, no mutable defaults.
 """
 from __future__ import annotations
@@ -9,7 +9,7 @@ from typing import Protocol
 
 
 class OrderRepository(Protocol):
-    """Repository interface — domain boundary."""
+    """Repository interface - domain boundary."""
 
     def find_by_id(self, order_id: str) -> Order | None: ...
     def save(self, order: Order) -> None: ...
@@ -17,14 +17,14 @@ class OrderRepository(Protocol):
 
 @dataclass(frozen=True)
 class CreateOrderCommand:
-    """Immutable command — no setters, no mutation."""
+    """Immutable command - no setters, no mutation."""
 
     customer_id: str
     items: list[OrderItem]
 
 
 class CreateOrderHandler:
-    """Use case handler — single responsibility."""
+    """Use case handler - single responsibility."""
 
     def __init__(self, repo: OrderRepository) -> None:
         self._repo = repo

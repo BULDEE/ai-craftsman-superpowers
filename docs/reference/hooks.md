@@ -2,7 +2,7 @@
 
 The plugin uses Claude Code hooks to automatically enforce code quality rules. Hooks run as shell scripts and agent prompts triggered by Claude Code events.
 
-**8 hook events** — 7 command hooks + 4 agent hooks.
+**8 hook events** - 7 command hooks + 4 agent hooks.
 
 ## Hook Events
 
@@ -65,7 +65,7 @@ Agent hooks run AI models (Haiku) for semantic analysis beyond regex patterns:
 | PHP001 | critical | `declare(strict_types=1)` in every PHP file | Yes |
 | PHP002 | critical | All classes must be `final` | Yes |
 | PHP003 | warning | No public setters (`public function set*`) | Yes |
-| PHP004 | warning | No `new DateTime()` — use Clock abstraction | No (warning) |
+| PHP004 | warning | No `new DateTime()` - use Clock abstraction | No (warning) |
 | PHP005 | warning | No empty catch blocks | No (warning) |
 
 ### TypeScript Rules (PostToolUse)
@@ -73,7 +73,7 @@ Agent hooks run AI models (Haiku) for semantic analysis beyond regex patterns:
 | Rule | Severity | Check | Blocking |
 |------|----------|-------|----------|
 | TS001 | critical | No `any` type annotations | Yes |
-| TS002 | warning | No `export default` — use named exports | No (warning) |
+| TS002 | warning | No `export default` - use named exports | No (warning) |
 | TS003 | warning | No non-null assertions (`!`) | No (warning) |
 
 ### Layer Rules (PreToolUse + PostToolUse)
@@ -124,7 +124,7 @@ Or suppress multiple rules:
 // craftsman-ignore: PHP002
 ```
 
-> **Important:** Ignored violations are still recorded in the metrics database with `ignored=1`. This ensures transparency — you can always see what was suppressed via `/craftsman:metrics`.
+> **Important:** Ignored violations are still recorded in the metrics database with `ignored=1`. This ensures transparency - you can always see what was suppressed via `/craftsman:metrics`.
 
 ## JSON Output Format
 
@@ -151,7 +151,7 @@ When a hook warns (exit 0), it uses `systemMessage`:
 
 ```json
 {
-  "systemMessage": "⚠️ PHP004: Avoid new DateTime() — use Clock abstraction (line 42)"
+  "systemMessage": "⚠️ PHP004: Avoid new DateTime() - use Clock abstraction (line 42)"
 }
 ```
 
@@ -241,11 +241,11 @@ The `bias-detector.sh` hook (UserPromptSubmit) detects cognitive biases in your 
 
 | Bias | Trigger Keywords | Warning |
 |------|-----------------|---------|
-| Acceleration | "vite", "quick", "just do it" | STOP — Design first |
-| Scope Creep | "et aussi", "while we're at it" | STOP — Is this in scope? |
-| Over-Optimization | "abstraire", "generalize" | STOP — YAGNI |
+| Acceleration | "vite", "quick", "just do it" | STOP - Design first |
+| Scope Creep | "et aussi", "while we're at it" | STOP - Is this in scope? |
+| Over-Optimization | "abstraire", "generalize" | STOP - YAGNI |
 
-Bias detection is **warning-only** (exit 0) — it never blocks your workflow.
+Bias detection is **warning-only** (exit 0) - it never blocks your workflow.
 
 ## Troubleshooting
 
@@ -268,7 +268,7 @@ which phpstan    # PHP
 which eslint     # TypeScript
 which deptrac    # Architecture (PHP)
 
-# If not installed, Level 2/3 silently skip — this is by design
+# If not installed, Level 2/3 silently skip - this is by design
 ```
 
 ### Metrics database issues

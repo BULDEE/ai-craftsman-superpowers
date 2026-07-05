@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# TypeScript Regex Validator — React Pack
+# TypeScript Regex Validator - React Pack
 # Provides pack_validate_typescript() for the pack-loader pipeline.
 #
 # Rules: TS001-003, WARN-TS001 (regex) + NEST001/LOC001/GOD001/PARAM001
@@ -15,7 +15,7 @@ _check_ts001() {
     while IFS= read -r line; do
         echo "$line" | grep -qE ": any[^a-zA-Z]|<any>|: any$" 2>/dev/null || continue
         if ! line_has_ignore "$line" "no-any"; then
-            add_violation "TS001" "'any' type found — use proper types or 'unknown'"
+            add_violation "TS001" "'any' type found - use proper types or 'unknown'"
         else
             metrics_record_violation "TS001" "$FILE_PATTERN" "critical" 0 1 2>/dev/null || true
         fi
@@ -25,22 +25,22 @@ _check_ts001() {
 _check_ts002() {
     local file="$1"
     if grep -q "export default" "$file" 2>/dev/null; then
-        add_violation "TS002" "Default export found — use named exports"
+        add_violation "TS002" "Default export found - use named exports"
     fi
 }
 
 _check_ts003() {
     local file="$1"
-    # No non-null assertion (!) — exclude !=, !==, !., logical NOT (!expr), and end-of-line
+    # No non-null assertion (!) - exclude !=, !==, !., logical NOT (!expr), and end-of-line
     if grep -qE "[a-zA-Z0-9_\)]\!([^=\.!(]|$)" "$file" 2>/dev/null; then
-        add_violation "TS003" "Non-null assertion (!) found — handle null explicitly"
+        add_violation "TS003" "Non-null assertion (!) found - handle null explicitly"
     fi
 }
 
 _check_warn_ts001() {
     local file="$1"
     if grep -qE "(function\s+\w+|=>)\s*\(([^,]+,){3,}" "$file" 2>/dev/null; then
-        add_warning "WARN-TS001" "Function with 4+ parameters — consider refactoring to object"
+        add_warning "WARN-TS001" "Function with 4+ parameters - consider refactoring to object"
     fi
 }
 

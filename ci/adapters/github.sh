@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# github.sh — GitHub Actions CI adapter
+# github.sh - GitHub Actions CI adapter
 #
 # Uses GitHub Actions workflow commands for annotations and gh CLI for PR comments.
 # =============================================================================

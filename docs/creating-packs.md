@@ -114,10 +114,10 @@ pack_validate_<lang>() {
 
 ### Rules
 
-- **Never use `exit 1`** — validators must use `exit 0` (pass) or `exit 2` (block)
+- **Never use `exit 1`** - validators must use `exit 0` (pass) or `exit 2` (block)
 - Always redirect stderr: `2>/dev/null` on grep/sed calls
 - Use `line_has_ignore` to respect `craftsman-ignore` comments
-- Keep validators fast (<50ms per file) — regex only, no external tool calls
+- Keep validators fast (<50ms per file) - regex only, no external tool calls
 - Static analysis tools (eslint, phpstan, clippy) go in `static-analysis/`, not validators
 
 ## Writing Agents
@@ -173,7 +173,7 @@ PACK_DIR="$(dirname "$SCRIPT_DIR")"
 TESTS_PASSED=0; TESTS_FAILED=0
 
 log_pass() { echo "  ✓ $1"; ((TESTS_PASSED++)); }
-log_fail() { echo "  ✗ $1 — $2"; ((TESTS_FAILED++)); }
+log_fail() { echo "  ✗ $1 - $2"; ((TESTS_FAILED++)); }
 
 # Source your validator
 source "$PACK_DIR/hooks/my-validator.sh"
@@ -195,6 +195,6 @@ echo "=== Results: $TESTS_PASSED passed, $TESTS_FAILED failed ==="
 
 See the community skeletons for complete working examples:
 
-- `examples/pack-skeleton-go/` — Go with error checking and init() detection
-- `examples/pack-skeleton-rust/` — Rust with unwrap/panic detection
-- `examples/pack-skeleton-python/` — Python with bare except, mutable defaults, wildcard imports
+- `examples/pack-skeleton-go/` - Go with error checking and init() detection
+- `examples/pack-skeleton-rust/` - Rust with unwrap/panic detection
+- `examples/pack-skeleton-python/` - Python with bare except, mutable defaults, wildcard imports

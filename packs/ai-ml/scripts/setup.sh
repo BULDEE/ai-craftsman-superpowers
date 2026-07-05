@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# AI-ML Pack Setup — Installs MCP server dependencies
+# AI-ML Pack Setup - Installs MCP server dependencies
 # Run: bash packs/ai-ml/scripts/setup.sh
 # =============================================================================
 set -euo pipefail

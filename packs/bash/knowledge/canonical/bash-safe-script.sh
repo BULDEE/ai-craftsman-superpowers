@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Canonical Bash Script — demonstrates safety options, naming, and structure.
+# Canonical Bash Script - demonstrates safety options, naming, and structure.
 # =============================================================================
 set -euo pipefail
 
-# Constants at the top — no magic numbers
+# Constants at the top - no magic numbers
 readonly MAX_RETRY_COUNT=3
 readonly TIMEOUT_SECONDS=30
 readonly LOG_FILE="/var/log/app/process.log"
@@ -29,7 +29,7 @@ validate_input_file() {
     }
 }
 
-# Atomic file write — temp file + rename (no partial writes)
+# Atomic file write - temp file + rename (no partial writes)
 write_output_atomically() {
     local output_path="$1"
     local content="$2"
@@ -46,7 +46,7 @@ write_output_atomically() {
     mv "$temporary_file" "$output_path"
 }
 
-# Retry with exponential backoff — descriptive variable names
+# Retry with exponential backoff - descriptive variable names
 retry_with_backoff() {
     local command_to_run="$1"
     local current_attempt=0
@@ -67,7 +67,7 @@ retry_with_backoff() {
     return 1
 }
 
-# Main — short, delegates to functions
+# Main - short, delegates to functions
 main() {
     local input_file="${1:-}"
 

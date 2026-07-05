@@ -2,7 +2,7 @@
 # =============================================================================
 # FileChanged Monitoring Hook for Claude Code
 # Lightweight Level 1 regex validation on file changes.
-# Complements Write/Edit hooks — covers external changes (IDE, git).
+# Complements Write/Edit hooks - covers external changes (IDE, git).
 #
 # FileChanged is a supported Claude Code hook type (verified 2026-04-04).
 # Wired in hooks.json with matcher "*.php|*.ts|*.tsx" and async: true.
@@ -75,7 +75,7 @@ esac
 if [[ $ISSUE_COUNT -gt 0 ]]; then
     rel_path="${FILE_PATH#"$PWD"/}"
     jq -n --arg fp "$rel_path" --arg issues "$(echo -e "$ISSUES")" --arg count "$ISSUE_COUNT" '{
-        systemMessage: ("FileChanged: " + $fp + " — " + $count + " issue(s) detected:\n" + $issues + "Not blocking — use Write/Edit for enforcement.")
+        systemMessage: ("FileChanged: " + $fp + " - " + $count + " issue(s) detected:\n" + $issues + "Not blocking - use Write/Edit for enforcement.")
     }'
 fi
 

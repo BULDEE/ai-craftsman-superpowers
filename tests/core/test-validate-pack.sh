@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# test-validate-pack.sh — Tests for scripts/validate-pack.sh
+# test-validate-pack.sh - Tests for scripts/validate-pack.sh
 # =============================================================================
 set -uo pipefail
 
@@ -10,7 +10,7 @@ VALIDATE_SCRIPT="${ROOT_DIR}/scripts/validate-pack.sh"
 
 source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
-# Temp directory — cleaned up on exit
+# Temp directory - cleaned up on exit
 TEST_TMP="$(mktemp -d /tmp/craftsman_validate_pack_XXXXXX)"
 trap 'rm -rf "$TEST_TMP"' EXIT
 

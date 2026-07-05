@@ -14,7 +14,7 @@ The result: developers either distrust AI or trust it too much.
 
 ## The Insight
 
-What makes a senior developer valuable isn't just knowledge—it's **process**:
+What makes a senior developer valuable isn't just knowledge-it's **process**:
 
 - They ask clarifying questions before coding
 - They challenge assumptions
@@ -110,7 +110,7 @@ A future where:
 
 **Craftsman**: Someone who takes pride in their work, continuously improves their skills, and produces quality output.
 
-**Superpowers**: Abilities beyond normal human capacity—speed, consistency, breadth of knowledge.
+**Superpowers**: Abilities beyond normal human capacity-speed, consistency, breadth of knowledge.
 
 **AI-Augmented Craftsman**: A human expert amplified by AI, not replaced by it.
 

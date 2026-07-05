@@ -1,6 +1,6 @@
 ---
 name: Repository Composition Pattern
-description: Fine-grained repository interface composition — separate interfaces per use case instead of god repositories
+description: Fine-grained repository interface composition - separate interfaces per use case instead of god repositories
 type: methodology
 ---
 
@@ -24,7 +24,7 @@ interface LeadRepositoryInterface extends
     LeadReportingRepositoryInterface,
     LeadTaskBoxRepositoryInterface
 {
-    // No methods — this is pure composition
+    // No methods - this is pure composition
 }
 ```
 
@@ -198,7 +198,7 @@ final readonly class DeduplicateLeadHandler
             $command->email,
             $command->tenant
         );
-        // Cannot access $this->leadRepository->deleteByTenant() — method doesn't exist
+        // Cannot access $this->leadRepository->deleteByTenant() - method doesn't exist
     }
 }
 

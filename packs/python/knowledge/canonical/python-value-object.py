@@ -1,4 +1,4 @@
-"""Canonical Python Value Object — immutable, validated, self-documenting."""
+"""Canonical Python Value Object - immutable, validated, self-documenting."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ class Email:
 
 @dataclass(frozen=True)
 class Money:
-    """Money value object — prevents primitive obsession for financial amounts."""
+    """Money value object - prevents primitive obsession for financial amounts."""
 
     amount: int  # Store in cents to avoid floating point
     currency: str = 'EUR'

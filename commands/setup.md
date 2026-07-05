@@ -328,8 +328,8 @@ Pre-select packs based on auto-detection from Pre-check (user can adjust):
 Use `AskUserQuestion` with `multiSelect: true` to confirm pack selection.
 
 **Question 4 - Technology packs:**
-- **Symfony Pack** - PHP/Symfony/DDD patterns — _auto-selected if PHP detected_
-- **React Pack** - React/TypeScript patterns — _auto-selected if Node detected_
+- **Symfony Pack** - PHP/Symfony/DDD patterns - _auto-selected if PHP detected_
+- **React Pack** - React/TypeScript patterns - _auto-selected if Node detected_
 - **AI-ML Pack** - AI/ML patterns (RAG, MLOps, agent design)
 
 Note: Core pack is always enabled.

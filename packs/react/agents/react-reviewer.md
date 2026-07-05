@@ -43,7 +43,7 @@ You are a **Senior React/TypeScript Developer** reviewing frontend applications.
 
 - [ ] Custom hooks for shared logic
 - [ ] Proper dependency arrays
-- [ ] No hooks in conditions (use() is the exception — it CAN go in conditionals)
+- [ ] No hooks in conditions (use() is the exception - it CAN go in conditionals)
 - [ ] TanStack Query for data fetching
 - [ ] `useSuspenseQuery` when component is wrapped in `<Suspense>` + `<ErrorBoundary>`
 - [ ] `useOptimistic` called inside `startTransition` or form action (never during render)
@@ -52,20 +52,20 @@ You are a **Senior React/TypeScript Developer** reviewing frontend applications.
 
 ### React 19 Patterns
 
-- [ ] `use(Context)` preferred over `useContext()` — works in conditionals/loops
+- [ ] `use(Context)` preferred over `useContext()` - works in conditionals/loops
 - [ ] `use(promise)` with proper `<Suspense>` + `<ErrorBoundary>` wrapping
-- [ ] Server Components use `async function` — no 'use server' on the component itself
+- [ ] Server Components use `async function` - no 'use server' on the component itself
 - [ ] 'use server' only on Server Action async functions
 - [ ] No components defined inside other components (causes remount on every render)
 - [ ] No barrel file imports (200–800ms bundle cost)
-- [ ] No `&&` rendering with numeric/NaN values — use ternary
+- [ ] No `&&` rendering with numeric/NaN values - use ternary
 
 ### State Management
 
 - [ ] Local state when possible
 - [ ] Context for cross-cutting concerns
 - [ ] No prop drilling (use composition)
-- [ ] Derived state computed during render — not stored in state or updated in effects
+- [ ] Derived state computed during render - not stored in state or updated in effects
 
 ## Common Violations
 
@@ -110,7 +110,7 @@ export function Button() {}
 ### useOptimistic Outside Transition
 
 ```tsx
-// ❌ BAD — setOptimistic outside startTransition
+// ❌ BAD - setOptimistic outside startTransition
 function handleClick() {
   addOptimistic(newItem); // Warning + immediate revert
   void serverSave(newItem);
@@ -128,13 +128,13 @@ function handleClick() {
 ### use() Without Boundaries
 
 ```tsx
-// ❌ BAD — use() with no Suspense/ErrorBoundary
+// ❌ BAD - use() with no Suspense/ErrorBoundary
 function UserName({ promise }: { promise: Promise<User> }): ReactNode {
   const user = use(promise); // No fallback if pending, crash if rejected
   return <span>{user.name}</span>;
 }
 
-// ✅ GOOD — parent wraps in both boundaries
+// ✅ GOOD - parent wraps in both boundaries
 // <ErrorBoundary fallback={<ErrorUI />}>
 //   <Suspense fallback={<Skeleton />}>
 //     <UserName promise={userPromise} />
@@ -145,7 +145,7 @@ function UserName({ promise }: { promise: Promise<User> }): ReactNode {
 ### Inline Component Definition
 
 ```tsx
-// ❌ BAD — Row remounts on every Table render, state lost
+// ❌ BAD - Row remounts on every Table render, state lost
 function Table({ rows }: TableProps): ReactNode {
   function Row({ data }: RowProps): ReactNode { // New reference every render
     const [selected, setSelected] = useState(false);
@@ -154,7 +154,7 @@ function Table({ rows }: TableProps): ReactNode {
   return <tbody>{rows.map(r => <Row key={r.id} data={r} />)}</tbody>;
 }
 
-// ✅ GOOD — Row defined at module level
+// ✅ GOOD - Row defined at module level
 function Row({ data }: RowProps): ReactNode { /* ... */ }
 function Table({ rows }: TableProps): ReactNode { /* ... */ }
 ```

@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Shared Test Helpers — Craftsman Test Framework
+# Shared Test Helpers - Craftsman Test Framework
 # Source this from any test file to get assertions, counters, and JSON utils.
 #
 # Usage:
 #   source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" && pwd)/test-helpers.sh"
 #
 # Provides:
-#   - log_pass / log_fail — colored assertion logging with counters
-#   - assert_exit_code — check exit code of last piped result
-#   - assert_json_valid — validate JSON output
-#   - assert_json_field — check specific JSON field value
-#   - assert_json_contains — check JSON output contains string
-#   - assert_contains / assert_not_contains — string matching
-#   - run_hook — generic hook runner (stdin JSON → exit_code|output)
-#   - test_summary — print pass/fail summary, exit with correct code
-#   - setup_test_env / cleanup_test_env — temp directory management
+#   - log_pass / log_fail - colored assertion logging with counters
+#   - assert_exit_code - check exit code of last piped result
+#   - assert_json_valid - validate JSON output
+#   - assert_json_field - check specific JSON field value
+#   - assert_json_contains - check JSON output contains string
+#   - assert_contains / assert_not_contains - string matching
+#   - run_hook - generic hook runner (stdin JSON → exit_code|output)
+#   - test_summary - print pass/fail summary, exit with correct code
+#   - setup_test_env / cleanup_test_env - temp directory management
 # =============================================================================
 
 # Guard against double-sourcing
@@ -133,20 +133,20 @@ run_hook() {
 
 # --- Environment ---
 
-# setup_test_env — create isolated temp dir, export CLAUDE_PLUGIN_DATA
+# setup_test_env - create isolated temp dir, export CLAUDE_PLUGIN_DATA
 setup_test_env() {
     export CLAUDE_PLUGIN_DATA="/tmp/craftsman-tests-$$"
     mkdir -p "$CLAUDE_PLUGIN_DATA"
 }
 
-# cleanup_test_env — remove temp dir
+# cleanup_test_env - remove temp dir
 cleanup_test_env() {
     [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]] && rm -rf "$CLAUDE_PLUGIN_DATA"
 }
 
 # --- Summary ---
 
-# test_summary — print results and exit with correct code
+# test_summary - print results and exit with correct code
 test_summary() {
     echo ""
     echo "==================================="

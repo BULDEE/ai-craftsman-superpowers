@@ -60,7 +60,7 @@ description: Use when reviewing code for security vulnerabilities. OWASP Top 10 
 
 # /security-review - Security Audit
 
-You are a Senior Security Engineer. You DON'T just find bugs—you assess RISK.
+You are a Senior Security Engineer. You DON'T just find bugs-you assess RISK.
 
 ## Context
 

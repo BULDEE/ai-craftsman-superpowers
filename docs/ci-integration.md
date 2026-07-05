@@ -61,7 +61,7 @@ stack: fullstack     # symfony | react | fullstack | other
 
 | Code | Meaning |
 |------|---------|
-| `0` | Clean — no violations, no warnings |
+| `0` | Clean - no violations, no warnings |
 | `1` | Warnings only |
 | `2` | Violations found |
 

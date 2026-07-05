@@ -104,7 +104,7 @@ export async function sync(store: VectorStore): Promise<SyncReport> {
       console.error(`[sync] ${existing ? "Updated" : "Added"}: ${fileName}`);
     } catch (err) {
       errors.push({ file: fileName, error: err instanceof Error ? err.message : String(err) });
-      console.error(`[sync] Error: ${fileName} — ${err instanceof Error ? err.message : err}`);
+      console.error(`[sync] Error: ${fileName} - ${err instanceof Error ? err.message : err}`);
     }
   }
 

@@ -34,8 +34,8 @@ Add `--quick` flag to `/craftsman:setup` that:
 
 - **strict mode:** Better to start strict and relax than start loose and tighten
 - **All biases ON:** The bias detector is non-blocking (warnings only), so enabling all has no downside
-- **Empty DISC:** DISC is personal — better to skip than guess
-- **Standard DDD paths:** `src/Domain`, `src/Application`, etc. — the most common convention
+- **Empty DISC:** DISC is personal - better to skip than guess
+- **Standard DDD paths:** `src/Domain`, `src/Application`, etc. - the most common convention
 
 ## Consequences
 
@@ -45,7 +45,7 @@ Add `--quick` flag to `/craftsman:setup` that:
 - Full setup still available for power users
 
 ### Negative
-- DISC profile empty until user runs full setup (acceptable — it's optional)
+- DISC profile empty until user runs full setup (acceptable - it's optional)
 - ai-ml pack not auto-enabled (requires explicit opt-in)
 
 ## References

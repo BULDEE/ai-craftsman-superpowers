@@ -3,7 +3,7 @@
 # Trigger: /craftsman:team create → select "feature"
 
 name: feature
-description: Feature implementation team — plan, build, verify
+description: Feature implementation team - plan, build, verify
 trigger: "Use when implementing new features requiring both backend and frontend work"
 
 agents:

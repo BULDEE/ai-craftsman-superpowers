@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Sentry Error Context — command wrapper for agent hook
+# Sentry Error Context - command wrapper for agent hook
 # Checks agent_hooks gate AND sentry config BEFORE emitting any context.
 # When enabled, injects a Sentry lookup request as additionalContext.
 # =============================================================================

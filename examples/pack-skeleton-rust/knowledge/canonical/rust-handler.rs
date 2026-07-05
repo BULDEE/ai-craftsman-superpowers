@@ -20,13 +20,13 @@ impl fmt::Display for OrderError {
 
 impl std::error::Error for OrderError {}
 
-/// Repository trait — domain boundary, no implementation details.
+/// Repository trait - domain boundary, no implementation details.
 pub trait OrderRepository: Send + Sync {
     fn find_by_id(&self, id: &str) -> Result<Order, OrderError>;
     fn save(&self, order: &Order) -> Result<(), OrderError>;
 }
 
-/// Order aggregate — private fields, behavioral methods.
+/// Order aggregate - private fields, behavioral methods.
 pub struct Order {
     id: String,
     customer_id: String,
@@ -35,7 +35,7 @@ pub struct Order {
 }
 
 impl Order {
-    /// Factory method — the only way to create an Order.
+    /// Factory method - the only way to create an Order.
     pub fn create(customer_id: String, items: Vec<OrderItem>) -> Result<Self, OrderError> {
         if items.is_empty() {
             return Err(OrderError::InvalidState("order must have at least one item".into()));

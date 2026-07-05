@@ -1,8 +1,8 @@
 # Agents Reference
 
 The plugin provides **11 agents** organized in two categories:
-- **4 Reviewers** — read-only analysis and code review
-- **7 Craftsmen** — implementation specialists with domain expertise
+- **4 Reviewers** - read-only analysis and code review
+- **7 Craftsmen** - implementation specialists with domain expertise
 
 ## How to Use Agents
 
@@ -83,7 +83,7 @@ The plugin provides **11 agents** organized in two categories:
 
 **Model**: Sonnet | **Effort**: high | **Memory**: project | **Max Turns**: 20
 
-**Mission**: DDD/Clean Architecture validation. **Read-only — cannot edit or write files.**
+**Mission**: DDD/Clean Architecture validation. **Read-only - cannot edit or write files.**
 
 **Skills**: design, challenge
 
