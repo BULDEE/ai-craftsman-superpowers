@@ -122,6 +122,64 @@ Advance one sure step at a time and simplify at every iteration; resist jumping 
 
 Refactoring is, in a sense, infinite: you can always find something to improve. Stop when the code is readable, maintainable, and easy to extend. Extract magic numbers into named constants, remove duplication (e.g. a repeated `% multiplier == 0` becomes an `isMultipleOf` helper), and stop.
 
+## Worked Example: FizzBuzz in Four Iterations
+
+The cycle is easier to trust once seen end to end. Each iteration adds one example from the list and does the smallest thing.
+
+**Iteration 1 - `print(1) == "1"`.** Red: the test names a class and method that do not exist yet; let the IDE generate them throwing `NotImplementedException`. Green: `return "1";` (Fake It). Refactor: nothing yet, but rename the test class if needed.
+
+**Iteration 2 - `print(3) == "Fizz"`.** Red: the new test fails, the first stays green. Green: the smallest change is one condition.
+
+```php
+public function print(int $number): string
+{
+    if ($number % 3 === 0) {
+        return "Fizz";
+    }
+    return (string) $number;
+}
+```
+
+Refactor: the literal `3` is a magic number; extract it to a named constant `FIZZ_MULTIPLIER`.
+
+**Iteration 3 - `print(5) == "Buzz"`.** Green: add a second guard for `% 5`, extract `BUZZ_MULTIPLIER`. All four tests green.
+
+**Iteration 4 - `print(15) == "FizzBuzz"`.** Green: add the combined guard *first* (order matters, it must precede the single guards). Refactor now that everything is green: the repeated `% multiplier === 0` is duplication.
+
+```php
+public function print(int $number): string
+{
+    if ($this->isMultipleOf($number, self::FIZZ_MULTIPLIER) && $this->isMultipleOf($number, self::BUZZ_MULTIPLIER)) {
+        return self::FIZZ . self::BUZZ;
+    }
+    if ($this->isMultipleOf($number, self::BUZZ_MULTIPLIER)) {
+        return self::BUZZ;
+    }
+    if ($this->isMultipleOf($number, self::FIZZ_MULTIPLIER)) {
+        return self::FIZZ;
+    }
+    return (string) $number;
+}
+
+private function isMultipleOf(int $number, int $divider): bool
+{
+    return $number % $divider === 0;
+}
+```
+
+Notice what happened: no design was drawn up front. The examples pulled the constants, the guard order, and the `isMultipleOf` abstraction into existence one green bar at a time. This is **emergent design**.
+
+## TDD Styles
+
+There is more than one way to drive with tests, and they compose:
+
+| Style | Starts from | Good when |
+|-------|-------------|-----------|
+| Inside-out (classicist / Detroit) | The innermost domain object, building outward | The domain rules are the hard part; you know the core |
+| Outside-in (mockist / London) | An acceptance test at the boundary, mocking collaborators inward | You know the interaction shape but not the internals |
+
+*TDD as if you meant it* is a deliberate exercise that pushes naivety to the extreme: only ever add the very smallest code, inlining everything, and let refactoring reveal the structure. It is counter-intuitive but frequently surfaces a simpler design than the one you would have planned.
+
 ## When TDD Is Not the Right Tool
 
 TDD assumes you can express the expected behavior as a small test up front. That is not always true:
