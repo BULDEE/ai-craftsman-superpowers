@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] - 2026-07-05
+
+### Added
+- **Core Knowledge Foundation.** The knowledge base gains its missing agnostic pillars so every pack, not just Symfony, inherits the full methodology (see ADR-0015). New core files under `knowledge/`:
+  - `clean-architecture.md` (Dependency Rule, four circles, boundary crossing via DIP, humble object, screaming architecture, partial boundaries) and `hexagonal.md` (ports & adapters, driving/driven, composition root), distilled from Martin and Cockburn.
+  - `tdd.md` (three laws, red-green-refactor, fake-it/triangulate/obvious, AAA, test naming) and `testing-strategy.md` (pyramid vs trophy, FIRST, test doubles, maintainable E2E via POM/BDD), grounded in Beck, Martraire et al., and the ADTF white paper.
+  - `legacy/` (`legacy-techniques.md` seams and Subclass&Override/Wrap&Sprout/Decouple-Core, `characterization-testing.md` golden master, `strangler-fig.md` branch-by-abstraction) and `refactoring/` (`mikado-method.md`, `refactoring-campaigns.md` churn x complexity hotspots), distilled from Carlo's *Legacy Code First Aid Kit* and Feathers.
+  - New core anti-patterns: `anti-patterns/{god-object,primitive-obsession,singleton-abuse}.md`.
+  - Completed the Fowler catalog in `refactoring-techniques.md` (Split Phase, Slide Statements, Replace Loop with Pipeline, Split Variable, Separate Query from Modifier).
+- **DDD promoted to language-agnostic core.** `knowledge/ddd/{ddd-domain-design,ddd-cqrs-architecture}.md` rewritten framework-free (PHP + TypeScript); Symfony specifics moved to `packs/symfony/knowledge/ddd-symfony-implementation.md`.
+- **SOLID canonical examples per pack** (`canonical/{php,tsx,py,bash}-solid.*`) plus a cross-language SOLID mapping table in `principles.md`.
+- **Knowledge integrity test** (`tests/core/test-knowledge-integrity.sh`): file existence, deprecation stubs, zero em-dash, and resolvable `[[wiki-links]]`. Registered in the suite runner.
+
+### Changed
+- Merged `design-patterns.md` into `patterns.md` (full GoF quick-reference catalog, selection guide, anti-patterns); the old file is a deprecation stub.
+- `commands/design.md`, `commands/refactor.md`, `commands/test.md`, and `agents/architect.md` now reference the new core knowledge.
+
+### Deprecated
+- `knowledge/design-patterns.md` and `packs/symfony/knowledge/ddd-{domain-design,cqrs-architecture}.md` are stubs, removed in v4.0.
+
+### Fixed
+- Removed em-dashes from three pre-existing knowledge files (`clean-code.md`, `stack-specifics.md`, `anti-patterns/sync-in-async.md`) per the copywriting rule.
+- Resynchronized `ci/craftsman-ci.sh` (was 3.4.4) and `CLAUDE.md` (was 3.4.5) with the plugin version.
+
 ## [3.5.0] - 2026-06-19
 
 ### Added
@@ -21,133 +45,133 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **knowledge-rag MCP server failed to connect** ("MCP error -32000: Connection closed"). The `mcpServers.knowledge-rag.args` entry used a bare relative path (`packs/ai-ml/mcp/knowledge-rag/start.mjs`), which Claude Code resolves against the current project working directory instead of the plugin root, raising `Cannot find module` and killing the process before the MCP handshake. Prefixed the path with `${CLAUDE_PLUGIN_ROOT}` so it resolves against the plugin install directory regardless of cwd.
 
-## [3.4.4] — 2026-04-06
+## [3.4.4] - 2026-04-06
 
 ### Fixed
-- **Hook blocking messages now visible to users** — When `post-write-check.sh` or `pre-write-check.sh` blocks a write, a human-readable violation summary is now emitted on stderr (displayed in Claude Code UI). Previously only JSON was written to stdout, resulting in an unhelpful "No stderr output" message.
+- **Hook blocking messages now visible to users** - When `post-write-check.sh` or `pre-write-check.sh` blocks a write, a human-readable violation summary is now emitted on stderr (displayed in Claude Code UI). Previously only JSON was written to stdout, resulting in an unhelpful "No stderr output" message.
 
-## [3.4.3] — 2026-04-05
+## [3.4.3] - 2026-04-05
 
 ### Changed
-- **Pre-push verification downgraded to warning** — `pre-push-verify.sh` no longer blocks pushes when session is unverified. Emits a warning instead. Reduces friction on trivial changes (configs, docs) while still encouraging verification for code changes.
+- **Pre-push verification downgraded to warning** - `pre-push-verify.sh` no longer blocks pushes when session is unverified. Emits a warning instead. Reduces friction on trivial changes (configs, docs) while still encouraging verification for code changes.
 
-## [3.4.2] — 2026-04-05
-
-### Fixed
-- **Auto-verify on test success** — Session now auto-sets `verified=true` when test suite passes (exit 0), eliminating the manual `craftsman-set-verified.sh` step before pushing. Detects `run-tests.sh`, `phpunit`, `jest`, `vitest`, `pytest`, `cargo test`, `go test`, and npm/pnpm/yarn test runners.
-
-## [3.4.1] — 2026-04-05
+## [3.4.2] - 2026-04-05
 
 ### Fixed
-- **CI hooks schema validator** — Added missing Claude Code hook events (`PostToolUseFailure`, `SubagentStop`, `PreCompact`, `PostCompact`) to `VALID_HOOK_EVENTS` in CI validation, fixing false negatives on valid hooks.json configurations.
+- **Auto-verify on test success** - Session now auto-sets `verified=true` when test suite passes (exit 0), eliminating the manual `craftsman-set-verified.sh` step before pushing. Detects `run-tests.sh`, `phpunit`, `jest`, `vitest`, `pytest`, `cargo test`, `go test`, and npm/pnpm/yarn test runners.
 
-## [3.4.0] — 2026-04-05
+## [3.4.1] - 2026-04-05
+
+### Fixed
+- **CI hooks schema validator** - Added missing Claude Code hook events (`PostToolUseFailure`, `SubagentStop`, `PreCompact`, `PostCompact`) to `VALID_HOOK_EVENTS` in CI validation, fixing false negatives on valid hooks.json configurations.
+
+## [3.4.0] - 2026-04-05
 
 ### Added
-- **`/craftsman:workflow` — Development Pipeline Orchestrator** — Flexible 7-step methodology: design → spec → plan → implement → test → verify → commit. Supports `--from <step>` to start at any point, `--skip <step>` to bypass steps, and `[Y/skip/stop]` gates between each step. Combines structured guidance with craftsman freedom — the workflow suggests, the craftsman decides. See [ADR-0013](docs/adr/0013-workflow-orchestrator.md).
-- **`/craftsman:setup --quick` — Zero-Question Auto-Setup** — Auto-detects stack (composer.json/package.json), extracts name from `git config`, and generates `.craft-config.yml` with smart defaults (strict mode, all biases ON, standard DDD paths). 30-second onboarding. Existing config protected unless `--force` is used. See [ADR-0014](docs/adr/0014-quick-setup-mode.md).
-- **ADR-0013** — Flexible Workflow Orchestrator design decision
-- **ADR-0014** — Quick Setup Mode design decision
-- **Examples** — Quick setup example, two workflow examples (full pipeline, --from resume)
+- **`/craftsman:workflow` - Development Pipeline Orchestrator** - Flexible 7-step methodology: design → spec → plan → implement → test → verify → commit. Supports `--from <step>` to start at any point, `--skip <step>` to bypass steps, and `[Y/skip/stop]` gates between each step. Combines structured guidance with craftsman freedom - the workflow suggests, the craftsman decides. See [ADR-0013](docs/adr/0013-workflow-orchestrator.md).
+- **`/craftsman:setup --quick` - Zero-Question Auto-Setup** - Auto-detects stack (composer.json/package.json), extracts name from `git config`, and generates `.craft-config.yml` with smart defaults (strict mode, all biases ON, standard DDD paths). 30-second onboarding. Existing config protected unless `--force` is used. See [ADR-0014](docs/adr/0014-quick-setup-mode.md).
+- **ADR-0013** - Flexible Workflow Orchestrator design decision
+- **ADR-0014** - Quick Setup Mode design decision
+- **Examples** - Quick setup example, two workflow examples (full pipeline, --from resume)
 
-## [3.3.5] — 2026-04-05
-
-### Fixed
-- **Test suite polluting bridge file** — Tests calling `session-start.sh` overwrote `~/.claude/craftsman-session-state-path` with temp paths, corrupting the real session's bridge file. Pre-push tests then read the real verified state instead of test state. Added backup/restore around session-start and pre-push test sections, and redirect bridge to test `CLAUDE_PLUGIN_DATA` during pre-push tests.
-
-## [3.3.4] — 2026-04-05
+## [3.3.5] - 2026-04-05
 
 ### Fixed
-- **Pre-push hook "No stderr output"** — Added stderr message alongside JSON output so Claude Code displays a clear, actionable block reason instead of the cryptic "No stderr output" error.
-- **`/craftsman:verify` never sets verified flag** — Root cause: the `set-verified` instruction was buried at line 266 of a 289-line skill file. Claude skipped it when focused on specific verification questions. Moved to "MANDATORY" section immediately after the verdict, before any optional content.
-- **Symlink regression in v3.3.3** — Edit tool resolved `commands/knowledge.md` symlink target to absolute path. Restored to relative `../packs/ai-ml/commands/knowledge.md`.
-- **CI secrets scanner false positive** — Removed `local paths in git history` check from scanner. Filesystem paths are not security secrets (no access granted). Current files are already validated by `scan_local_paths`. Only API keys/tokens warrant history scanning.
+- **Test suite polluting bridge file** - Tests calling `session-start.sh` overwrote `~/.claude/craftsman-session-state-path` with temp paths, corrupting the real session's bridge file. Pre-push tests then read the real verified state instead of test state. Added backup/restore around session-start and pre-push test sections, and redirect bridge to test `CLAUDE_PLUGIN_DATA` during pre-push tests.
 
-## [3.3.3] — 2026-04-05
+## [3.3.4] - 2026-04-05
 
 ### Fixed
-- **Command namespace regression** — Removed explicit `name:` fields from 20 command frontmatter files. Claude Code uses the `name:` value as-is in autocomplete, bypassing automatic `craftsman:` prefix. Without `name:`, Claude Code derives from filename and correctly shows `/craftsman:setup` instead of `/setup`. Aligns with official plugin conventions (vercel, metrikia, stripe all omit `name:`).
+- **Pre-push hook "No stderr output"** - Added stderr message alongside JSON output so Claude Code displays a clear, actionable block reason instead of the cryptic "No stderr output" error.
+- **`/craftsman:verify` never sets verified flag** - Root cause: the `set-verified` instruction was buried at line 266 of a 289-line skill file. Claude skipped it when focused on specific verification questions. Moved to "MANDATORY" section immediately after the verdict, before any optional content.
+- **Symlink regression in v3.3.3** - Edit tool resolved `commands/knowledge.md` symlink target to absolute path. Restored to relative `../packs/ai-ml/commands/knowledge.md`.
+- **CI secrets scanner false positive** - Removed `local paths in git history` check from scanner. Filesystem paths are not security secrets (no access granted). Current files are already validated by `scan_local_paths`. Only API keys/tokens warrant history scanning.
 
-## [3.3.2] — 2026-04-05
+## [3.3.3] - 2026-04-05
 
 ### Fixed
-- **Absolute symlink breaking portability** — `commands/knowledge.md` used a hardcoded absolute path, making the plugin unusable on other machines. Fixed to relative `../packs/ai-ml/commands/knowledge.md`.
-- **Git history sanitized** — Cleaned hardcoded local paths from git history via BFG to pass secrets scan.
-- **`craftsman-ci.sh` SH002 suppressions** — Added justified `craftsman-ignore` comments for 4 long functions that are cohesive output/config blocks.
+- **Command namespace regression** - Removed explicit `name:` fields from 20 command frontmatter files. Claude Code uses the `name:` value as-is in autocomplete, bypassing automatic `craftsman:` prefix. Without `name:`, Claude Code derives from filename and correctly shows `/craftsman:setup` instead of `/setup`. Aligns with official plugin conventions (vercel, metrikia, stripe all omit `name:`).
 
-## [3.3.1] — 2026-04-05
+## [3.3.2] - 2026-04-05
+
+### Fixed
+- **Absolute symlink breaking portability** - `commands/knowledge.md` used a hardcoded absolute path, making the plugin unusable on other machines. Fixed to relative `../packs/ai-ml/commands/knowledge.md`.
+- **Git history sanitized** - Cleaned hardcoded local paths from git history via BFG to pass secrets scan.
+- **`craftsman-ci.sh` SH002 suppressions** - Added justified `craftsman-ignore` comments for 4 long functions that are cohesive output/config blocks.
+
+## [3.3.1] - 2026-04-05
 
 ### Removed
-- **Mjolnir companion** — The Norse forge companion (persona injection, quality event reactions, `/craftsman:mjolnir` status command, and configuration toggle) has been removed. Claude Code does not expose a native companion API for plugins, making the feature purely text-based with no visual sidebar presence. The atmospheric value did not justify the added complexity.
+- **Mjolnir companion** - The Norse forge companion (persona injection, quality event reactions, `/craftsman:mjolnir` status command, and configuration toggle) has been removed. Claude Code does not expose a native companion API for plugins, making the feature purely text-based with no visual sidebar presence. The atmospheric value did not justify the added complexity.
 
 ### Improved
-- **`/craftsman:plan` — Git-First Assessment (Phase 0)** — The planning skill now starts with a mandatory git-history evaluation. Before designing file-by-file task breakdowns, it checks whether the scope maps to identifiable commits that can be reverted or cherry-picked. Prevents over-engineering when a simple `git revert` achieves the same result more safely.
+- **`/craftsman:plan` - Git-First Assessment (Phase 0)** - The planning skill now starts with a mandatory git-history evaluation. Before designing file-by-file task breakdowns, it checks whether the scope maps to identifiable commits that can be reverted or cherry-picked. Prevents over-engineering when a simple `git revert` achieves the same result more safely.
 
-## [3.2.4] — 2026-04-05
+## [3.2.4] - 2026-04-05
 
 ### Fixed
-- **Verify/push path mismatch (definitive fix)** — v3.2.3 bridge file mechanism was correct in code but Claude simplified the inline Python when executing `/craftsman:verify`, losing the bridge file lookup. Extracted path resolution into `session_state.py set-verified` command and generated `~/.claude/craftsman-set-verified.sh` wrapper at session start. Verify skill now calls one shell script instead of inline Python.
+- **Verify/push path mismatch (definitive fix)** - v3.2.3 bridge file mechanism was correct in code but Claude simplified the inline Python when executing `/craftsman:verify`, losing the bridge file lookup. Extracted path resolution into `session_state.py set-verified` command and generated `~/.claude/craftsman-set-verified.sh` wrapper at session start. Verify skill now calls one shell script instead of inline Python.
 
 ### Added
-- **`set-verified` command** in `session_state.py` — auto-resolves session-state path via bridge file, sets `verified=true` atomically. Single source of truth for path resolution.
-- **`craftsman-set-verified.sh` wrapper** — generated by `session-start.sh` with baked-in plugin root path. Skills call this directly, no `CLAUDE_PLUGIN_ROOT` needed.
+- **`set-verified` command** in `session_state.py` - auto-resolves session-state path via bridge file, sets `verified=true` atomically. Single source of truth for path resolution.
+- **`craftsman-set-verified.sh` wrapper** - generated by `session-start.sh` with baked-in plugin root path. Skills call this directly, no `CLAUDE_PLUGIN_ROOT` needed.
 
-## [3.2.3] — 2026-04-05
+## [3.2.3] - 2026-04-05
 
 ### Fixed
-- **Session state bridge desync** — `/craftsman:verify` wrote `verified=true` to a different path than `pre-push-verify.sh` read, because `CLAUDE_PLUGIN_DATA` is unavailable in Bash tool context. Added bridge file pattern: `session-start.sh` writes the canonical path to `~/.claude/craftsman-session-state-path`, both `verify.md` and `pre-push-verify.sh` resolve via the bridge.
+- **Session state bridge desync** - `/craftsman:verify` wrote `verified=true` to a different path than `pre-push-verify.sh` read, because `CLAUDE_PLUGIN_DATA` is unavailable in Bash tool context. Added bridge file pattern: `session-start.sh` writes the canonical path to `~/.claude/craftsman-session-state-path`, both `verify.md` and `pre-push-verify.sh` resolve via the bridge.
 
 ### Added
-- **Healthcheck: session-bridge** — `hc_check_session_bridge()` verifies the bridge file exists, is non-empty, and points to a valid directory. Catches post-reinstall issues.
+- **Healthcheck: session-bridge** - `hc_check_session_bridge()` verifies the bridge file exists, is non-empty, and points to a valid directory. Catches post-reinstall issues.
 
-## [3.2.2] — 2026-04-04
-
-### Fixed
-- **Breaking plugin validation** — `skills` and `agents` fields in `plugin.json` used inline objects incompatible with Claude Code v2.1.92 schema. Removed inline definitions; Claude Code now auto-discovers from `commands/` and `agents/` directories.
-- **Agent frontmatter completeness** — migrated `allowedTools`, `isolation`, and `skills` metadata from `plugin.json` into each agent's YAML frontmatter (10 files). Fixed `tools:` → `allowedTools:` in react-reviewer, symfony-reviewer, security-pentester.
-
-## [3.2.1] — 2026-04-04
+## [3.2.2] - 2026-04-04
 
 ### Fixed
-- **PY001 regex bug** — `[=,\s]` matched literal `s` in ERE character classes, causing false positives on `result`, `else`, `sys`. Changed to `[=,[:space:]]`.
+- **Breaking plugin validation** - `skills` and `agents` fields in `plugin.json` used inline objects incompatible with Claude Code v2.1.92 schema. Removed inline definitions; Claude Code now auto-discovers from `commands/` and `agents/` directories.
+- **Agent frontmatter completeness** - migrated `allowedTools`, `isolation`, and `skills` metadata from `plugin.json` into each agent's YAML frontmatter (10 files). Fixed `tools:` → `allowedTools:` in react-reviewer, symfony-reviewer, security-pentester.
+
+## [3.2.1] - 2026-04-04
+
+### Fixed
+- **PY001 regex bug** - `[=,\s]` matched literal `s` in ERE character classes, causing false positives on `result`, `else`, `sys`. Changed to `[=,[:space:]]`.
 
 ### Changed
-- **Dog-fooding compliance** — Plugin now passes its own validation rules on all Python and Bash source files.
+- **Dog-fooding compliance** - Plugin now passes its own validation rules on all Python and Bash source files.
 - `pack_validate_python()` split into 6 focused sub-functions (`_check_py001`..`_check_py005`, `_check_warn_py001`)
-- `yaml-parser.py` — extracted `_dispatch_yaml_line()`, added type hints, Python 3.9 compatibility (`from __future__ import annotations`)
-- `metrics-query.py` — extracted `_parse_args()`, `_execute_query()`, `_print_select_results()`, added type hints
-- `rules-engine.sh` — split 4 functions >30 lines, renamed `ns` → `namespace`
-- `pack-loader.sh` — split 2 functions >30 lines, renamed `t` → `tool_entry`, `st` → `scaffold_type`
+- `yaml-parser.py` - extracted `_dispatch_yaml_line()`, added type hints, Python 3.9 compatibility (`from __future__ import annotations`)
+- `metrics-query.py` - extracted `_parse_args()`, `_execute_query()`, `_print_select_results()`, added type hints
+- `rules-engine.sh` - split 4 functions >30 lines, renamed `ns` → `namespace`
+- `pack-loader.sh` - split 2 functions >30 lines, renamed `t` → `tool_entry`, `st` → `scaffold_type`
 
 ### Added
-- `tests/core/test-dogfood.sh` — self-validation test running plugin validators against own code
+- `tests/core/test-dogfood.sh` - self-validation test running plugin validators against own code
 
-## [3.2.0] — 2026-04-04
+## [3.2.0] - 2026-04-04
 
 ### Added
-- **Python Pack** (`packs/python/`) — full language pack with 6 rules: PY001 (naming), PY002 (function length), PY003 (type hints), PY004 (bare except), PY005 (mutable defaults), WARN-PY001 (parameter count). Canonical examples and anti-pattern documentation included.
-- **Bash Pack** (`packs/bash/`) — full language pack with 6 rules: SH001 (safety options), SH002 (function length), SH003 (variable naming), SH004 (eval security), SH005 (unquoted variables), WARN-SH001 (local declarations). Closes the 83% Bash codebase blind spot.
-- **Knowledge: Clean Code** (`knowledge/clean-code.md`) — naming, functions, comments, error handling, SOLID reference
-- **Knowledge: Refactoring Techniques** (`knowledge/refactoring-techniques.md`) — code smells catalog, composing methods, moving features, simplifying conditionals. Reference: refactoring.guru
-- **Knowledge: Design Patterns** (`knowledge/design-patterns.md`) — 23 GoF patterns (creational, structural, behavioral) with Python examples and selection guide. Reference: refactoring.guru
-- **Symfony Knowledge Base** — 8 new methodology documents extracted from production projects (Metrikia, Qualia):
-  - `ddd-cqrs-architecture.md` — Full DDD+CQRS layer architecture with Symfony & API Platform
-  - `ddd-domain-design.md` — Entities as aggregates, value objects, domain events, bounded contexts
-  - `api-platform-patterns.md` — State Providers/Processors, pagination, cache invalidation, serialization groups
-  - `messenger-patterns.md` — Async processing, idempotency, retry strategy, message versioning
-  - `symfony-best-practices.md` — Configuration hierarchy, services, controllers, security, testing
-  - `repository-composition.md` — Interface Segregation for repositories (7 focused interfaces per aggregate)
-  - `anti-patterns/anemic-domain.md` — Behavioral methods vs getter/setter entities
-  - `anti-patterns/service-locator.md` — Constructor injection vs ContainerInterface::get()
+- **Python Pack** (`packs/python/`) - full language pack with 6 rules: PY001 (naming), PY002 (function length), PY003 (type hints), PY004 (bare except), PY005 (mutable defaults), WARN-PY001 (parameter count). Canonical examples and anti-pattern documentation included.
+- **Bash Pack** (`packs/bash/`) - full language pack with 6 rules: SH001 (safety options), SH002 (function length), SH003 (variable naming), SH004 (eval security), SH005 (unquoted variables), WARN-SH001 (local declarations). Closes the 83% Bash codebase blind spot.
+- **Knowledge: Clean Code** (`knowledge/clean-code.md`) - naming, functions, comments, error handling, SOLID reference
+- **Knowledge: Refactoring Techniques** (`knowledge/refactoring-techniques.md`) - code smells catalog, composing methods, moving features, simplifying conditionals. Reference: refactoring.guru
+- **Knowledge: Design Patterns** (`knowledge/design-patterns.md`) - 23 GoF patterns (creational, structural, behavioral) with Python examples and selection guide. Reference: refactoring.guru
+- **Symfony Knowledge Base** - 8 new methodology documents extracted from production projects (Metrikia, Qualia):
+  - `ddd-cqrs-architecture.md` - Full DDD+CQRS layer architecture with Symfony & API Platform
+  - `ddd-domain-design.md` - Entities as aggregates, value objects, domain events, bounded contexts
+  - `api-platform-patterns.md` - State Providers/Processors, pagination, cache invalidation, serialization groups
+  - `messenger-patterns.md` - Async processing, idempotency, retry strategy, message versioning
+  - `symfony-best-practices.md` - Configuration hierarchy, services, controllers, security, testing
+  - `repository-composition.md` - Interface Segregation for repositories (7 focused interfaces per aggregate)
+  - `anti-patterns/anemic-domain.md` - Behavioral methods vs getter/setter entities
+  - `anti-patterns/service-locator.md` - Constructor injection vs ContainerInterface::get()
 - 15 new tests: 8 Python pack tests + 7 Bash pack tests
 - `craftsman-ignore: SH001` support for sourced library files (validators loaded via `source` must not have `set -euo pipefail`)
 
 ### Changed
 - Python validation migrated from inline code in `post-write-check.sh` to proper pack architecture (`packs/python/hooks/python-validator.sh`)
-- `post-write-check.sh` now delegates to `pack_run_validators` for Python and Bash — same pattern as PHP/TypeScript
+- `post-write-check.sh` now delegates to `pack_run_validators` for Python and Bash - same pattern as PHP/TypeScript
 - Plugin now validates **all 4 language families** it touches: PHP, TypeScript, Python, Bash
 - Knowledge base expanded from 5 to 45 documents across 5 packs + core
-- Bias detector patterns made context-aware — requires imperative verb context, eliminates false positives on "quick", "fast"
+- Bias detector patterns made context-aware - requires imperative verb context, eliminates false positives on "quick", "fast"
 - Rules engine refactored: extracted `_rules_find_directory_override`, `_rules_store_rule_fields` (SRP compliance)
 
 ### Fixed
@@ -156,47 +180,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 8 agent effort level mismatches between plugin.json and .md files
 - README version badge 3.0.0 → 3.2.0
 
-## [3.1.0] — 2026-04-04
+## [3.1.0] - 2026-04-04
 
 ### Added
-- `hooks/lib/session_state.py` — shared Python module (Clean Code compliant) with 13 commands: read, write, merge, append, increment, check-flag, record-violation, detect-patterns, pre-compact, post-compact, get-previous-violations, read-session-metrics
-- **Python validation in core** (PY001: naming, PY002: function length) — the plugin now validates its own Python code
-- `tests/lib/test-helpers.sh` — centralized test infrastructure (log_pass/log_fail, assertions, test_summary)
-- `tests/core/test-session-state-lib.sh` — 20 unit tests for session state module
-- PostCompact hook — verifies session state recovery after context compaction
+- `hooks/lib/session_state.py` - shared Python module (Clean Code compliant) with 13 commands: read, write, merge, append, increment, check-flag, record-violation, detect-patterns, pre-compact, post-compact, get-previous-violations, read-session-metrics
+- **Python validation in core** (PY001: naming, PY002: function length) - the plugin now validates its own Python code
+- `tests/lib/test-helpers.sh` - centralized test infrastructure (log_pass/log_fail, assertions, test_summary)
+- `tests/core/test-session-state-lib.sh` - 20 unit tests for session state module
+- PostCompact hook - verifies session state recovery after context compaction
 - 3 new examples: refactor (extract Value Object), verify (pre-commit), healthcheck (plugin diagnostic)
 - Superpowers plugin combination guide in README with recommended development flow
 
 ### Fixed
-- **CRITICAL**: Non-atomic writes in `post-write-check.sh` — session-state.json could be corrupted when multiple hooks fire simultaneously. Now uses `tempfile.mkstemp() + os.rename()`.
-- **Python Clean Code violations** in `session_state.py` — renamed all abbreviations (`fp`->`file_path`, `dir_b`->`directory`, `d`->`parent_directory`, etc.), extracted magic numbers to constants, split long functions
+- **CRITICAL**: Non-atomic writes in `post-write-check.sh` - session-state.json could be corrupted when multiple hooks fire simultaneously. Now uses `tempfile.mkstemp() + os.rename()`.
+- **Python Clean Code violations** in `session_state.py` - renamed all abbreviations (`fp`->`file_path`, `dir_b`->`directory`, `d`->`parent_directory`, etc.), extracted magic numbers to constants, split long functions
 - `bias-detector.sh` output changed from raw text to JSON `{systemMessage}` format for proper Claude Code integration
-- `bin/craftsman-validate` — replaced string interpolation with `jq --arg` to prevent shell injection
+- `bin/craftsman-validate` - replaced string interpolation with `jq --arg` to prevent shell injection
 - ADR numbering: unified from dual scheme (0001-0009 + 001-004) to consistent 0001-0012
-- Removed ADR-0013 (documentation verification) — was a process rule, not an architectural decision
-- `test-adapters.sh` — version assertion matched stale v2.1.0 instead of mock report's v2.6.0
+- Removed ADR-0013 (documentation verification) - was a process rule, not an architectural decision
+- `test-adapters.sh` - version assertion matched stale v2.1.0 instead of mock report's v2.6.0
 
 ### Changed
-- Migrated **all** session-state operations to shared `session_state.py` module — 8 hooks refactored, ~150 lines of inline Python eliminated
+- Migrated **all** session-state operations to shared `session_state.py` module - 8 hooks refactored, ~150 lines of inline Python eliminated
 - Refactored 19 test files to use shared `test-helpers.sh`, eliminating ~400 lines of duplicated test boilerplate
-- **Hook event validation refactored** — extracted hardcoded hook event list from `session-start.sh` and `test-hooks.sh` into centralized `hooks/lib/hook-events.sh` configuration. Single source of truth for all 25 valid Claude Code hook event types. Fixes Issue #4.
-- **Agent metadata synchronized** — all 9 agent .md files now have `allowedTools` arrays, `isolation` fields, and consistent `effort` values matching `plugin.json`. Fixes Issue #3.
+- **Hook event validation refactored** - extracted hardcoded hook event list from `session-start.sh` and `test-hooks.sh` into centralized `hooks/lib/hook-events.sh` configuration. Single source of truth for all 25 valid Claude Code hook event types. Fixes Issue #4.
+- **Agent metadata synchronized** - all 9 agent .md files now have `allowedTools` arrays, `isolation` fields, and consistent `effort` values matching `plugin.json`. Fixes Issue #3.
 - Stale documentation counts corrected: "15 commands" → "20 skills", "5 agents" → "11 agents"
 - README examples section expanded from 6 to 11 entries
 - README ADRs section expanded from 11 to 12 with consistent numbering
 
-## [3.0.0] — 2026-04-04
+## [3.0.0] - 2026-04-04
 
-### BREAKING — Paradigm Shift: Passive → Proactive
+### BREAKING - Paradigm Shift: Passive → Proactive
 
 The plugin now actively suggests the right command at the right time. Claude reads the routing table at session start and proposes craftsman commands when the context matches.
 
 ### Added
-- **Proactive Command Discovery** — routing table injected into session-start systemMessage
-- `hooks/lib/routing-table.sh` — dynamic routing table adapted to loaded packs
-- `/craftsman:healthcheck` — global plugin diagnostic (system deps, config, runtime, AI/ML)
-- `/craftsman:knowledge` — knowledge base management (add, sync, list, status, remove)
-- Incremental indexing — hash-based sync replaces full rebuild (SHA256 per file)
+- **Proactive Command Discovery** - routing table injected into session-start systemMessage
+- `hooks/lib/routing-table.sh` - dynamic routing table adapted to loaded packs
+- `/craftsman:healthcheck` - global plugin diagnostic (system deps, config, runtime, AI/ML)
+- `/craftsman:knowledge` - knowledge base management (add, sync, list, status, remove)
+- Incremental indexing - hash-based sync replaces full rebuild (SHA256 per file)
 - Healthcheck summary injected into session-start output
 - `hooks/lib/healthcheck.sh` shared library for health checks
 
@@ -214,20 +238,20 @@ The plugin now actively suggests the right command at the right time. Claude rea
 ## [2.9.1] - 2026-04-04
 
 ### Fixed
-- Conflict detector now also checks `~/.mcp.json` — a stale home-level entry with invalid path silently overrode the plugin-managed MCP server
+- Conflict detector now also checks `~/.mcp.json` - a stale home-level entry with invalid path silently overrode the plugin-managed MCP server
 
 ## [2.9.0] - 2026-04-04
 
 ### Fixed
 - No-op MCP server protocol mismatch: switched from Content-Length (LSP) to NDJSON framing to match MCP SDK 1.25.3
-- Bootstrap error logging: `stdio: "ignore"` → `stdio: "pipe"` with try/catch — install/build failures are now visible instead of silently swallowed
+- Bootstrap error logging: `stdio: "ignore"` → `stdio: "pipe"` with try/catch - install/build failures are now visible instead of silently swallowed
 - Added conflict detection: warns users when `~/.claude.json` contains a manual `knowledge-rag` MCP entry that conflicts with the plugin-managed server
 
 ## [2.8.2] - 2026-04-04
 
 ### Fixed
 - knowledge-rag MCP server fails for all users with "Failed to reconnect" because `dist/` and `node_modules/` are gitignored and never built during plugin installation
-- MCP server now conditional on `ai-ml` pack activation via `CLAUDE_PLUGIN_OPTION_packs` — users without `ai-ml` get a no-op MCP server (valid protocol, zero tools, zero errors)
+- MCP server now conditional on `ai-ml` pack activation via `CLAUDE_PLUGIN_OPTION_packs` - users without `ai-ml` get a no-op MCP server (valid protocol, zero tools, zero errors)
 - Auto-bootstrap: when `ai-ml` pack is enabled, `start.mjs` launcher auto-installs dependencies and builds TypeScript on first run
 - Fixed stale path references in docs (`ai-pack/` → `packs/ai-ml/`)
 
@@ -292,7 +316,7 @@ The plugin now actively suggests the right command at the right time. Claude rea
 - **Pack Validation Script**: `scripts/validate-pack.sh` validates pack structure, references, rule ID collisions, agent conventions
 - **External Pack Support**: Load packs from outside the plugin via `.craft-config.yml` `packs.external` paths
 - **Pack Scaffold Type**: `/craftsman:scaffold pack` generates complete pack directory structure
-- **Pack Creation Guide**: `docs/creating-packs.md` — comprehensive guide for community pack authors
+- **Pack Creation Guide**: `docs/creating-packs.md` - comprehensive guide for community pack authors
 - **Go Pack Skeleton**: `examples/pack-skeleton-go/` with error checking and init() detection rules
 - **Rust Pack Skeleton**: `examples/pack-skeleton-rust/` with unwrap/panic detection rules
 - **Python Pack Skeleton**: `examples/pack-skeleton-python/` with bare except, mutable defaults, wildcard import rules
@@ -342,7 +366,7 @@ The plugin now actively suggests the right command at the right time. Claude rea
 - `/craftsman:source-verify` command (moved to CLAUDE.md instruction)
 - `/craftsman:agent-create` command (integrated into scaffold)
 - `/craftsman:start` command (absorbed into setup)
-- Standalone scaffold commands (entity, usecase, component, hook — unified into scaffold)
+- Standalone scaffold commands (entity, usecase, component, hook - unified into scaffold)
 - Old `symfony-pack/`, `react-pack/` root directories
 
 ---
@@ -351,11 +375,11 @@ The plugin now actively suggests the right command at the right time. Claude rea
 
 ### Added
 
-- **Distribution ignore** — `.claude-plugin/ignore` reduces plugin size from 134 MB to <1 MB by excluding ai-pack/, tests/, scripts/, docs/superpowers/
-- **Dependency check** — `session-start.sh` verifies python3, jq, sqlite3 at boot with clear install instructions if missing
-- **Agent hooks opt-out** — `agent_hooks: false` in userConfig disables all 4 AI agent hooks (DDD verifier, Sentry, analyzer, reviewer). Saves ~$0.15-0.30/session in Haiku API costs.
-- **API Cost Model** — README section documenting agent hook costs and opt-out mechanism
-- **Auto-setup gate** — Improved first-run detection: checks both global (`~/.claude/.craft-config.yml`) and project config, with clear guidance to run `/craftsman:setup`
+- **Distribution ignore** - `.claude-plugin/ignore` reduces plugin size from 134 MB to <1 MB by excluding ai-pack/, tests/, scripts/, docs/superpowers/
+- **Dependency check** - `session-start.sh` verifies python3, jq, sqlite3 at boot with clear install instructions if missing
+- **Agent hooks opt-out** - `agent_hooks: false` in userConfig disables all 4 AI agent hooks (DDD verifier, Sentry, analyzer, reviewer). Saves ~$0.15-0.30/session in Haiku API costs.
+- **API Cost Model** - README section documenting agent hook costs and opt-out mechanism
+- **Auto-setup gate** - Improved first-run detection: checks both global (`~/.claude/.craft-config.yml`) and project config, with clear guidance to run `/craftsman:setup`
 
 ---
 
@@ -363,16 +387,16 @@ The plugin now actively suggests the right command at the right time. Claude rea
 
 ### Added
 
-- **Version bump script** — `scripts/bump-version.sh` updates all version references in one command
-- **README v2.x features** — Custom Rule Engine, CI/CD Integration, Circuit Breaker, Pack Templates, Schema Validation sections
-- **README missing commands** — Added `/craftsman:team`, `/craftsman:start` to commands table
+- **Version bump script** - `scripts/bump-version.sh` updates all version references in one command
+- **README v2.x features** - Custom Rule Engine, CI/CD Integration, Circuit Breaker, Pack Templates, Schema Validation sections
+- **README missing commands** - Added `/craftsman:team`, `/craftsman:start` to commands table
 
 ### Fixed
 
-- **SECURITY.md** — Updated commands count (22→25), hooks count (6→7), added pre-push-verify.sh, v2.x audit trail, supported versions
-- **docs/reference/skills.md** — Added 3 missing commands to Quick Reference Table (`/craftsman:team`, `/craftsman:ci`, `/craftsman:start`)
-- **docs/reference/hooks.md** — Added pre-push-verify.sh, Rules Engine, Schema Validation, Atomic Commits, Monorepo Safety sections
-- **README Project Structure** — Added `config/`, `ci/`, `pre-push-verify.sh`, fixed hooks count 6→7
+- **SECURITY.md** - Updated commands count (22→25), hooks count (6→7), added pre-push-verify.sh, v2.x audit trail, supported versions
+- **docs/reference/skills.md** - Added 3 missing commands to Quick Reference Table (`/craftsman:team`, `/craftsman:ci`, `/craftsman:start`)
+- **docs/reference/hooks.md** - Added pre-push-verify.sh, Rules Engine, Schema Validation, Atomic Commits, Monorepo Safety sections
+- **README Project Structure** - Added `config/`, `ci/`, `pre-push-verify.sh`, fixed hooks count 6→7
 
 ---
 
@@ -380,22 +404,22 @@ The plugin now actively suggests the right command at the right time. Claude rea
 
 ### Security
 
-- **SQL injection fix** — `metrics-db.sh` write functions now use parameterized queries via `metrics-query.py` Python helper. Eliminates injection risk from filenames/rule names containing SQL metacharacters.
-- **Bitbucket adapter fix** — Replaced fragile double-nested `python3 -c` JSON encoding with single safe call using `sys.stdin.read()`.
+- **SQL injection fix** - `metrics-db.sh` write functions now use parameterized queries via `metrics-query.py` Python helper. Eliminates injection risk from filenames/rule names containing SQL metacharacters.
+- **Bitbucket adapter fix** - Replaced fragile double-nested `python3 -c` JSON encoding with single safe call using `sys.stdin.read()`.
 
 ### Added
 
-- **Hooks schema validation** — `session-start.sh` validates `hooks.json` events against supported set at startup. Catches unsupported events before CI fails.
-- **Atomic commit enforcement** — Stop hook caps file inspection at 20 files and warns when >15 files modified in a session, encouraging small focused commits.
-- **Monorepo sampling** — InstructionsLoaded agent switches to directory-level analysis when Glob returns >100 files. Prevents token explosion on large codebases.
-- **Key Differentiators section** — README "Why Craftsman?" marketing table with 8 unique selling points.
-- **Project CLAUDE.md** — Development rules, testing commands, version sync checklist, and 10 marketing differentiators.
+- **Hooks schema validation** - `session-start.sh` validates `hooks.json` events against supported set at startup. Catches unsupported events before CI fails.
+- **Atomic commit enforcement** - Stop hook caps file inspection at 20 files and warns when >15 files modified in a session, encouraging small focused commits.
+- **Monorepo sampling** - InstructionsLoaded agent switches to directory-level analysis when Glob returns >100 files. Prevents token explosion on large codebases.
+- **Key Differentiators section** - README "Why Craftsman?" marketing table with 8 unique selling points.
+- **Project CLAUDE.md** - Development rules, testing commands, version sync checklist, and 10 marketing differentiators.
 
 ### Fixed
 
-- `commands/ci.md` — Added missing `effort: medium` frontmatter field.
-- README badges — Updated from v1.5.0/22 commands to v2.2.0/25 commands.
-- README — Removed outdated "CI/CD not supported" line (CI has been supported since v2.1.0).
+- `commands/ci.md` - Added missing `effort: medium` frontmatter field.
+- README badges - Updated from v1.5.0/22 commands to v2.2.0/25 commands.
+- README - Removed outdated "CI/CD not supported" line (CI has been supported since v2.1.0).
 
 ---
 
@@ -403,19 +427,19 @@ The plugin now actively suggests the right command at the right time. Claude rea
 
 ### Added
 
-- **Custom Rule Engine** — Per-project rule customization with 3-level inheritance:
+- **Custom Rule Engine** - Per-project rule customization with 3-level inheritance:
   - Global (~/.claude/.craft-config.yml) → Project (.craft-config.yml) → Directory (.craft-rules.yml)
   - Short form (`PHP001: warn`) and long form (custom rules with pattern, message, severity, languages)
   - Custom rule validation on config load (bad regex = skipped with warning)
-- **CI Adapter System** — Universal adapter architecture for multi-provider CI:
+- **CI Adapter System** - Universal adapter architecture for multi-provider CI:
   - Auto-detection via env vars (GITHUB_ACTIONS, GITLAB_CI, BITBUCKET_BUILD_NUMBER)
   - 4 adapters: GitHub Actions, GitLab CI, Bitbucket Pipelines, Generic (Jenkins/CircleCI)
   - `craftsman-ci.sh ci` mode with full adapter lifecycle
   - `craftsman-ci.sh init --provider` generates CI template files
   - Unified PR/MR comment format across all providers
   - Inline file annotations (GitHub ::error, GitLab codequality, Bitbucket Reports API)
-- **CI Templates** — GitLab CI, Bitbucket Pipelines, Jenkinsfile templates
-- **Circuit Breaker** — Protects against external service failures:
+- **CI Templates** - GitLab CI, Bitbucket Pipelines, Jenkinsfile templates
+- **Circuit Breaker** - Protects against external service failures:
   - 3 states: closed → open → half-open
   - Configurable threshold and cooldown per channel
   - File-based cache with TTL and LRU eviction
@@ -426,12 +450,12 @@ The plugin now actively suggests the right command at the right time. Claude rea
 
 ### Changed
 
-- **Config format** — Updated to v2.1 with `rules:` section for per-rule overrides and `channels:` for circuit breaker config
-- **post-write-check.sh** — Refactored to use rules engine instead of hardcoded severity logic
-- **craftsman-ci.sh** — Integrated rules engine, added `ci` and `init` subcommands, bumped to v2.1.0
-- **channels.sh** — Rewritten with circuit breaker integration and cache orchestration
-- **Sentry hook** — Now checks circuit breaker state before querying, records success/failure
-- **GitHub Actions template** — Simplified to use adapter system
+- **Config format** - Updated to v2.1 with `rules:` section for per-rule overrides and `channels:` for circuit breaker config
+- **post-write-check.sh** - Refactored to use rules engine instead of hardcoded severity logic
+- **craftsman-ci.sh** - Integrated rules engine, added `ci` and `init` subcommands, bumped to v2.1.0
+- **channels.sh** - Rewritten with circuit breaker integration and cache orchestration
+- **Sentry hook** - Now checks circuit breaker state before querying, records success/failure
+- **GitHub Actions template** - Simplified to use adapter system
 
 ---
 
@@ -439,46 +463,46 @@ The plugin now actively suggests the right command at the right time. Claude rea
 
 ### Added
 
-- **Teams system** — Agent team orchestration with `/craftsman:team` (create, context, list):
+- **Teams system** - Agent team orchestration with `/craftsman:team` (create, context, list):
   - 3 built-in templates: `code-review`, `feature`, `security-audit`
   - Interactive team builder with questionnaire or template selection
   - Codebase analysis for optimal team composition
-- **CI export** — `/craftsman:ci` skill + standalone `craftsman-ci.sh` CLI:
+- **CI export** - `/craftsman:ci` skill + standalone `craftsman-ci.sh` CLI:
   - Same regex rules as hooks (PHP001-005, TS001-003, LAYER001-003)
   - JSON + text output formats for CI/CD integration
   - GitHub Actions workflow template (`craftsman-quality-gate.yml`)
   - 36 CLI tests, 0 failures
-- **Onboarding** — `/craftsman:start` for first-time users:
+- **Onboarding** - `/craftsman:start` for first-time users:
   - Auto-detect stack, scan codebase, suggest top 5 skills
   - Quick reference card with all commands
-- **Pre-push verification** — `pre-push-verify.sh` blocks `git push` if `/craftsman:verify` not run
-- **Workflow enforcement** — `bias-detector.sh` warns when domain modeling without `/craftsman:design`
-- **TeammateIdle + TaskCompleted hooks** — New hook events in hooks.json
-- **4 canonical examples** — API Platform 4 State Provider, Messenger handler, React Server Component, Compound Component
-- **3 anti-patterns** — sync-in-async (Messenger), barrel imports, inline components
+- **Pre-push verification** - `pre-push-verify.sh` blocks `git push` if `/craftsman:verify` not run
+- **Workflow enforcement** - `bias-detector.sh` warns when domain modeling without `/craftsman:design`
+- **TeammateIdle + TaskCompleted hooks** - New hook events in hooks.json
+- **4 canonical examples** - API Platform 4 State Provider, Messenger handler, React Server Component, Compound Component
+- **3 anti-patterns** - sync-in-async (Messenger), barrel imports, inline components
 
 ### Changed
 
-- **Hooks enriched** — Structured PHPStan/ESLint/deptrac parsing with error-to-code mapping (PHPSTAN001-003, ESLINT001)
-- **Correction Learning v2** — Cross-file pattern detection: project-wide and directory-level suggestions when same rule violated in 3+ files
-- **craftsman-ignore multi-rules** — `// craftsman-ignore: PHP001, TS001, LAYER001` on single line
-- **Session metrics** — Now tracks agent invocations, team type, and completed tasks
-- **All 22 skills enriched** — `paths` field (7 skills), `effort` field (all 22), `!command` injections for runtime context
-- **Scaffolders** (entity, usecase, component, hook) — Worktree isolation recommendation
-- **/craftsman:plan** — TaskCreate/TaskUpdate integration + Agent tool dispatch for parallel execution
-- **/craftsman:verify** — Auto-detection + real execution of tests/lint/typecheck + session state `verified=true`
-- **/craftsman:debug** — WebSearch/WebFetch auto-research after 2 inconclusive investigation cycles
-- **/craftsman:challenge** — Deep Review Mode with parallel reviewer agents for complex PRs
-- **/craftsman:parallel** — Real Agent tool spawn with `isolation: "worktree"` and `run_in_background: true`
-- **/craftsman:setup** — Auto-detection of stack + analysis tools check + pack auto-selection
-- **/craftsman:metrics** — Correction trends, quality score (100-based), agent/team usage stats
-- **Symfony pack** — API Platform 4 (State Provider/Processor), Messenger async handlers, Scheduler 7.4+, MapRequestPayload
-- **React pack** — React 19 Server Components, useOptimistic, useTransition, Compound Components, Render Props with useSuspenseQuery
-- **knowledge/stack-specifics.md** — 6 new sections (API Platform 4, Messenger, Scheduler, React 19, Composition)
+- **Hooks enriched** - Structured PHPStan/ESLint/deptrac parsing with error-to-code mapping (PHPSTAN001-003, ESLINT001)
+- **Correction Learning v2** - Cross-file pattern detection: project-wide and directory-level suggestions when same rule violated in 3+ files
+- **craftsman-ignore multi-rules** - `// craftsman-ignore: PHP001, TS001, LAYER001` on single line
+- **Session metrics** - Now tracks agent invocations, team type, and completed tasks
+- **All 22 skills enriched** - `paths` field (7 skills), `effort` field (all 22), `!command` injections for runtime context
+- **Scaffolders** (entity, usecase, component, hook) - Worktree isolation recommendation
+- **/craftsman:plan** - TaskCreate/TaskUpdate integration + Agent tool dispatch for parallel execution
+- **/craftsman:verify** - Auto-detection + real execution of tests/lint/typecheck + session state `verified=true`
+- **/craftsman:debug** - WebSearch/WebFetch auto-research after 2 inconclusive investigation cycles
+- **/craftsman:challenge** - Deep Review Mode with parallel reviewer agents for complex PRs
+- **/craftsman:parallel** - Real Agent tool spawn with `isolation: "worktree"` and `run_in_background: true`
+- **/craftsman:setup** - Auto-detection of stack + analysis tools check + pack auto-selection
+- **/craftsman:metrics** - Correction trends, quality score (100-based), agent/team usage stats
+- **Symfony pack** - API Platform 4 (State Provider/Processor), Messenger async handlers, Scheduler 7.4+, MapRequestPayload
+- **React pack** - React 19 Server Components, useOptimistic, useTransition, Compound Components, Render Props with useSuspenseQuery
+- **knowledge/stack-specifics.md** - 6 new sections (API Platform 4, Messenger, Scheduler, React 19, Composition)
 
 ### Fixed
 
-- **8 factual inaccuracies** in packs — Messenger routing glob, Processor return type, Next.js cache leak, unsafe type cast, untyped activity fetch, missing ErrorBoundary note, pagination type, missing patterns
+- **8 factual inaccuracies** in packs - Messenger routing glob, Processor return type, Next.js cache leak, unsafe type cast, untyped activity fetch, missing ErrorBoundary note, pagination type, missing patterns
 
 ---
 
@@ -486,19 +510,19 @@ The plugin now actively suggests the right command at the right time. Claude rea
 
 ### Added
 
-- **7 craftsman agents** — New specialized agents for full-stack implementation:
-  - `team-lead` (Opus, max effort) — orchestrator, delegates, challenges, never codes
-  - `backend-craftsman` (Sonnet) — PHP/Symfony expert with Symfony.com + API Platform refs
-  - `frontend-craftsman` (Sonnet) — React/TS expert with 65 Vercel best practices rules
-  - `architect` (Sonnet, read-only) — DDD/Clean Architecture validation, disallowedTools: Edit,Write
-  - `ai-engineer` (Sonnet) — RAG, LLM, MCP server, agent design
-  - `ui-ux-director` (Sonnet) — UX, WCAG 2.1 AA, design tokens, data visualization
-  - `doc-writer` (Haiku, cost-optimized) — ADRs, README, CHANGELOG, runbooks
-- **Agent Teams support** — `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` enabled in settings. Team launch prompt prepared at `.claude/team-prompts/v2-implementation.md`.
+- **7 craftsman agents** - New specialized agents for full-stack implementation:
+  - `team-lead` (Opus, max effort) - orchestrator, delegates, challenges, never codes
+  - `backend-craftsman` (Sonnet) - PHP/Symfony expert with Symfony.com + API Platform refs
+  - `frontend-craftsman` (Sonnet) - React/TS expert with 65 Vercel best practices rules
+  - `architect` (Sonnet, read-only) - DDD/Clean Architecture validation, disallowedTools: Edit,Write
+  - `ai-engineer` (Sonnet) - RAG, LLM, MCP server, agent design
+  - `ui-ux-director` (Sonnet) - UX, WCAG 2.1 AA, design tokens, data visualization
+  - `doc-writer` (Haiku, cost-optimized) - ADRs, README, CHANGELOG, runbooks
+- **Agent Teams support** - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` enabled in settings. Team launch prompt prepared at `.claude/team-prompts/v2-implementation.md`.
 
 ### Changed
 
-- **5 existing reviewers enriched** — All reviewers now have `memory: project` (cross-session learning), `effort: high`, `skills` preload, and `maxTurns` (camelCase per official Claude Code docs). Fields migrated from legacy `allowed-tools`/`max-turns` to official `tools`/`maxTurns`.
+- **5 existing reviewers enriched** - All reviewers now have `memory: project` (cross-session learning), `effort: high`, `skills` preload, and `maxTurns` (camelCase per official Claude Code docs). Fields migrated from legacy `allowed-tools`/`max-turns` to official `tools`/`maxTurns`.
 
 ---
 
@@ -506,16 +530,16 @@ The plugin now actively suggests the right command at the right time. Claude rea
 
 ### Added
 
-- **Sentry Channel integration** — Sentry MCP server bound via `channels` in plugin.json. PostToolUse agent hook queries Sentry for errors related to edited files.
-- **Channel lifecycle library** — `hooks/lib/channels.sh` provides `channel_available()` and `channel_status_summary()` for gating channel usage.
-- **Sentry configuration** — `sentry_org`, `sentry_project`, `sentry_token` (sensitive: true) in userConfig.
-- **Corrections reporting** — InstructionsLoaded agent hook queries 30-day correction trends and suggests strictness adjustments.
-- **Channel status** — InstructionsLoaded agent reports active channels at session start.
+- **Sentry Channel integration** - Sentry MCP server bound via `channels` in plugin.json. PostToolUse agent hook queries Sentry for errors related to edited files.
+- **Channel lifecycle library** - `hooks/lib/channels.sh` provides `channel_available()` and `channel_status_summary()` for gating channel usage.
+- **Sentry configuration** - `sentry_org`, `sentry_project`, `sentry_token` (sensitive: true) in userConfig.
+- **Corrections reporting** - InstructionsLoaded agent hook queries 30-day correction trends and suggests strictness adjustments.
+- **Channel status** - InstructionsLoaded agent reports active channels at session start.
 
 ### Changed
 
-- **config.sh** — Added `_config_resolve()` generic helper. All config functions now use it.
-- **hooks.json** — Now has 8 events, 6 command hooks, 4 agent hooks (PostToolUse DDD + Sentry, InstructionsLoaded, Stop).
+- **config.sh** - Added `_config_resolve()` generic helper. All config functions now use it.
+- **hooks.json** - Now has 8 events, 6 command hooks, 4 agent hooks (PostToolUse DDD + Sentry, InstructionsLoaded, Stop).
 
 ---
 
@@ -523,12 +547,12 @@ The plugin now actively suggests the right command at the right time. Claude rea
 
 ### Added
 
-- **Semantic Intelligence** — 3 agent hooks for semantic analysis beyond regex:
-  - PostToolUse DDD verifier (Haiku) — checks layer violations, aggregate boundaries, value objects, naming
-  - InstructionsLoaded project analyzer (Haiku) — builds architectural context map at session start
-  - Stop final reviewer (Haiku) — validates architecture before session end (strict mode only)
-- **Correction Learning System** — Detects when user fixes Claude-generated code, records patterns in metrics.db corrections table, injects trends into InstructionsLoaded.
-- **Environment variable fix** — All hooks now use `CLAUDE_PLUGIN_DATA` with proper fallback.
+- **Semantic Intelligence** - 3 agent hooks for semantic analysis beyond regex:
+  - PostToolUse DDD verifier (Haiku) - checks layer violations, aggregate boundaries, value objects, naming
+  - InstructionsLoaded project analyzer (Haiku) - builds architectural context map at session start
+  - Stop final reviewer (Haiku) - validates architecture before session end (strict mode only)
+- **Correction Learning System** - Detects when user fixes Claude-generated code, records patterns in metrics.db corrections table, injects trends into InstructionsLoaded.
+- **Environment variable fix** - All hooks now use `CLAUDE_PLUGIN_DATA` with proper fallback.
 
 ---
 
@@ -536,7 +560,7 @@ The plugin now actively suggests the right command at the right time. Claude rea
 
 ### Fixed
 
-- **Metrics DB migration** — Added 'info' severity to violations CHECK constraint. Auto-migrates existing tables.
+- **Metrics DB migration** - Added 'info' severity to violations CHECK constraint. Auto-migrates existing tables.
 
 ---
 
@@ -544,24 +568,24 @@ The plugin now actively suggests the right command at the right time. Claude rea
 
 ### Added
 
-- **3-level code validation** — Hooks now enforce code rules with progressive analysis: regex (<50ms), static analysis (<2s), and architecture validation (<2s). Rules: PHP001-005, TS001-003, LAYER001-003.
-- **Blocking hooks (exit 2)** — Critical violations now **block** Claude from proceeding. Code must be fixed before continuing. Warnings remain non-blocking.
-- **Pre-write validation** — New PreToolUse hook (`pre-write-check.sh`) validates layer imports BEFORE file write, preventing architecture violations at the source.
-- **Session metrics** — New SessionEnd hook (`session-metrics.sh`) records session summary (blocked/warned counts) to local SQLite database.
-- **`/craftsman:metrics` command** — Quality dashboard showing violations by rule, daily trends (14 days), and session history. Queries local SQLite database.
-- **`craftsman-ignore` syntax** — Suppress specific rules per-line or per-file with `// craftsman-ignore: RULE_ID` comments. Suppressed violations are still tracked in metrics.
-- **Metrics database** — SQLite database at `${CLAUDE_PLUGIN_DATA}/metrics.db` records all violations with project hash (privacy), rule, severity, and blocked/ignored status.
-- **Static analysis wrappers** — `hooks/lib/static-analysis.sh` wraps PHPStan, ESLint, deptrac, and dependency-cruiser with graceful degradation (returns empty if tools not installed).
-- **Hook test suite** — `tests/hooks/test-hooks.sh` with 12 behavioral tests covering all rules and edge cases.
+- **3-level code validation** - Hooks now enforce code rules with progressive analysis: regex (<50ms), static analysis (<2s), and architecture validation (<2s). Rules: PHP001-005, TS001-003, LAYER001-003.
+- **Blocking hooks (exit 2)** - Critical violations now **block** Claude from proceeding. Code must be fixed before continuing. Warnings remain non-blocking.
+- **Pre-write validation** - New PreToolUse hook (`pre-write-check.sh`) validates layer imports BEFORE file write, preventing architecture violations at the source.
+- **Session metrics** - New SessionEnd hook (`session-metrics.sh`) records session summary (blocked/warned counts) to local SQLite database.
+- **`/craftsman:metrics` command** - Quality dashboard showing violations by rule, daily trends (14 days), and session history. Queries local SQLite database.
+- **`craftsman-ignore` syntax** - Suppress specific rules per-line or per-file with `// craftsman-ignore: RULE_ID` comments. Suppressed violations are still tracked in metrics.
+- **Metrics database** - SQLite database at `${CLAUDE_PLUGIN_DATA}/metrics.db` records all violations with project hash (privacy), rule, severity, and blocked/ignored status.
+- **Static analysis wrappers** - `hooks/lib/static-analysis.sh` wraps PHPStan, ESLint, deptrac, and dependency-cruiser with graceful degradation (returns empty if tools not installed).
+- **Hook test suite** - `tests/hooks/test-hooks.sh` with 12 behavioral tests covering all rules and edge cases.
 
 ### Changed
 
-- **post-write-check.sh** — Complete rewrite from warning-only (exit 0) to blocking (exit 2) with JSON structured output, craftsman-ignore support, metrics recording, and static analysis integration.
-- **hooks.json** — Now registers 4 event hooks: PreToolUse, PostToolUse, UserPromptSubmit, SessionEnd.
+- **post-write-check.sh** - Complete rewrite from warning-only (exit 0) to blocking (exit 2) with JSON structured output, craftsman-ignore support, metrics recording, and static analysis integration.
+- **hooks.json** - Now registers 4 event hooks: PreToolUse, PostToolUse, UserPromptSubmit, SessionEnd.
 
 ### Removed
 
-- **Duplicate scripts** — Removed `scripts/bias-detector.sh` and `scripts/post-write-check.sh` (canonical copies live in `hooks/`).
+- **Duplicate scripts** - Removed `scripts/bias-detector.sh` and `scripts/post-write-check.sh` (canonical copies live in `hooks/`).
 
 ---
 
