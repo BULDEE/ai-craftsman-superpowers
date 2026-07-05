@@ -5,13 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.0] - 2026-07-06
+
+### Added
+- **`/craftsman:legacy` command (the centerpiece).** Four modes for regaining control of an inherited codebase: `audit` (rank hotspots, produce `LEGACY-AUDIT.md`), `cover` (characterization net before touching), `untangle` (break dependencies), `migrate` (strangler-fig). Consumes existing analysis-tool output via `--from` (SonarQube / CodeScene / PHPStan) instead of recomputing a weaker signal. Atomic campaign state in `.craftsman/legacy-campaign.json`.
+- **`legacy-surgeon` agent.** 3P agent (Sonnet, worktree) that drives a full rescue: characterize, break dependencies, strangler-fig migration, one green commit at a time.
+- **`legacy-takeover` team template.** Sequential architect → legacy-surgeon → security-pentester → doc-writer for large multi-week rescues.
+- **`hooks/lib/hotspot_analysis.py`.** Zero-dependency churn x complexity ranking (command-time only, read-only git log). A fallback for teams with no external analysis tool, not a competitor to one.
+- **`knowledge/tooling-integration.md`.** Positions the plugin as the action layer on top of static-analysis tools: consume their reports, do not re-compute.
+- **Legacy and refactoring knowledge pillars.** `legacy/{legacy-techniques,characterization-testing,strangler-fig,taking-over-legacy,communicating-tech-debt}.md` and `refactoring/{mikado-method,refactoring-campaigns,code-smells,refactoring-katas}.md`, presenting the working developer's dependency-breaking and safe-change toolbox.
+- **Legacy Rescue Playbook** (`docs/guides/legacy-rescue.md`). Operational field guide chaining the whole pipeline, indexed from `docs/README.md`.
+
+### Changed
+- **`/craftsman:refactor`** gains a safety-net-first Step 0 gate and a Mikado mode; paths widened to py/sh/go/rs.
+- **`/craftsman:workflow`** gains Step 0 scenario detection (greenfield / analyze-legacy / regain-control) that routes legacy work to `/craftsman:legacy`.
+- **Knowledge base attribution.** Techniques are presented as generic developer practice; only the Clean series and Fowler are cited by name. Book-and-author references elsewhere were removed in favor of the technique itself.
+
 ## [3.6.0] - 2026-07-05
 
 ### Added
 - **Core Knowledge Foundation.** The knowledge base gains its missing agnostic pillars so every pack, not just Symfony, inherits the full methodology (see ADR-0015). New core files under `knowledge/`:
-  - `clean-architecture.md` (Dependency Rule, four circles, boundary crossing via DIP, humble object, screaming architecture, partial boundaries) and `hexagonal.md` (ports & adapters, driving/driven, composition root), distilled from Martin and Cockburn.
-  - `tdd.md` (three laws, red-green-refactor, fake-it/triangulate/obvious, AAA, test naming) and `testing-strategy.md` (pyramid vs trophy, FIRST, test doubles, maintainable E2E via POM/BDD), grounded in Beck, Martraire et al., and the ADTF white paper.
-  - `legacy/` (`legacy-techniques.md` seams and Subclass&Override/Wrap&Sprout/Decouple-Core, `characterization-testing.md` golden master, `strangler-fig.md` branch-by-abstraction) and `refactoring/` (`mikado-method.md`, `refactoring-campaigns.md` churn x complexity hotspots), distilled from Carlo's *Legacy Code First Aid Kit* and Feathers.
+  - `clean-architecture.md` (Dependency Rule, four circles, boundary crossing via DIP, humble object, screaming architecture, partial boundaries) and `hexagonal.md` (ports & adapters, driving/driven, composition root), grounded in the Clean series.
+  - `tdd.md` (three laws, red-green-refactor, fake-it/triangulate/obvious, AAA, test naming) and `testing-strategy.md` (pyramid vs trophy, FIRST, test doubles, maintainable E2E via POM/BDD).
+  - `legacy/` (`legacy-techniques.md` seams and Subclass&Override/Wrap&Sprout/Decouple-Core, `characterization-testing.md` golden master, `strangler-fig.md` branch-by-abstraction) and `refactoring/` (`mikado-method.md`, `refactoring-campaigns.md` churn x complexity hotspots).
   - New core anti-patterns: `anti-patterns/{god-object,primitive-obsession,singleton-abuse}.md`.
   - Completed the Fowler catalog in `refactoring-techniques.md` (Split Phase, Slide Statements, Replace Loop with Pipeline, Split Variable, Separate Query from Modifier).
 - **DDD promoted to language-agnostic core.** `knowledge/ddd/{ddd-domain-design,ddd-cqrs-architecture}.md` rewritten framework-free (PHP + TypeScript); Symfony specifics moved to `packs/symfony/knowledge/ddd-symfony-implementation.md`.

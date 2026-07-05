@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# craftsman-ci — CI-compatible quality gate
+# craftsman-ci - CI-compatible quality gate
 # Standalone bash CLI that enforces the same rules as post-write-check.sh.
 # Works WITHOUT Claude Code installed.
 #
@@ -13,7 +13,7 @@
 # =============================================================================
 set -o pipefail
 
-VERSION="3.6.0"
+VERSION="3.7.0"
 
 # =============================================================================
 # Defaults
@@ -49,7 +49,7 @@ if [[ "${1:-}" == "ci" ]]; then
     # source the provider file directly in the current shell.
     CI_PROVIDER=$(adapter_load "${CI_PROVIDER:-}")
     adapter_load "${CI_PROVIDER}" >/dev/null
-    echo "craftsman-ci v${VERSION} — CI mode (${CI_PROVIDER})" >&2
+    echo "craftsman-ci v${VERSION} - CI mode (${CI_PROVIDER})" >&2
 
     # Build args for adapter_run
     CI_RUN_ARGS=()
@@ -122,7 +122,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --help|-h)
             cat <<EOF
-craftsman-ci v${VERSION} — Craftsman Quality Gate
+craftsman-ci v${VERSION} - Craftsman Quality Gate
 
 Usage:
   craftsman-ci [--format json|text] [--config FILE] [paths...]
@@ -140,7 +140,7 @@ Options:
   paths...              Paths to scan (default: src/)
 
 Exit codes:
-  0  Clean — no violations, no warnings
+  0  Clean - no violations, no warnings
   1  Warnings only
   2  Violations found
 EOF
@@ -209,7 +209,7 @@ _parse_yml_value() {
     grep -E "^${key}:" "$file" 2>/dev/null | head -1 | awk '{print $2}' | tr -d '"' | tr -d "'"
 }
 
-# craftsman-ignore: SH002 — config resolution is inherently sequential, splitting would reduce readability
+# craftsman-ignore: SH002 - config resolution is inherently sequential, splitting would reduce readability
 _resolve_config() {
     if [[ "$RULES_ENGINE_AVAILABLE" == true ]]; then
         # Use rules engine for config resolution (plugin context)
@@ -381,9 +381,9 @@ metrics_file_pattern() { echo "$1"; }
 metrics_init() { :; }
 
 # =============================================================================
-# File scanner — delegates to pack validators (single source of truth)
+# File scanner - delegates to pack validators (single source of truth)
 # =============================================================================
-# craftsman-ignore: SH002 — scanner delegates to pack validators, splitting the dispatcher adds indirection
+# craftsman-ignore: SH002 - scanner delegates to pack validators, splitting the dispatcher adds indirection
 scan_file() {
     local file="$1"
     local ext="${file##*.}"
@@ -476,12 +476,12 @@ scan_paths() {
 # =============================================================================
 # Output: text format
 # =============================================================================
-# craftsman-ignore: SH002 — text formatter is a single cohesive output block
+# craftsman-ignore: SH002 - text formatter is a single cohesive output block
 output_text() {
     local total_violations=${#V_FILES[@]}
     local total_warnings=${#W_FILES[@]}
 
-    echo "craftsman-ci v${VERSION} — Quality Gate"
+    echo "craftsman-ci v${VERSION} - Quality Gate"
     echo "==================================="
     echo "Config: ${STRICTNESS}, ${STACK}"
     echo ""
@@ -544,7 +544,7 @@ _json_escape() {
     echo "$s"
 }
 
-# craftsman-ignore: SH002 — JSON formatter is a single cohesive output block
+# craftsman-ignore: SH002 - JSON formatter is a single cohesive output block
 output_json() {
     local timestamp
     timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date +"%Y-%m-%dT%H:%M:%SZ")

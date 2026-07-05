@@ -4,9 +4,9 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
-[![Version](https://img.shields.io/badge/Version-3.6.0-blue)](CHANGELOG.md)
-[![Commands](https://img.shields.io/badge/Commands-21-orange)]()
-[![Agents](https://img.shields.io/badge/Agents-11-red)]()
+[![Version](https://img.shields.io/badge/Version-3.7.0-blue)](CHANGELOG.md)
+[![Commands](https://img.shields.io/badge/Commands-22-orange)]()
+[![Agents](https://img.shields.io/badge/Agents-12-red)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 **Transform Claude into a disciplined Senior Software Craftsman**
@@ -170,7 +170,8 @@ All commands are explicitly invoked with `/craftsman:command-name`. See [ADR-000
 | `/craftsman:verify` | Evidence-based verification before completion claims |
 | `/craftsman:workflow` | Flexible development pipeline (design → spec → plan → implement → test → verify → commit) |
 | `/craftsman:spec` | Specification-first development (TDD/BDD) |
-| `/craftsman:refactor` | Systematic refactoring with behavior preservation |
+| `/craftsman:refactor` | Systematic refactoring with behavior preservation (safety-net-first gate, Mikado mode) |
+| `/craftsman:legacy` | Legacy rescue: audit hotspots, cover with characterization tests, break dependencies, strangler-fig migration |
 | `/craftsman:test` | Pragmatic testing following Fowler/Martin principles |
 | `/craftsman:git` | Safe git workflow with destructive command protection |
 | `/craftsman:parallel` | Parallel agent orchestration for independent tasks |
@@ -249,7 +250,7 @@ sentry_token: (stored securely)
 
 ### Specialized Agents (v1.5.0)
 
-11 agents - 4 reviewers + 7 craftsmen:
+12 agents - 4 reviewers + 8 craftsmen:
 
 | Agent | Role | Model |
 |-------|------|-------|
@@ -262,6 +263,7 @@ sentry_token: (stored securely)
 | `ui-ux-director` | UX, WCAG 2.1 AA, design tokens | Sonnet |
 | `doc-writer` | ADRs, README, CHANGELOG, runbooks | Haiku |
 | `security-pentester` | Security vulnerability detection | Sonnet |
+| `legacy-surgeon` | Legacy rescue: characterize, break dependencies, strangler-fig | Sonnet |
 | `symfony-reviewer` | Symfony/DDD best practices | Sonnet |
 | `react-reviewer` | React patterns and hooks | Sonnet |
 
@@ -457,8 +459,8 @@ See [`/examples`](examples/) for detailed usage examples:
 ```
 hooks/              → Real-time validation (SessionStart → PostToolUse → Stop → SessionEnd)
 hooks/lib/          → Shared libraries (pack-loader, config, rules-engine, metrics, static-analysis)
-commands/           → Core user-invoked workflows (20 skills)
-agents/             → Core agents (11) + pack symlinks
+commands/           → Core user-invoked workflows (21 skills)
+agents/             → Core agents (12) + pack symlinks
 knowledge/          → Core methodology, language-agnostic (Clean Architecture, Hexagonal, DDD, TDD,
                       testing strategy, refactoring, legacy techniques, patterns, principles, anti-patterns)
   ddd/              → Entities, value objects, aggregates, CQRS (agnostic)
@@ -531,7 +533,7 @@ This plugin prioritizes transparency and safety:
 |-----------|----------|-----------------|
 | Commands | Prompt templates | Only when instructed |
 | Reviewer Agents | Code analysis (11 agents) | Never (read-only) |
-| Craftsman Agents | Implementation (7 agents) | When instructed |
+| Craftsman Agents | Implementation (8 agents) | When instructed |
 | Command Hooks | Validation scripts (15 scripts) | Never (read-only, except metrics DB + session state) |
 | Agent Hooks | Semantic analysis (4 agents, Haiku) | Never (read-only) |
 
