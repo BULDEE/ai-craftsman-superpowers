@@ -53,7 +53,7 @@ Hooks execute **shell scripts** and **agent prompts** at specific lifecycle even
 
 All hooks in this plugin:
 
-- ✅ Command hooks exit 0 (warn) or 2 (block violations) — never exit 1
+- ✅ Command hooks exit 0 (warn) or 2 (block violations) - never exit 1
 - ✅ Agent hooks use Haiku model with timeouts (20-30s)
 - ✅ Only read from stdin (JSON input from Claude Code)
 - ✅ Only output to stdout/stderr (structured JSON)
@@ -80,14 +80,25 @@ The optional RAG system requires explicit setup and:
 | File read | Yes | Code analysis and context gathering |
 | File write | Yes | Code generation (user-initiated) |
 | Shell execution | Yes | Validation hooks (read-only) |
-| Network | No | Plugin works fully offline |
+| Network | Conditional | See network access table below |
+
+### Network Access (full disclosure)
+
+| Feature | Default | Destination | Data sent |
+|---------|---------|-------------|-----------|
+| Regex + static analysis hooks (Level 1-3) | On | None | Nothing. Fully offline |
+| Agent hooks (4 Haiku agents) | On (`agent_hooks: true`) | Anthropic API (via Claude Code) | Edited file content for semantic analysis. ~4 calls per Write/Edit, ~$0.15-0.30/session. Disable with `agent_hooks: false` |
+| Sentry context agent | Off (needs `sentry_org`/`sentry_project`) | Sentry API (via MCP, read-only) | File paths to query matching errors |
+| Knowledge RAG MCP server | No-op unless `ai-ml` pack active | npm registry (one-time install), local Ollama | Nothing to third parties. Embeddings computed and stored locally |
+
+With `agent_hooks: false` and no Sentry config, the plugin runs fully offline.
 
 ## Reporting Vulnerabilities
 
 If you discover a security vulnerability:
 
 1. **Do NOT** open a public issue
-2. Email: security@buldee.com (or contact@woprrr.dev)
+2. Email: security@buldee.com (or contact@buldee.com)
 3. Include:
    - Description of the vulnerability
    - Steps to reproduce
@@ -111,14 +122,25 @@ We will respond within 48 hours and work with you on disclosure.
 
 ## Third-Party Dependencies
 
-This plugin has **zero runtime dependencies**. Hooks use only:
+### Core hooks: zero dependencies
+
+The hook system (validation, rules engine, metrics, bias detection) uses only system tools:
 
 - `bash` (system)
 - `jq` (optional, for JSON parsing)
 - `grep` (system)
-- `python3` (system, for parameterized SQL queries)
+- `python3` (system, for parameterized SQL queries and YAML parsing)
 
-No npm packages, no external binaries, no network calls.
+No npm packages, no external binaries, no network calls in the hook path.
+
+### Knowledge RAG MCP server: npm dependencies (opt-in)
+
+`plugin.json` declares one MCP server (`knowledge-rag`, launched via `packs/ai-ml/mcp/knowledge-rag/start.mjs`). Its behavior:
+
+- **`ai-ml` pack NOT active (default):** runs a no-op MCP server using Node.js builtins only. Zero tools exposed, zero installs, zero network.
+- **`ai-ml` pack active:** on first launch, runs `npm install` in the plugin directory to fetch its dependencies (`@modelcontextprotocol/sdk`, `better-sqlite3` with native compilation, `pdf-parse`, `tsx`), then builds and starts the server. Embeddings use local Ollama; no data leaves the machine.
+
+The auto-install is scoped to the plugin's own directory and only triggers when you explicitly enable the `ai-ml` pack. Review `start.mjs` before enabling if your environment restricts package installation.
 
 ## Code Verification
 
@@ -129,26 +151,21 @@ Before installing, you can verify the hooks:
 git clone https://github.com/BULDEE/ai-craftsman-superpowers.git
 cd ai-craftsman-superpowers
 
-# Review hooks (the only executable code)
+# Review the hook scripts (executable code also lives in ci/, packs/*/hooks/,
+# and packs/ai-ml/mcp/knowledge-rag/start.mjs - review those too)
 cat hooks/bias-detector.sh
 cat hooks/post-write-check.sh
 
-# Verify no network calls
-grep -r "curl\|wget\|fetch\|http" hooks/
-# Should return nothing
+# Verify no external network calls in hooks
+grep -rn "curl\|wget" hooks/ --include='*.sh'
+# Expected: exactly one match - healthcheck.sh curls http://localhost:11434
+# (local Ollama availability probe, 2s timeout, no data sent). Nothing external.
 ```
 
 ## Supported Versions
 
 | Version | Supported |
 |---------|-----------|
-| 2.2.x | ✅ |
-| 2.1.x | ✅ |
-| 2.0.x | ✅ |
-| 1.5.x | ✅ |
-| 1.4.x | ✅ |
-| 1.3.x | ✅ |
-| 1.2.x | ✅ |
-| 1.1.x | ✅ |
-| 1.0.x | ✅ |
-| < 1.0 | ❌ |
+| 3.x | ✅ Active development |
+| 2.x | ⚠️ Security fixes only |
+| < 2.0 | ❌ |

@@ -110,32 +110,32 @@ I need to add a forgot password feature.
 
 See [`/examples`](examples/) for detailed usage examples with expected outputs.
 
-## Why Craftsman? — 6 Core Differentiators
+## Why Craftsman? - 6 Core Differentiators
 
 What makes this plugin genuinely unique in the Claude Code ecosystem:
 
 ### 1. **Correction Learning System**
-Records every violation fix users make and injects correction trends at next session start. SQLite-backed feedback loop that progressively teaches Claude the exact patterns your codebase rejects. Cross-file pattern detection suggests project-wide fixes when 3+ files share the same violation. Unique in the ecosystem — no other Claude Code plugin creates this behavioral feedback loop.
+Records every violation fix users make and injects correction trends at next session start. SQLite-backed feedback loop that progressively teaches Claude the exact patterns your codebase rejects. Cross-file pattern detection suggests project-wide fixes when 3+ files share the same violation. Unique in the ecosystem - no other Claude Code plugin creates this behavioral feedback loop.
 
 ### 2. **Rules Engine with 3-Level Inheritance**
 Enterprise-ready rule customization: Global → Project → Directory overrides. Short form (`PHP001: warn`) and long form (custom rules with regex, message, severity, languages, paths). Legacy code coexists with strict new code via directory-level relaxation. Python-backed YAML parser with bash 3.2 shell compatibility.
 
 ### 3. **Cognitive Bias Detector**
-Real-time detection of acceleration bias, scope creep, and over-optimization in user prompts. Context-aware bilingual FR/EN pattern matching on UserPromptSubmit hook — requires imperative verb context to reduce false positives. Non-blocking warnings that encourage reflection before action.
+Real-time detection of acceleration bias, scope creep, and over-optimization in user prompts. Context-aware bilingual FR/EN pattern matching on UserPromptSubmit hook - requires imperative verb context to reduce false positives. Non-blocking warnings that encourage reflection before action.
 
 ### 4. **Real-Time Quality Gate**
 3-level progressive validation on every Write/Edit:
-- **Level 1: Regex (<50ms)** — strict_types, final, any, setters. Always active.
-- **Level 2: Static analysis (<2s)** — PHPStan, ESLint. When tools installed.
-- **Level 3: Architecture (<2s)** — deptrac, dependency-cruiser. When tools installed.
+- **Level 1: Regex (<50ms)** - strict_types, final, any, setters. Always active.
+- **Level 2: Static analysis (<2s)** - PHPStan, ESLint. When tools installed.
+- **Level 3: Architecture (<2s)** - deptrac, dependency-cruiser. When tools installed.
 
 Graceful degradation: works with zero tools installed (Level 1 only).
 
 ### 5. **Multi-Provider CI Pipeline**
-Same rules engine runs in hooks (real-time) AND CI (pipeline) with zero drift — CI sources the same pack validators as hooks. 4 providers: GitHub Actions, GitLab CI, Bitbucket Pipelines, Jenkins. Adapter pattern: detect → run → annotate → comment → exit.
+Same rules engine runs in hooks (real-time) AND CI (pipeline) with zero drift - CI sources the same pack validators as hooks. 4 providers: GitHub Actions, GitLab CI, Bitbucket Pipelines, Jenkins. Adapter pattern: detect → run → annotate → comment → exit.
 
 ### 6. **Metrics & Trend Analysis**
-SQLite-backed tracking of violations, corrections, and sessions. 7-day and 30-day trend views. Data-driven quality improvement: identify most-violated rules and adjust strictness. Currently per-machine — team metrics sync planned for v4.
+SQLite-backed tracking of violations, corrections, and sessions. 7-day and 30-day trend views. Data-driven quality improvement: identify most-violated rules and adjust strictness. Currently per-machine - team metrics sync planned for v4.
 
 ---
 
@@ -249,11 +249,11 @@ sentry_token: (stored securely)
 
 ### Specialized Agents (v1.5.0)
 
-11 agents — 4 reviewers + 7 craftsmen:
+11 agents - 4 reviewers + 7 craftsmen:
 
 | Agent | Role | Model |
 |-------|------|-------|
-| `team-lead` | Orchestrator — delegates, challenges, never codes | Sonnet |
+| `team-lead` | Orchestrator - delegates, challenges, never codes | Sonnet |
 | `backend-craftsman` | PHP/Symfony expert (Symfony.com + API Platform refs) | Sonnet |
 | `frontend-craftsman` | React/TS expert (65 Vercel best practices) | Sonnet |
 | `architect` | DDD/Clean Architecture validation (read-only) | Sonnet |
@@ -269,7 +269,7 @@ sentry_token: (stored securely)
 
 Hooks validate your code automatically with **3-level analysis**:
 
-**Level 1 — Fast Regex (<50ms):** Runs on every write/edit.
+**Level 1 - Fast Regex (<50ms):** Runs on every write/edit.
 
 | Rule | Language | Check |
 |------|----------|-------|
@@ -295,13 +295,13 @@ Hooks validate your code automatically with **3-level analysis**:
 | LAYER002 | PHP | Domain cannot import Presentation |
 | LAYER003 | PHP | Application cannot import Presentation |
 
-**Level 2 — Static Analysis (<2s):** PHPStan, ESLint (when installed). Graceful degradation if tools are absent.
+**Level 2 - Static Analysis (<2s):** PHPStan, ESLint (when installed). Graceful degradation if tools are absent.
 
-**Level 3 — Architecture (<2s):** Deptrac, dependency-cruiser (when installed).
+**Level 3 - Architecture (<2s):** Deptrac, dependency-cruiser (when installed).
 
 **Suppressing rules:** Add `// craftsman-ignore: RULE_ID` inline to suppress a specific rule.
 
-Violations are **blocking** (exit 2) — Claude must fix the code before proceeding. All violations are recorded in a local SQLite database for trend tracking via `/craftsman:metrics`.
+Violations are **blocking** (exit 2) - Claude must fix the code before proceeding. All violations are recorded in a local SQLite database for trend tracking via `/craftsman:metrics`.
 
 ### Custom Rule Engine (v2.1.0+)
 
@@ -347,16 +347,16 @@ Each scaffolder offers template selection before generating code:
 
 ### Schema Validation & Safety (v2.2.0+)
 
-- **Hooks schema validation** — `session-start.sh` validates all hook events against the supported set at startup
-- **Atomic commit enforcement** — Stop hook warns when >15 files modified, caps inspection at 20
-- **Monorepo sampling** — InstructionsLoaded switches to directory-level analysis for large codebases (>100 files)
+- **Hooks schema validation** - `session-start.sh` validates all hook events against the supported set at startup
+- **Atomic commit enforcement** - Stop hook warns when >15 files modified, caps inspection at 20
+- **Monorepo sampling** - InstructionsLoaded switches to directory-level analysis for large codebases (>100 files)
 
 ## Advanced: Knowledge Base RAG (Optional)
 
 The plugin includes an **optional** MCP server for RAG (Retrieval-Augmented Generation) over local documents.
 
 > **Note:** The plugin is fully functional without the MCP. This is a power-user feature.
-> The MCP server is **conditional** — it only activates when the `ai-ml` pack is explicitly enabled in your plugin config. Users without it get zero errors.
+> The MCP server is **conditional** - it only activates when the `ai-ml` pack is explicitly enabled in your plugin config. Users without it get zero errors.
 
 ### Prerequisites
 
@@ -373,7 +373,9 @@ The plugin includes an **optional** MCP server for RAG (Retrieval-Augmented Gene
 brew install ollama && ollama pull nomic-embed-text
 ollama serve  # Keep running
 
-# 3. Restart Claude Code — the MCP server auto-installs and builds on first run
+# 3. Restart Claude Code - the MCP server auto-installs and builds on first run
+#    (runs `npm install` inside the plugin directory: @modelcontextprotocol/sdk,
+#     better-sqlite3, pdf-parse. One-time, scoped to the plugin, nothing global)
 
 # 4. Create knowledge directory & add documents
 mkdir -p ~/.claude/ai-craftsman-superpowers/knowledge
@@ -493,7 +495,7 @@ Craftsman and [Superpowers](https://github.com/anthropics/claude-code-plugins/tr
 | CI pipeline | - | Multi-provider adapter pattern |
 | Subagent management | Dispatch, review loops | Quality gate on subagent output |
 
-Both plugins load simultaneously. No configuration needed — hooks.json events do not conflict.
+Both plugins load simultaneously. No configuration needed - hooks.json events do not conflict.
 
 ## Philosophy
 
@@ -528,7 +530,18 @@ This plugin prioritizes transparency and safety:
 | Command Hooks | Validation scripts (15 scripts) | Never (read-only, except metrics DB + session state) |
 | Agent Hooks | Semantic analysis (4 agents, Haiku) | Never (read-only) |
 
-**Hooks use exit codes** — Bias detection warns (exit 0). Code rule violations **block** (exit 2) to enforce quality standards. See [Hooks Reference](docs/reference/hooks.md).
+**Hooks use exit codes** - Bias detection warns (exit 0). Code rule violations **block** (exit 2) to enforce quality standards. See [Hooks Reference](docs/reference/hooks.md).
+
+### Data & Network Transparency
+
+| What | Where it goes | When |
+|------|---------------|------|
+| Edited file content | Anthropic API (Haiku, via Claude Code) | Only if `agent_hooks: true` (default). Disable to run fully offline |
+| File paths for error lookup | Sentry API (read-only, via MCP) | Only if `sentry_org`/`sentry_project` configured |
+| Metrics, corrections, session state | Local SQLite (`${CLAUDE_PLUGIN_DATA}/metrics.db`) | Always. Never leaves your machine |
+| RAG embeddings | Local Ollama + local SQLite | Only if `ai-ml` pack enabled. No third-party calls |
+
+No telemetry, no analytics, no phone-home. With `agent_hooks: false` and no Sentry config, zero network activity.
 
 See [SECURITY.md](./SECURITY.md) for full security documentation.
 
@@ -556,16 +569,16 @@ grep -r "curl\|wget\|fetch\|http" hooks/
 
 ### By Design
 
-- **Hooks block on violations** — Code rule violations are blocking (exit 2); bias detection is warning-only (exit 0)
-- **No auto-commit** — All git operations require explicit user action
-- **Commands are opinionated** — Follows DDD/Clean Architecture strictly
-- **Explicit invocation** — Commands are deliberately invoked, not auto-triggered
+- **Hooks block on violations** - Code rule violations are blocking (exit 2); bias detection is warning-only (exit 0)
+- **No auto-commit** - All git operations require explicit user action
+- **Commands are opinionated** - Follows DDD/Clean Architecture strictly
+- **Explicit invocation** - Commands are deliberately invoked, not auto-triggered
 
 ### Current Constraints
 
-- **PHP/TypeScript focus** — Other languages have basic support only
-- **RAG requires Ollama** — No cloud embedding providers supported
-- **English/French only** — Bias detection patterns in EN/FR
+- **PHP/TypeScript focus** - Other languages have basic support only
+- **RAG requires Ollama** - No cloud embedding providers supported
+- **English/French only** - Bias detection patterns in EN/FR
 
 ### Not Supported
 
