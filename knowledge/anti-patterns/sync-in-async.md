@@ -8,12 +8,12 @@ Treating `$bus->dispatch()` as a synchronous call that returns the handler's res
 
 ## Why it's wrong
 
-`MessageBusInterface::dispatch()` always returns an `Envelope`, not the handler's return value. When a transport is configured, the handler runs in a worker process — `dispatch()` returns immediately with no result. Attempting to read the handler output from `dispatch()` silently fails or causes errors.
+`MessageBusInterface::dispatch()` always returns an `Envelope`, not the handler's return value. When a transport is configured, the handler runs in a worker process - `dispatch()` returns immediately with no result. Attempting to read the handler output from `dispatch()` silently fails or causes errors.
 
 ## The Anti-Pattern
 
 ```php
-// WRONG — dispatch() does not return handler output
+// WRONG - dispatch() does not return handler output
 $response = $bus->dispatch(new CreateOrderCommand($data));
 return new JsonResponse(['orderId' => $response->id]); // Fatal: Envelope has no ->id
 ```
@@ -23,7 +23,7 @@ return new JsonResponse(['orderId' => $response->id]); // Fatal: Envelope has no
 For async use cases, the controller must accept eventual consistency:
 
 ```php
-// CORRECT — fire and return 202 Accepted
+// CORRECT - fire and return 202 Accepted
 $bus->dispatch(new CreateOrderCommand($data));
 return new JsonResponse([], Response::HTTP_ACCEPTED);
 ```
@@ -31,7 +31,7 @@ return new JsonResponse([], Response::HTTP_ACCEPTED);
 For sync use cases that need a return value, use a **Query bus** (sync transport) and retrieve results via a repository, not via dispatch return:
 
 ```php
-// CORRECT — query via repository after synchronous dispatch
+// CORRECT - query via repository after synchronous dispatch
 $bus->dispatch(new CreateOrderCommand($data));
 $order = $this->orderRepository->findLastByUser($userId);
 return new JsonResponse(['orderId' => $order->id()->toString()]);

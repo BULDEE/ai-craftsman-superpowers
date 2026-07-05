@@ -61,7 +61,7 @@ Source: https://symfony.com/doc/current/messenger.html
 ### Handler declaration
 
 ```php
-// Auto-discovered — no services.yaml tag needed
+// Auto-discovered - no services.yaml tag needed
 #[AsMessageHandler]
 final readonly class CreateOrderHandler
 {
@@ -129,7 +129,7 @@ RecurringMessage::every(string|int|\DateInterval $freq, object $message, ?\DateT
 
 ### Cron shorthand aliases
 
-`@daily`, `@weekly`, `@monthly`, `@hourly` — all valid in `cron()` spec.
+`@daily`, `@weekly`, `@monthly`, `@hourly` - all valid in `cron()` spec.
 
 ### Consume
 
@@ -192,7 +192,7 @@ interface User {
 
 ---
 
-## React 19 — New Hooks (verified)
+## React 19 - New Hooks (verified)
 
 Sources:
 - https://react.dev/reference/react/use
@@ -200,12 +200,12 @@ Sources:
 - https://react.dev/reference/react/useTransition
 - https://react.dev/reference/rsc/use-server
 
-### `use(resource)` — replaces `useContext`, reads Promises
+### `use(resource)` - replaces `useContext`, reads Promises
 
 ```typescript
 import { use } from 'react';
 
-// Read context — preferred over useContext() in React 19
+// Read context - preferred over useContext() in React 19
 // Advantage: works inside conditionals and loops
 const theme = use(ThemeContext);
 
@@ -219,9 +219,9 @@ TypeScript signature: `function use<T>(resource: Promise<T> | Context<T>): T`
 Constraints:
 - Cannot be called in `try-catch` blocks
 - Cannot be called in event handlers
-- Create Promises in Server Components and pass to Client Components — Client-side Promises recreate on every render
+- Create Promises in Server Components and pass to Client Components - Client-side Promises recreate on every render
 
-### `useOptimistic` — optimistic UI updates
+### `useOptimistic` - optimistic UI updates
 
 ```typescript
 import { useOptimistic } from 'react';
@@ -238,22 +238,22 @@ const [optimisticItems, addOptimisticItem] = useOptimistic(
 // MUST be called inside a Transition or Server Action
 startTransition(async () => {
   addOptimisticItem(newItem);      // Immediate UI update
-  await serverApi.save(newItem);   // Real update — reverts if it fails
+  await serverApi.save(newItem);   // Real update - reverts if it fails
 });
 ```
 
 Constraints:
 - `setOptimistic` MUST be called inside `startTransition` or a form action
 - Calling outside a Transition produces a warning and the update reverts immediately
-- Optimistic state is temporary — automatically converges to real state after the action completes
+- Optimistic state is temporary - automatically converges to real state after the action completes
 
-### `useTransition` — non-urgent state updates
+### `useTransition` - non-urgent state updates
 
 ```typescript
 import { useTransition } from 'react';
 
 // Returns: [isPending, startTransition]
-// isPending: boolean — true while the transition is processing
+// isPending: boolean - true while the transition is processing
 // Source: https://react.dev/reference/react/useTransition
 
 const [isPending, startTransition] = useTransition();
@@ -267,10 +267,10 @@ startTransition(async () => {
 
 Constraints:
 - Cannot use with controlled inputs (`<input value={...}>`)
-- `setTimeout` inside `startTransition` is NOT marked as a Transition — wrap the callback inside `startTransition` after the `await`
+- `setTimeout` inside `startTransition` is NOT marked as a Transition - wrap the callback inside `startTransition` after the `await`
 - Prefer `useTransition` over manual `useState` loading flags (Vercel rule 6.11)
 
-### `useActionState` — form actions with state (React 19)
+### `useActionState` - form actions with state (React 19)
 
 ```typescript
 import { useActionState } from 'react';
@@ -298,7 +298,7 @@ return (
 );
 ```
 
-### `<form action={fn}>` — React 19 Server Actions in forms
+### `<form action={fn}>` - React 19 Server Actions in forms
 
 This is **real React 19**, not a Next.js-only feature.
 
@@ -309,7 +309,7 @@ This is **real React 19**, not a Next.js-only feature.
 
 async function createUser(formData: FormData): Promise<void> {
   'use server';
-  // Validate and authorize — treat all arguments as untrusted
+  // Validate and authorize - treat all arguments as untrusted
   const email = formData.get('email');
   if (typeof email !== 'string') return;
   await userApi.create({ email });
@@ -342,9 +342,9 @@ Is the component interactive? (onClick, useState, useEffect, browser APIs)
 | Rule | Reason |
 |------|--------|
 | `async` functions for data fetching | Native async/await in Server Components |
-| Wrap independently-fetched children in `<Suspense>` | Streaming — users see content earlier |
+| Wrap independently-fetched children in `<Suspense>` | Streaming - users see content earlier |
 | `"use client"` boundaries should be leaves | Minimizes client bundle size |
-| No `useState`/`useEffect` in Server Components | They run on server — no browser state |
+| No `useState`/`useEffect` in Server Components | They run on server - no browser state |
 
 ---
 
@@ -390,13 +390,13 @@ function DataLoader<T>({ queryKey, queryFn, children }: DataLoaderProps<T>) {
 > https://api-platform.com/docs/core/state-processors/, https://api-platform.com/docs/core/dto/,
 > https://api-platform.com/docs/core/pagination/
 
-### Interface Signatures (exact — AP4)
+### Interface Signatures (exact - AP4)
 
 ```php
-// ProviderInterface — ApiPlatform\State\ProviderInterface
+// ProviderInterface - ApiPlatform\State\ProviderInterface
 public function provide(Operation $operation, array $uriVariables = [], array $context = []): object|array|null;
 
-// ProcessorInterface — ApiPlatform\State\ProcessorInterface
+// ProcessorInterface - ApiPlatform\State\ProcessorInterface
 // Generic hint: @implements ProcessorInterface<T, T|void>
 public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed;
 ```
@@ -457,7 +457,7 @@ final class BookCollection
 
 ### State Provider: Collection vs Item
 
-Use `CollectionOperationInterface` to branch — **still valid in AP4**:
+Use `CollectionOperationInterface` to branch - **still valid in AP4**:
 
 ```php
 use ApiPlatform\Metadata\CollectionOperationInterface;
@@ -479,7 +479,7 @@ public function provide(Operation $operation, array $uriVariables = [], array $c
 #[Autowire(service: 'api_platform.doctrine.orm.state.remove_processor')]
 ```
 
-### Pagination — Custom State Providers
+### Pagination - Custom State Providers
 
 For custom providers, return an instance of `PaginatorInterface` or `PartialPaginatorInterface`,
 not a plain array, to get Hydra pagination links (first/last/next/prev):
@@ -504,9 +504,9 @@ return new ArrayPaginator($items, $offset, $limit, $total);
 ## Vercel React Best Practices (verified)
 
 Source: https://github.com/vercel-labs/agent-skills/blob/main/skills/react-best-practices/AGENTS.md
-(40+ rules across 8 categories — full list at source. Top 10 most impactful below.)
+(40+ rules across 8 categories - full list at source. Top 10 most impactful below.)
 
-### 1. Avoid Barrel File Imports (CRITICAL — 200–800ms cost)
+### 1. Avoid Barrel File Imports (CRITICAL - 200–800ms cost)
 
 Import directly from source files. Barrel files force loading all re-exported modules.
 
@@ -525,13 +525,13 @@ See: `knowledge/anti-patterns/barrel-imports.md`
 Use `<Suspense>` to show the wrapper UI faster while data loads, instead of awaiting everything before returning JSX.
 
 ```tsx
-// BAD — blocks entire page on slow data
+// BAD - blocks entire page on slow data
 export async function Page(): Promise<ReactNode> {
   const [user, activities] = await Promise.all([getUser(), getActivities()]);
   return <Layout><UserCard user={user} /><Feed items={activities} /></Layout>;
 }
 
-// GOOD — layout renders immediately, data streams in
+// GOOD - layout renders immediately, data streams in
 export async function Page(): Promise<ReactNode> {
   return (
     <Layout>
@@ -547,11 +547,11 @@ export async function Page(): Promise<ReactNode> {
 Never await independent async operations sequentially.
 
 ```typescript
-// BAD — sequential (slow)
+// BAD - sequential (slow)
 const user = await getUser(id);
 const posts = await getPosts(id);
 
-// GOOD — parallel
+// GOOD - parallel
 const [user, posts] = await Promise.all([getUser(id), getPosts(id)]);
 ```
 
@@ -584,7 +584,7 @@ import { cache } from 'react';
 const getUser = cache(async (id: UserId): Promise<User> => {
   return db.users.findById(id);
 });
-// Multiple components can call getUser(id) — only one DB query per request
+// Multiple components can call getUser(id) - only one DB query per request
 ```
 
 ### 7. Authenticate Server Actions Like API Routes (HIGH)
@@ -607,16 +607,16 @@ async function deletePost(postId: string): Promise<void> {
 Pass only fields the client component actually uses across the Server/Client boundary.
 
 ```typescript
-// BAD — entire user object serialized (including sensitive fields)
+// BAD - entire user object serialized (including sensitive fields)
 <ClientCard user={user} />
 
-// GOOD — only needed fields
+// GOOD - only needed fields
 <ClientCard name={user.name} avatarUrl={user.avatarUrl} />
 ```
 
 ### 9. Calculate Derived State During Rendering (MEDIUM)
 
-Compute values from current props/state during render — never store them in state or update them in effects.
+Compute values from current props/state during render - never store them in state or update them in effects.
 
 ```typescript
 // BAD
@@ -627,12 +627,12 @@ useEffect(() => { setFullName(`${firstName} ${lastName}`); }, [firstName, lastNa
 const fullName = `${firstName} ${lastName}`; // Computed during render
 ```
 
-### 10. Use Explicit Conditional Rendering — Ternary Over && (MEDIUM)
+### 10. Use Explicit Conditional Rendering - Ternary Over && (MEDIUM)
 
 `&&` renders falsy values like `0` and `NaN`. Always use ternary for safety.
 
 ```tsx
-// BAD — renders "0" when count is 0
+// BAD - renders "0" when count is 0
 {count && <Badge>{count}</Badge>}
 
 // GOOD
