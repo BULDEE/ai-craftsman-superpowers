@@ -539,6 +539,83 @@ else
 fi
 
 # =============================================================================
+# 10. Contract parity (static, auto-discovered)
+# -----------------------------------------------------------------------------
+# Section 3 checks the 4 KNOWN providers at runtime. This section auto-discovers
+# every provider file on disk, so a newly-added adapter (e.g. azure.sh) that
+# forgets a contract function is caught without editing this test. AST/graph
+# tooling cannot see the dynamic `source "${provider}.sh"` dispatch, so parity
+# is enforced here or nowhere.
+# =============================================================================
+echo ""
+echo "=== Contract Parity (static, auto-discovered) ==="
+
+ADAPTER_DIR="$ROOT_DIR/ci/adapters"
+CONTRACT_FNS=(adapter_detect adapter_run adapter_annotate adapter_comment adapter_exit)
+
+provider_count=0
+for pfile in "$ADAPTER_DIR"/*.sh; do
+    pname="$(basename "$pfile" .sh)"
+    [[ "$pname" == "adapter" ]] && continue
+    provider_count=$((provider_count + 1))
+
+    missing=""
+    for fn in "${CONTRACT_FNS[@]}"; do
+        # Top-level function definition: `adapter_run() {`
+        if ! grep -qE "^${fn}\(\)" "$pfile"; then
+            missing="$missing $fn"
+        fi
+    done
+
+    if [[ -z "$missing" ]]; then
+        log_pass "$pname.sh statically defines all 5 contract functions"
+    else
+        log_fail "$pname.sh missing contract functions" "${missing# }"
+    fi
+done
+
+# Guard against an empty glob or a moved directory silently passing.
+if [[ "$provider_count" -ge 4 ]]; then
+    log_pass "Auto-discovered $provider_count provider adapters"
+else
+    log_fail "Provider adapter discovery" "expected >=4, found $provider_count"
+fi
+
+# The base adapter.sh owns shared helpers, NOT the provider contract.
+BASE_FNS=(adapter_auto_detect adapter_load adapter_compute_exit adapter_format_comment)
+missing_base=""
+for fn in "${BASE_FNS[@]}"; do
+    if ! grep -qE "^${fn}\(\)" "$ADAPTER_BASE"; then
+        missing_base="$missing_base $fn"
+    fi
+done
+if [[ -z "$missing_base" ]]; then
+    log_pass "adapter.sh base defines all shared helpers"
+else
+    log_fail "adapter.sh base missing helpers" "${missing_base# }"
+fi
+
+# =============================================================================
+# 11. Exit-code delegation parity
+# -----------------------------------------------------------------------------
+# Exit semantics (0 clean / 1 warnings / 2 violations) are contract-critical.
+# Every provider must route adapter_exit through the base adapter_compute_exit
+# instead of reimplementing the 0/1/2 logic and drifting.
+# =============================================================================
+echo ""
+echo "=== Exit-Code Delegation Parity ==="
+
+for pfile in "$ADAPTER_DIR"/*.sh; do
+    pname="$(basename "$pfile" .sh)"
+    [[ "$pname" == "adapter" ]] && continue
+    if sed -n '/^adapter_exit()/,/^}/p' "$pfile" | grep -q 'adapter_compute_exit'; then
+        log_pass "$pname.sh adapter_exit delegates to adapter_compute_exit"
+    else
+        log_fail "$pname.sh adapter_exit divergent" "must call adapter_compute_exit"
+    fi
+done
+
+# =============================================================================
 # Summary
 # =============================================================================
 test_summary
