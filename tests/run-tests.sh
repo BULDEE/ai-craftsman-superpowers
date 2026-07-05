@@ -338,7 +338,7 @@ test_hook_behavior() {
         if bash "$hook_test" > /dev/null 2>&1; then
             log_pass "Hook behavior tests pass"
         else
-            log_fail "Hook behavior tests failed — run tests/core/test-hooks.sh for details"
+            log_fail "Hook behavior tests failed - run tests/core/test-hooks.sh for details"
         fi
     else
         log_skip "Hook behavior tests (tests/core/test-hooks.sh not found)"
@@ -355,7 +355,7 @@ test_agent_hooks() {
         if bash "$agent_test" > /dev/null 2>&1; then
             log_pass "Agent hook gate tests pass"
         else
-            log_fail "Agent hook gate tests failed — run tests/core/test-agent-hooks.sh for details"
+            log_fail "Agent hook gate tests failed - run tests/core/test-agent-hooks.sh for details"
         fi
     else
         log_skip "Agent hook gate tests (tests/core/test-agent-hooks.sh not found)"
@@ -373,7 +373,7 @@ test_config_resolution() {
         if bash "$config_test" > /dev/null 2>&1; then
             log_pass "Config resolution tests pass"
         else
-            log_fail "Config resolution tests failed — run tests/core/test-config.sh for details"
+            log_fail "Config resolution tests failed - run tests/core/test-config.sh for details"
         fi
     else
         log_skip "Config resolution tests (tests/core/test-config.sh not found)"
@@ -397,7 +397,7 @@ test_pack_suites() {
         if bash "$test_file" > /dev/null 2>&1; then
             log_pass "Pack suite passes: $name"
         else
-            log_fail "Pack suite failed: $name — run tests/packs/$name for details"
+            log_fail "Pack suite failed: $name - run tests/packs/$name for details"
         fi
     done
 }
@@ -413,7 +413,7 @@ test_craftsman_ci() {
         if bash "$ci_test" > /dev/null 2>&1; then
             log_pass "craftsman-ci CLI tests pass"
         else
-            log_fail "craftsman-ci CLI tests failed — run tests/ci/test-craftsman-ci.sh for details"
+            log_fail "craftsman-ci CLI tests failed - run tests/ci/test-craftsman-ci.sh for details"
         fi
     else
         log_skip "craftsman-ci CLI tests (tests/ci/test-craftsman-ci.sh not found)"
@@ -431,7 +431,7 @@ test_bias_detector() {
         if bash "$bias_test" > /dev/null 2>&1; then
             log_pass "Bias detector tests pass"
         else
-            log_fail "Bias detector tests failed — run tests/core/test-bias-detector.sh for details"
+            log_fail "Bias detector tests failed - run tests/core/test-bias-detector.sh for details"
         fi
     else
         log_skip "Bias detector tests (tests/core/test-bias-detector.sh not found)"
@@ -449,7 +449,7 @@ test_correction_learning() {
         if bash "$correction_test" > /dev/null 2>&1; then
             log_pass "Correction learning tests pass"
         else
-            log_fail "Correction learning tests failed — run tests/core/test-correction-learning.sh for details"
+            log_fail "Correction learning tests failed - run tests/core/test-correction-learning.sh for details"
         fi
     else
         log_skip "Correction learning tests (tests/core/test-correction-learning.sh not found)"
@@ -467,7 +467,7 @@ test_session_metrics() {
         if bash "$metrics_test" > /dev/null 2>&1; then
             log_pass "Session metrics tests pass"
         else
-            log_fail "Session metrics tests failed — run tests/core/test-session-metrics.sh for details"
+            log_fail "Session metrics tests failed - run tests/core/test-session-metrics.sh for details"
         fi
     else
         log_skip "Session metrics tests (tests/core/test-session-metrics.sh not found)"
@@ -482,7 +482,7 @@ test_session_metrics() {
         if bash "$state_lib_test" > /dev/null 2>&1; then
             log_pass "Session state library tests pass"
         else
-            log_fail "Session state library tests failed — run tests/core/test-session-state-lib.sh for details"
+            log_fail "Session state library tests failed - run tests/core/test-session-state-lib.sh for details"
         fi
     else
         log_skip "Session state library tests (tests/core/test-session-state-lib.sh not found)"
@@ -500,7 +500,7 @@ test_knowledge_integrity() {
         if bash "$knowledge_test" > /dev/null 2>&1; then
             log_pass "Knowledge base integrity tests pass"
         else
-            log_fail "Knowledge base integrity tests failed — run tests/core/test-knowledge-integrity.sh for details"
+            log_fail "Knowledge base integrity tests failed - run tests/core/test-knowledge-integrity.sh for details"
         fi
     else
         log_skip "Knowledge base integrity tests (tests/core/test-knowledge-integrity.sh not found)"
@@ -518,10 +518,46 @@ test_workflow_command() {
         if bash "$workflow_test" > /dev/null 2>&1; then
             log_pass "Workflow command tests pass"
         else
-            log_fail "Workflow command tests failed — run tests/core/test-workflow-command.sh for details"
+            log_fail "Workflow command tests failed - run tests/core/test-workflow-command.sh for details"
         fi
     else
         log_skip "Workflow command tests (tests/core/test-workflow-command.sh not found)"
+    fi
+}
+
+# Test: Legacy command (content validation)
+test_legacy_command() {
+    echo ""
+    log_info "Testing legacy command (content)"
+
+    local legacy_test="$SCRIPT_DIR/core/test-legacy-command.sh"
+
+    if [[ -f "$legacy_test" ]]; then
+        if bash "$legacy_test" > /dev/null 2>&1; then
+            log_pass "Legacy command tests pass"
+        else
+            log_fail "Legacy command tests failed - run tests/core/test-legacy-command.sh for details"
+        fi
+    else
+        log_skip "Legacy command tests (tests/core/test-legacy-command.sh not found)"
+    fi
+}
+
+# Test: Hotspot analysis tool (functional)
+test_hotspot_analysis() {
+    echo ""
+    log_info "Testing hotspot analysis tool (functional)"
+
+    local hotspot_test="$SCRIPT_DIR/core/test-hotspot-analysis.sh"
+
+    if [[ -f "$hotspot_test" ]]; then
+        if bash "$hotspot_test" > /dev/null 2>&1; then
+            log_pass "Hotspot analysis tests pass"
+        else
+            log_fail "Hotspot analysis tests failed - run tests/core/test-hotspot-analysis.sh for details"
+        fi
+    else
+        log_skip "Hotspot analysis tests (tests/core/test-hotspot-analysis.sh not found)"
     fi
 }
 
@@ -536,7 +572,7 @@ test_quick_setup() {
         if bash "$quick_test" > /dev/null 2>&1; then
             log_pass "Quick setup tests pass"
         else
-            log_fail "Quick setup tests failed — run tests/core/test-quick-setup.sh for details"
+            log_fail "Quick setup tests failed - run tests/core/test-quick-setup.sh for details"
         fi
     else
         log_skip "Quick setup tests (tests/core/test-quick-setup.sh not found)"
@@ -554,7 +590,7 @@ test_dogfood() {
         if bash "$dogfood_test" > /dev/null 2>&1; then
             log_pass "Dog-fooding tests pass"
         else
-            log_fail "Dog-fooding tests failed — run tests/core/test-dogfood.sh for details"
+            log_fail "Dog-fooding tests failed - run tests/core/test-dogfood.sh for details"
         fi
     else
         log_skip "Dog-fooding tests (tests/core/test-dogfood.sh not found)"
@@ -646,6 +682,8 @@ main() {
         test_pack_suites
         test_craftsman_ci
         test_workflow_command
+        test_legacy_command
+        test_hotspot_analysis
         test_quick_setup
         test_dogfood
     fi

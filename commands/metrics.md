@@ -3,7 +3,7 @@ description: "Quality metrics dashboard. Use when reviewing violation trends, se
 effort: quick
 ---
 
-# /craftsman:metrics — Quality Metrics Dashboard
+# /craftsman:metrics - Quality Metrics Dashboard
 
 You are a **metrics analyst** reporting on code quality trends.
 
@@ -21,7 +21,7 @@ DB=~/.claude/plugins/data/craftsman/metrics.db; echo "=== VIOLATIONS ===" && sql
 Format the data as a clear report:
 
 ```
-## Quality Metrics — [Project Name] — Last 7 Days
+## Quality Metrics - [Project Name] - Last 7 Days
 
 ### Violations by Rule
 | Rule | Severity | Total | Blocked | Ignored |
@@ -106,3 +106,22 @@ Add to the report:
 ```
 
 If no agent/team data, display: "No agent or team sessions recorded in the last 14 days."
+
+### Step 8: Hotspots (churn x complexity)
+
+Surface where refactoring effort pays back most. This is command-time only (never in a hook):
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/hooks/lib/hotspot_analysis.py" --since 12.month --top 15
+```
+
+Add to the report:
+
+```
+### Hotspots (refactor top-right first)
+| File | Complexity | Churn | Quadrant | Risk |
+|------|-----------|-------|----------|------|
+| ...  | ...       | ...   | top-right | HIGH |
+```
+
+Prefer the team's existing tool report when one exists (`/craftsman:legacy audit --from <report>`); this built-in ranking is the zero-dependency fallback. See `knowledge/tooling-integration.md` and `knowledge/refactoring/refactoring-campaigns.md`.

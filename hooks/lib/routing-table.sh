@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Routing Table — Dynamic command suggestion for Claude's context
+# Routing Table - Dynamic command suggestion for Claude's context
 #
 # Generates a context-aware routing block that instructs Claude when to
 # suggest each craftsman command. Adapts to loaded packs.
@@ -19,6 +19,7 @@ _register_core_routes() {
 - Multi-step feature, migration, large refactoring → /craftsman:plan
 - Code review, PR review, architecture audit → /craftsman:challenge
 - Improving existing code, tech debt, code smells → /craftsman:refactor
+- Inherit/tame legacy, untested code, characterization tests, strangler migration → /craftsman:legacy
 - Git commit, branch, merge, workflow → /craftsman:git
 - Check plugin health, diagnose issues → /craftsman:healthcheck
 - Before claiming work is done → /craftsman:verify
@@ -67,5 +68,5 @@ routing_table() {
     routes="${routes}$(_register_pack_routes "$packs")"
     local sp_note=""
     sp_note=$(_detect_superpowers_synergy)
-    echo "CRAFTSMAN COMMANDS — Suggest these when context matches (do NOT auto-execute, propose to user):${routes}${sp_note}"
+    echo "CRAFTSMAN COMMANDS - Suggest these when context matches (do NOT auto-execute, propose to user):${routes}${sp_note}"
 }

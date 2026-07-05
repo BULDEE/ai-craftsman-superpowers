@@ -38,7 +38,7 @@ else
 fi
 
 # Test: core commands always present
-for cmd in debug team design spec plan challenge refactor git healthcheck verify; do
+for cmd in debug team design spec plan challenge refactor legacy git healthcheck verify; do
     if echo "$output" | grep -q "/craftsman:${cmd}"; then
         log_pass "core command /craftsman:${cmd} present"
     else

@@ -2,6 +2,15 @@
 # =============================================================================
 # Structural metrics for C-like sources (PHP, TypeScript/TSX, JS/JSX).
 #
+# NOT a replacement for SonarQube / PHPStan / ESLint complexity rules. This is
+# the ZERO-DEPENDENCY, REAL-TIME FALLBACK: it runs on every Write/Edit in the AI
+# loop, in milliseconds, with no tool installed, and is language-agnostic so a
+# new pack inherits structural signals for free. When a project runs a real
+# analysis tool, that tool is the source of truth for its axis: relax the
+# overlapping rule via the rules engine (e.g. `GOD001: off` at project level)
+# and let `/craftsman:legacy audit --from <report>` ingest the tool's output.
+# See knowledge/tooling-integration.md for the full boundary.
+#
 # Emits one "RULE|message" line per finding on stdout. The bash wrapper
 # (structural.sh) routes each through add_violation, so severity is decided by
 # the rules engine (warn-first rollout; see rules-engine.sh).
