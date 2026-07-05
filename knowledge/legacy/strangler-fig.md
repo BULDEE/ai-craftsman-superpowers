@@ -10,6 +10,14 @@ A cut-over rewrite is a bet that you can rebuild everything correctly before the
 
 Use it when the system is too large or too critical to replace at once. Do **not** use it for a small component you could rewrite safely in a day, or when the legacy system is genuinely disposable.
 
+| | Big-Bang Rewrite | Strangler Fig |
+|---|------------------|---------------|
+| Value delivered | Only at the end (maybe never) | From the first slice |
+| Risk | One enormous bet | A stream of small, reversible ones |
+| Rollback | All-or-nothing | Per slice, behind a flag |
+| Two systems in sync | Diverge for months | Coexist deliberately, briefly |
+| Best for | Truly disposable, tiny systems | Large, critical, long-lived systems |
+
 ## The Enabling Patterns
 
 ### Branch by Abstraction
@@ -30,11 +38,32 @@ class NewPaymentProcessor implements PaymentProcessor { /* the rebuilt slice */ 
 const processor: PaymentProcessor = flags.newPayments ? new NewPaymentProcessor() : new LegacyPaymentProcessor();
 ```
 
-This keeps `main` always releasable: the new implementation ships dormant behind the flag until it is proven.
+This keeps `main` always releasable: the new implementation ships dormant behind the flag until it is proven. The flag can be graduated from a boolean to a cohort so you divert a slice of traffic rather than all of it:
+
+```typescript
+// Graduated rollout: a percentage cohort, not an all-or-nothing switch.
+function pickProcessor(order: Order): PaymentProcessor {
+  const onNew = flags.newPaymentsPercent >= hashToPercent(order.id);
+  return onNew ? new NewPaymentProcessor() : new LegacyPaymentProcessor();
+}
+```
 
 ### Event Interception
 
 Intercept the calls or events flowing into the legacy system and divert a subset to the new one. A facade, proxy, or router sits in front and decides, per request, whether the legacy or the new path handles it. This lets you migrate by route, by customer, or by percentage of traffic.
+
+```typescript
+// A router at the edge sends captured routes to the new component, the rest to legacy.
+class MigrationRouter {
+  private readonly captured = new Set(["/orders", "/orders/:id"]);
+  handle(req: HttpRequest): Promise<HttpResponse> {
+    return this.captured.has(route(req))
+      ? this.newComponent.handle(req)   // strangled route
+      : this.legacy.handle(req);        // everything not yet migrated
+  }
+}
+// Each migrated route is added to `captured` and the legacy handler shrinks.
+```
 
 ### Asset Capture
 
@@ -53,7 +82,42 @@ class LegacyCustomerAcl {
 }
 ```
 
+The ACL is **bidirectional**: it translates legacy shapes into the clean model on the way in, and the clean model back into whatever the legacy side still expects on the way out, so both can coexist during the migration.
+
+```typescript
+class CustomerAcl {
+  toDomain(row: LegacyCustomerRow): Customer {
+    return Customer.rehydrate(new CustomerId(row.CUST_ID), Email.of(row.EMAIL_ADDR));
+  }
+  toLegacy(customer: Customer): LegacyCustomerRow {
+    return { CUST_ID: customer.id.value, EMAIL_ADDR: customer.email.toString() };
+  }
+}
+```
+
 Without an ACL, the legacy model leaks into the new one and the rewrite quietly becomes a reshuffle. Treat the ACL as temporary scaffolding: it can be removed once the legacy side is gone.
+
+## Shadow Running: Proving Parity Before You Divert
+
+The safest cutover runs the new path **in parallel** with the legacy one for real traffic, comparing outputs without acting on the new result. Only when the diff is zero for long enough do you start diverting.
+
+```typescript
+function shippingWithShadow(order: Order): ShippingCost {
+  const legacy = legacyShipping.calculate(order);
+  try {
+    const candidate = newShipping.calculate(order);
+    if (!candidate.equals(legacy)) {
+      metrics.increment("shipping.shadow.mismatch");
+      logger.warn("shadow mismatch", { order: order.id, legacy, candidate });
+    }
+  } catch (e) {
+    metrics.increment("shipping.shadow.error");   // never let the shadow break production
+  }
+  return legacy; // legacy still owns the real answer until parity is proven
+}
+```
+
+The shadow path must never affect the response or throw into the real flow; it only observes. Watch the mismatch metric fall to zero before touching the traffic split.
 
 ## Incremental Cutover Checklist
 
@@ -86,6 +150,27 @@ At every step the system ships and can roll back. The old code is gone only when
 ## At the Architecture Level and the Code Level
 
 Strangler fig is usually described for replacing a whole legacy system, but the same shape works inside a class. The **bubble** from [[legacy/legacy-techniques]] is a strangler at the code level: a new well-designed class that progressively takes over a legacy God Class, forwarding what it has not yet absorbed. Same philosophy, smaller radius: grow the new, fade the old, never rewrite in one shot.
+
+## Measuring the Migration
+
+A strangler needs a visible burn-down or it drifts into permanent dual-running. Track the shrinking seam:
+
+| Metric | Meaning | Target |
+|--------|---------|--------|
+| % traffic on the new path | How far the cutover has progressed | 100%, then remove the flag |
+| Shadow mismatch rate | Parity between old and new | 0 before diverting |
+| Legacy call sites remaining | How much host is left | 0, then delete the abstraction |
+| ACL translations remaining | Residual coupling to the legacy model | 0, then delete the ACL |
+
+When every number reaches its target, the host tree is dead and the fig stands alone. Publish this burn-down so the migration stays funded and finished.
+
+## When the Strangler Stalls
+
+Migrations rot at the halfway point, where dual-running feels stable and the last slices are the hard ones. Symptoms and fixes:
+
+- **The flag has lived for months.** Set a removal deadline per slice; a flag with no expiry is permanent complexity.
+- **The new path handles only the easy cases.** The remaining legacy cases are exactly the ones worth migrating; schedule them explicitly instead of leaving the 20% forever.
+- **Nobody owns the burn-down.** Assign the migration metrics to one person; unowned migrations never finish.
 
 ## Pitfalls
 
