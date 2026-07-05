@@ -459,7 +459,12 @@ hooks/              → Real-time validation (SessionStart → PostToolUse → S
 hooks/lib/          → Shared libraries (pack-loader, config, rules-engine, metrics, static-analysis)
 commands/           → Core user-invoked workflows (20 skills)
 agents/             → Core agents (11) + pack symlinks
-knowledge/          → Core methodology (DDD, Clean Architecture, patterns)
+knowledge/          → Core methodology, language-agnostic (Clean Architecture, Hexagonal, DDD, TDD,
+                      testing strategy, refactoring, legacy techniques, patterns, principles, anti-patterns)
+  ddd/              → Entities, value objects, aggregates, CQRS (agnostic)
+  legacy/           → Seams, characterization testing, strangler fig
+  refactoring/      → Mikado method, hotspot-driven campaigns
+  anti-patterns/    → God object, primitive obsession, singleton abuse, and more
 packs/              → Loadable language packs
   symfony/          → PHP/Symfony pack (validators, agents, knowledge, templates)
   react/            → React/TypeScript pack (validators, agents, knowledge, templates)

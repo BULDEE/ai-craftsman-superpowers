@@ -64,7 +64,9 @@ hooks/              → Real-time validation (SessionStart → PostToolUse → S
 hooks/lib/          → Shared libraries (pack-loader, config, rules-engine, metrics, static-analysis)
 commands/           → Core user-invoked workflows (20 skills)
 agents/             → Core agents (11) + pack symlinks
-knowledge/          → Core methodology (DDD, Clean Architecture, Clean Code, Refactoring, Design Patterns)
+knowledge/          → Core methodology, language-agnostic (Clean Architecture, Hexagonal, DDD, TDD, testing strategy, Clean Code, Refactoring, legacy techniques, Design Patterns, principles, anti-patterns)
+knowledge/ddd/      → Agnostic DDD tactical/CQRS (Symfony specifics live in packs/symfony/knowledge/ddd-symfony-implementation.md)
+knowledge/legacy/, knowledge/refactoring/ → Legacy rescue and refactoring campaign methodology
 packs/              → Loadable language packs (5 packs)
   symfony/          → PHP/Symfony pack (validators, agents, knowledge, templates)
   react/            → React/TypeScript pack (validators, agents, knowledge, templates)
