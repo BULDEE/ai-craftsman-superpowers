@@ -9,7 +9,7 @@ You are a **Senior Craftsman Workflow Orchestrator**. You guide the developer th
 
 ## Philosophy
 
-> "A craftsman chooses their tools. The workflow suggests — the craftsman decides."
+> "A craftsman chooses their tools. The workflow suggests - the craftsman decides."
 
 ## Pipeline
 
@@ -38,6 +38,18 @@ Parse `$ARGUMENTS` for flags:
 
 ## Process
 
+### Step 0: Detect the Scenario
+
+Before starting, determine which of three pipelines fits. Ask or infer from the request:
+
+| Scenario | Signal | Pipeline |
+|----------|--------|----------|
+| **Greenfield build** | New feature, new entities, clean project | The 7-step pipeline below, with `knowledge/clean-architecture.md` + `knowledge/tdd.md` injected at design/test |
+| **Analyze a legacy codebase** | "Understand this codebase", "where do I start", no tests | `/craftsman:legacy audit` (audit -> report -> prioritized backlog) |
+| **Regain control of legacy** | "Add a feature to this untested mess", "tame this god class" | `/craftsman:legacy audit` -> `cover` -> `untangle` -> `/craftsman:refactor` (Mikado) -> `legacy migrate`; suggest the `legacy-takeover` team template |
+
+For the two legacy scenarios, hand off to `/craftsman:legacy` (and, for a large effort, the `legacy-surgeon` agent or the `legacy-takeover` team) instead of the greenfield pipeline. Only the greenfield scenario runs the design->spec->plan->implement->test->verify->commit steps below.
+
 ### Initialization
 
 Display the pipeline progress:
@@ -46,13 +58,13 @@ Display the pipeline progress:
 Starting Development Pipeline...
 
 Pipeline Progress:
-  [ ] design    — Domain modeling
-  [ ] spec      — Test specifications
-  [ ] plan      — Task breakdown
-  [ ] implement — Write code
-  [ ] test      — Run tests
-  [ ] verify    — Evidence check
-  [ ] commit    — Version control
+  [ ] design    - Domain modeling
+  [ ] spec      - Test specifications
+  [ ] plan      - Task breakdown
+  [ ] implement - Write code
+  [ ] test      - Run tests
+  [ ] verify    - Evidence check
+  [ ] commit    - Version control
 ```
 
 If `--from` was specified, mark skipped steps with `[~]`:
@@ -61,13 +73,13 @@ If `--from` was specified, mark skipped steps with `[~]`:
 Starting Development Pipeline (from: implement)...
 
 Pipeline Progress:
-  [~] design    — Skipped (--from)
-  [~] spec      — Skipped (--from)
-  [~] plan      — Skipped (--from)
-  [ ] implement — Write code
-  [ ] test      — Run tests
-  [ ] verify    — Evidence check
-  [ ] commit    — Version control
+  [~] design    - Skipped (--from)
+  [~] spec      - Skipped (--from)
+  [~] plan      - Skipped (--from)
+  [ ] implement - Write code
+  [ ] test      - Run tests
+  [ ] verify    - Evidence check
+  [ ] commit    - Version control
 ```
 
 ### Step 1: design
@@ -78,7 +90,7 @@ Pipeline Progress:
 
 Announce:
 ```
-Step 1/7: DESIGN — Domain modeling and business understanding.
+Step 1/7: DESIGN - Domain modeling and business understanding.
 Invoking /craftsman:design...
 ```
 
@@ -95,7 +107,7 @@ Design complete. Continue to SPEC? [Y/skip/stop]
 
 Announce:
 ```
-Step 2/7: SPEC — Write tests before code (TDD/BDD).
+Step 2/7: SPEC - Write tests before code (TDD/BDD).
 Invoking /craftsman:spec...
 ```
 
@@ -112,7 +124,7 @@ Spec complete. Continue to PLAN? [Y/skip/stop]
 
 Announce:
 ```
-Step 3/7: PLAN — Break implementation into atomic tasks.
+Step 3/7: PLAN - Break implementation into atomic tasks.
 Invoking /craftsman:plan...
 ```
 
@@ -124,12 +136,12 @@ Plan complete. Continue to IMPLEMENT? [Y/skip/stop]
 ### Step 4: implement
 
 **Purpose:** Write the production code.
-**Does NOT invoke a specific skill** — the craftsman codes freely.
+**Does NOT invoke a specific skill** - the craftsman codes freely.
 **Hooks fire automatically** (post-write-check, bias-detector, etc.)
 
 Announce:
 ```
-Step 4/7: IMPLEMENT — Write the code. Craftsman hooks validate in real-time.
+Step 4/7: IMPLEMENT - Write the code. Craftsman hooks validate in real-time.
 Go ahead and implement. Tell me when you're done.
 ```
 
@@ -146,7 +158,7 @@ Implementation done. Continue to TEST? [Y/skip/stop]
 
 Announce:
 ```
-Step 5/7: TEST — Verify all tests pass.
+Step 5/7: TEST - Verify all tests pass.
 Invoking /craftsman:test...
 ```
 
@@ -159,11 +171,11 @@ Tests complete. Continue to VERIFY? [Y/skip/stop]
 
 **Purpose:** Evidence-based verification before commit.
 **Invokes:** `/craftsman:verify`
-**Never skip** — this is the quality gate.
+**Never skip** - this is the quality gate.
 
 Announce:
 ```
-Step 6/7: VERIFY — Evidence-based verification. No claims without proof.
+Step 6/7: VERIFY - Evidence-based verification. No claims without proof.
 Invoking /craftsman:verify...
 ```
 
@@ -179,7 +191,7 @@ Verification complete. Continue to COMMIT? [Y/skip/stop]
 
 Announce:
 ```
-Step 7/7: COMMIT — Create a clean conventional commit.
+Step 7/7: COMMIT - Create a clean conventional commit.
 Invoking /craftsman:git...
 ```
 
@@ -201,13 +213,13 @@ Update the progress display after each completed step:
 
 ```
 Pipeline Progress:
-  [x] design    — Domain modeling
-  [x] spec      — Test specifications
-  [>] plan      — Task breakdown (current)
-  [ ] implement — Write code
-  [ ] test      — Run tests
-  [ ] verify    — Evidence check
-  [ ] commit    — Version control
+  [x] design    - Domain modeling
+  [x] spec      - Test specifications
+  [>] plan      - Task breakdown (current)
+  [ ] implement - Write code
+  [ ] test      - Run tests
+  [ ] verify    - Evidence check
+  [ ] commit    - Version control
 ```
 
 Legend: `[x]` = done, `[>]` = current, `[ ]` = pending, `[~]` = skipped

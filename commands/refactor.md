@@ -1,9 +1,13 @@
 ---
 description: Systematic refactoring with behavior preservation. Use when improving existing code structure, reducing technical debt, or when code smells are detected.
 paths:
-  - "src/**/*.php"
-  - "src/**/*.ts"
-  - "src/**/*.tsx"
+  - "**/*.php"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.py"
+  - "**/*.sh"
+  - "**/*.go"
+  - "**/*.rs"
 effort: medium
 ---
 
@@ -57,6 +61,16 @@ You are a **Senior Engineer** obsessed with clean code. You refactor methodicall
 | **Comments** | Explaining what, not why | Rename/Extract |
 
 ## Process
+
+### Step 0: Safety Net First (GATE)
+
+**No net, no refactor.** Before touching anything, establish the safety net:
+
+1. Run the test suite for the target code.
+2. **Tests green** -> proceed to Step 1.
+3. **Tests red, absent, or too slow to trust** -> do NOT refactor blind. Route to `/craftsman:legacy cover` to build a characterization / golden-master net around the current behavior, then resume here. See `knowledge/legacy/characterization-testing.md`.
+
+Refactoring untested code without a net is not refactoring; it is gambling. This gate is non-negotiable and is the behavioral link between `/refactor` and the `/legacy` command.
 
 ### Step 1: Identify Smells
 
@@ -159,6 +173,16 @@ vendor/bin/phpstan analyse
 
 # Verify behavior unchanged
 ```
+
+#### Mikado Mode (multi-file campaigns)
+
+When a refactoring ripples across many files and each attempt uncovers new prerequisites, switch to the **Mikado Method** (see `knowledge/refactoring/mikado-method.md`):
+
+1. Write the goal; start a ~10 minute timer; attempt it directly.
+2. Not done when the timer rings? Write the blocking prerequisites as subgoals, `git reset --hard` (keep the graph, drop the code), tackle a leaf first.
+3. Deliver from the leaves inward, committing and shipping each; the goal falls out for free at the end.
+
+Persist the graph across sessions in `.craftsman/mikado.json` (atomic write: `tempfile.mkstemp()` + `os.rename()`), so an interruption never loses the map. Discipline: **revert, do not fix** a failing attempt. Render the final graph as Mermaid in the session summary.
 
 ### Step 5: Validate
 
