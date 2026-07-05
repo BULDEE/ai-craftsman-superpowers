@@ -80,6 +80,27 @@ A **test double** stands in for a real collaborator. Know the five kinds and pic
 
 Prefer a **fake** over a **mock** where you can: a fake exercises the real contract, while a mock asserts a call sequence and re-couples the test to implementation. Reserve mocks for true boundaries you cannot run (a payment API, an email sender).
 
+```typescript
+// Stub - canned answer, no verification. Use to steer a path.
+const clock: Clock = { now: () => new Date("2026-01-01") };
+
+// Fake - a real, simple implementation of the port. Verify via its state.
+class InMemoryOrders implements OrderRepository {
+  private readonly rows = new Map<string, Order>();
+  save(o: Order) { this.rows.set(o.id, o); }
+  count() { return this.rows.size; }
+}
+
+// Mock - expectation on an unrunnable boundary. Use sparingly.
+test("a failed charge sends an alert", () => {
+  const alerts = mock<AlertService>();
+  new Checkout(new InMemoryOrders(), failingGateway()).run(cart);
+  expect(alerts.send).toHaveBeenCalledWith(expect.objectContaining({ kind: "charge_failed" }));
+});
+```
+
+Rule of thumb: if your test needs three mocks and asserts on call order, the design is probably wrong, not the test. Introduce a port and a fake instead (see [[hexagonal]]).
+
 ## End-to-End Tests That Survive
 
 E2E tests are the most expensive and the most fragile. Three practices keep them maintainable (ADTF 2020):
@@ -104,6 +125,34 @@ Scenario: I can add a task
 **3. One behavior per scenario.** Chaining "add then delete" in one scenario falsely implies a dependency and makes failures ambiguous. Keep each behavior a separate, independent scenario.
 
 **Page Object Model.** Encapsulate every screen's locators and interactions behind a page object; tests call `todosPage.submit(task)`, never raw selectors. When markup changes, one page object changes, not fifty tests. For actor-centric flows, Screenplay refines POM further.
+
+## Why Integration and Contract Tests Earn Their Place
+
+Unit tests prove each unit; they say nothing about the wiring. Most production incidents live at boundaries: a wrong SQL mapping, a serialized field that changed shape, a queue message a consumer no longer understands. Two targeted levels catch these cheaply:
+
+- **Integration test**: run the real adapter against the real dependency (a test database, a local broker). It is the only level that proves your Doctrine mapping or your HTTP client actually works.
+- **Contract test**: pin the schema shared by two services so neither breaks the other silently. The consumer records what it expects; the provider verifies it still delivers exactly that.
+
+```typescript
+// Contract (consumer side): "I expect this exact response shape."
+const expected = { id: "o1", status: "confirmed", total: 3000 };
+providerMock.given("order o1 is confirmed")
+  .uponReceiving("a request for order o1")
+  .willRespondWith({ status: 200, body: expected });
+// The provider replays this contract in its own CI: drift fails a build, not production.
+```
+
+A handful of these replaces a swarm of slow E2E tests that would otherwise be your only defense against boundary drift.
+
+## Test Smells
+
+| Smell | Why it hurts | Fix |
+|-------|--------------|-----|
+| Assertion-free test | Green means nothing | Assert an observable outcome |
+| Mystery guest | Depends on hidden external data/file | Make inputs explicit in the test |
+| Test that mirrors the code | Breaks on every refactor | Assert behavior, not structure |
+| Conditional logic in a test | Untested test; branches hide bugs | One path per test |
+| Slow unit test | Suite stops being run | Remove I/O; inject clock/network |
 
 ## Coverage: Measure Risk, Not Lines
 
