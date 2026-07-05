@@ -131,6 +131,27 @@ final class OrderService
 }
 ```
 
+### SOLID Across Languages
+
+The five principles are language-agnostic, but their idioms differ. Each loaded pack ships a canonical SOLID reference showing the idiomatic form; consult the one for your stack.
+
+| Principle | PHP / Symfony | TypeScript / React | Python | Bash |
+|-----------|---------------|--------------------|--------|------|
+| **S**RP | One `final` class, one reason to change | Component renders; hook fetches; util formats | One class/module, one job | One function, one job |
+| **O**CP | `interface` + new implementing class | Renderer registry over a `switch` | `Protocol` + new class | `handle_<type>` dispatch by convention |
+| **L**SP | Substitutable subtypes; no throwing overrides | Variants honor the same props contract | Independent types over coupling subclasses | Replacement functions honor the same contract |
+| **I**SP | Split reader/writer interfaces | Narrow props, not the whole entity | Narrow `Protocol`s | Pass only the args a function needs |
+| **D**IP | Inject repository/`Clock` interfaces | Inject a gateway via props/context | Inject a `Clock`/`Protocol` | Inject a logger function name |
+
+Canonical files (loaded on demand by the scaffold and design commands):
+
+- `packs/symfony/knowledge/canonical/php-solid.php`
+- `packs/react/knowledge/canonical/tsx-solid.tsx`
+- `packs/python/knowledge/canonical/py-solid.py`
+- `packs/bash/knowledge/canonical/bash-solid.sh` (honest about which principles map only in spirit)
+
+Go and Rust follow with their own canonical files (interfaces and traits for ISP/DIP) as those packs ship.
+
 ## KISS (Keep It Simple, Stupid)
 
 > The simplest solution is usually the best.
