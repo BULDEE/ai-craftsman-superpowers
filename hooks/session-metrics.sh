@@ -20,11 +20,30 @@ metrics_init 2>/dev/null || true
 
 # Read session info from stdin
 INPUT=$(cat)
-SESSION_DURATION=$(echo "$INPUT" | jq -r '.session_duration_seconds // 0' 2>/dev/null)
 
-# Count violations from this session (approximate using duration)
+# SessionEnd input has NO duration field (only session_id/transcript_path/
+# cwd/reason). Derive duration from the epoch marker written by
+# session-start.sh. Historical bug: reading the nonexistent
+# session_duration_seconds yielded 0, producing a "-0 seconds" SQL window
+# that recorded 0 blocked/warned on every session.
+START_TS_FILE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-start-ts"
+SESSION_DURATION=0
+if [[ -f "$START_TS_FILE" ]]; then
+    START_TS=$(cat "$START_TS_FILE" 2>/dev/null)
+    NOW_TS=$(date +%s)
+    if [[ "$START_TS" =~ ^[0-9]+$ ]] && (( NOW_TS >= START_TS )); then
+        SESSION_DURATION=$(( NOW_TS - START_TS ))
+    fi
+fi
+# Fallback: 1h window when the marker is missing or invalid ("0" would
+# collapse the violation-count window to nothing).
+if [[ "$SESSION_DURATION" -le 0 ]]; then
+    SESSION_DURATION=3600
+fi
+
+# Count violations from this session (window = session duration)
 PROJECT_HASH=$(metrics_project_hash)
-DURATION_PARAM="-${SESSION_DURATION:-3600} seconds"
+DURATION_PARAM="-${SESSION_DURATION} seconds"
 BLOCKED=$(python3 "${SCRIPT_DIR}/lib/metrics-query.py" "$METRICS_DB" \
     "SELECT COUNT(*) FROM violations WHERE project_hash=? AND blocked=1 AND timestamp > datetime('now', ?)" \
     "$PROJECT_HASH" "$DURATION_PARAM" 2>/dev/null || echo 0)
@@ -81,7 +100,7 @@ if [[ ${#SUMMARY_PARTS[@]} -gt 0 ]]; then
     }'
 fi
 
-# Clear session state for correction learning
-rm -f "$SESSION_STATE"
+# Clear session state for correction learning + start-time marker
+rm -f "$SESSION_STATE" "$START_TS_FILE"
 
 exit 0

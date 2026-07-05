@@ -51,6 +51,11 @@ fi
 SESSION_STATE_PATH="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
 printf '%s' "$SESSION_STATE_PATH" > "${HOME}/.claude/craftsman-session-state-path" 2>/dev/null || true
 
+# Record session start epoch. SessionEnd input has no duration field
+# (only session_id/transcript_path/cwd/reason), so session-metrics.sh
+# derives duration and its violation-count window from this marker.
+printf '%s' "$(date +%s)" > "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-start-ts" 2>/dev/null || true
+
 # Generate a self-contained verify wrapper at a well-known path.
 # Skills run via the Bash tool without CLAUDE_PLUGIN_ROOT, so they cannot
 # locate session_state.py directly. This wrapper bakes in the resolved path
