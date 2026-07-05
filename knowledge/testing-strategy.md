@@ -158,6 +158,35 @@ A handful of these replaces a swarm of slow E2E tests that would otherwise be yo
 
 A line-coverage percentage is a weak proxy. High coverage with assertion-free tests proves nothing; 60% coverage that exercises every business rule and boundary is worth more than 95% that only touches getters. Target the code where a defect is costly or likely (the domain, the money paths), and accept low coverage on trivial glue.
 
+## Readable Fixtures: Test Data Builders
+
+Tests drown in setup noise when every one constructs a full object by hand. Two patterns keep the Arrange section short and intention-revealing:
+
+- **Object Mother**: named factory methods for canonical cases (`Orders.confirmed()`, `Customers.vip()`).
+- **Test Data Builder**: a fluent builder with sensible defaults, overriding only what the test cares about.
+
+```typescript
+// Without a builder - noise drowns the one detail that matters
+const order = new Order("o1", "c1", [new Line("SKU", 2, 1500)], "PENDING", new Date());
+
+// With a builder - the test states only what it is about
+const order = anOrder().withStatus("PENDING").build();
+const overdue = anOrder().dueOn("2020-01-01").build();
+```
+
+The builder makes the test read as a sentence and shields every test from constructor churn: add a required field and you change one builder, not a hundred setups.
+
+## Choosing the Right Level
+
+When unsure where a test belongs, ask what could break and how fast you need to know:
+
+- Pure rule or calculation, no I/O -> **unit**, always.
+- "Does my SQL/HTTP adapter actually work?" -> **integration**, with the real dependency.
+- "Will my change break the other team's service?" -> **contract**.
+- "Does the money path work end to end for a real user?" -> **one** E2E per critical journey, no more.
+
+Push every test to the lowest level that can still prove the thing you care about. The lower it lives, the faster and more precise its failure.
+
 ## Flaky Tests
 
 A test that passes and fails without code changes is worse than no test: it trains the team to ignore red. Policy:
