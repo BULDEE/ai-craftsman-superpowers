@@ -175,6 +175,8 @@ A repository interface in `Domain/` (the classic DDD `OrderRepositoryInterface`)
 | Use case depends on a concrete Doctrine repository | The hexagon depends on a driven adapter | Depend on the port; inject the adapter |
 | DTO leaking framework types across a port | Outer format entered the hexagon | Translate to a plain command/response at the edge |
 | One "port" with 20 methods | Fat interface, adapters implement unused methods | Segregate ports by conversation (ISP) |
+| Mocking the adapter in tests | Couples the test to the driver's internals | Substitute a fake at the port instead |
+| The application constructs its own adapters | The hexagon depends on concrete infrastructure | Wire adapters in the composition root only |
 
 ## When Hexagonal Is Worth It
 
@@ -182,6 +184,21 @@ Ports & Adapters is not free: every port is an interface and an extra indirectio
 
 - **Yes**: swappable infrastructure (payment providers, storage), high-value domain logic that must be unit-tested fast, systems driven from several entry points (HTTP + CLI + queue).
 - **Not yet**: a thin CRUD screen with no rules, a throwaway script, a prototype whose domain is still being discovered. Introduce ports when a second adapter or a testability need actually appears.
+
+## Naming Ports by Conversation
+
+Name a port after the conversation, not the technology behind it. `PaymentGateway`, not `StripeClient`; `Clock`, not `SystemTime`; `OrderRepository`, not `DoctrineOrders`. The name should survive replacing the adapter.
+
+```php
+// The port speaks the domain's language; the adapter's tech never leaks into the name.
+interface NotificationSender { public function send(Notification $n): void; }  // port
+final class TwilioSmsSender implements NotificationSender { /* ... */ }        // adapter
+final class SendGridEmailSender implements NotificationSender { /* ... */ }    // adapter
+```
+
+## Rule
+
+> Every conversation the application has with the outside world is a port it owns, implemented by an adapter it never names. Test by swapping adapters, not by mocking internals.
 
 ## Related
 

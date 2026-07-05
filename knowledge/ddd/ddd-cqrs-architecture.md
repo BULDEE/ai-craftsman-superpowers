@@ -99,6 +99,68 @@ final readonly class ConfirmOrderHandler
 
 Do not reach for full CQRS everywhere: separate read models earn their cost when reads and writes have genuinely different shapes or scaling needs. Until then, CQS within a single model is enough.
 
+### The full write path
+
+A command travels one clean line from the edge to persistence, emitting an event on the way:
+
+```php
+// 1. Command - a plain, typed write intention created at the boundary.
+final readonly class ConfirmOrderCommand
+{
+    public function __construct(public string $orderId) {}
+}
+
+// 2. Handler - loads the aggregate, calls a behavior, saves, dispatches events.
+final readonly class ConfirmOrderHandler
+{
+    public function __construct(
+        private OrderRepository $orders,
+        private EventBus $events,
+    ) {}
+
+    public function __invoke(ConfirmOrderCommand $c): void
+    {
+        $order = $this->orders->require(new OrderId($c->orderId));
+        $order->confirm();                 // 3. invariant enforced inside the aggregate
+        $this->orders->save($order);
+        $this->events->publishAll($order->releaseEvents()); // 4. OrderConfirmed goes out
+    }
+}
+```
+
+### The read path
+
+A query never touches the aggregate; it returns a read model shaped for one screen:
+
+```php
+final readonly class OrderSummary        // a read model - plain data, no behavior
+{
+    public function __construct(
+        public string $id,
+        public string $status,
+        public string $formattedTotal,
+    ) {}
+}
+
+final readonly class GetOrderSummary
+{
+    public function __construct(private OrderSummaryReadModel $read) {}
+    public function __invoke(string $orderId): OrderSummary
+    {
+        return $this->read->byId($orderId); // hits a denormalized projection, not the domain
+    }
+}
+```
+
+Deciding how far to split reads and writes:
+
+| Situation | Approach |
+|-----------|----------|
+| Simple CRUD, same shape both ways | CQS within one model; no separate read model |
+| Reads much heavier than writes | Separate read models / projections |
+| Complex reporting off event history | Event-sourced projections |
+| Different scaling for reads vs writes | Full CQRS with separate stores |
+
 ## Repository Pattern
 
 The domain declares the repository as an **interface** (a driven port); infrastructure implements it. The domain never names the ORM.

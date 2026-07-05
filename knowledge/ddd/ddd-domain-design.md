@@ -142,6 +142,48 @@ public function closeDeal(DealId $dealId, Money $amount): void
 
 Never expose the internal collection; hand out copies or query methods, never the array itself.
 
+### Designing an aggregate: the rules in one place
+
+Four questions size an aggregate correctly:
+
+| Question | Guidance |
+|----------|----------|
+| What must always be true together? | That invariant defines the boundary; everything the rule needs is inside. |
+| What can be eventually consistent? | Put it in a *separate* aggregate, referenced by id. |
+| How big is one transaction? | One transaction should modify one aggregate. |
+| Do children have independent lifecycles? | If yes, they are probably their own aggregates. |
+
+```php
+// The factory enforces the creation invariant; behaviors enforce the rest.
+final class Order
+{
+    private function __construct(
+        private readonly OrderId $id,
+        private array $lines,
+        private OrderStatus $status,
+    ) {}
+
+    public static function place(CustomerId $customer, array $lines): self
+    {
+        if ($lines === []) {
+            throw OrderException::cannotPlaceEmptyOrder(); // invariant at construction
+        }
+        return new self(OrderId::generate(), $lines, OrderStatus::Draft);
+    }
+
+    public function confirm(): void
+    {
+        if ($this->status !== OrderStatus::Draft) {
+            throw OrderException::alreadyConfirmed($this->id);
+        }
+        $this->status = OrderStatus::Confirmed;
+        $this->recordDomainEvent(new OrderConfirmed($this->id));
+    }
+}
+```
+
+There is no path to an invalid `Order`: no public constructor, no setters, every transition guarded.
+
 ## Bounded Contexts
 
 A large domain is not one model but several. A **Bounded Context** is a boundary within which a term has one precise meaning. "Customer" in Sales is not "Customer" in Billing; forcing one shared class couples the two and makes both wrong.

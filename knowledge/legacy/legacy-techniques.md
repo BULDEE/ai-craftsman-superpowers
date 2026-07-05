@@ -137,6 +137,46 @@ This is [[hexagonal]] reached from the inside out, one seam at a time.
 
 When a legacy class is too tangled to fix in place, create a **bubble**: a new, well-designed class (often in a new folder) that is a safe space for the redesigned code. Everything not yet migrated forwards to the legacy code; the new class progressively takes over. This is the **Strangler Fig pattern applied at the class level** rather than the architecture level: no big-bang rewrite, just a design that grows while the legacy one fades. See [[legacy/strangler-fig]].
 
+## Parameterize Constructor
+
+**When:** a constructor `new`s a hard dependency inside itself, so a test cannot substitute it.
+
+```php
+// Before - the DB connection is created inside; untestable.
+final class ReportService
+{
+    private Database $db;
+    public function __construct() { $this->db = new MySqlDatabase(getenv('DSN')); }
+}
+
+// After - the dependency is a parameter; tests pass a fake, prod passes the real one.
+final class ReportService
+{
+    public function __construct(private readonly Database $db) {}
+}
+```
+
+Keep the old zero-arg constructor as a temporary overload if callers cannot all change at once, then remove it.
+
+## Extract Interface
+
+**When:** you need a seam at a boundary to inject a fake, but the collaborator is a concrete class.
+
+```php
+// 1. Extract an interface from the concrete class's public surface.
+interface Database
+{
+    public function query(string $sql): array;
+}
+
+// 2. The concrete implements it (a mechanical, safe change).
+final class MySqlDatabase implements Database { public function query(string $sql): array { /* ... */ } }
+
+// 3. Callers depend on the interface; tests provide an InMemoryDatabase.
+```
+
+Extract Interface plus Parameterize Constructor together turn almost any hard dependency into a substitutable seam.
+
 ## Dependency-Breaking Quick Reference
 
 | Technique | Use when |

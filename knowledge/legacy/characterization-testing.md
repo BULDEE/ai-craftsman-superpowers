@@ -17,6 +17,14 @@ The same idea appears under several labels; they are interchangeable:
 
 The mindset differs from TDD: you are **not** asserting the *correct* answer, you are recording the *current* one, even if it is wrong. Bugs get frozen too, on purpose: your job right now is to not change behavior, not to fix it.
 
+| | Unit test (TDD) | Characterization test |
+|---|-----------------|-----------------------|
+| Asserts | The *correct* behavior from a spec | The *current* behavior, as-is |
+| Written | Before the code (red-green-refactor) | After the code, around existing behavior |
+| On a found bug | Fails (good, drives a fix) | Passes (the bug is frozen on purpose) |
+| Lifespan | Permanent | Temporary scaffolding, replaced by unit tests |
+| Purpose | Drive design | Enable safe change of untested code |
+
 ## The Recipe
 
 1. **Execute** the code with representative inputs.
@@ -34,6 +42,15 @@ test("supermarket receipt is unchanged", () => {
   approvals.verify(printReceipt(receipt));
 });
 ```
+
+```python
+# The same shape in Python with an approval library.
+def test_payroll_is_unchanged(verify):
+    outputs = [str(calculate_payroll(e)) for e in [salaried(), hourly(), on_leave()]]
+    verify("\n".join(outputs))   # first run writes .approved; later runs diff against it
+```
+
+The first run has no approved file, so it fails; you inspect the produced output and, if it is plausible, approve it. That approved file is committed and becomes the oracle.
 
 ## Step by Step on a Legacy Function
 
@@ -75,6 +92,18 @@ function createTracker() {
 
 The added parameter is a temporary **shim**, not a permanent hack: remove it as you refactor the code into something testable by design.
 
+```python
+# The same beacon in Python: an injected recorder, default no-op.
+def add_player(name, track=lambda _obj: None):
+    players.append(name)
+    track(players)          # silent in production, captured in the test
+
+def test_add_player_records_state(verify):
+    seen = []
+    add_player("Nicolas", track=lambda obj: seen.append(str(obj)))
+    verify("\n".join(seen))
+```
+
 ## Scrubbing Unstable Data
 
 If an approval test fails on every run without a code change, the output contains **unstable data**, usually timestamps, UUIDs, or randomness. Do not weaken the test; **scrub** the unstable parts, replacing them with a constant.
@@ -86,6 +115,16 @@ If an approval test fails on every run without a code change, the output contain
 ```
 
 An advanced scrubber preserves identity: the same original value maps to the same placeholder (`**Scrubbed-ID-1**`, `**Scrubbed-ID-2**`), so you still see relationships between fields without depending on their volatile values.
+
+```typescript
+// A scrubber is just a function applied to the output before approval.
+const scrub = (out: string): string =>
+  out
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "**Scrubbed-ID**")
+    .replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z/g, "**Scrubbed-Date**");
+
+approvals.verify(scrub(renderUsers(users)));
+```
 
 ## The Printer: Make the Approved Output Readable
 
@@ -100,6 +139,30 @@ Total:                    6.99
 ```
 
 A receipt-shaped printer for a checkout kata is far easier to diff and reason about than a raw JSON blob. Refine the printer as you learn what the code actually does.
+
+```typescript
+// A custom printer turns a messy result into a human-reviewable approved value.
+function printReceipt(r: Receipt): string {
+  const lines = r.items.map((i) => `${i.name.padEnd(20)}${(i.total / 100).toFixed(2).padStart(8)}`);
+  return [...lines, "", `${"Total:".padEnd(20)}${(r.total / 100).toFixed(2).padStart(8)}`].join("\n");
+}
+```
+
+When you change the printer, every approved file changes too; do that as a deliberate, separate step so a formatting change never hides a behavior change.
+
+## Checking the Net Catches Change
+
+A characterization test is only worth the disk it sits on if it fails when behavior changes. Prove it deliberately:
+
+```bash
+# 1. Suite is green. 2. Introduce an obvious mistake in the code under test.
+# 3. Run again: at least one approved test MUST go red.
+sed -i 's/return total/return 0/' src/checkout.js
+npm test   # expect a failing approval; if it stays green, your net has a hole
+git checkout src/checkout.js   # revert the deliberate break
+```
+
+If nothing goes red, you have not actually pinned the behavior you are about to change; add inputs until you do.
 
 ## Coverage as a Map, Mutation as the Proof
 
@@ -117,6 +180,26 @@ Two checks keep a characterization suite honest:
 | Unreadable approved blob | Reviews rubber-stamp diffs | Write a custom Printer |
 | Stubbing a global (`console.log`) to silence a side effect | Global state leak across tests, test coupled to implementation | Isolate the side effect behind a seam and override it - see [[legacy/legacy-techniques]] |
 | Never checking the net catches changes | The test protects nothing | Introduce an obvious mistake and confirm red |
+| Approving output without reading it | You freeze a bug you could have caught, or noise | Read the diff before approving the first time |
+| Keeping characterization tests forever | They pin implementation, not intent | Replace them bottom-up with real unit tests as you refactor |
+
+## Tooling
+
+Most languages have an actively maintained Approval Tests library (see approvaltests.com); pick the one for your stack rather than hand-rolling the diff.
+
+| Language | Library |
+|----------|---------|
+| JavaScript / TypeScript | jest-image-snapshot / jest snapshots, approvals |
+| Python | approvaltests, syrupy |
+| PHP | approvals-php |
+| Java / Kotlin | ApprovalTests.Java |
+| C# | ApprovalTests.Net, Verify |
+
+Any of these gives you the approve/diff loop, a scrubber hook, and a printer hook; you supply the domain-shaped printer.
+
+## Rule
+
+> Characterization freezes what the code *does*, not what it *should* do. Get the golden master green first, prove it catches change, and only then refactor or fix.
 
 ## Related
 

@@ -181,6 +181,25 @@ Migrations rot at the halfway point, where dual-running feels stable and the las
 | Cutover with no parity net | Silent behavior changes reach production | Characterize before diverting traffic |
 | Flipping 100% at once | You reintroduced the big-bang risk | Divert a cohort, compare, widen gradually |
 | Flag left forever | Dead branches, confusing routing | Delete the flag with the legacy path |
+| Migrating only the easy cases | The hard 20% lives on legacy indefinitely | Schedule the hard slices explicitly |
+| No owner for the burn-down | The migration stalls at 50% and never finishes | Assign the migration metrics to one person |
+
+## The Flag Is Configuration, Not Code
+
+Keep the rollout decision in configuration so widening the cohort never needs a deploy:
+
+```yaml
+# feature-flags.yaml - flip the percentage without shipping code.
+new_shipping:
+  enabled: true
+  percent: 10        # raise to 25, 50, 100 as parity holds; then delete this block
+```
+
+Once `percent` reaches 100 and the mismatch metric has been zero for a safe window, remove the flag, the legacy path, and the ACL in that order.
+
+## Rule
+
+> Grow the new system around the old, prove parity slice by slice, and remove the host once the new one carries the load. A strangler that never strangles is just added complexity.
 
 ## Related
 
