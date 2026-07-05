@@ -3,7 +3,7 @@ description: "Multi-agent orchestration with native Claude Code teams. Use when 
 effort: heavy
 ---
 
-# /craftsman:team — Agent Team Manager (Native Teams)
+# /craftsman:team - Agent Team Manager (Native Teams)
 
 You are the **team coordinator** for AI Craftsman Superpowers. You assemble, configure, and spawn teams using Claude Code's **native Agent Teams** feature (`TeamCreate` + `TaskCreate` + teammates).
 
@@ -29,15 +29,16 @@ Ask the user:
 ```
 How do you want to build your team?
 
-1. code-review   — Architecture + security + domain quality review
-2. feature       — Backend + frontend + post-implementation review
-3. security-audit — Penetration testing + architecture security
-4. custom        — Interactive questionnaire
+1. code-review     - Architecture + security + domain quality review
+2. feature         - Backend + frontend + post-implementation review
+3. security-audit  - Penetration testing + architecture security
+4. legacy-takeover - Map, net, decouple, and document a legacy codebase
+5. custom          - Interactive questionnaire
 ```
 
 ### Step 2a: Template Path
 
-If a template is selected (1, 2, or 3):
+If a template is selected (1 through 4):
 
 1. Load the template from `teams/templates/<name>.yml`
 2. Display the template summary:
@@ -54,36 +55,36 @@ If a template is selected (1, 2, or 3):
 
 Collect team parameters interactively:
 
-**Q1 — Goal:**
+**Q1 - Goal:**
 ```
 What's the main goal?
-  review    — Code review / audit
-  implement — Build a feature
-  audit     — Security / compliance audit
-  migrate   — Migration / refactoring
+  review    - Code review / audit
+  implement - Build a feature
+  audit     - Security / compliance audit
+  migrate   - Migration / refactoring
 ```
 
-**Q2 — Team size:**
+**Q2 - Team size:**
 ```
 How many agents? (2–5)
 ```
 
-**Q3 — Specialties needed** (multi-select):
+**Q3 - Specialties needed** (multi-select):
 ```
 Which specialties are required?
-  architecture  — Clean Architecture, DDD, layer boundaries
-  security      — OWASP, pentesting, authentication flows
-  frontend      — React, TypeScript, hooks, components
-  backend       — PHP/Symfony, domain modeling, use cases
-  ddd           — Domain modeling, aggregates, value objects
-  performance   — Profiling, caching, query optimization
+  architecture  - Clean Architecture, DDD, layer boundaries
+  security      - OWASP, pentesting, authentication flows
+  frontend      - React, TypeScript, hooks, components
+  backend       - PHP/Symfony, domain modeling, use cases
+  ddd           - Domain modeling, aggregates, value objects
+  performance   - Profiling, caching, query optimization
 ```
 
-**Q4 — Isolation:**
+**Q4 - Isolation:**
 ```
 Agent isolation strategy?
-  worktree — Each agent works in its own git worktree (recommended for implement/migrate)
-  shared   — All agents share the current working directory
+  worktree - Each agent works in its own git worktree (recommended for implement/migrate)
+  shared   - All agents share the current working directory
 ```
 
 ### Step 3: Generate Team Config
@@ -134,8 +135,8 @@ TeamCreate({
 ```
 
 This creates:
-- `~/.claude/teams/<team-name>.json` — team config with member registry
-- `~/.claude/tasks/<team-name>/` — shared task list directory
+- `~/.claude/teams/<team-name>.json` - team config with member registry
+- `~/.claude/tasks/<team-name>/` - shared task list directory
 
 #### Step 4.2: Create Tasks
 
@@ -146,14 +147,14 @@ Use `TaskCreate` for each agent's work scope. Tasks should be:
 
 Example for a code-review team:
 ```
-TaskCreate({ title: "Architecture review — layer violations and dependency direction", description: "..." })
-TaskCreate({ title: "Security audit — OWASP top 10 and authentication flows", description: "..." })
-TaskCreate({ title: "Domain quality — aggregate boundaries and value objects", description: "..." })
+TaskCreate({ title: "Architecture review - layer violations and dependency direction", description: "..." })
+TaskCreate({ title: "Security audit - OWASP top 10 and authentication flows", description: "..." })
+TaskCreate({ title: "Domain quality - aggregate boundaries and value objects", description: "..." })
 ```
 
 For **parallel-then-review** workflows, also create the review task:
 ```
-TaskCreate({ title: "Consolidation review — merge findings and resolve conflicts", description: "Depends on: [task IDs of parallel tasks]" })
+TaskCreate({ title: "Consolidation review - merge findings and resolve conflicts", description: "Depends on: [task IDs of parallel tasks]" })
 ```
 
 #### Step 4.3: Spawn Teammates
@@ -170,7 +171,7 @@ Agent({
 })
 ```
 
-**CRITICAL**: Include `team_name` — this is what makes the agent a **teammate** instead of an isolated subagent. Teammates:
+**CRITICAL**: Include `team_name` - this is what makes the agent a **teammate** instead of an isolated subagent. Teammates:
 - Appear in their own terminal window (iTerm tab or tmux pane)
 - Share a task list at `~/.claude/tasks/<team-name>/`
 - Can send messages to each other via `SendMessage`
@@ -207,16 +208,16 @@ Launch teammates one at a time. Wait for idle notification + task completion bef
 
 After spawning teammates:
 
-1. **Wait for notifications** — Teammates send messages automatically when they complete tasks or go idle. Do NOT poll or sleep.
-2. **Respond to blockers** — If a teammate reports an issue, help resolve it via `SendMessage`.
-3. **Track progress** — Use `TaskList` to see overall completion status.
-4. **Re-assign if needed** — If a teammate is struggling, send guidance via `SendMessage`.
+1. **Wait for notifications** - Teammates send messages automatically when they complete tasks or go idle. Do NOT poll or sleep.
+2. **Respond to blockers** - If a teammate reports an issue, help resolve it via `SendMessage`.
+3. **Track progress** - Use `TaskList` to see overall completion status.
+4. **Re-assign if needed** - If a teammate is struggling, send guidance via `SendMessage`.
 
 When all tasks are completed:
 
-1. **Collect findings** — Read each teammate's task output or messages
-2. **Aggregate by severity** — BLOCKING → MUST FIX → IMPROVE
-3. **Deduplicate** — Remove overlapping findings across agents
+1. **Collect findings** - Read each teammate's task output or messages
+2. **Aggregate by severity** - BLOCKING → MUST FIX → IMPROVE
+3. **Deduplicate** - Remove overlapping findings across agents
 4. **Present consolidated report:**
 
 ```markdown
@@ -236,7 +237,7 @@ When all tasks are completed:
 3. [IMPROVE] ...
 ```
 
-5. **Shutdown the team** — Send shutdown to all teammates:
+5. **Shutdown the team** - Send shutdown to all teammates:
 ```
 SendMessage({ to: "<teammate-name>", message: { type: "shutdown_request" } })
 ```
@@ -250,8 +251,8 @@ Analyze the codebase to recommend the optimal team composition.
 ### Step 1: Structure Analysis
 
 Use the **Glob** tool to list source files (exclude vendor/node_modules/.git):
-- `Glob("src/**/*.php")` — list PHP source files
-- `Glob("src/**/*.ts")` and `Glob("src/**/*.tsx")` — list TypeScript source files
+- `Glob("src/**/*.php")` - list PHP source files
+- `Glob("src/**/*.ts")` and `Glob("src/**/*.tsx")` - list TypeScript source files
 
 Report up to 200 files found. If no files match, say "No source files found."
 
@@ -277,7 +278,7 @@ Use the **Glob** tool to detect DDD layers:
 If no DDD directories found, say "No DDD structure detected."
 
 Use the **Glob** tool to detect bounded contexts:
-- `Glob("src/*/")` — list top-level directories under src/, excluding Domain/Application/Infrastructure/Presentation/vendor/node_modules
+- `Glob("src/*/")` - list top-level directories under src/, excluding Domain/Application/Infrastructure/Presentation/vendor/node_modules
 
 ### Step 4: Count Files by Layer
 
@@ -359,16 +360,16 @@ Available Teams
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 BUILT-IN TEMPLATES
-  code-review    (3 agents) — PR reviews, quality audits
-  feature        (3 agents) — Full-stack feature implementation
-  security-audit (3 agents) — Pre-release security checks
+  code-review    (3 agents) - PR reviews, quality audits
+  feature        (3 agents) - Full-stack feature implementation
+  security-audit (3 agents) - Pre-release security checks
 
 CUSTOM TEAMS
-  <name>         (<n> agents) — <purpose>
+  <name>         (<n> agents) - <purpose>
   (none yet)
 
 ACTIVE TEAMS
-  <name>         (<n> members) — <status>
+  <name>         (<n> members) - <status>
   (none running)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -381,12 +382,12 @@ Run /craftsman:team context to get a recommendation.
 ## Help (no subcommand)
 
 ```
-/craftsman:team — Agent Team Manager (Native Teams)
+/craftsman:team - Agent Team Manager (Native Teams)
 
 SUBCOMMANDS
-  /craftsman:team create   — Interactive team builder (uses TeamCreate)
-  /craftsman:team context  — Analyze codebase and get team recommendation
-  /craftsman:team list     — List templates, custom teams, and active teams
+  /craftsman:team create   - Interactive team builder (uses TeamCreate)
+  /craftsman:team context  - Analyze codebase and get team recommendation
+  /craftsman:team list     - List templates, custom teams, and active teams
 
 EXAMPLES
   /craftsman:team create                → guided team assembly

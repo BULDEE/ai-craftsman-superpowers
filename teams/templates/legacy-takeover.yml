@@ -1,0 +1,40 @@
+# Legacy Takeover Team Template
+# Use when inheriting or regaining control of an untested, tangled legacy codebase.
+# Trigger: /craftsman:team create -> select "legacy-takeover"
+
+name: legacy-takeover
+description: Legacy rescue team - map the codebase, net it, decouple it, document it
+trigger: "Use when inheriting, taming, or regaining control of a legacy codebase (untested, tangled, undocumented)"
+
+agents:
+  - agent: architect
+    role: lead
+    focus: "Map hotspots and dependencies, identify bounded contexts, decide where to start (audit)"
+
+  - agent: legacy-surgeon
+    role: member
+    focus: "Characterize behavior, break dependencies with seams, refactor under the net, strangler-fig migration"
+
+  - agent: security-pentester
+    role: member
+    focus: "Verify the rescue does not open vulnerabilities; audit auth/data paths in the touched code"
+
+  - agent: doc-writer
+    role: member
+    focus: "Capture ADRs, onboarding notes, and a LEGACY-AUDIT summary for future maintainers"
+
+workflow:
+  type: sequential
+  steps:
+    - architect          # Audit first: hotspots, dependency map, where to start
+    - legacy-surgeon     # Net it, decouple it, refactor under the net
+    - security-pentester # Confirm the changes introduced no security regressions
+    - doc-writer         # Record decisions and the audit for future maintainers
+
+knowledge:
+  - knowledge/legacy/taking-over-legacy.md
+  - knowledge/legacy/characterization-testing.md
+  - knowledge/legacy/legacy-techniques.md
+  - knowledge/legacy/strangler-fig.md
+  - knowledge/refactoring/refactoring-campaigns.md
+  - knowledge/tooling-integration.md
