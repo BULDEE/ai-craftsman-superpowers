@@ -14,6 +14,10 @@
 | 🔴 Expert | [Advanced Guide (AI Engineers)](./guides/advanced.md) | 45 min |
 | ⚫ Master | [Master Guide (Architects)](./guides/master.md) | 60 min |
 
+## Playbooks
+
+- [Legacy Rescue Playbook](./guides/legacy-rescue.md) - regain control of an untested, inherited codebase with `/craftsman:legacy`
+
 ## Reference Documentation
 
 - [Skills Reference](./reference/skills.md) - All available skills and usage
