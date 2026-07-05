@@ -1,6 +1,6 @@
 # Clean Code Principles
 
-> "Clean code reads like well-written prose." — Robert C. Martin
+> "Clean code reads like well-written prose." - Robert C. Martin
 
 ## Naming
 
@@ -9,12 +9,12 @@
 Names should tell WHY something exists, WHAT it does, and HOW it's used.
 
 ```python
-# Bad — reveals nothing
+# Bad - reveals nothing
 d = 0
 lst = []
 fp = open("data.csv")
 
-# Good — reveals intent
+# Good - reveals intent
 elapsed_days = 0
 active_customers = []
 customer_data_file = open("data.csv")
@@ -77,12 +77,12 @@ That's a hidden side effect that breaks trust.
 Functions should EITHER change state (command) OR return data (query). Never both.
 
 ```python
-# Bad — command + query mixed
+# Bad - command + query mixed
 def set_attribute(name, value):
     self._attributes[name] = value
     return True  # What does True mean?
 
-# Good — separated
+# Good - separated
 def set_attribute(name, value):
     self._attributes[name] = value
 
@@ -92,7 +92,7 @@ def has_attribute(name):
 
 ## Comments
 
-### Don't Comment Bad Code — Rewrite It
+### Don't Comment Bad Code - Rewrite It
 
 ```python
 # Bad: comment explaining unclear code
@@ -115,12 +115,12 @@ if employee.is_eligible_for_full_benefits():
 ### Use Exceptions, Not Return Codes
 
 ```python
-# Bad — caller must check return
+# Bad - caller must check return
 result = process_data(payload)
 if result == -1:
     handle_error()
 
-# Good — exception separates happy path
+# Good - exception separates happy path
 try:
     process_data(payload)
 except InvalidPayloadError as error:
@@ -135,13 +135,13 @@ Use Null Object pattern, Optional, or throw exceptions instead.
 ### Catch Specific Exceptions
 
 ```python
-# Bad — catches everything
+# Bad - catches everything
 try:
     parse_config(path)
 except:
     pass
 
-# Good — catches what you expect
+# Good - catches what you expect
 try:
     parse_config(path)
 except FileNotFoundError:
@@ -155,12 +155,12 @@ except yaml.YAMLError as parse_error:
 ### Tell, Don't Ask
 
 ```python
-# Bad — asking then telling
+# Bad - asking then telling
 if order.get_status() == "pending":
     order.set_status("confirmed")
     order.set_confirmed_at(now())
 
-# Good — telling
+# Good - telling
 order.confirm()  # Object manages its own state
 ```
 
@@ -173,10 +173,10 @@ A method should only call methods on:
 - Its direct components
 
 ```python
-# Bad — train wreck
+# Bad - train wreck
 customer.get_address().get_city().get_zip_code()
 
-# Good — delegate
+# Good - delegate
 customer.shipping_zip_code()
 ```
 

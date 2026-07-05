@@ -1,0 +1,208 @@
+# The Mikado Method
+
+> "You can't anticipate what needs to be done first, but you regularly check where you are going so you can adapt to whatever comes up."
+
+The Mikado Method (Ola Ellnestam & Daniel Brolund, popularized for legacy work by Nicolas Carlo) is how you make a large change in a codebase full of **unknown unknowns** without ever leaving it broken. Instead of a big risky branch, you discover the graph of prerequisites one timebox at a time, and you only ever commit code that works.
+
+## When to Use It
+
+- A change whose full extent you cannot see up front (the classic legacy trap).
+- Every attempt uncovers "but first I have to change this other thing", recursively.
+- You keep saying "almost done" for days and cannot back it with evidence.
+
+Signals you should reach for Mikado right now:
+
+- The build breaks in a dozen unrelated files the moment you make the "small" change.
+- You have a long-running branch that has not shipped in days.
+- Each fix reveals another prerequisite you did not anticipate.
+- You cannot estimate the change because you do not yet know its shape.
+
+The two phases at a glance:
+
+| | Discovery | Delivery |
+|---|-----------|----------|
+| You are | Learning the shape of the change | Executing known, small steps |
+| On timer end | Note prerequisites, `git reset --hard` | Commit, tick off, ship |
+| Output | A growing graph of subgoals | A shrinking graph and shipped PRs |
+| Direction | Top-down (attack the goal) | Bottom-up (work the leaves) |
+| Mindset | Curiosity, willingness to revert | Discipline, ship often |
+
+If you can already see the whole change and it is small, you do not need Mikado; just do it. Mikado earns its overhead exactly when the depth of the change is unknown.
+
+## The Two Phases
+
+The method is a loop with a timer (about 10 minutes is best):
+
+```
+Write the goal down
+        |
+   Start timer  (~10 min)
+        |
+  Goal done before the timer?
+        |                         |
+       NO  (Discovery)           YES  (Delivery)
+        |                         |
+  List blocking subgoals     Commit
+   (unrelated? -> Parking)    Tick off the goal
+        |                     (optionally open an intermediate PR)
+   git reset --hard           |
+        |                     Pick the next subgoal
+   Pick a subgoal  <----------+
+```
+
+### Discovery Phase
+
+Attempt the goal directly. When the timer rings and it is not done:
+
+1. Write down every prerequisite you just discovered as a **subgoal** node, drawing the dependency graph of what must happen first.
+2. `git reset --hard` - **throw the attempt away.** You keep the *knowledge* (the graph), not the broken code.
+3. Pick one subgoal and start a new timer against it.
+
+Reverting is not failure; it is the mechanism. You attacked the problem to *learn its shape*, and now you know one more prerequisite. Repeating this turns an unknowable change into an explicit graph of small, known tasks.
+
+### Delivery Phase
+
+After discovering subgoals over and over, you reach leaves that take under ten minutes. Now you deliver:
+
+- Work from the **leaves of the graph** inward. A leaf has no unmet prerequisite, so it always completes cleanly.
+- Each completed leaf makes its parents easier, like dominoes.
+- The codebase stays working the whole time, so you can **ship multiple times**: open intermediate PRs for the preparatory work. Deliver often to avoid the merge conflicts of a long-running branch. Delivering often is what makes you go faster.
+
+## A Worked Example
+
+Goal: **replace scattered `console.log()` calls with a proper injectable logger** in a legacy service. You try it directly and immediately hit a wall: the `Transaction` class logs inline, `Ticket` logs inline, there is no logger abstraction, and there are no tests. `git reset --hard`, and note what blocked you. After a few Discovery timeboxes the graph looks like this:
+
+```
+Replace console.log() with a logger   <- the goal (last thing to do)
+  |-- Wrap calls into ConsoleLogger
+  |     |-- Create Logger interface
+  |     |-- Create ConsoleLogger class
+  |-- Update the call sites
+  |     |-- Refactor Transaction to inject the logger  <- was a hidden prerequisite
+  |     |-- Migrate Ticket to use the Logger interface
+  |-- Expose the logger through configuration
+  |     |-- Import it from configuration
+  |     |-- Extract Logger into the common lib
+  |-- (safety net) Test create() / print() / cancel()   <- do these FIRST
+```
+
+Delivery works the leaves first: write the characterization tests, create the interface and `ConsoleLogger`, inject them into `Transaction` and `Ticket` one at a time (committing and shipping each), wire configuration, and only then flip the final `console.log` calls. Every step ships green; the goal at the top is reached last, almost trivially, because every prerequisite is already done.
+
+## A Second Example: A Rippling Upgrade
+
+Goal: **upgrade a validation library across a codebase** where the new major version renames its API. You change the import and the build explodes in forty files. Instead of fixing all forty in a broken state, revert and let Mikado map it:
+
+```
+Upgrade validation lib to v3          <- goal
+  |-- Replace deprecated Schema.build() with Schema.of()  (14 sites)
+  |-- Migrate custom validators to the new interface
+  |     |-- Adapt the error-shape the framework now returns
+  |-- Update the DI wiring for the new factory
+  |-- (safety net) Characterize the current validation error messages
+```
+
+Each subgoal is small and shippable. You bump the library only at the very end, once every call site already speaks the new API, so the "big" upgrade lands as a one-line change with everything green. Compare that to the alternative: a red build for two days and a giant unreviewable PR.
+
+## Team Collaboration
+
+The graph is a shared artifact. On a pair or mob, one person drives while the graph is visible to all, so everyone sees the same map of prerequisites and the same "next leaf". For remote work, a shared mind-map (mindmup, or a diagram in the PR description) lets reviewers follow the progression subgoal by subgoal. Because each Delivery step ships independently, teammates can pick up different leaves of the same graph without stepping on each other.
+
+## The Parking
+
+In legacy code you constantly spot unrelated messes near what you are changing. You cannot chase every one, but your brain keeps nagging. Create a **Parking**: a node deliberately *not* connected to the goal, where you dump stray thoughts, refactorings, and TODOs.
+
+The Parking frees your mind because it trusts the note instead of your memory. At the end, you decide to tackle some, file issues for others, or drop the rest: if a parked item is truly important, it will come back on its own.
+
+## Why It Works
+
+| Reason | Effect |
+|--------|--------|
+| You start fresh every time | No tunnel where you lose track of what you changed or when you'll be done |
+| The timebox is short | Reverting costs at most ~10 minutes of redoable work |
+| You reflect every iteration | You cannot anticipate the order, but you adapt to what surfaces |
+
+Two more benefits fall out: you can **stop almost anytime** (an interruption is cheap because the next step is written down), and your daily status becomes honest - a real progress bar of ticked subgoals instead of "almost done".
+
+## Combine It
+
+Mikado composes with the other legacy disciplines:
+
+- **Micro-committing**: inside a Delivery step, commit every couple of minutes so each subgoal is itself a chain of checkpoints. See [[refactoring/refactoring-campaigns]].
+- **Incremental refactoring**: many subgoals are safe, mechanical moves (extract, change signature, migrate callers). See [[refactoring-techniques]].
+- **Characterization tests**: on untested code, the first subgoals are often "get this under a test" before any change. See [[legacy/characterization-testing]].
+
+## Common Mistakes
+
+| Mistake | Consequence | Correction |
+|---------|-------------|------------|
+| Pushing through instead of reverting | You accumulate broken, intertwined changes with no way back | Timebox and `git reset --hard`; keep the graph, drop the code |
+| No timer | Discovery drifts into an hours-long tunnel | Start a ~10 minute timer every attempt |
+| Working from the root | You try the goal before its prerequisites exist; nothing completes | Always deliver from the leaves inward |
+| Chasing unrelated messes | You lose the goal in a swamp of side-quests | Put them in the Parking, decide later |
+| One giant final commit | Un-reviewable, un-revertable, un-bisectable | Commit each subgoal; ship intermediate PRs |
+
+## Mikado vs Just Refactoring
+
+Plain refactoring assumes you can see the target and the path. Mikado is for when you **cannot**: it is a discovery protocol layered on top of refactoring. Once Discovery has drawn the graph, each Delivery step is ordinary safe refactoring. Think of Mikado as the map-making, and [[refactoring-techniques]] as the walking.
+
+## Common Objections
+
+**"I could just crack this in an hour without the ceremony."** Maybe. But the honest test: start a timer for 30-60 minutes and try. When it rings, ask yourself truthfully whether you are done and whether more surprises are coming. If it is not crystal clear, revert and switch to Mikado. It exists precisely for the *unknown unknowns* you cannot estimate; if there were none, you would already be finished.
+
+**"Reverting ten minutes of work feels wasteful."** The value you produced was the knowledge now captured in the graph, not the diff. Worst case you redo ten minutes, and next time you take smaller steps. `git stash` a fragment if you genuinely need it for reference.
+
+**"Won't a graph slow me down?"** Only until the change is trivial; then you skip it. For a change whose depth you cannot see, the graph is faster than thrashing, because you never end up lost in a broken state wondering whether to push on or start over.
+
+## Origins
+
+The method comes from Ola Ellnestam and Daniel Brolund's *The Mikado Method*, named after the pick-up-sticks game where you remove one stick without disturbing the pile. Nicolas Carlo popularized its pairing with the Parking (an idea from Philippe Bourgau) for day-to-day legacy work.
+
+## Tooling and Overkill
+
+- Start low-tech: pen and paper keep you focused and add zero friction. For remote pairs, a fast mind-map tool (e.g. mindmup) works; avoid anything that makes creating a connected node slow.
+- This plugin's `/refactor` Mikado mode persists the graph across sessions (in `.craftsman/mikado.json`) so an interruption never loses it.
+- Do not automate the revert away or skip the timer: the discipline of letting go of code you wrote is the skill being built.
+
+## Cheat Sheet
+
+1. Write the goal at the top of a graph.
+2. Start a ~10 minute timer and attempt the goal (or current subgoal) directly.
+3. Timer rings, goal done? **Yes** -> commit, tick it off, optionally ship a PR, pick the next subgoal.
+4. **No** -> write down the blocking prerequisites as child nodes; drop anything unrelated into the Parking.
+5. `git reset --hard` to return to a working state; keep only the graph.
+6. Pick a subgoal (prefer a leaf) and go to step 2.
+7. Repeat until the goal at the top falls out for free.
+
+## Keep the Graph Persistent
+
+The graph outlives a single session, so store it where an interruption cannot lose it:
+
+```
+.craftsman/mikado.json    # goal, subgoals, done-state, parking - survives restarts
+```
+
+This plugin's `/refactor` Mikado mode reads and writes that file, so you can stop mid-migration and resume with the map intact.
+
+## On Letting Go
+
+The hardest part is step 5: throwing away code that "almost worked". It feels wasteful, but it is the whole point. The value you produced in a Discovery timebox is *knowledge*, captured in the graph, not the diff. If reverting feels painful, that is a signal you need to practice it more, not that the method is wrong: worst case you redo ten minutes of work, and next time you will take smaller, safer steps by reflex. Being able to let go of code you wrote is a craft skill in its own right, and it is what lets you move fast on code that would otherwise trap you.
+
+If you genuinely need a fragment of the reverted attempt, `git stash` it before resetting so it stays available for reference while your working tree returns to green.
+
+## What Mikado Is Not
+
+- **Not up-front design.** You do not plan the graph in advance; you discover it by attempting the goal and failing safely.
+- **Not a branch strategy.** It works on `main` (or short-lived branches), shipping each subgoal; a long-running branch is the thing it replaces.
+- **Not only for huge changes.** Any change with hidden prerequisites qualifies, even a one-day task that keeps sprouting "but first".
+
+## Rule
+
+> Attack the goal to learn its shape, then throw the attempt away and keep the map. Deliver from the leaves inward, shipping every step green.
+
+## Related
+
+- [[refactoring-techniques]] - the safe moves each Mikado subgoal is usually made of.
+- [[legacy/legacy-techniques]] - seams and dependency-breaking, the subgoals Mikado uncovers most in legacy.
+- [[legacy/characterization-testing]] - "get this under a test" is usually the first Mikado subgoal on untested code.
+- [[refactoring/refactoring-campaigns]] - micro-committing and shipping often inside each Delivery step.
+- [[legacy/strangler-fig]] - the same "keep it working, deliver often" philosophy at the architecture scale.

@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
-[![Version](https://img.shields.io/badge/Version-3.5.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-3.6.0-blue)](CHANGELOG.md)
 [![Commands](https://img.shields.io/badge/Commands-21-orange)]()
 [![Agents](https://img.shields.io/badge/Agents-11-red)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -459,7 +459,12 @@ hooks/              → Real-time validation (SessionStart → PostToolUse → S
 hooks/lib/          → Shared libraries (pack-loader, config, rules-engine, metrics, static-analysis)
 commands/           → Core user-invoked workflows (20 skills)
 agents/             → Core agents (11) + pack symlinks
-knowledge/          → Core methodology (DDD, Clean Architecture, patterns)
+knowledge/          → Core methodology, language-agnostic (Clean Architecture, Hexagonal, DDD, TDD,
+                      testing strategy, refactoring, legacy techniques, patterns, principles, anti-patterns)
+  ddd/              → Entities, value objects, aggregates, CQRS (agnostic)
+  legacy/           → Seams, characterization testing, strangler fig
+  refactoring/      → Mikado method, hotspot-driven campaigns
+  anti-patterns/    → God object, primitive obsession, singleton abuse, and more
 packs/              → Loadable language packs
   symfony/          → PHP/Symfony pack (validators, agents, knowledge, templates)
   react/            → React/TypeScript pack (validators, agents, knowledge, templates)

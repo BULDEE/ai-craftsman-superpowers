@@ -128,9 +128,13 @@ tests/Unit/Domain/
 ## Knowledge References
 
 For detailed patterns, read these files:
-- `knowledge/patterns.md` - Design patterns catalog
-- `knowledge/principles.md` - SOLID, DDD principles
-- `knowledge/anti-patterns/` - What to avoid
+- `knowledge/clean-architecture.md` - Dependency Rule, layers, boundaries
+- `knowledge/hexagonal.md` - ports & adapters, driving/driven, composition root
+- `knowledge/ddd/ddd-domain-design.md` - entities, value objects, aggregates, domain events
+- `knowledge/ddd/ddd-cqrs-architecture.md` - layers, use cases, CQRS, repositories
+- `knowledge/patterns.md` - Design patterns catalog (GoF + DDD)
+- `knowledge/principles.md` - SOLID (with cross-language mapping), KISS, DRY, YAGNI
+- `knowledge/anti-patterns/` - god object, primitive obsession, singleton abuse, and more
 
 ## Validation
 

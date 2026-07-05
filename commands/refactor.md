@@ -188,6 +188,16 @@ vendor/bin/phpstan analyse
 None. All tests pass without modification.
 ```
 
+## Knowledge References
+
+For detailed techniques and legacy strategy, read these files:
+- `knowledge/refactoring-techniques.md` - the full Fowler catalog (Extract, Move, Split Phase, Pipeline, CQS)
+- `knowledge/refactoring/refactoring-campaigns.md` - hotspots (churn x complexity), prioritization
+- `knowledge/refactoring/mikado-method.md` - safe multi-file change via discovery/delivery
+- `knowledge/legacy/legacy-techniques.md` - seams, subclass & override, wrap & sprout
+- `knowledge/legacy/characterization-testing.md` - golden master net before refactoring untested code
+- `knowledge/legacy/strangler-fig.md` - branch-by-abstraction, incremental cutover
+
 ## Refactoring Catalog
 
 ### Extract Method
@@ -290,4 +300,4 @@ final class StandardFeeCalculator implements FeeCalculator { ... }
 - [refactoring.guru](https://refactoring.guru/refactoring)
 - [refactoring.com](https://refactoring.com/)
 
-> "Any fool can write code that a computer can understand. Good programmers write code that humans can understand." — Martin Fowler
+> "Any fool can write code that a computer can understand. Good programmers write code that humans can understand." - Martin Fowler
