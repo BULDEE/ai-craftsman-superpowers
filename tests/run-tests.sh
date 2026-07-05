@@ -489,6 +489,24 @@ test_session_metrics() {
     fi
 }
 
+# Test: Knowledge base integrity (files, stubs, em-dash, wiki-links)
+test_knowledge_integrity() {
+    echo ""
+    log_info "Testing knowledge base integrity"
+
+    local knowledge_test="$SCRIPT_DIR/core/test-knowledge-integrity.sh"
+
+    if [[ -f "$knowledge_test" ]]; then
+        if bash "$knowledge_test" > /dev/null 2>&1; then
+            log_pass "Knowledge base integrity tests pass"
+        else
+            log_fail "Knowledge base integrity tests failed — run tests/core/test-knowledge-integrity.sh for details"
+        fi
+    else
+        log_skip "Knowledge base integrity tests (tests/core/test-knowledge-integrity.sh not found)"
+    fi
+}
+
 # Test: Workflow command (content validation)
 test_workflow_command() {
     echo ""
@@ -624,6 +642,7 @@ main() {
         test_bias_detector
         test_correction_learning
         test_session_metrics
+        test_knowledge_integrity
         test_pack_suites
         test_craftsman_ci
         test_workflow_command
