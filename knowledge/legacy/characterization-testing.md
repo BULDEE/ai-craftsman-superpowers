@@ -35,6 +35,22 @@ test("supermarket receipt is unchanged", () => {
 });
 ```
 
+## Step by Step on a Legacy Function
+
+Suppose you inherit a 200-line `calculatePayroll(employee)` with no tests and you must add a new bonus rule. Do not read it line by line hoping to understand it; characterize it first.
+
+1. Pick a handful of representative inputs: a salaried employee, an hourly one, one with overtime, one on leave. You do not need to understand the code to choose these; pick shapes that look different.
+2. Call the function with each and print whatever it returns and does. If it returns nothing, reach for the tracker beacon below.
+3. Run the tests. They fail, because there is no approved file yet. Look at the produced output: if it is plausible, approve it. You have just frozen the current behavior, warts and all.
+4. Run coverage. If the "on leave" branch is still uncovered, you are missing an input; add one until the lines you intend to touch are green.
+5. Break something on purpose (return `0` from a helper). Confirm at least one approved test goes red. Now the net is proven.
+
+Only now do you add the bonus rule. When an approved file changes, you know exactly which behavior your edit moved, and you decide whether that change was intended.
+
+## Golden Master for a Whole Program
+
+The technique scales past a single function. For a legacy batch job or a CLI, drive the whole program with a set of recorded inputs and capture its entire output (stdout, generated files, final database state serialized to text). This whole-program golden master is often the *only* net you can get quickly on tangled code with no seams, and it buys you enough safety to start carving seams from the inside. Combine it with generated inputs (fuzzing a range of values) to widen coverage cheaply.
+
 ## Capturing Side Effects: the Tracker Beacon
 
 Often the behavior you care about is not in the return value: the code logs, mutates hidden state, or calls a collaborator. Inject an **optional tracker** that does nothing by default (so production is unchanged) and records in tests.
