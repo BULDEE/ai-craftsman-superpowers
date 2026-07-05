@@ -1,6 +1,6 @@
 # Refactoring Techniques
 
-> "Refactoring is a disciplined technique for restructuring code, altering its internal structure without changing its external behavior." — Martin Fowler
+> "Refactoring is a disciplined technique for restructuring code, altering its internal structure without changing its external behavior." - Martin Fowler
 
 Reference: [refactoring.guru/refactoring](https://refactoring.guru/refactoring)
 
@@ -12,7 +12,7 @@ Reference: [refactoring.guru/refactoring](https://refactoring.guru/refactoring)
 2. Second time: wince but do it anyway
 3. Third time: refactor
 
-### Code Smells — Detection Guide
+### Code Smells - Detection Guide
 
 | Category | Smell | Detection Signal |
 |----------|-------|-----------------|
@@ -32,7 +32,7 @@ Reference: [refactoring.guru/refactoring](https://refactoring.guru/refactoring)
 | | Duplicate Code | Same structure in 2+ places |
 | | Dead Code | Unreachable or unused code |
 | | Lazy Class | Class that doesn't do enough |
-| | Speculative Generality | YAGNI — built for hypothetical futures |
+| | Speculative Generality | YAGNI - built for hypothetical futures |
 | **Couplers** | Feature Envy | Method uses other object's data more |
 | | Inappropriate Intimacy | Classes access each other's privates |
 | | Message Chains | `a.b().c().d()` |
@@ -123,15 +123,15 @@ When one class does the work of two. Split responsibilities.
 
 ### Inline Class
 
-Inverse — when a class does almost nothing. Merge it back.
+Inverse - when a class does almost nothing. Merge it back.
 
 ### Hide Delegate
 
 ```python
-# Before — client knows about department
+# Before - client knows about department
 manager = person.department.manager
 
-# After — person delegates
+# After - person delegates
 manager = person.manager  # person.manager delegates to department
 ```
 
@@ -338,3 +338,96 @@ class Stack:
     def push(self, item):
         self._items.append(item)
 ```
+
+## Modern Refactorings (Fowler, 2nd Edition)
+
+### Split Phase
+
+When one block does two things in sequence (parse then compute, gather then format), split it into two phases connected by a simple intermediate data structure. Each phase becomes independently understandable and testable.
+
+```javascript
+// Before - parsing and calculation tangled in one function
+function priceOrder(product, quantity, shippingMethod) {
+  const basePrice = product.basePrice * quantity;
+  const discount = Math.max(quantity - product.discountThreshold, 0) * product.basePrice * product.discountRate;
+  const shippingCost = quantity * shippingMethod.feePerCase;
+  return basePrice - discount + shippingCost;
+}
+
+// After - phase 1 builds intermediate data, phase 2 computes from it
+function priceOrder(product, quantity, shippingMethod) {
+  return applyShipping(calculatePricingData(product, quantity), shippingMethod);
+}
+```
+
+### Slide Statements (Move Statements)
+
+Move related statements next to each other before extracting. Declarations belong beside their first use; statements that change the same data belong together. Sliding first makes the subsequent Extract Function clean instead of tangled.
+
+```javascript
+// Before - the declaration is far from where it is used
+let result;
+const pricingPlan = retrievePricingPlan();
+const order = retrieveOrder();
+let charge;
+const chargePerUnit = pricingPlan.unit;
+
+// After - move each declaration down to its first use
+const pricingPlan = retrievePricingPlan();
+const chargePerUnit = pricingPlan.unit;
+const order = retrieveOrder();
+```
+
+### Replace Loop with Pipeline
+
+Replace an imperative loop that filters and transforms with a chained pipeline (map/filter/reduce). The pipeline reads top-to-bottom as a sequence of operations instead of hiding intent in accumulator mutation.
+
+```typescript
+// Before - loop with a mutated accumulator
+const names: string[] = [];
+for (const person of people) {
+  if (person.job === "programmer") {
+    names.push(person.name.toUpperCase());
+  }
+}
+
+// After - a pipeline that reads as its intent
+const names = people
+  .filter((p) => p.job === "programmer")
+  .map((p) => p.name.toUpperCase());
+```
+
+### Split Variable
+
+A variable assigned more than once for different purposes is doing two jobs. Give each responsibility its own immutable variable; this removes a class of bug and makes the code renameable.
+
+```javascript
+// Before - one variable, two meanings
+let temp = 2 * (height + width);       // perimeter
+temp = height * width;                  // area
+
+// After - one variable per concept
+const perimeter = 2 * (height + width);
+const area = height * width;
+```
+
+### Separate Query from Modifier
+
+Enforce Command-Query Separation: a function that returns a value must not also change observable state. Split it into a pure query and a separate command, so callers can ask without causing side effects.
+
+```javascript
+// Before - returns a value AND mutates
+function getTotalAndSetTaxFlag(order) {
+  order.taxApplied = true;              // command
+  return order.subtotal * 1.2;          // query
+}
+
+// After - two functions, each with one job
+function totalWithTax(order) { return order.subtotal * 1.2; }   // query
+function applyTax(order) { order.taxApplied = true; }            // command
+```
+
+### The Polymorphism Path
+
+`Replace Conditional with Polymorphism` (above) is usually the destination of a short sequence, not a single move. When a `switch` on a type code recurs across methods, first `Replace Type Code with Subclasses` (or a Strategy), then move each `case` body into the matching subtype, and finally delete the conditional. Doing it in these safe steps keeps the code green throughout, and each step is a candidate Mikado subgoal (see [[refactoring/mikado-method]]).
+
