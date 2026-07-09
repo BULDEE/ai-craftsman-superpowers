@@ -3,8 +3,9 @@
 # Config Resolution Library
 # Resolves configuration from multiple sources with priority:
 #   1. .craft-config.yml in $PWD (highest)
-#   2. CLAUDE_PLUGIN_OPTION_* env vars
-#   3. Hardcoded defaults (lowest)
+#   2. .craft-config.yml in ~/.claude (global, shared across projects)
+#   3. CLAUDE_PLUGIN_OPTION_* env vars
+#   4. Hardcoded defaults (lowest)
 #
 # Usage:
 #   source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/config.sh"
@@ -28,6 +29,10 @@ _config_resolve() {
     local yml_value=""
     if [[ -f "$PWD/.craft-config.yml" ]]; then
         yml_value=$(_config_parse_yml_value "$key" "$PWD/.craft-config.yml")
+    fi
+
+    if [[ -z "$yml_value" ]] && [[ -f "${HOME}/.claude/.craft-config.yml" ]]; then
+        yml_value=$(_config_parse_yml_value "$key" "${HOME}/.claude/.craft-config.yml")
     fi
 
     if [[ -n "$yml_value" ]]; then
