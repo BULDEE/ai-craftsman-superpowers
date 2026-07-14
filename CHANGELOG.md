@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.9.0] - 2026-07-14
+
+### Added
+- **Global config fallback** (#4, thanks @Lucr4m). `~/.claude/.craft-config.yml` written by `/craftsman:setup` is now actually read by hooks. Resolution order: `$PWD/.craft-config.yml` > `CLAUDE_PLUGIN_OPTION_*` env vars > `~/.claude/.craft-config.yml` > hardcoded defaults. Explicit plugin options are never silently overridden by the machine-wide file, and the global file fills per-key gaps left by higher sources.
+- **Global fallback test coverage.** `tests/core/test-config.sh` now sandboxes `HOME` (a developer's real global config can no longer leak into test results) and covers global-only resolution, env-over-global, PWD-over-global, and per-key fallback.
+
+### Fixed
+- **CI executable-bit check** no longer fails on sourced libraries (`hooks/lib/*`, pack validators) and bash-invoked test files discovered by the 3.8.0 dynamic script discovery. Only direct-exec entry points require the exec bit; syntax and ShellCheck coverage unchanged.
+- `bump-version.sh` now exits 1 when a tracked file matches neither the old nor the new version, instead of printing a soft "may already be updated". That soft message let CLAUDE.md silently drift (stuck at 3.7.0 through the 3.8.0 release). Stale steps removed: README badge (dynamic shields.io since 3.8.0) and `test-adapters.sh` mock reports (frozen fixtures).
+
 ## [3.8.0] - 2026-07-14
 
 ### Added

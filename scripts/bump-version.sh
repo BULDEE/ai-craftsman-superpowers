@@ -9,9 +9,12 @@
 #   - .claude-plugin/plugin.json
 #   - .claude-plugin/marketplace.json (2 occurrences)
 #   - ci/craftsman-ci.sh (VERSION=)
-#   - README.md (badge)
 #   - CLAUDE.md (Current version)
-#   - tests/ci/test-adapters.sh (3 mock report versions)
+#
+# README badges are dynamic (shields.io github/v/release) since 3.8.0 and
+# tests/ci/test-adapters.sh mock reports are frozen fixtures - neither is
+# touched here. Exits 1 if any tracked file matches neither the old nor the
+# new version (drift), so a silent miss can't survive two releases again.
 # =============================================================================
 set -euo pipefail
 
@@ -43,8 +46,9 @@ fi
 echo "Bumping version: ${CURRENT_VERSION} → ${NEW_VERSION}"
 echo ""
 
-# Track files changed
+# Track files changed and drift
 CHANGED=0
+DRIFTED=0
 
 bump_file() {
     local file="$1"
@@ -63,8 +67,11 @@ bump_file() {
         count=$(grep -c "$replacement" "$file" 2>/dev/null || echo "0")
         echo "  ✓  $label (${count} occurrence(s))"
         CHANGED=$((CHANGED + 1))
+    elif grep -q "$replacement" "$file" 2>/dev/null; then
+        echo "  -  $label (already at ${NEW_VERSION})"
     else
-        echo "  -  $label (pattern not found, may already be updated)"
+        echo "  ✗  $label (matches neither ${CURRENT_VERSION} nor ${NEW_VERSION} - version drift, fix manually)"
+        DRIFTED=$((DRIFTED + 1))
     fi
 }
 
@@ -86,25 +93,18 @@ bump_file "${ROOT_DIR}/ci/craftsman-ci.sh" \
     "VERSION=\"${NEW_VERSION}\"" \
     "ci/craftsman-ci.sh"
 
-# 4. README.md badge
-bump_file "${ROOT_DIR}/README.md" \
-    "Version-${CURRENT_VERSION}-blue" \
-    "Version-${NEW_VERSION}-blue" \
-    "README.md (badge)"
-
-# 5. CLAUDE.md
+# 4. CLAUDE.md
 bump_file "${ROOT_DIR}/CLAUDE.md" \
     "Current version:.* ${CURRENT_VERSION}" \
     "Current version:** ${NEW_VERSION}" \
     "CLAUDE.md"
 
-# 6. Test fixtures
-bump_file "${ROOT_DIR}/tests/ci/test-adapters.sh" \
-    "\"version\": \"${CURRENT_VERSION}\"" \
-    "\"version\": \"${NEW_VERSION}\"" \
-    "tests/ci/test-adapters.sh"
-
 echo ""
+if [[ "$DRIFTED" -gt 0 ]]; then
+    echo "FAILED: ${DRIFTED} file(s) drifted out of version sync (see ✗ above)."
+    echo "Fix them manually to ${NEW_VERSION}, then re-run to verify."
+    exit 1
+fi
 echo "Done. ${CHANGED} file(s) updated."
 echo ""
 echo "Next steps:"
