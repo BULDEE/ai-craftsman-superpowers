@@ -84,3 +84,4 @@ When bumping version, update ALL of these:
 - `ci/craftsman-ci.sh` → `VERSION=`
 - `CHANGELOG.md` → new entry
 - `README.md` → Version badge
+- `README.fr.md` → Version badge + sync any README.md content changes (French mirror, English is the source of truth)

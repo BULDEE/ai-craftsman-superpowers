@@ -12,6 +12,9 @@ if [[ "${CLAUDE_PLUGIN_OPTION_agent_hooks:-true}" == "false" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/hook-profile.sh"
+hook_profile_should_run "agent-structure-analyzer" "standard,strict" || exit 0
+
 PLUGIN_DATA="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
 DB="${PLUGIN_DATA}/metrics.db"
 

@@ -362,6 +362,40 @@ test_agent_hooks() {
     fi
 }
 
+test_config_protection() {
+    echo ""
+    log_info "Testing config-protection hook (functional)"
+
+    local cfg_test="$SCRIPT_DIR/core/test-config-protection.sh"
+
+    if [[ -f "$cfg_test" ]]; then
+        if bash "$cfg_test" > /dev/null 2>&1; then
+            log_pass "Config-protection tests pass"
+        else
+            log_fail "Config-protection tests failed - run tests/core/test-config-protection.sh for details"
+        fi
+    else
+        log_skip "Config-protection tests (tests/core/test-config-protection.sh not found)"
+    fi
+}
+
+test_security_invariants() {
+    echo ""
+    log_info "Testing security invariants (functional)"
+
+    local sec_test="$SCRIPT_DIR/core/test-security-invariants.sh"
+
+    if [[ -f "$sec_test" ]]; then
+        if bash "$sec_test" > /dev/null 2>&1; then
+            log_pass "Security invariant tests pass"
+        else
+            log_fail "Security invariant tests failed - run tests/core/test-security-invariants.sh for details"
+        fi
+    else
+        log_skip "Security invariant tests (tests/core/test-security-invariants.sh not found)"
+    fi
+}
+
 # Test: Config resolution (unit tests)
 test_config_resolution() {
     echo ""
@@ -674,6 +708,8 @@ main() {
 
         test_hook_behavior
         test_agent_hooks
+        test_config_protection
+        test_security_invariants
         test_config_resolution
         test_bias_detector
         test_correction_learning

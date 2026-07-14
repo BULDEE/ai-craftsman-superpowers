@@ -6,12 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   secrets-scan:
     name: Secrets & Sensitive Data Scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0  # Full history for git log scan
 
@@ -25,10 +28,10 @@ jobs:
     name: Validate JSON Files
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
 
@@ -65,10 +68,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [secrets-scan]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
 
@@ -141,10 +144,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [secrets-scan]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
 
@@ -189,103 +192,96 @@ jobs:
     runs-on: ubuntu-latest
     needs: [secrets-scan]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Discover shell scripts
+        id: discover
+        run: |
+          # Dynamic discovery instead of a hardcoded subset - covers every
+          # script we ship (hooks, hook libs, CI adapters, pack validators,
+          # test suite), not just the ones someone remembered to list.
+          mapfile -t SCRIPTS < <(
+            find hooks ci scripts packs .github/scripts tests bin -type f \
+              \( -name "*.sh" -o -name "craftsman-ci" -o -name "craftsman-validate" \) \
+              ! -path "*/node_modules/*" ! -path "*/fixtures/*" ! -path "*/canonical/*" \
+            | sort
+          )
+          echo "Discovered ${#SCRIPTS[@]} shell scripts"
+          printf '%s\n' "${SCRIPTS[@]}" > /tmp/shell-scripts.txt
 
       - name: Check shell script syntax
         run: |
           echo "Checking shell script syntax..."
-
-          SCRIPTS=(
-            "hooks/post-write-check.sh"
-            "hooks/bias-detector.sh"
-            "hooks/file-changed.sh"
-            "hooks/pre-write-check.sh"
-            "hooks/session-metrics.sh"
-            "hooks/session-start.sh"
-            "hooks/post-bash-test-verify.sh"
-            "tests/run-tests.sh"
-          )
-
           FAILED=0
-          for script in "${SCRIPTS[@]}"; do
-            if [ -f "$script" ]; then
-              if bash -n "$script" 2>/dev/null; then
-                echo "✓ $script"
-              else
-                echo "✗ $script - Syntax error"
-                bash -n "$script"
-                FAILED=1
-              fi
+          while IFS= read -r script; do
+            [ -z "$script" ] && continue
+            if bash -n "$script" 2>/dev/null; then
+              echo "✓ $script"
             else
-              echo "✗ $script - File not found"
+              echo "✗ $script - Syntax error"
+              bash -n "$script"
               FAILED=1
             fi
-          done
-
+          done < /tmp/shell-scripts.txt
           exit $FAILED
 
       - name: Check scripts are executable
         run: |
           echo "Checking script permissions..."
-
-          SCRIPTS=(
-            "hooks/post-write-check.sh"
-            "hooks/bias-detector.sh"
-            "hooks/file-changed.sh"
-            "hooks/pre-write-check.sh"
-            "hooks/session-metrics.sh"
-            "hooks/session-start.sh"
-            "hooks/post-bash-test-verify.sh"
-            "tests/run-tests.sh"
-          )
-
           FAILED=0
-          for script in "${SCRIPTS[@]}"; do
-            if [ -f "$script" ]; then
-              if [ -x "$script" ]; then
-                echo "✓ $script is executable"
-              else
-                echo "✗ $script is not executable"
-                FAILED=1
-              fi
+          while IFS= read -r script; do
+            [ -z "$script" ] && continue
+            if [ -x "$script" ]; then
+              echo "✓ $script is executable"
+            else
+              echo "✗ $script is not executable"
+              FAILED=1
             fi
-          done
-
+          done < /tmp/shell-scripts.txt
           exit $FAILED
 
       - name: Install ShellCheck
         run: sudo apt-get install -y shellcheck
 
-      - name: Run ShellCheck
+      - name: Run ShellCheck (blocking on real errors)
         run: |
-          echo "Running ShellCheck..."
-
-          SCRIPTS=(
-            "hooks/post-write-check.sh"
-            "hooks/bias-detector.sh"
-            "hooks/file-changed.sh"
-            "hooks/pre-write-check.sh"
-            "hooks/session-metrics.sh"
-            "hooks/session-start.sh"
-            "hooks/post-bash-test-verify.sh"
-            "tests/run-tests.sh"
-          )
-
-          FAILED=0
-          for script in "${SCRIPTS[@]}"; do
-            if [ -f "$script" ]; then
-              if shellcheck -x "$script"; then
-                echo "✓ $script passed ShellCheck"
-              else
-                echo "✗ $script has ShellCheck warnings"
-                FAILED=1
-              fi
+          # error severity = actual bugs (undefined behavior, broken quoting
+          # that changes semantics, etc.) - these fail the build.
+          # warning/info/style severities are informational: this codebase
+          # deliberately shares globals across `source`d scripts (adapter.sh
+          # -> provider adapters, craftsman-ci.sh -> pack validators), which
+          # ShellCheck's -x cannot always trace across dynamic source calls
+          # and flags as SC2034 "unused". Blocking on those would fail the
+          # build on false positives, not real issues.
+          echo "Running ShellCheck (error severity, blocking)..."
+          ERRORS=0
+          while IFS= read -r script; do
+            [ -z "$script" ] && continue
+            if ! shellcheck -x -S error "$script"; then
+              echo "✗ $script has ShellCheck ERROR-level issues"
+              ERRORS=1
             fi
-          done
+          done < /tmp/shell-scripts.txt
 
-          # Exit with warning only, not failure (ShellCheck can be strict)
-          if [ $FAILED -eq 1 ]; then
-            echo "::warning::ShellCheck found issues in some scripts"
+          if [ $ERRORS -eq 1 ]; then
+            echo "::error::ShellCheck found error-severity issues - see log above"
+            exit 1
+          fi
+          echo "✓ No error-severity ShellCheck issues"
+
+      - name: Run ShellCheck (informational, warning+)
+        run: |
+          echo "Running ShellCheck (warning severity and above, informational)..."
+          FOUND=0
+          while IFS= read -r script; do
+            [ -z "$script" ] && continue
+            if ! shellcheck -x -S warning "$script" 2>&1; then
+              FOUND=1
+            fi
+          done < /tmp/shell-scripts.txt
+
+          if [ $FOUND -eq 1 ]; then
+            echo "::warning::ShellCheck found warning-severity issues (non-blocking) - see log above"
           fi
 
   validate-skills:
@@ -293,7 +289,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [secrets-scan]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Validate SKILL.md files
         run: |
@@ -410,7 +406,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [secrets-scan]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Check knowledge base structure
         run: |
@@ -464,15 +460,45 @@ jobs:
 
           exit $FAILED
 
-  run-tests:
-    name: Run Test Suite
+  lint-python:
+    name: Lint Python Hook Libraries
     runs-on: ubuntu-latest
-    needs: [validate-json, validate-shell-scripts]
+    needs: [secrets-scan]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Run ruff (bugs only - unused imports, undefined names, syntax)
+        run: |
+          # --select F,E9: pyflakes correctness checks + syntax errors.
+          # Deliberately excludes style rules (E7xx etc) - some of these
+          # scripts use a compact style (semicolon-joined statements) on
+          # purpose; style is a taste call for the maintainer, not a CI gate.
+          ruff check --select F,E9 hooks/lib/*.py
+
+      - name: Run ruff (style, informational)
+        run: ruff check hooks/lib/*.py || echo "::warning::ruff found style issues (non-blocking) - see log above"
+
+  run-tests:
+    name: Run Test Suite (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: [validate-json, validate-shell-scripts]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
 
@@ -486,7 +512,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [secrets-scan]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Check agent files
         run: |
@@ -528,7 +554,7 @@ jobs:
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [secrets-scan, validate-json, validate-hooks-schema, validate-plugin-manifest, validate-shell-scripts, validate-skills, validate-knowledge-base, run-tests, check-agents]
+    needs: [secrets-scan, validate-json, validate-hooks-schema, validate-plugin-manifest, validate-shell-scripts, validate-skills, validate-knowledge-base, lint-python, run-tests, check-agents]
     if: always()
     steps:
       - name: Check all jobs status
@@ -547,6 +573,7 @@ jobs:
           echo "  - Shell scripts: ${{ needs.validate-shell-scripts.result }}"
           echo "  - Skills structure: ${{ needs.validate-skills.result }}"
           echo "  - Knowledge base: ${{ needs.validate-knowledge-base.result }}"
+          echo "  - Python lint: ${{ needs.lint-python.result }}"
           echo "  - Test suite: ${{ needs.run-tests.result }}"
           echo "  - Agent definitions: ${{ needs.check-agents.result }}"
           echo ""
@@ -559,6 +586,7 @@ jobs:
              [[ "${{ needs.validate-shell-scripts.result }}" == "failure" ]] || \
              [[ "${{ needs.validate-skills.result }}" == "failure" ]] || \
              [[ "${{ needs.validate-knowledge-base.result }}" == "failure" ]] || \
+             [[ "${{ needs.lint-python.result }}" == "failure" ]] || \
              [[ "${{ needs.run-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.check-agents.result }}" == "failure" ]]; then
             echo "FAILED: One or more validation jobs failed"

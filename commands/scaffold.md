@@ -43,6 +43,19 @@ Before generating ANY code, you MUST load and read the canonical example for the
 | api-resource | `packs/symfony/knowledge/canonical/php-state-provider.php` |
 | pack | *(generates new pack from convention - no canonical needed)* |
 
+## Template Variants (v2.1.0+)
+
+Before generating `entity`, `usecase`, `component`, or `hook` code, offer the user a template variant matching their case, loaded from the pack's `templates/` directory:
+
+| Pack | Template | Use Case |
+|------|----------|----------|
+| Symfony | `bounded-context-backend` | Standard DDD entity |
+| Symfony | `crud-api` | API Platform 4 CRUD |
+| Symfony | `event-sourced` | Event Sourcing + Projections |
+| React | `bounded-context-frontend` | Standard TanStack Query hook |
+| React | `form-heavy` | Multi-step wizard + Zod |
+| React | `dashboard-data` | TanStack Table + Recharts |
+
 ## Process
 
 ### Phase 1: Context

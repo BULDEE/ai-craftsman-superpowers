@@ -11,6 +11,8 @@ set -uo pipefail
 trap 'exit 0' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/hook-profile.sh"
+hook_profile_should_run "tool-failure-tracker" "standard,strict" || exit 0
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
 
 HAS_PYTHON3=true

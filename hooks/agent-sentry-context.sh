@@ -16,6 +16,10 @@ if [[ -z "${CLAUDE_PLUGIN_OPTION_sentry_org:-}" ]]; then
     exit 0
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/hook-profile.sh"
+hook_profile_should_run "agent-sentry-context" "standard,strict" || exit 0
+
 # Read tool input from stdin
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
@@ -23,7 +27,6 @@ FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 [[ -z "$FILE_PATH" || ! -f "$FILE_PATH" ]] && exit 0
 
 # Circuit breaker check
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "${SCRIPT_DIR}/lib/channels.sh" ]]; then
     source "${SCRIPT_DIR}/lib/channels.sh"
     cb_init sentry 3 300 2>/dev/null || true

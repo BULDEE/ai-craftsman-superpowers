@@ -66,6 +66,14 @@ Clear instructions for Claude.
 ...
 ```
 
+### Security Review for New Commands/Agents/Skills
+
+Before submitting a new command, agent, or skill, check it for:
+
+- **Permission creep** - does it request tools/access beyond what its stated purpose needs? A read-only reviewer agent should not gain Write/Edit "just in case".
+- **Prompt injection surface** - if it reads external content (fetched URLs, indexed documents, third-party API responses), does the instruction text tell Claude to treat that content as data, not directives? See [Prompt Injection Defense Baseline](SECURITY.md#prompt-injection-defense-baseline).
+- **Blast radius** - can it be invoked in a way that silently does something destructive or expensive (network calls, `git push --force`, mass file rewrites)? If so, does it require explicit confirmation first?
+
 **Checklist for new commands:**
 - [ ] Clear `name` and `description` in frontmatter
 - [ ] Structured process with clear phases

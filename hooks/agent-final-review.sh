@@ -11,6 +11,10 @@ if [[ "${CLAUDE_PLUGIN_OPTION_agent_hooks:-true}" == "false" ]]; then
     exit 0
 fi
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/hook-profile.sh"
+hook_profile_should_run "agent-final-review" "standard,strict" || exit 0
+
 # Gate: skip if strictness is not 'strict'
 if [[ "${CLAUDE_PLUGIN_OPTION_strictness:-strict}" != "strict" ]]; then
     exit 0

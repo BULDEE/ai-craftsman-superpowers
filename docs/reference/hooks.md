@@ -56,6 +56,37 @@ Agent hooks run AI models (Haiku) for semantic analysis beyond regex patterns:
 
 > **Note:** Exit code 1 is reserved for script errors. Hooks use exit 2 for intentional blocking.
 
+## Security Invariant Tests (v3.8.0+)
+
+`tests/core/test-security-invariants.sh` proves - rather than assumes - that `config-protection.sh` and `pre-write-check.sh` never execute arbitrary code or touch the filesystem outside their contract, even when fed adversarial `file_path`/`content` values (command substitution, path traversal, shell metacharacters, malformed non-JSON stdin). Sandbox + witness-marker pattern: a marker file is planted, the hook is fed a payload designed to delete or alter it, and the test asserts the marker is untouched. Also verifies both hooks fail open (exit 0) on malformed input rather than crashing into an undefined state.
+
+Note: there is no hook that blocks destructive shell commands (`git reset --hard`, `rm -rf`) at the tool-execution level today - `/craftsman:git`'s destructive-command guidance is a prompt-level convention Claude follows, not code that intercepts Bash execution. This test suite covers what's actually enforceable in code: the Write/Edit quality-gate hooks.
+
+## Config Protection (v3.8.0+)
+
+`config-protection.sh` (PreToolUse, Write|Edit) blocks writes to single-purpose linter/formatter/architecture config files - `phpstan.neon(.dist)`, `.eslintrc*`, `eslint.config.*`, `.php-cs-fixer(.dist).php`, `deptrac.y(a)ml`, `.dependency-cruiser.*` - so an agent can't silently loosen a rule instead of fixing the code that violates it.
+
+`.craft-config.yml`/`.craft-rules.yml` are intentionally excluded - they're the user-facing rule override mechanism (see Custom Rule Engine) and `/craftsman:setup` writes to them by design. Multi-purpose files (`pyproject.toml`, `package.json`) are excluded too - too much unrelated project metadata to block wholesale.
+
+Blocks with exit 2. Escape hatch: `CRAFTSMAN_DISABLED_HOOKS=config-protection` for a session where a genuine config change is intended.
+
+## Hook Profiles (v3.8.0+)
+
+Secondary and costed hooks - the 4 agent hooks plus `post-bash-test-verify.sh`, `tool-failure-tracker.sh`, `subagent-quality-gate.sh`, `file-changed.sh`, `pre-push-verify.sh` - can be skipped for a session via environment variables, without touching plugin config:
+
+```bash
+# Turn off all secondary/costed hooks for this session
+export CRAFTSMAN_HOOK_PROFILE=minimal
+
+# Or disable specific hooks by id, regardless of profile
+export CRAFTSMAN_DISABLED_HOOKS=file-changed,tool-failure-tracker
+
+# See what a profile would skip without actually skipping anything
+export CRAFTSMAN_HOOK_DRY_RUN=true
+```
+
+`CRAFTSMAN_HOOK_PROFILE` defaults to `standard` (current full behavior, no change from prior versions). `strict` currently behaves like `standard` - reserved for future stricter tiers. The core quality gate (`pre-write-check.sh`, `post-write-check.sh`), bias detection, and session bookkeeping (`session-start.sh`, `session-metrics.sh`, `pre-compact-save.sh`, `post-compact-verify.sh`) intentionally do not support `CRAFTSMAN_HOOK_PROFILE`/`CRAFTSMAN_DISABLED_HOOKS` at all - disabling them would silently turn off the plugin's core value or lose session state, so that's a deliberate boundary, not a gap. Disable them via the `agent_hooks`/`strictness` plugin config instead, or the `/plugin` hooks toggle.
+
 ## Code Rules
 
 ### PHP Rules (PostToolUse)
@@ -246,6 +277,18 @@ The `bias-detector.sh` hook (UserPromptSubmit) detects cognitive biases in your 
 | Over-Optimization | "abstraire", "generalize" | STOP - YAGNI |
 
 Bias detection is **warning-only** (exit 0) - it never blocks your workflow.
+
+## Iron Law Pattern (v2.1.0+)
+
+Design-first methodology enforced through hooks, not just requested in a prompt: the `bias-detector.sh` hook warns when domain entities are being modeled without a prior `/craftsman:design` invocation in the session. This prevents impulsive architecture changes - jumping straight to implementation before the design phase has challenged the model.
+
+## Circuit Breaker (v2.1.0+)
+
+Production-grade protection for external service calls (Sentry MCP), implemented in `hooks/lib/circuit-breaker.sh`:
+
+- **3 states:** `closed` (normal operation) → `open` (service failing, calls short-circuited) → `half-open` (probing recovery)
+- **File-based cache** with TTL/LRU eviction serves stale data during outages instead of blocking on a dead dependency
+- Applies to any hook that calls out to Sentry for error context (`agent-sentry-context.sh`)
 
 ## Troubleshooting
 

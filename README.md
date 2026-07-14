@@ -2,86 +2,84 @@
 
 <div align="center">
 
+🇬🇧 **English** | [🇫🇷 Français](README.fr.md)
+
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
-[![Version](https://img.shields.io/badge/Version-3.7.0-blue)](CHANGELOG.md)
-[![Commands](https://img.shields.io/badge/Commands-22-orange)]()
-[![Agents](https://img.shields.io/badge/Agents-12-red)]()
+[![Version](https://img.shields.io/github/v/release/BULDEE/ai-craftsman-superpowers?label=version)](CHANGELOG.md)
+[![CI](https://img.shields.io/github/actions/workflow/status/BULDEE/ai-craftsman-superpowers/ci.yml?label=CI)](.github/workflows/ci.yml)
+[![Commands](https://img.shields.io/badge/Commands-18%2B-orange)](COMMANDS-QUICK-REF.md)
+[![Agents](https://img.shields.io/badge/Agents-6%2B-red)](#specialized-agents)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 **Transform Claude into a disciplined Senior Software Craftsman**
 
-[Installation](#installation) •
-[Skills](#skills) •
+[Quick Start](#quick-start) •
+[Commands](#commands) •
 [Security](#security) •
 [Contributing](#contributing)
 
 </div>
 
+> [!WARNING]
+> Only install this plugin from the official sources listed below. Do not trust forks, mirrors, or "improved" copies distributed elsewhere - see [Pre-Installation Verification](#pre-installation-verification).
+
 ---
 
-> Senior craftsman methodology for Claude Code. DDD, Clean Architecture, TDD.
+DDD, Clean Architecture, and TDD methodology enforced through hooks, commands, and a rules engine - not just suggested in a prompt, but actually blocked when violated.
 
-Transform Claude Code into a disciplined software engineer with battle-tested methodologies.
+## Why Craftsman? - 6 Core Differentiators
+
+What makes this plugin genuinely unique in the Claude Code ecosystem:
+
+1. **Correction Learning System** - records every violation fix you make and injects correction trends at next session start. SQLite-backed feedback loop that progressively teaches Claude the exact patterns your codebase rejects. Cross-file detection suggests project-wide fixes when 3+ files share the same violation.
+2. **Rules Engine with 3-Level Inheritance** - Global → Project → Directory overrides. Short form (`PHP001: warn`) or long form (custom regex rules). Legacy code coexists with strict new code via directory-level relaxation.
+3. **Cognitive Bias Detector** - real-time detection of acceleration bias, scope creep, and over-optimization in your prompts, bilingual FR/EN, context-aware to reduce false positives.
+4. **Real-Time Quality Gate** - 3-level progressive validation on every Write/Edit: regex (<50ms, always on) → static analysis (<2s, PHPStan/ESLint) → architecture (<2s, deptrac/dependency-cruiser). Degrades gracefully with zero tools installed.
+5. **Multi-Provider CI Pipeline** - the same rules engine runs in hooks (real-time) and CI (pipeline) with zero drift, across GitHub Actions, GitLab CI, Bitbucket Pipelines, and Jenkins.
+6. **Metrics & Trend Analysis** - SQLite-backed tracking of violations, corrections, and sessions, with 7-day/30-day trend views to identify your most-violated rules.
+
+> No other Claude Code plugin combines all 6: learning from past mistakes, enterprise rule customization, cognitive protection, real-time validation, zero CI drift, and measurable quality trends.
 
 ## Requirements
 
-- Claude Code v1.0.33 or later
-- Run `claude --version` to check
+- Claude Code v1.0.33 or later (`claude --version` to check)
 
 ## Installation
 
-### From GitHub (Recommended)
-
 ```bash
-# Step 1: Add the marketplace
+# 1. Add the marketplace
 /plugin marketplace add BULDEE/ai-craftsman-superpowers
 
-# Step 2: Install the plugin
+# 2. Install the plugin
 /plugin install craftsman@BULDEE-ai-craftsman-superpowers
 
-# Step 3: Restart Claude Code
+# 3. Restart Claude Code
 exit
 claude
 ```
 
-### From Local Path
+<details>
+<summary>Install from a local clone instead</summary>
 
 ```bash
-# If you cloned the repo locally
 git clone https://github.com/BULDEE/ai-craftsman-superpowers.git /path/to/ai-craftsman-superpowers
 /plugin marketplace add /path/to/ai-craftsman-superpowers
 /plugin install craftsman@ai-craftsman-superpowers
 ```
+</details>
 
-### Verify Installation
+<details>
+<summary>Verify the install</summary>
 
 ```bash
-# Open plugin manager
 /plugin
-
-# Go to "Installed" tab to see craftsman plugin
-# Go to "Errors" tab if skills don't appear
+# "Installed" tab → craftsman plugin should appear
+# "Errors" tab → check here if skills don't appear
 ```
-
-## API Cost Model
-
-The plugin uses AI agent hooks for deep semantic analysis beyond regex. These are **optional** and can be disabled.
-
-| Agent Hook | Trigger | Model | Purpose |
-|------------|---------|-------|---------|
-| DDD Verifier | Each Write/Edit | Haiku | Layer violations, aggregate boundaries, naming |
-| Sentry Context | Each Write/Edit | Haiku | Error context from Sentry (if configured) |
-| Architecture Analyzer | Session start | Haiku | Build project context map |
-| Final Reviewer | Session end | Haiku | Validate architecture (strict mode only) |
-
-**Estimated cost:** ~$0.15-0.30 per session (50 Write/Edit operations)
-
-**Opt-out:** Set `agent_hooks: false` in plugin config to disable all agent hooks. Regex-based validation (Level 1) and static analysis (Level 2) continue to work without agent hooks.
+</details>
 
 ## Quick Start
-
-After installation, try:
 
 ```bash
 # Design a new entity (follows DDD phases)
@@ -91,10 +89,6 @@ I need to create a User entity for an e-commerce platform.
 # Debug an issue systematically (ReAct pattern)
 /craftsman:debug
 I have a memory leak in my Node.js app.
-
-# Plan a feature implementation
-/craftsman:plan
-I need to migrate our API to microservices.
 
 # Review code for architecture issues
 /craftsman:challenge
@@ -108,204 +102,35 @@ I need to add a forgot password feature.
 /craftsman:setup --quick
 ```
 
-See [`/examples`](examples/) for detailed usage examples with expected outputs.
+New to the methodology? Start with the [Beginner Guide](docs/guides/beginner.md) - it walks through DDD concepts and core commands with worked examples. See [`/examples`](examples/) for detailed usage with expected outputs, and [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md) for the full command list.
 
-## Why Craftsman? - 6 Core Differentiators
+## API Cost Model (optional)
 
-What makes this plugin genuinely unique in the Claude Code ecosystem:
+The 6 differentiators above work with **zero API cost** beyond your normal Claude Code usage - regex validation, the rules engine, bias detection, CI export, and metrics are all local.
 
-### 1. **Correction Learning System**
-Records every violation fix users make and injects correction trends at next session start. SQLite-backed feedback loop that progressively teaches Claude the exact patterns your codebase rejects. Cross-file pattern detection suggests project-wide fixes when 3+ files share the same violation. Unique in the ecosystem - no other Claude Code plugin creates this behavioral feedback loop.
+One optional layer adds deeper semantic analysis via Haiku agent hooks (DDD layer violations, Sentry error context, architecture review): ~$0.15-0.30 per session (50 Write/Edit operations).
 
-### 2. **Rules Engine with 3-Level Inheritance**
-Enterprise-ready rule customization: Global → Project → Directory overrides. Short form (`PHP001: warn`) and long form (custom rules with regex, message, severity, languages, paths). Legacy code coexists with strict new code via directory-level relaxation. Python-backed YAML parser with bash 3.2 shell compatibility.
-
-### 3. **Cognitive Bias Detector**
-Real-time detection of acceleration bias, scope creep, and over-optimization in user prompts. Context-aware bilingual FR/EN pattern matching on UserPromptSubmit hook - requires imperative verb context to reduce false positives. Non-blocking warnings that encourage reflection before action.
-
-### 4. **Real-Time Quality Gate**
-3-level progressive validation on every Write/Edit:
-- **Level 1: Regex (<50ms)** - strict_types, final, any, setters. Always active.
-- **Level 2: Static analysis (<2s)** - PHPStan, ESLint. When tools installed.
-- **Level 3: Architecture (<2s)** - deptrac, dependency-cruiser. When tools installed.
-
-Graceful degradation: works with zero tools installed (Level 1 only).
-
-### 5. **Multi-Provider CI Pipeline**
-Same rules engine runs in hooks (real-time) AND CI (pipeline) with zero drift - CI sources the same pack validators as hooks. 4 providers: GitHub Actions, GitLab CI, Bitbucket Pipelines, Jenkins. Adapter pattern: detect → run → annotate → comment → exit.
-
-### 6. **Metrics & Trend Analysis**
-SQLite-backed tracking of violations, corrections, and sessions. 7-day and 30-day trend views. Data-driven quality improvement: identify most-violated rules and adjust strictness. Currently per-machine - team metrics sync planned for v4.
-
----
-
-> **No other Claude Code plugin combines all 6: learning from past mistakes, enterprise rule customization, cognitive protection, real-time validation, zero CI drift, and measurable quality trends.**
-
-## Additional Features
-
-### Model Tiering
-Configure which Claude model each agent uses. Cost-optimize by assigning Haiku to documentation tasks and Sonnet to complex analysis.
-
-### Atomic Commit Enforcement
-Stop hook warns when >15 files modified in a session and caps inspection at 20 files, encouraging small focused commits.
-
-### Circuit Breaker
-Production-grade protection for external services (Sentry). 3 states: closed → open → half-open. File-based cache with TTL/LRU eviction serves stale data during outages.
-
-### Iron Law Pattern
-Design-first methodology enforced through hooks: bias detection warns when domain modeling without `/craftsman:design`. Prevents impulsive architecture changes.
+**Opt-out:** set `agent_hooks: false` in the plugin config. Everything else keeps working.
 
 ## Commands
 
-All commands are explicitly invoked with `/craftsman:command-name`. See [ADR-0007](docs/adr/0007-commands-over-skills.md) for the rationale.
+All commands are explicitly invoked with `/craftsman:command-name` (see [ADR-0007](docs/adr/0007-commands-over-skills.md) for why). Full reference: [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md).
 
-### Core Methodology
+| Category | Commands |
+|----------|----------|
+| Core methodology | `design`, `debug`, `plan`, `challenge`, `verify`, `workflow`, `spec`, `refactor`, `legacy`, `test`, `git`, `parallel` |
+| Scaffolding | `scaffold entity/usecase/component/hook/api-resource/pack` |
+| AI/ML engineering | `rag`, `mlops`, `agent-design` |
+| Utilities | `metrics`, `setup`, `team`, `healthcheck`, `knowledge` |
+| CI/CD | `ci` |
 
-| Command | Purpose |
-|---------|---------|
-| `/craftsman:design` | DDD design with challenge phases (Understand → Challenge → Recommend → Implement) |
-| `/craftsman:debug` | Systematic debugging using ReAct pattern |
-| `/craftsman:plan` | Structured planning & execution with checkpoints |
-| `/craftsman:challenge` | Senior architecture review and code challenge |
-| `/craftsman:verify` | Evidence-based verification before completion claims |
-| `/craftsman:workflow` | Flexible development pipeline (design → spec → plan → implement → test → verify → commit) |
-| `/craftsman:spec` | Specification-first development (TDD/BDD) |
-| `/craftsman:refactor` | Systematic refactoring with behavior preservation (safety-net-first gate, Mikado mode) |
-| `/craftsman:legacy` | Legacy rescue: audit hotspots, cover with characterization tests, break dependencies, strangler-fig migration |
-| `/craftsman:test` | Pragmatic testing following Fowler/Martin principles |
-| `/craftsman:git` | Safe git workflow with destructive command protection |
-| `/craftsman:parallel` | Parallel agent orchestration for independent tasks |
+Scaffolders offer a template variant before generating code (e.g. `bounded-context` vs `event-sourced` for entities) - see [Template Variants](commands/scaffold.md#template-variants-v210).
 
-### Scaffolding
+## Specialized Agents
 
-| Command | Purpose |
-|---------|---------|
-| `/craftsman:scaffold entity` | DDD entity with Value Objects, Events, Tests |
-| `/craftsman:scaffold usecase` | Use case with Command/Handler pattern |
-| `/craftsman:scaffold component` | React component with TypeScript, tests, Storybook |
-| `/craftsman:scaffold hook` | TanStack Query hook with tests |
-| `/craftsman:scaffold api-resource` | API Platform resource with State Provider |
-| `/craftsman:scaffold pack` | Create new community pack |
+Core agents (more load automatically with packs): `team-lead` (orchestrator), `architect` (DDD/Clean Architecture, read-only), `doc-writer` (ADRs, README, CHANGELOG), `security-pentester`, `legacy-surgeon`, `ui-ux-director` - plus pack-specific reviewers/craftsmen for Symfony, React, and AI/ML. Full roster and model tiering: [Agents Reference](docs/reference/agents.md).
 
-### AI/ML Engineering
-
-| Command | Purpose |
-|---------|---------|
-| `/craftsman:rag` | Design RAG pipelines (ingestion, retrieval, generation) |
-| `/craftsman:mlops` | Audit ML projects for production readiness |
-| `/craftsman:agent-design` | Design AI agents using 3P pattern (Perceive/Plan/Perform) |
-
-### Utilities
-
-| Command | Purpose |
-|---------|---------|
-| `/craftsman:scaffold` | Unified scaffolder for all types (entity, usecase, component, hook, api-resource, pack) |
-| `/craftsman:metrics` | Display quality metrics dashboard (violations, trends, sessions) |
-| `/craftsman:setup` | Interactive setup wizard (DISC profile, stack, packs). Use `--quick` for zero-question auto-setup |
-| `/craftsman:team` | Create and manage agent teams for collaborative tasks |
-
-### CI/CD Integration
-
-| Command | Purpose |
-|---------|---------|
-| `/craftsman:ci` | Export quality gates to CI/CD pipeline (GitHub, GitLab, Bitbucket, Jenkins) |
-
-## Features
-
-### Bias Protection (Active by Default)
-
-Hooks automatically detect and warn about cognitive biases:
-
-| Bias | Trigger (context-aware) | Protection |
-|------|---------|------------|
-| **Acceleration** | "fais ça vite", "just do it", "skip the design" | STOP - Design first |
-| **Scope Creep** | "et aussi ajoutons", "let's also add" | STOP - Is this in scope? |
-| **Over-Optimization** | "abstraire ce pattern", "make it generic" | STOP - YAGNI |
-
-### Semantic Intelligence (v1.3.0+)
-
-Agent hooks provide semantic analysis beyond regex:
-
-| Hook | Event | Purpose |
-|------|-------|---------|
-| DDD Verifier (Haiku) | PostToolUse | Checks layer violations, aggregate boundaries, value objects, naming |
-| Sentry Context (Haiku) | PostToolUse | Injects error context from Sentry for edited files |
-| Project Analyzer (Haiku) | InstructionsLoaded | Builds architectural context map at session start |
-| Final Reviewer (Haiku) | Stop | Validates architecture before session end (strict mode) |
-
-### Correction Learning (v1.3.0+)
-
-The plugin detects when you fix Claude-generated code and records patterns in the metrics database. At session start, recent correction trends are injected so Claude learns from past mistakes. View trends with `/craftsman:metrics`.
-
-### Sentry Channel Integration (v1.4.0+)
-
-Sentry MCP server is bound as a channel. When editing files, the PostToolUse agent hook automatically queries Sentry for related errors and injects context. Configure via:
-
-```bash
-# In plugin settings
-sentry_org: your-org
-sentry_project: your-project
-sentry_token: (stored securely)
-```
-
-### Specialized Agents (v1.5.0)
-
-12 agents - 4 reviewers + 8 craftsmen:
-
-| Agent | Role | Model |
-|-------|------|-------|
-| `team-lead` | Orchestrator - delegates, challenges, never codes | Sonnet |
-| `backend-craftsman` | PHP/Symfony expert (Symfony.com + API Platform refs) | Sonnet |
-| `frontend-craftsman` | React/TS expert (65 Vercel best practices) | Sonnet |
-| `architect` | DDD/Clean Architecture validation (read-only) | Sonnet |
-| `ai-engineer` | RAG, LLM, MCP server, agent design | Sonnet |
-| `api-craftsman` | API Platform 4, REST/HATEOAS, OpenAPI | Sonnet |
-| `ui-ux-director` | UX, WCAG 2.1 AA, design tokens | Sonnet |
-| `doc-writer` | ADRs, README, CHANGELOG, runbooks | Haiku |
-| `security-pentester` | Security vulnerability detection | Sonnet |
-| `legacy-surgeon` | Legacy rescue: characterize, break dependencies, strangler-fig | Sonnet |
-| `symfony-reviewer` | Symfony/DDD best practices | Sonnet |
-| `react-reviewer` | React patterns and hooks | Sonnet |
-
-### Code Rule Enforcement (v1.2.0+)
-
-Hooks validate your code automatically with **3-level analysis**:
-
-**Level 1 - Fast Regex (<50ms):** Runs on every write/edit.
-
-| Rule | Language | Check |
-|------|----------|-------|
-| PHP001 | PHP | `declare(strict_types=1)` required |
-| PHP002 | PHP | `final class` on all classes |
-| PHP003 | PHP | No public setters |
-| PHP004 | PHP | No `new DateTime()` direct usage |
-| PHP005 | PHP | No empty catch blocks |
-| TS001 | TypeScript | No `any` types |
-| TS002 | TypeScript | Named exports only |
-| TS003 | TypeScript | No non-null assertions (`!`) |
-| PY001 | Python | No short variable names (min 3 chars) |
-| PY002 | Python | Function max 25 lines |
-| PY003 | Python | Return type hints required |
-| PY004 | Python | No bare `except:` |
-| PY005 | Python | No mutable default arguments |
-| SH001 | Bash | `set -u` required (not in sourced libs) |
-| SH002 | Bash | Function max 30 lines |
-| SH003 | Bash | No short variable names |
-| SH004 | Bash | No `eval` usage |
-| SH005 | Bash | No unquoted variables in file ops |
-| LAYER001 | PHP | Domain cannot import Infrastructure |
-| LAYER002 | PHP | Domain cannot import Presentation |
-| LAYER003 | PHP | Application cannot import Presentation |
-
-**Level 2 - Static Analysis (<2s):** PHPStan, ESLint (when installed). Graceful degradation if tools are absent.
-
-**Level 3 - Architecture (<2s):** Deptrac, dependency-cruiser (when installed).
-
-**Suppressing rules:** Add `// craftsman-ignore: RULE_ID` inline to suppress a specific rule.
-
-Violations are **blocking** (exit 2) - Claude must fix the code before proceeding. All violations are recorded in a local SQLite database for trend tracking via `/craftsman:metrics`.
-
-### Custom Rule Engine (v2.1.0+)
+## Rules Engine
 
 Override any rule per-project or per-directory with 3-level config inheritance:
 
@@ -315,170 +140,50 @@ Override any rule per-project or per-directory with 3-level config inheritance:
       └─ {dir}/.craft-rules.yml      ← Directory overrides
 ```
 
-Short form: `PHP001: warn` / `TS001: ignore`. Long form: custom rules with regex, severity, languages.
+Short form: `PHP001: warn` / `TS001: ignore`. Long form: custom rules with regex, severity, languages. Suppress a single occurrence inline with `// craftsman-ignore: RULE_ID`.
 
-### CI/CD Integration (v2.1.0+)
+## CI/CD Integration
 
-Same rules engine runs in hooks (real-time) AND CI (pipeline). 4 providers with adapter pattern:
+Same rules engine, zero drift between local hooks and CI, 4 providers:
 
-| Provider | Template | Annotations |
-|----------|----------|-------------|
-| GitHub Actions | `craftsman-quality-gate.yml` | `::error` inline |
-| GitLab CI | `.gitlab-ci.craftsman.yml` | codequality artifact |
-| Bitbucket Pipelines | `bitbucket-pipelines.craftsman.yml` | Reports API |
-| Jenkins | `Jenkinsfile.craftsman` | Console output |
+| Provider | Template |
+|----------|----------|
+| GitHub Actions | `craftsman-quality-gate.yml` |
+| GitLab CI | `.gitlab-ci.craftsman.yml` |
+| Bitbucket Pipelines | `bitbucket-pipelines.craftsman.yml` |
+| Jenkins | `Jenkinsfile.craftsman` |
 
-Use `/craftsman:ci export` to generate or `craftsman-ci.sh init --provider` from CLI.
+Use `/craftsman:ci export` or `craftsman-ci.sh init --provider` from the CLI.
 
-### Circuit Breaker (v2.1.0+)
+Also enforced by hooks: the [Circuit Breaker](docs/reference/hooks.md#circuit-breaker-v210) protects Sentry integration during outages, and the [Iron Law Pattern](docs/reference/hooks.md#iron-law-pattern-v210) blocks impulsive architecture changes made without a prior `/craftsman:design` pass. Full hook behavior, exit codes, and rule IDs: [Hooks Reference](docs/reference/hooks.md).
 
-Production-grade protection for external services (Sentry). 3 states: closed → open → half-open. File-based cache with TTL/LRU eviction serves stale data during outages.
+## Advanced: Knowledge Base RAG (optional)
 
-### Pack Template Variants (v2.1.0+)
-
-Each scaffolder offers template selection before generating code:
-
-| Pack | Template | Use Case |
-|------|----------|----------|
-| Symfony | `bounded-context` | Standard DDD entity |
-| Symfony | `crud-api` | API Platform 4 CRUD |
-| Symfony | `event-sourced` | Event Sourcing + Projections |
-| React | `bounded-context` | Standard TanStack Query hook |
-| React | `form-heavy` | Multi-step wizard + Zod |
-| React | `dashboard-data` | TanStack Table + Recharts |
-
-### Schema Validation & Safety (v2.2.0+)
-
-- **Hooks schema validation** - `session-start.sh` validates all hook events against the supported set at startup
-- **Atomic commit enforcement** - Stop hook warns when >15 files modified, caps inspection at 20
-- **Monorepo sampling** - InstructionsLoaded switches to directory-level analysis for large codebases (>100 files)
-
-## Advanced: Knowledge Base RAG (Optional)
-
-The plugin includes an **optional** MCP server for RAG (Retrieval-Augmented Generation) over local documents.
-
-> **Note:** The plugin is fully functional without the MCP. This is a power-user feature.
-> The MCP server is **conditional** - it only activates when the `ai-ml` pack is explicitly enabled in your plugin config. Users without it get zero errors.
-
-### Prerequisites
-
-- Node.js 20+
-- [Ollama](https://ollama.ai) with `nomic-embed-text` model
-
-### Setup
+An **optional** MCP server adds RAG over your local documents. Fully inert unless the `ai-ml` pack is enabled - zero errors for users who don't need it.
 
 ```bash
-# 1. Enable the ai-ml pack in your plugin config
-# Set packs: "ai-ml" (or "symfony,react,ai-ml") in Claude Code plugin settings
-
-# 2. Install Ollama
 brew install ollama && ollama pull nomic-embed-text
-ollama serve  # Keep running
+ollama serve
 
-# 3. Restart Claude Code - the MCP server auto-installs and builds on first run
-#    (runs `npm install` inside the plugin directory: @modelcontextprotocol/sdk,
-#     better-sqlite3, pdf-parse. One-time, scoped to the plugin, nothing global)
-
-# 4. Create knowledge directory & add documents
 mkdir -p ~/.claude/ai-craftsman-superpowers/knowledge
 cp ~/your-docs/*.pdf ~/.claude/ai-craftsman-superpowers/knowledge/
-
-# 5. Index knowledge base (from plugin cache directory)
-cd ~/.claude/plugins/cache/ai-craftsman-superpowers/craftsman/*/packs/ai-ml/mcp/knowledge-rag
-npm run index:ollama
 ```
 
-See [Local RAG Setup Guide](docs/guides/local-rag-ollama.md) and [MCP Reference](docs/reference/mcp-servers.md) for detailed instructions.
-
-> **Why Ollama?** 100% local, free, private. See [ADR-0002](docs/adr/0002-ollama-over-openai.md).
+See [Local RAG Setup Guide](docs/guides/local-rag-ollama.md) and [MCP Reference](docs/reference/mcp-servers.md) for the full setup, and [ADR-0002](docs/adr/0002-ollama-over-openai.md) for why Ollama over a cloud provider.
 
 ## CLAUDE.md Configuration
 
-Understanding how to structure your CLAUDE.md files is crucial for optimal plugin integration.
+Priority order: explicit user instruction → project `CLAUDE.md` → plugin (skills, hooks, knowledge) → global `~/.claude/CLAUDE.md`.
 
-### Priority Hierarchy
-
-```
-1. Explicit user instruction     ← Highest
-2. Project CLAUDE.md (./CLAUDE.md)
-3. Plugin (skills, hooks, knowledge)
-4. Global CLAUDE.md (~/.claude/CLAUDE.md)  ← Lowest
-```
-
-### Quick Rules
-
-| Put in Global | Put in Project | Let Plugin Handle |
-|---------------|----------------|-------------------|
-| DISC profile | Architecture | Code enforcement |
-| Communication style | Key entities | Design patterns |
-| Personal biases | External services | Canonical examples |
-| Stack versions | Project rules | Skill routing |
-
-See **[CLAUDE.md Best Practices Guide](docs/guides/claude-md-best-practices.md)** for complete documentation.
+Put DISC profile/communication style/personal biases in your **global** CLAUDE.md, architecture/key entities/project rules in your **project** CLAUDE.md, and let the **plugin** handle code enforcement and design patterns. Full guidance: [CLAUDE.md Best Practices Guide](docs/guides/claude-md-best-practices.md).
 
 ## Architecture Decisions
 
-See [`/docs/adr`](docs/adr/) for Architecture Decision Records:
-
-- [ADR-0001: Skills over Prompts](docs/adr/0001-skills-over-prompts.md)
-- [ADR-0002: Ollama over OpenAI](docs/adr/0002-ollama-over-openai.md)
-- [ADR-0003: SQLite over pgvector](docs/adr/0003-sqlite-over-pgvector.md)
-- [ADR-0004: 3P Agent Pattern](docs/adr/0004-3p-agent-pattern.md)
-- [ADR-0005: Knowledge-First Architecture](docs/adr/0005-knowledge-first-architecture.md)
-- [ADR-0006: Project-Specific Knowledge](docs/adr/0006-project-specific-knowledge.md)
-- [ADR-0007: Commands over Skills](docs/adr/0007-commands-over-skills.md)
-- [ADR-0008: Inline SQLite over Bash Expansion](docs/adr/0008-inline-sqlite-over-bash-expansion.md)
-- [ADR-0009: Command Hooks over Agent Hooks](docs/adr/0009-command-hooks-over-agent-hooks.md)
-- [ADR-0010: Model Tiering Strategy](docs/adr/0010-model-tiering.md)
-- [ADR-0011: Context Fork Strategy](docs/adr/0011-context-fork-strategy.md)
-- [ADR-0012: Progressive Disclosure](docs/adr/0012-progressive-disclosure.md)
-- [ADR-0013: Workflow Orchestrator](docs/adr/0013-workflow-orchestrator.md)
-- [ADR-0014: Quick Setup Mode](docs/adr/0014-quick-setup-mode.md)
-
-## Examples
-
-See [`/examples`](examples/) for detailed usage examples:
-
-- [Design: Create Entity](examples/design/01-create-entity.md)
-- [Debug: Memory Leak](examples/debug/01-memory-leak.md)
-- [Challenge: Code Review](examples/challenge/01-code-review.md)
-- [Plan: Migration](examples/plan/01-migration-microservices.md)
-- [Refactor: Extract Value Object](examples/refactor/01-extract-value-object.md)
-- [Git: Safe Commit](examples/git/01-safe-commit.md)
-- [Test: Testing Strategy](examples/test/01-testing-strategy.md)
-- [Verify: Pre-Commit Verification](examples/verify/01-pre-commit-verification.md)
-- [Healthcheck: Plugin Diagnostic](examples/healthcheck/01-plugin-diagnostic.md)
-- [Team: Fullstack Feature](examples/team/01-feature-fullstack.md)
-- [Parallel: Code Review](examples/parallel/01-parallel-review.md)
-- [Setup: Quick Setup](examples/setup/01-quick-setup.md)
-- [Workflow: Feature Development](examples/workflow/01-feature-workflow.md)
-- [Workflow: Resume from Implement](examples/workflow/02-workflow-from-implement.md)
-
-## Architecture
-
-```
-hooks/              → Real-time validation (SessionStart → PostToolUse → Stop → SessionEnd)
-hooks/lib/          → Shared libraries (pack-loader, config, rules-engine, metrics, static-analysis)
-commands/           → Core user-invoked workflows (21 skills)
-agents/             → Core agents (12) + pack symlinks
-knowledge/          → Core methodology, language-agnostic (Clean Architecture, Hexagonal, DDD, TDD,
-                      testing strategy, refactoring, legacy techniques, patterns, principles, anti-patterns)
-  ddd/              → Entities, value objects, aggregates, CQRS (agnostic)
-  legacy/           → Seams, characterization testing, strangler fig
-  refactoring/      → Mikado method, hotspot-driven campaigns
-  anti-patterns/    → God object, primitive obsession, singleton abuse, and more
-packs/              → Loadable language packs
-  symfony/          → PHP/Symfony pack (validators, agents, knowledge, templates)
-  react/            → React/TypeScript pack (validators, agents, knowledge, templates)
-  ai-ml/            → AI/ML pack (agents, knowledge, commands)
-ci/                 → CI pipeline integration (adapter pattern)
-```
+16 ADRs cover the reasoning behind every major design choice - see [`/docs/adr`](docs/adr/). Start with [ADR-0007: Commands over Skills](docs/adr/0007-commands-over-skills.md) and [ADR-0005: Knowledge-First Architecture](docs/adr/0005-knowledge-first-architecture.md) if you're evaluating the plugin's design.
 
 ## Using with Superpowers Plugin
 
-Craftsman and [Superpowers](https://github.com/anthropics/claude-code-plugins/tree/main/superpowers) are complementary. Superpowers provides workflow orchestration (brainstorming, planning, TDD, subagent-driven development). Craftsman provides domain-specific quality enforcement (DDD rules, architectural validation, correction learning).
-
-**Recommended development flow:**
+Craftsman and [Superpowers](https://github.com/anthropics/claude-code-plugins/tree/main/superpowers) are complementary and load simultaneously with no conflicts. Superpowers handles workflow orchestration (brainstorming, planning, TDD, subagent-driven development); Craftsman handles domain-specific quality enforcement (DDD rules, architectural validation, correction learning).
 
 ```
 1. /superpowers:brainstorming     → Design the solution collaboratively
@@ -491,81 +196,28 @@ Craftsman and [Superpowers](https://github.com/anthropics/claude-code-plugins/tr
 5. /superpowers:finishing-a-development-branch → PR and merge
 ```
 
-**What each plugin handles:**
-
-| Concern | Superpowers | Craftsman |
-|---------|-------------|-----------|
-| Workflow orchestration | Brainstorming, planning, TDD | - |
-| Code quality enforcement | - | Hooks, rules engine, correction learning |
-| Architecture validation | - | Layer boundaries, DDD patterns |
-| Bias detection | - | Acceleration, scope creep, over-optimization |
-| CI pipeline | - | Multi-provider adapter pattern |
-| Subagent management | Dispatch, review loops | Quality gate on subagent output |
-
-Both plugins load simultaneously. No configuration needed - hooks.json events do not conflict.
-
 ## Philosophy
 
 > "Weeks of coding can save hours of planning."
 
-### Core Principles
+Design before code. Test-first. Systematic debugging over random fixes. YAGNI. Clean Architecture - dependencies point inward. Make it work, make it right, make it fast, in that order.
 
-1. **Design before code** - Understand, challenge, then implement
-2. **Test-first** - If you can't write the test, you don't understand the requirement
-3. **Systematic debugging** - No random fixes, find root cause first
-4. **YAGNI** - Build what's needed, not what might be needed
-5. **Clean Architecture** - Dependencies point inward
-6. **Make it work, make it right, make it fast** - In that order
-
-### Pragmatism over Dogmatism
-
-| Dogmatic | Pragmatic (our choice) |
-|----------|------------------------|
-| 100% test coverage | Critical paths covered (80%) |
-| Pure DDD everywhere | DDD for complex domains only |
-| Always abstract | Concrete first, abstract when needed |
+Pragmatism over dogmatism: 80% coverage on critical paths beats 100% everywhere; DDD for complex domains, not every domain; concrete first, abstract when actually needed.
 
 ## Security
 
-This plugin prioritizes transparency and safety:
+Command hooks and reviewer agents are read-only except for the local metrics DB and session state. Agent hooks (Haiku) never modify files. Violations block (exit 2); bias detection only warns (exit 0).
 
-| Component | Behavior | Modifies Files? |
-|-----------|----------|-----------------|
-| Commands | Prompt templates | Only when instructed |
-| Reviewer Agents | Code analysis (11 agents) | Never (read-only) |
-| Craftsman Agents | Implementation (8 agents) | When instructed |
-| Command Hooks | Validation scripts (15 scripts) | Never (read-only, except metrics DB + session state) |
-| Agent Hooks | Semantic analysis (4 agents, Haiku) | Never (read-only) |
-
-**Hooks use exit codes** - Bias detection warns (exit 0). Code rule violations **block** (exit 2) to enforce quality standards. See [Hooks Reference](docs/reference/hooks.md).
-
-### Data & Network Transparency
-
-| What | Where it goes | When |
-|------|---------------|------|
-| Edited file content | Anthropic API (Haiku, via Claude Code) | Only if `agent_hooks: true` (default). Disable to run fully offline |
-| File paths for error lookup | Sentry API (read-only, via MCP) | Only if `sentry_org`/`sentry_project` configured |
-| Metrics, corrections, session state | Local SQLite (`${CLAUDE_PLUGIN_DATA}/metrics.db`) | Always. Never leaves your machine |
-| RAG embeddings | Local Ollama + local SQLite | Only if `ai-ml` pack enabled. No third-party calls |
-
-No telemetry, no analytics, no phone-home. With `agent_hooks: false` and no Sentry config, zero network activity.
-
-See [SECURITY.md](./SECURITY.md) for full security documentation.
+**No telemetry, no analytics, no phone-home.** With `agent_hooks: false` and no Sentry config, zero network activity. Edited file content only reaches the Anthropic API when `agent_hooks: true` (default); Sentry is only queried if configured; metrics and RAG embeddings never leave your machine. Full breakdown: [SECURITY.md](SECURITY.md#data--network-transparency).
 
 ### Pre-Installation Verification
 
-Verify the plugin before installing:
-
 ```bash
-# Clone and inspect
 git clone https://github.com/BULDEE/ai-craftsman-superpowers.git
 cd ai-craftsman-superpowers
 
-# Review hooks (the only executable code)
-cat hooks/bias-detector.sh
-cat hooks/post-write-check.sh
-cat hooks/pre-write-check.sh
-cat hooks/session-metrics.sh
+# Review hooks - the only executable code
+cat hooks/bias-detector.sh hooks/post-write-check.sh hooks/pre-write-check.sh hooks/session-metrics.sh
 
 # Verify no network calls
 grep -r "curl\|wget\|fetch\|http" hooks/
@@ -574,101 +226,31 @@ grep -r "curl\|wget\|fetch\|http" hooks/
 
 ## Known Limitations
 
-### By Design
+**By design:** code rule violations block, bias detection only warns; no auto-commit; commands are explicitly invoked, never auto-triggered; methodology is opinionated (DDD/Clean Architecture).
 
-- **Hooks block on violations** - Code rule violations are blocking (exit 2); bias detection is warning-only (exit 0)
-- **No auto-commit** - All git operations require explicit user action
-- **Commands are opinionated** - Follows DDD/Clean Architecture strictly
-- **Explicit invocation** - Commands are deliberately invoked, not auto-triggered
+**Current constraints:** PHP/TypeScript get full rule coverage, other languages basic support only; RAG requires Ollama (no cloud embedding providers); bias detection patterns are EN/FR only; auto-fixing violations and IDE plugins are not supported by design.
 
-### Current Constraints
-
-- **PHP/TypeScript focus** - Other languages have basic support only
-- **RAG requires Ollama** - No cloud embedding providers supported
-- **English/French only** - Bias detection patterns in EN/FR
-
-### Not Supported
-
-- ❌ Auto-fixing violations (by design, for safety)
-- ❌ IDE plugins (Claude Code CLI only)
+More detail in the [FAQ](FAQ.md).
 
 ## Contributing
 
-We welcome contributions! This is an open source project.
+Contributions welcome - this is an open source project.
 
 1. Fork the repository
 2. Create a feature branch
-3. Follow the craftsman methodology (use `/craftsman:design` first!)
+3. Follow the craftsman methodology (`/craftsman:design` first!)
 4. Add tests for new features
 5. Submit a PR
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
-
-### Ideas for Contributions
-
-- New skills for other frameworks (Django, Rails, Go)
-- Additional language support for hooks
-- Improved examples and documentation
-- Integration tests
-- Translations
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines. Looking for ideas? New framework skills (Django, Rails, Go), additional hook language support, examples, integration tests, and translations are all welcome.
 
 ## Troubleshooting
 
-### Commands not appearing in autocompletion
-
-**Symptom:** `/cra<TAB>` doesn't suggest craftsman commands, but they work when typed fully.
-
-**Cause:** Version mismatch between `plugin.json` and `marketplace.json` prevents cache updates.
-
-**Fix:**
-```bash
-# Force update the plugin
-claude plugin update craftsman@ai-craftsman-superpowers
-
-# If still not working, clear cache and reinstall
-rm -rf ~/.claude/plugins/cache/ai-craftsman-superpowers
-claude plugin install craftsman@ai-craftsman-superpowers
-
-# Restart Claude Code
-exit
-claude
-```
-
-### Skills not loading
-
-```bash
-# Clear plugin cache
-rm -rf ~/.claude/plugins/cache
-
-# Restart Claude Code
-exit
-claude
-
-# Reinstall plugin
-/plugin uninstall craftsman@BULDEE-ai-craftsman-superpowers
-/plugin install craftsman@BULDEE-ai-craftsman-superpowers
-```
-
-### Check for errors
-
-```bash
-# Open plugin manager
-/plugin
-
-# Go to "Errors" tab
-# Check for missing dependencies or path issues
-```
-
-### Hooks not running
-
-Verify hooks are enabled in your scope:
-1. `/plugin` → "Installed" tab
-2. Select craftsman plugin
-3. Check "Hooks enabled" status
+Moved to [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ## License
 
-Apache License 2.0 - See [LICENSE](LICENSE)
+Apache License 2.0 - see [LICENSE](LICENSE)
 
 ## Support
 
@@ -679,8 +261,6 @@ Apache License 2.0 - See [LICENSE](LICENSE)
 
 ## Sponsors
 
-This project is proudly sponsored by:
-
 | Sponsor | Description |
 |---------|-------------|
 | **[BULDEE](https://buldee.com)** | Building the future of AI-assisted development |
@@ -690,9 +270,7 @@ Interested in sponsoring? [Contact us](https://github.com/BULDEE/ai-craftsman-su
 
 ## Acknowledgments
 
-- Built following [Anthropic's official plugin guidelines](https://code.claude.com/docs/en/discover-plugins)
-- Inspired by DDD, Clean Architecture, and TDD principles
-- Thanks to all contributors and sponsors!
+Built following [Anthropic's official plugin guidelines](https://code.claude.com/docs/en/discover-plugins), inspired by DDD, Clean Architecture, and TDD principles. Thanks to all contributors and sponsors!
 
 ---
 

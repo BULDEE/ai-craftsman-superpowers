@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.8.0] - 2026-07-14
+
+### Added
+- **Config protection hook** (`hooks/config-protection.sh`, PreToolUse Write|Edit). Blocks writes to single-purpose linter/formatter/architecture config files (`phpstan.neon*`, `.eslintrc*`, `eslint.config.*`, `.php-cs-fixer*`, `deptrac.y(a)ml`, `.dependency-cruiser.*`) so an agent can't silently loosen a rule instead of fixing the flagged code. `.craft-config.yml` and multi-purpose files (`pyproject.toml`, `package.json`) are intentionally excluded. Escape hatch: `CRAFTSMAN_DISABLED_HOOKS=config-protection`.
+- **Hook profiles** (`hooks/lib/hook-profile.sh`). Session-level opt-out of secondary/costed hooks via `CRAFTSMAN_HOOK_PROFILE=minimal`, `CRAFTSMAN_DISABLED_HOOKS=<ids>`, and `CRAFTSMAN_HOOK_DRY_RUN=true`. Wired into the 4 agent hooks plus `post-bash-test-verify`, `tool-failure-tracker`, `subagent-quality-gate`, `file-changed`, `pre-push-verify`. Core quality gate, bias detection, and session bookkeeping deliberately do not support it.
+- **Security invariant tests** (`tests/core/test-security-invariants.sh`). Sandbox + witness-marker suite proving `config-protection.sh` and `pre-write-check.sh` never execute injected code or touch files outside their contract, and fail open on malformed stdin. Plus `tests/core/test-config-protection.sh` for functional coverage; both registered in `tests/run-tests.sh`.
+- **Prompt Injection Defense Baseline** in `SECURITY.md`: external content relayed by hooks (Sentry payloads, RAG documents) is data, never instructions. `CONTRIBUTING.md` gains a security review checklist (permission creep, injection surface, blast radius) for new commands/agents/skills.
+- **French README** (`README.fr.md`) plus `FAQ.md`, `MIGRATION.md`, `TROUBLESHOOTING.md`, `COMMANDS-QUICK-REF.md`, and GitHub Sponsors funding config.
+
+### Changed
+- **CI hardening** (`.github/workflows/ci.yml`): all actions pinned by commit SHA, top-level `permissions: contents: read`, shell scripts discovered dynamically instead of a hardcoded list, ShellCheck blocking on real errors, new `lint-python` job (ruff, bugs-only blocking), and the test suite now runs on a `ubuntu-latest` + `macos-latest` matrix.
+- **README.md** restructured: differentiators condensed, install verification collapsed, marketing tables moved to `COMMANDS-QUICK-REF.md`, supply-chain warning added, dynamic version/CI badges.
+- `docs/reference/hooks.md` documents config protection, hook profiles, security invariant tests, Iron Law, and circuit breaker.
+- `commands/scaffold.md` documents pack template variants.
+
+### Removed
+- Internal working documents from the public repo: `docs/roadmap-v3.6-v4.0.md`, `docs/audit-report-2026-03-30.md`, `docs/SUBMISSION-TEMPLATE.md`, `tests/BRUTAL-EVALUATION-PROMPT.md`.
+
 ## [3.7.0] - 2026-07-06
 
 ### Added

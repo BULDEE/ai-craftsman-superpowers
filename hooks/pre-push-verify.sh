@@ -12,6 +12,8 @@ set -uo pipefail
 trap 'echo "WARNING: pre-push-verify.sh failed at line $LINENO" >&2; exit 0' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/hook-profile.sh"
+hook_profile_should_run "pre-push-verify" "standard,strict" || exit 0
 source "${SCRIPT_DIR}/lib/config.sh"
 
 # Resolve the session-state path via the bridge file written by session-start.sh.

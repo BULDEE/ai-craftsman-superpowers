@@ -32,3 +32,14 @@ commands/rag.md
 # Test artifacts
 coverage/
 .nyc_output/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# External tool junk (graphify skill, Playwright MCP)
+graphify-out/
+.playwright-mcp/
+
+# Node dependencies (installed on demand, e.g. packs/ai-ml/mcp/knowledge-rag)
+node_modules/

@@ -11,6 +11,8 @@ set -uo pipefail
 trap 'exit 0' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/hook-profile.sh"
+hook_profile_should_run "post-bash-test-verify" "standard,strict" || exit 0
 
 INPUT=$(cat)
 
