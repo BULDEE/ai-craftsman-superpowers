@@ -228,9 +228,18 @@ jobs:
       - name: Check scripts are executable
         run: |
           echo "Checking script permissions..."
+          # Only direct-exec entry points need the exec bit. Sourced libraries
+          # (hooks/lib/*, pack validators via pack-loader.sh) and test files
+          # invoked as `bash <file>` (run-tests.sh, hooks.json) do not.
           FAILED=0
           while IFS= read -r script; do
             [ -z "$script" ] && continue
+            case "$script" in
+              tests/run-tests.sh) ;;
+              hooks/lib/*|packs/*|tests/*)
+                echo "- $script (sourced/bash-invoked, exec bit not required)"
+                continue ;;
+            esac
             if [ -x "$script" ]; then
               echo "✓ $script is executable"
             else
