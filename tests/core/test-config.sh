@@ -17,6 +17,12 @@ mkdir -p "$TEST_DIR"
 ORIGINAL_PWD="$PWD"
 cd "$TEST_DIR"
 
+# Sandbox HOME so a developer's real ~/.claude/.craft-config.yml can never
+# leak into these tests (config.sh reads ${HOME}/.claude/.craft-config.yml)
+ORIGINAL_HOME="$HOME"
+export HOME="$TEST_DIR/home"
+mkdir -p "$HOME/.claude"
+
 # Clean env before each test section
 unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
@@ -103,6 +109,72 @@ else
 fi
 
 rm -f "$TEST_DIR/.craft-config.yml"
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
+
+# =============================================================================
+# 3b. Global config fallback (~/.claude/.craft-config.yml)
+# =============================================================================
+echo ""
+echo "=== Global Config Fallback ==="
+
+GLOBAL_CONFIG="$HOME/.claude/.craft-config.yml"
+
+# Global-only value resolves (no PWD file, no env var)
+rm -f "$TEST_DIR/.craft-config.yml"
+unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
+
+cat > "$GLOBAL_CONFIG" <<'YAML'
+strictness: moderate
+stack: symfony
+YAML
+
+result=$(config_strictness)
+if [[ "$result" == "moderate" ]]; then
+    log_pass "Global config strictness applies when nothing else is set"
+else
+    log_fail "Global config strictness should apply" "got '$result', expected 'moderate'"
+fi
+
+result=$(config_stack)
+if [[ "$result" == "symfony" ]]; then
+    log_pass "Global config stack applies when nothing else is set"
+else
+    log_fail "Global config stack should apply" "got '$result', expected 'symfony'"
+fi
+
+# Env var overrides global config (explicit plugin config wins)
+export CLAUDE_PLUGIN_OPTION_strictness="relaxed"
+
+result=$(config_strictness)
+if [[ "$result" == "relaxed" ]]; then
+    log_pass "Env var overrides global config"
+else
+    log_fail "Env var should override global config" "got '$result', expected 'relaxed'"
+fi
+
+# PWD config overrides global config
+cat > "$TEST_DIR/.craft-config.yml" <<'YAML'
+strictness: strict
+YAML
+
+result=$(config_strictness)
+if [[ "$result" == "strict" ]]; then
+    log_pass "PWD config overrides global config and env var"
+else
+    log_fail "PWD config should override global config" "got '$result', expected 'strict'"
+fi
+
+# Global fills only the keys the higher sources leave unset
+result=$(config_stack)
+if [[ "$result" == "symfony" ]]; then
+    log_pass "Global config fills keys missing from PWD config"
+else
+    log_fail "Global config should fill missing keys" "got '$result', expected 'symfony'"
+fi
+
+rm -f "$TEST_DIR/.craft-config.yml" "$GLOBAL_CONFIG"
 unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
@@ -422,6 +494,7 @@ unset CLAUDE_PLUGIN_OPTION_sentry_project 2>/dev/null || true
 # Cleanup
 # =============================================================================
 cd "$ORIGINAL_PWD"
+export HOME="$ORIGINAL_HOME"
 unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 unset CLAUDE_PLUGIN_OPTION_sentry_org 2>/dev/null || true
