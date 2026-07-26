@@ -38,7 +38,7 @@ VERDICT=$(haiku_verify "$PROMPT") || exit 0
 if [[ "$VERDICT" == DDD_VIOLATIONS* ]]; then
     {
         echo "DDD verification (Haiku) found issues in ${FILE_PATH}:"
-        echo "${VERDICT#DDD_VIOLATIONS}"
+        haiku_findings "${VERDICT#DDD_VIOLATIONS}"
         echo "Fix them or justify why they are acceptable."
     } >&2
     exit 2

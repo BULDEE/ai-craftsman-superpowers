@@ -50,7 +50,7 @@ if [[ "$VERDICT" == REVIEW_ISSUES* ]]; then
     echo $((REWAKES + 1)) > "$BUDGET_FILE" 2>/dev/null || true
     {
         echo "Final review (Haiku) found architecture issues in this session's changes:"
-        echo "${VERDICT#REVIEW_ISSUES}"
+        haiku_findings "${VERDICT#REVIEW_ISSUES}"
         if [[ "$FILE_COUNT" -gt 15 ]]; then
             echo "Also: ${FILE_COUNT} files changed - prefer small atomic commits (1-5 files each) before pushing."
         fi
