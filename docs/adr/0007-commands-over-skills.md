@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted** - 2025-02-04
+**Superseded** by [ADR-0017: Skills Over Commands](0017-skills-over-commands.md) (2026-07-26). The constraints below (skills invisible in `/help`, no explicit invocation, no invocation control) no longer exist: commands were merged into skills. Originally Accepted 2025-02-04.
 
 ## Context
 

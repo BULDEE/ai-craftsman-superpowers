@@ -114,7 +114,7 @@ One optional layer adds deeper semantic analysis via Haiku agent hooks (DDD laye
 
 ## Commands
 
-All commands are explicitly invoked with `/craftsman:command-name` (see [ADR-0007](docs/adr/0007-commands-over-skills.md) for why). Full reference: [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md).
+All commands are explicitly invoked with `/craftsman:command-name`. Full reference: [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md). In v4 these become skills with forked execution and live context injection, with unchanged invocations - see [ADR-0017](docs/adr/0017-skills-over-commands.md).
 
 | Category | Commands |
 |----------|----------|
@@ -177,9 +177,20 @@ Priority order: explicit user instruction → project `CLAUDE.md` → plugin (sk
 
 Put DISC profile/communication style/personal biases in your **global** CLAUDE.md, architecture/key entities/project rules in your **project** CLAUDE.md, and let the **plugin** handle code enforcement and design patterns. Full guidance: [CLAUDE.md Best Practices Guide](docs/guides/claude-md-best-practices.md).
 
+## Roadmap: v4.0.0 - The Self-Learning Craftsman System
+
+The next major version is decided and in progress: a **clean break** targeting Claude Code >= 2.1.218, with no backward compatibility (the 3.9.x line stays available and frozen). Headlines:
+
+- **Closed learning loop**: recurring corrections become candidate instincts you review in `/craftsman:metrics`; approved ones are codified as project skills. Detection stays automatic, codification stays human-gated.
+- **Native-first architecture**: workflows become forked skills with live context injection, bash agent-hook wrappers become native Haiku-tiered `agent`/`prompt` hooks, verification uses `asyncRewake` and `TaskCompleted` gates.
+- **Semantic Level 1.5**: LSP-backed validation between the regex gate and static analysis, activating only on language servers you already have installed - the plugin orchestrates your stack's tooling, never substitutes for it.
+- **Context discipline**: every injection capped by configurable budgets, every hook individually disableable.
+
+Full plan and phases: [docs/v4-roadmap.md](docs/v4-roadmap.md). Decisions: ADRs [0016](docs/adr/0016-v4-clean-break-native-first.md) through [0023](docs/adr/0023-deterministic-verification-loop.md). Breaking changes: [MIGRATION.md](MIGRATION.md).
+
 ## Architecture Decisions
 
-16 ADRs cover the reasoning behind every major design choice - see [`/docs/adr`](docs/adr/). Start with [ADR-0007: Commands over Skills](docs/adr/0007-commands-over-skills.md) and [ADR-0005: Knowledge-First Architecture](docs/adr/0005-knowledge-first-architecture.md) if you're evaluating the plugin's design.
+24 ADRs cover the reasoning behind every major design choice - see [`/docs/adr`](docs/adr/). Start with [ADR-0016: v4 Clean Break](docs/adr/0016-v4-clean-break-native-first.md) and [ADR-0005: Knowledge-First Architecture](docs/adr/0005-knowledge-first-architecture.md) if you're evaluating the plugin's design.
 
 ## Using with Superpowers Plugin
 

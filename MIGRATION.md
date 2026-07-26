@@ -2,7 +2,23 @@
 
 Breaking changes only. Minor/patch upgrades never require manual action - see [CHANGELOG.md](CHANGELOG.md) for the full history.
 
-## 2.x / 3.x → 3.7.0 (current)
+## 3.x → 4.0.0 (upcoming)
+
+**What changes:** v4 is a clean break to a native-first architecture (full rationale in [docs/v4-roadmap.md](docs/v4-roadmap.md) and ADRs 0016-0023). No backward compatibility with 3.x config or older Claude Code versions.
+
+**Requirements:**
+- Claude Code **>= 2.1.218** (`claude --version` to check). Older versions must stay on the 3.9.x line, which remains available and frozen.
+
+**Breaking changes:**
+- `commands/*.md` are removed; every workflow is now a skill (`skills/<name>/SKILL.md`). User-facing invocations are unchanged: `/craftsman:design`, `/craftsman:challenge`, etc. keep working. Anything that referenced plugin command file paths directly must point at the skill paths instead.
+- `output-styles/` is removed; the plugin activates its main-thread agent via plugin `settings.json`.
+- The bash agent-hook wrappers (`agent-ddd-verifier.sh`, `agent-sentry-context.sh`, `agent-final-review.sh`, `subagent-quality-gate.sh`) are replaced by native `agent`/`prompt` hooks. If you disabled them via `agent_hooks: false`, that option still works and now costs nothing when off.
+- `.craft-config.yml` gains a `v: 4` marker plus new `context_budget` and `hooks.disabled` keys, validated by a JSON schema. Run `/craftsman:setup` after upgrading: it migrates a 3.x config in place and shows you what it inferred. A 3.x config without `v: 4` is reported by `/craftsman:healthcheck` but not silently interpreted.
+- The metrics database moves from `~/.claude/plugins/data/craftsman/` to `${CLAUDE_PLUGIN_DATA}`. Migration is automatic on first run (the old file is copied, never deleted).
+
+**New after upgrade:** LSP-backed Level 1.5 validation (activates only if your language server is already installed), learned-skill promotion with human review in `/craftsman:metrics`, setup by observation (generated project-conventions skill and codemap), `asyncRewake` test-failure wake-ups, and a `TaskCompleted` evidence gate following your `strictness` setting.
+
+## 2.x / 3.x → 3.7.0
 
 No breaking changes since 3.0.0. Safe to upgrade directly.
 

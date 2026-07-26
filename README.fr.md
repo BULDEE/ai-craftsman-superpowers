@@ -114,7 +114,7 @@ Une couche optionnelle ajoute une analyse sémantique plus profonde via des hook
 
 ## Commandes
 
-Toutes les commandes s'invoquent explicitement avec `/craftsman:nom-de-commande` (voir [ADR-0007](docs/adr/0007-commands-over-skills.md) pour la justification). Référence complète : [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md).
+Toutes les commandes s'invoquent explicitement avec `/craftsman:nom-de-commande`. Référence complète : [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md). En v4 elles deviennent des skills avec exécution forkée et injection de contexte en direct, invocations inchangées : voir [ADR-0017](docs/adr/0017-skills-over-commands.md).
 
 | Catégorie | Commandes |
 |-----------|-----------|
@@ -177,9 +177,20 @@ Ordre de priorité : instruction utilisateur explicite → `CLAUDE.md` de projet
 
 Mettez le profil DISC/style de communication/biais personnels dans votre CLAUDE.md **global**, l'architecture/entités clés/règles projet dans votre CLAUDE.md **projet**, et laissez le **plugin** gérer l'application des règles de code et les design patterns. Guide complet : [CLAUDE.md Best Practices Guide](docs/guides/claude-md-best-practices.md).
 
+## Roadmap : v4.0.0 - Le système craftsman auto-apprenant
+
+La prochaine version majeure est décidée et en cours : une **rupture nette** ciblant Claude Code >= 2.1.218, sans rétrocompatibilité (la branche 3.9.x reste disponible et gelée). Les grandes lignes :
+
+- **Boucle d'apprentissage fermée** : les corrections récurrentes deviennent des instincts candidats que vous validez dans `/craftsman:metrics` ; les instincts approuvés sont codifiés en skills projet. La détection reste automatique, la codification reste validée par un humain.
+- **Architecture native-first** : les workflows deviennent des skills forkés avec injection de contexte en direct, les wrappers bash de hooks agents deviennent des hooks natifs `agent`/`prompt` sur Haiku, la vérification s'appuie sur `asyncRewake` et les gates `TaskCompleted`.
+- **Niveau 1.5 sémantique** : validation LSP entre le gate regex et l'analyse statique, activée uniquement sur les serveurs de langage déjà installés : le plugin orchestre l'outillage de votre stack, il ne s'y substitue jamais.
+- **Discipline de contexte** : chaque injection plafonnée par des budgets configurables, chaque hook désactivable individuellement.
+
+Plan complet et phases : [docs/v4-roadmap.md](docs/v4-roadmap.md). Décisions : ADR [0016](docs/adr/0016-v4-clean-break-native-first.md) à [0023](docs/adr/0023-deterministic-verification-loop.md). Changements cassants : [MIGRATION.md](MIGRATION.md).
+
 ## Décisions d'architecture
 
-16 ADR couvrent le raisonnement derrière chaque choix de conception majeur : voir [`/docs/adr`](docs/adr/). Commencez par [ADR-0007: Commands over Skills](docs/adr/0007-commands-over-skills.md) et [ADR-0005: Knowledge-First Architecture](docs/adr/0005-knowledge-first-architecture.md) si vous évaluez la conception du plugin.
+24 ADR couvrent le raisonnement derrière chaque choix de conception majeur : voir [`/docs/adr`](docs/adr/). Commencez par [ADR-0016: v4 Clean Break](docs/adr/0016-v4-clean-break-native-first.md) et [ADR-0005: Knowledge-First Architecture](docs/adr/0005-knowledge-first-architecture.md) si vous évaluez la conception du plugin.
 
 ## Utilisation avec le plugin Superpowers
 

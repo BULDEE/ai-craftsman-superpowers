@@ -25,6 +25,10 @@
 - [Knowledge Base](./reference/knowledge.md) - Built-in knowledge
 - [MCP Servers](./reference/mcp-servers.md) - RAG and integrations
 
+## Roadmap
+
+- [v4.0.0 Roadmap - The Self-Learning Craftsman System](./v4-roadmap.md) - decided direction, phases, and breaking changes
+
 ## Architecture Decisions
 
 All major decisions are documented as ADRs (Architecture Decision Records):
@@ -34,6 +38,27 @@ All major decisions are documented as ADRs (Architecture Decision Records):
 - [ADR-0003: SQLite over pgvector](./adr/0003-sqlite-over-pgvector.md)
 - [ADR-0004: 3P Agent Pattern](./adr/0004-3p-agent-pattern.md)
 - [ADR-0005: Knowledge-First Architecture](./adr/0005-knowledge-first-architecture.md)
+- [ADR-0006: Project-Specific Knowledge](./adr/0006-project-specific-knowledge.md)
+- [ADR-0007: Commands over Skills](./adr/0007-commands-over-skills.md) (superseded by ADR-0017)
+- [ADR-0008: Inline SQLite over Bash Expansion](./adr/0008-inline-sqlite-over-bash-expansion.md)
+- [ADR-0009: Command Hooks over Agent Hooks](./adr/0009-command-hooks-over-agent-hooks.md) (superseded by ADR-0018)
+- [ADR-0010: Model Tiering](./adr/0010-model-tiering.md)
+- [ADR-0011: Context Fork Strategy](./adr/0011-context-fork-strategy.md)
+- [ADR-0012: Progressive Disclosure](./adr/0012-progressive-disclosure.md)
+- [ADR-0013: Workflow Orchestrator](./adr/0013-workflow-orchestrator.md)
+- [ADR-0014: Quick Setup Mode](./adr/0014-quick-setup-mode.md)
+- [ADR-0015: Core Knowledge Taxonomy](./adr/0015-core-knowledge-taxonomy.md)
+
+### v4.0.0 decisions (2026-07)
+
+- [ADR-0016: v4 Clean Break - Native-First on Claude Code >= 2.1.218](./adr/0016-v4-clean-break-native-first.md)
+- [ADR-0017: Skills over Commands](./adr/0017-skills-over-commands.md)
+- [ADR-0018: Native Prompt and Agent Hooks](./adr/0018-native-prompt-agent-hooks.md)
+- [ADR-0019: Established Tooling First - No Substitution](./adr/0019-established-tooling-first.md)
+- [ADR-0020: Instinct Promotion with Human Review](./adr/0020-instinct-promotion-human-review.md)
+- [ADR-0021: Context Budgets and Kill Switches](./adr/0021-context-budgets-and-kill-switches.md)
+- [ADR-0022: Setup by Observation](./adr/0022-setup-by-observation.md)
+- [ADR-0023: Deterministic Verification Loop](./adr/0023-deterministic-verification-loop.md)
 
 ## Philosophy
 

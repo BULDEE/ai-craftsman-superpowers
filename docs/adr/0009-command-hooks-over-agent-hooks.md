@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR-0018: Native Prompt and Agent Hooks](0018-native-prompt-agent-hooks.md) (2026-07-26). The blocker below (no conditional execution in `hooks.json`) was removed by the `if` field, and native `prompt`/`agent` hook types now provide gated, model-tiered verification. Originally Accepted 2026-03-30.
 
 ## Date
 
