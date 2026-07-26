@@ -320,7 +320,7 @@ _should_block() {
         esac
         case "$STRICTNESS" in
             strict)   return 0 ;;
-            moderate) [[ "$rule" == LAYER* ]] && return 0; return 1 ;;
+            moderate) [[ "$rule" == LAYER* || "$rule" == RATCHET* || "$rule" == SEC* ]] && return 0; return 1 ;;
             relaxed)  return 1 ;;
             *)        return 0 ;;
         esac
@@ -424,6 +424,7 @@ scan_file() {
                 pack_run_validators "$file" "php"
                 pack_run_validators "$file" "php_layers"
                 pack_run_validators "$file" "php_persistence"
+                pack_run_validators "$file" "php_security"
             fi
             ;;
         ts|tsx)
@@ -432,12 +433,28 @@ scan_file() {
                 pack_run_validators "$file" "typescript"
                 pack_run_validators "$file" "typescript_layers"
                 pack_run_validators "$file" "typescript_persistence"
+                pack_run_validators "$file" "typescript_security"
             fi
             ;;
         *)
             return 0
             ;;
     esac
+
+    # Structural ratchet parity (ADR-0025): identical check to the hook.
+    # CI never writes the baseline; the pipeline is read-only.
+    if [[ -f "$PWD/.craftsman-baseline.json" ]] && command -v python3 >/dev/null 2>&1; then
+        local ratchet_out ratchet_exit
+        ratchet_exit=0
+        ratchet_out=$(python3 "$PLUGIN_ROOT/hooks/lib/ratchet.py" check "$file" \
+            --baseline "$PWD/.craftsman-baseline.json" 2>/dev/null) || ratchet_exit=$?
+        if [[ $ratchet_exit -eq 1 && -n "$ratchet_out" ]]; then
+            while IFS= read -r ratchet_line; do
+                [[ -z "$ratchet_line" ]] && continue
+                add_violation "RATCHET001" "structural regression: ${ratchet_line#RATCHET001 }" "$file"
+            done <<< "$ratchet_out"
+        fi
+    fi
 
     # Static analysis Level 2/3 (PHPStan, ESLint, Deptrac, dependency-cruiser)
     if [[ "$SA_AVAILABLE" == true ]]; then

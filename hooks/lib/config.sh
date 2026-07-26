@@ -91,10 +91,16 @@ config_should_block() {
     strictness=$(config_strictness)
     case "$strictness" in
         strict)   return 0 ;;
-        moderate) [[ "$rule" == LAYER* ]] && return 0; return 1 ;;
+        moderate) [[ "$rule" == LAYER* || "$rule" == RATCHET* || "$rule" == SEC* ]] && return 0; return 1 ;;
         relaxed)  return 1 ;;
         *)        return 0 ;;
     esac
+}
+
+config_guided() {
+    local value
+    value=$(_config_resolve "guided" "false")
+    [[ "$value" == "true" ]]
 }
 
 config_stop_review_enabled() {

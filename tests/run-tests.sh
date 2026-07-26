@@ -375,6 +375,40 @@ test_agent_hooks() {
     fi
 }
 
+test_ratchet() {
+    echo ""
+    log_info "Testing structural ratchet (functional)"
+
+    local ratchet_test="$SCRIPT_DIR/core/test-ratchet.sh"
+
+    if [[ -f "$ratchet_test" ]]; then
+        if bash "$ratchet_test" > /dev/null 2>&1; then
+            log_pass "Structural ratchet tests pass"
+        else
+            log_fail "Ratchet tests failed - run tests/core/test-ratchet.sh for details"
+        fi
+    else
+        log_skip "Ratchet tests (tests/core/test-ratchet.sh not found)"
+    fi
+}
+
+test_design_panel() {
+    echo ""
+    log_info "Testing adversarial design panel (functional)"
+
+    local panel_test="$SCRIPT_DIR/core/test-design-panel.sh"
+
+    if [[ -f "$panel_test" ]]; then
+        if bash "$panel_test" > /dev/null 2>&1; then
+            log_pass "Design panel tests pass"
+        else
+            log_fail "Design panel tests failed - run tests/core/test-design-panel.sh for details"
+        fi
+    else
+        log_skip "Design panel tests (tests/core/test-design-panel.sh not found)"
+    fi
+}
+
 test_okf_knowledge() {
     echo ""
     log_info "Testing OKF knowledge bundle (functional)"

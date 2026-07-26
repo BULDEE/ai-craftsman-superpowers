@@ -241,6 +241,7 @@ case "$EXT" in
             pack_run_validators "$FILE_PATH" "php"
             pack_run_validators "$FILE_PATH" "php_layers"
             pack_run_validators "$FILE_PATH" "php_persistence"
+            pack_run_validators "$FILE_PATH" "php_security"
             _run_static_analysis "$FILE_PATH"
         fi
         ;;
@@ -249,6 +250,7 @@ case "$EXT" in
             pack_run_validators "$FILE_PATH" "typescript"
             pack_run_validators "$FILE_PATH" "typescript_layers"
             pack_run_validators "$FILE_PATH" "typescript_persistence"
+            pack_run_validators "$FILE_PATH" "typescript_security"
             _run_static_analysis "$FILE_PATH"
         fi
         ;;
@@ -297,6 +299,28 @@ _validate_custom_rules "$FILE_PATH"
 _check_corrections "$FILE_PATH"
 
 # =============================================================================
+# Structural ratchet (ADR-0025): a touched file may improve or stay equal,
+# never regress. Inert until the project opts in via `ratchet.py init`.
+# =============================================================================
+if [[ -f "$PWD/.craftsman-baseline.json" ]] && command -v python3 >/dev/null 2>&1; then
+    # Capture with an explicit || branch: a non-zero exit inside a command
+    # substitution would otherwise fire the fail-open ERR trap before we can
+    # read the status, silently skipping the whole check.
+    RATCHET_EXIT=0
+    RATCHET_OUT=$(python3 "${SCRIPT_DIR}/lib/ratchet.py" check "$FILE_PATH" \
+        --baseline "$PWD/.craftsman-baseline.json" 2>/dev/null) || RATCHET_EXIT=$?
+    if [[ $RATCHET_EXIT -eq 1 && -n "$RATCHET_OUT" ]]; then
+        while IFS= read -r ratchet_line; do
+            [[ -z "$ratchet_line" ]] && continue
+            add_violation "RATCHET001" "structural regression: ${ratchet_line#RATCHET001 }"
+        done <<< "$RATCHET_OUT"
+    elif [[ $RATCHET_EXIT -eq 0 ]]; then
+        python3 "${SCRIPT_DIR}/lib/ratchet.py" update "$FILE_PATH" \
+            --baseline "$PWD/.craftsman-baseline.json" >/dev/null 2>&1 || true
+    fi
+fi
+
+# =============================================================================
 # Output Decision
 # =============================================================================
 
@@ -339,6 +363,13 @@ if [[ $CRITICAL_COUNT -gt 0 ]]; then
         if [[ -n "$DOCTRINE" ]]; then
             echo "Doctrine (knowledge/):" >&2
             echo "$DOCTRINE" | sed 's/^/  → /' >&2
+            # Guided mode: same exigency, maximum teaching. The gate explains
+            # itself at the moment of friction instead of assuming expertise.
+            if config_guided; then
+                DOCTRINE_TITLE=$(echo "$DOCTRINE" | head -1 | cut -f2)
+                DOCTRINE_ID=$(echo "$DOCTRINE" | head -1 | cut -f1)
+                echo "Why this matters: ${DOCTRINE_TITLE}. Fixing it now costs one edit; fixing it in six months costs an afternoon. Read: knowledge/${DOCTRINE_ID}.md" >&2
+            fi
         fi
     fi
     if [[ -n "$pattern_msg" ]]; then

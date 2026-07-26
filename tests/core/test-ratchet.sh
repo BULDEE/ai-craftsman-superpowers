@@ -182,4 +182,83 @@ fi
 cd "$ROOT_DIR"
 rm -rf "$WORK2"
 
+echo ""
+echo "=== Gate integration (post-write-check) ==="
+
+WORK3="/tmp/craftsman-ratchet-gate-$$"
+mkdir -p "$WORK3/src"
+PREV_PWD="$PWD"
+cd "$WORK3"
+git init -q .
+cat > .craft-config.yml <<'YAML'
+v: 4
+strictness: strict
+stack: symfony
+YAML
+
+cat > src/Gate.php <<'PHP'
+<?php
+declare(strict_types=1);
+final class Gate {
+    private function __construct() {}
+    public static function create(): self { return new self(); }
+}
+PHP
+python3 "$RATCHET" init src --baseline .craftsman-baseline.json >/dev/null
+
+cat > src/Gate.php <<'PHP'
+<?php
+declare(strict_types=1);
+final class Gate {
+    private function __construct() {}
+    public static function create(): self { return new self(); }
+    public function tangle(int $value): int {
+        if ($value) { if ($value > 1) { if ($value > 2) { return 3; } } }
+        return 0;
+    }
+}
+PHP
+
+EXIT_CODE=0
+OUT=$(echo "{\"tool_input\":{\"file_path\":\"$WORK3/src/Gate.php\"}}" | \
+    CLAUDE_PLUGIN_ROOT="$ROOT_DIR" bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1) || EXIT_CODE=$?
+if [[ $EXIT_CODE -eq 2 ]] && echo "$OUT" | grep -q "RATCHET001"; then
+    log_pass "strict mode: structural regression blocks with RATCHET001"
+else
+    log_fail "gate block" "exit=$EXIT_CODE out=$(echo "$OUT" | head -4)"
+fi
+
+echo ""
+echo "=== Guided mode ==="
+
+cat > .craft-config.yml <<'YAML'
+v: 4
+strictness: strict
+stack: symfony
+guided: true
+YAML
+
+mkdir -p src/Domain
+cat > src/Domain/G.php <<'PHP'
+<?php
+declare(strict_types=1);
+namespace App\Domain;
+final class G {
+    public function bad(): array {
+        return $this->db->executeQuery("SELECT name FROM users");
+    }
+}
+PHP
+EXIT_CODE=0
+OUT=$(echo "{\"tool_input\":{\"file_path\":\"$WORK3/src/Domain/G.php\"}}" | \
+    CLAUDE_PLUGIN_ROOT="$ROOT_DIR" bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1) || EXIT_CODE=$?
+if [[ $EXIT_CODE -eq 2 ]] && echo "$OUT" | grep -q "Why this matters:"; then
+    log_pass "guided mode: block message teaches in plain language"
+else
+    log_fail "guided message" "exit=$EXIT_CODE $(echo "$OUT" | tail -4)"
+fi
+
+cd "$PREV_PWD"
+rm -rf "$WORK3"
+
 test_summary
