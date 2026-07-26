@@ -125,10 +125,18 @@ config_packs_dir() {
     echo "${CLAUDE_PLUGIN_ROOT:-$(pwd)}/packs"
 }
 
-# Parse external pack paths from .craft-config.yml
-# Returns one path per line (resolves ~ to $HOME)
+# Parse external pack paths from the USER'S OWN global config.
+# Returns one path per line (resolves ~ to $HOME).
+#
+# SECURITY (deliberate asymmetry with every other config key): external packs
+# are `source`d verbatim by pack-loader.sh, so declaring one is equivalent to
+# granting arbitrary code execution. Reading this key from the project file
+# would let any cloned repository execute code the moment a session starts,
+# before the developer writes anything. Only the machine owner may declare
+# them, in ~/.claude/.craft-config.yml. Every other key still honours the
+# project override: this one cannot.
 config_external_packs() {
-    local config_file="$PWD/.craft-config.yml"
+    local config_file="${HOME}/.claude/.craft-config.yml"
     [[ ! -f "$config_file" ]] && return
 
     local in_external=false

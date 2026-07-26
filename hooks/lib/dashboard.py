@@ -9,6 +9,7 @@ every project recorded in the database, so quality is visible per repository
 and across repositories. The output is a single self-contained HTML file
 served from localhost - nothing leaves the machine.
 """
+import html
 import json
 import sqlite3
 import sys
@@ -81,7 +82,9 @@ def _rows(rows: list[tuple], cols: int) -> str:
         return f'<tr><td colspan="{cols}" class="empty">no data yet</td></tr>'
     out = []
     for row in rows:
-        cells = "".join(f"<td>{'' if value is None else value}</td>" for value in row)
+        cells = "".join(
+            f"<td>{'' if value is None else html.escape(str(value))}</td>" for value in row
+        )
         out.append(f"<tr>{cells}</tr>")
     return "".join(out)
 
@@ -93,7 +96,7 @@ def _sparkline(trend: list[tuple]) -> str:
     peak = max(values) or 1
     bars = "".join(
         f'<div class="bar" style="height:{max(4, round(value / peak * 100))}%" '
-        f'title="{row[0]}: {value} violations"></div>'
+        f'title="{html.escape(str(row[0]))}: {value} violations"></div>'
         for row, value in zip(trend, values)
     )
     return f'<div class="spark">{bars}</div>'
@@ -179,8 +182,34 @@ def render(data: dict, db_path: str) -> str:
     )
 
 
+class _SingleFileHandler(SimpleHTTPRequestHandler):
+    """Serves exactly one HTML file.
+
+    The default handler roots at a directory, and the dashboard sits next to
+    metrics.db: any script running in the page (or any other local process)
+    could then fetch the whole cross-project history over 127.0.0.1. Only the
+    rendered page is reachable here; everything else is 404.
+    """
+
+    page_path: Path
+
+    def do_GET(self) -> None:
+        if self.path.split("?")[0] not in ("/", f"/{self.page_path.name}"):
+            self.send_error(404)
+            return
+        body = self.page_path.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args) -> None:
+        return
+
+
 def _serve(out_path: Path, port: int) -> None:
-    handler = partial(SimpleHTTPRequestHandler, directory=str(out_path.parent))
+    handler = type("BoundHandler", (_SingleFileHandler,), {"page_path": out_path})
     url = f"http://127.0.0.1:{port}/{out_path.name}"
     with ThreadingHTTPServer(("127.0.0.1", port), handler) as httpd:
         print(f"Serving {url} (Ctrl+C to stop)")

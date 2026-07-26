@@ -56,7 +56,9 @@ if [[ "${1:-}" == "ci" ]]; then
     [[ -n "$CI_CONFIG" ]] && CI_RUN_ARGS+=(--config "$CI_CONFIG")
     CI_RUN_ARGS+=("${CI_SCAN_PATHS[@]}")
 
-    local_report="/tmp/craftsman-report-$$.json"
+    # mktemp, not PID: a predictable name in shared /tmp lets a co-tenant on a
+    # CI runner pre-create or race the file that decides the gate result.
+    local_report=$(mktemp "${TMPDIR:-/tmp}/craftsman-report-XXXXXX") || local_report="/tmp/craftsman-report-$$.json"
     adapter_run "$local_report" "${CI_RUN_ARGS[@]}"
 
     adapter_annotate "$local_report"

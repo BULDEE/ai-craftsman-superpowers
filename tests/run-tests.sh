@@ -375,6 +375,23 @@ test_agent_hooks() {
     fi
 }
 
+test_hostile_repo() {
+    echo ""
+    log_info "Testing hostile-repository invariants (functional)"
+
+    local hostile_test="$SCRIPT_DIR/core/test-hostile-repo.sh"
+
+    if [[ -f "$hostile_test" ]]; then
+        if bash "$hostile_test" > /dev/null 2>&1; then
+            log_pass "Hostile-repository invariants hold"
+        else
+            log_fail "Hostile-repo tests failed - run tests/core/test-hostile-repo.sh for details"
+        fi
+    else
+        log_skip "Hostile-repo tests (tests/core/test-hostile-repo.sh not found)"
+    fi
+}
+
 test_ratchet() {
     echo ""
     log_info "Testing structural ratchet (functional)"

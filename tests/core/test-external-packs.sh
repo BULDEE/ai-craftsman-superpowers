@@ -42,7 +42,15 @@ BASH
 
 CRAFT_DIR="$TMPDIR_BASE/project"
 mkdir -p "$CRAFT_DIR"
-cat > "$CRAFT_DIR/.craft-config.yml" <<YAML
+
+# External packs are sourced as shell code, so only the machine owner's own
+# global config may declare them (a project-level declaration would be RCE for
+# any cloned repository). Sandbox HOME and write the declaration there.
+_ORIG_HOME="$HOME"
+export HOME="$TMPDIR_BASE/home"
+mkdir -p "$HOME/.claude"
+GLOBAL_CONFIG="$HOME/.claude/.craft-config.yml"
+cat > "$GLOBAL_CONFIG" <<YAML
 stack: fullstack
 packs:
   external:
@@ -74,7 +82,7 @@ echo ""
 echo "--- Invalid external path ---"
 _pack_reset
 
-cat > "$CRAFT_DIR/.craft-config.yml" <<YAML
+cat > "$GLOBAL_CONFIG" <<YAML
 stack: fullstack
 packs:
   external:
@@ -110,7 +118,7 @@ commands:
   scaffold_types: []
 YAML
 
-cat > "$CRAFT_DIR/.craft-config.yml" <<YAML
+cat > "$GLOBAL_CONFIG" <<YAML
 stack: fullstack
 packs:
   external:
@@ -152,6 +160,7 @@ fi
 # Cleanup
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 cd "$ROOT_DIR"
+export HOME="$_ORIG_HOME"
 rm -rf "$TMPDIR_BASE"
 
 echo ""

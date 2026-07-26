@@ -117,7 +117,11 @@ metrics_project_hash() {
 
 metrics_file_pattern() {
     local file="$1"
-    local rel_path="${file#$PWD/}"
+    # A prefix strip is not a containment check: when the file is outside the
+    # project it silently no-ops and the absolute path gets recorded. Same
+    # mistake shape as the ratchet baseline bug (see hooks/lib/ratchet.py).
+    local rel_path="$file"
+    [[ "$file" == "$PWD"/* ]] && rel_path="${file#$PWD/}"
     echo "$rel_path" | sed -E 's/\/[^\/]+\.(php|ts|tsx)$/\/**\/*.\1/'
 }
 

@@ -95,7 +95,7 @@ for n in notes:
             -X PUT \
             -H "PRIVATE-TOKEN: ${token}" \
             -H "Content-Type: application/json" \
-            --data "$(python3 -c "import json; print(json.dumps({'body': '''${comment_body}'''}))" 2>/dev/null)" \
+            --data "$(printf '%s' "$comment_body" | python3 -c "import json,sys; print(json.dumps({'body': sys.stdin.read()}))" 2>/dev/null)" \
             "${api_url}/projects/${project_id}/merge_requests/${mr_iid}/notes/${existing_note_id}" \
             >/dev/null 2>&1
     else
@@ -103,7 +103,7 @@ for n in notes:
             -X POST \
             -H "PRIVATE-TOKEN: ${token}" \
             -H "Content-Type: application/json" \
-            --data "$(python3 -c "import json; print(json.dumps({'body': '''${comment_body}'''}))" 2>/dev/null)" \
+            --data "$(printf '%s' "$comment_body" | python3 -c "import json,sys; print(json.dumps({'body': sys.stdin.read()}))" 2>/dev/null)" \
             "${api_url}/projects/${project_id}/merge_requests/${mr_iid}/notes" \
             >/dev/null 2>&1
     fi

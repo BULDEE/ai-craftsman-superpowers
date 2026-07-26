@@ -41,8 +41,32 @@ _rules_store_dir() {
     echo "$_RULES_STORE/$namespace"
 }
 
+# Rule ids reach this as filenames, and they come from YAML keys in a
+# repository-controlled config. A key containing a path separator would write
+# outside the store; keys are therefore structurally constrained here as well
+# as validated at the point of entry (defense in depth: this also covers
+# callers added later).
+# A rule id becomes a filename and a store key. It comes from a YAML key in a
+# repository-controlled config, so it is constrained to an identifier charset
+# before it reaches any sink.
+_rules_id_is_safe() {
+    [[ "$1" =~ ^[A-Za-z0-9_-]+$ ]]
+}
+
+_rules_key_is_safe() {
+    local key="$1"
+    [[ -n "$key" ]] || return 1
+    [[ "$key" != */* ]] || return 1
+    [[ "$key" != *..* ]] || return 1
+    return 0
+}
+
 _rules_set() {
     local namespace="$1" key="$2" value="$3"
+    _rules_key_is_safe "$key" || {
+        echo "[rules-engine] rejected unsafe rule key: ${key}" >&2
+        return 0
+    }
     local dir
     dir="$(_rules_store_dir "$namespace")"
     mkdir -p "$dir"
@@ -133,6 +157,7 @@ _rules_apply_parsed_config() {
 
     local rule_id
     for rule_id in $rule_ids; do
+        _rules_id_is_safe "$rule_id" || continue
         _rules_store_rule_fields "$json_output" "$rule_id"
     done
 }
@@ -204,9 +229,14 @@ _rules_parse_dir_config() {
     local rule_ids
     rule_ids=$(printf '%s' "$json_output" | jq -r '.rules // {} | keys[]' 2>/dev/null)
 
-    local rule_id
+    _rules_cache_dir_rules "$json_output" "$dir_key" "$rule_ids"
+}
+
+_rules_cache_dir_rules() {
+    local json_output="$1" dir_key="$2" rule_ids="$3"
+    local rule_id rule_val
     for rule_id in $rule_ids; do
-        local rule_val
+        _rules_id_is_safe "$rule_id" || continue
         rule_val=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"]" 2>/dev/null)
         if [[ "$rule_val" =~ ^(block|warn|ignore)$ ]]; then
             _rules_set "dir_cache" "${dir_key}:${rule_id}" "$rule_val"
