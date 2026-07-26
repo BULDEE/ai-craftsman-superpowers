@@ -114,8 +114,19 @@ export CRAFTSMAN_HOOK_DRY_RUN=true
 | LAYER001 | critical | Domain cannot import Infrastructure | Yes |
 | LAYER002 | critical | Domain cannot import Presentation | Yes |
 | LAYER003 | critical | Application cannot import Presentation | Yes |
+| LAYER004 | critical | Domain cannot contain raw SQL/DQL (PHP) or import a database client (TS) | Yes |
 
 Layer validation uses both file path detection (`*/Domain/*`) and namespace scanning (`namespace App\Domain`) to identify the architectural layer.
+
+### Persistence Rules (PostToolUse + CI)
+
+| Rule | Severity | Check | Blocking |
+|------|----------|-------|----------|
+| DB001 | warning | No `SELECT *` - name the columns you need | No (warning) |
+| DB002 | warning | Migration with `up()` must have `down()` | No (warning) |
+| DB003 | warning | Query call inside a loop (N+1 heuristic) | No (warning) |
+
+Persistence validation ships with the symfony and react packs and runs through the same validators in hooks and CI. The reasoning behind each rule lives in [`knowledge/persistence/`](../../knowledge/persistence/): repository boundaries, migration discipline, storage choice, and read/write separation.
 
 ## 3-Level Validation
 

@@ -10,7 +10,7 @@ rules:
   static_analysis: ["ESLINT001", "ESLINT002", "ESLINT003", "ESLINT004"]
 
 hooks:
-  validators: ["hooks/typescript-validator.sh", "hooks/layer-validator.sh"]
+  validators: ["hooks/typescript-validator.sh", "hooks/layer-validator.sh", "hooks/persistence-validator.sh"]
 
 static_analysis:
   tools: ["static-analysis/eslint.sh"]

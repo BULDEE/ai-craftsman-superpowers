@@ -24,7 +24,10 @@ stack:
   react_version: "19"
 
 # Rule overrides (per-rule severity: block, warn, ignore)
-# Builtin rules: PHP001-005, TS001-003, LAYER001-003, WARN-PHP001, WARN-TS001
+# Builtin rules: PHP001-005, TS001-003, LAYER001-004, DB001-003,
+#   WARN-PHP001, WARN-TS001
+#   LAYER004: raw SQL/DQL or a database client inside the Domain layer
+#   DB001: SELECT * | DB002: migration without down() | DB003: query inside a loop (N+1)
 # Custom rules use long form with pattern, message, severity, languages
 rules:
   # Examples (uncomment to customize):

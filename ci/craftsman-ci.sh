@@ -399,6 +399,7 @@ scan_file() {
             if [[ "$PACKS_AVAILABLE" == true ]]; then
                 pack_run_validators "$file" "php"
                 pack_run_validators "$file" "php_layers"
+                pack_run_validators "$file" "php_persistence"
             fi
             ;;
         ts|tsx)
@@ -406,6 +407,7 @@ scan_file() {
             if [[ "$PACKS_AVAILABLE" == true ]]; then
                 pack_run_validators "$file" "typescript"
                 pack_run_validators "$file" "typescript_layers"
+                pack_run_validators "$file" "typescript_persistence"
             fi
             ;;
         *)

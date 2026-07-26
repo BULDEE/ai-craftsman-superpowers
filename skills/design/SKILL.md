@@ -87,6 +87,14 @@ State your recommendation clearly:
 **Reason:** [One sentence]
 **Trade-off:** [What we give up with this choice]
 
+### Persistence Mapping
+
+| Aggregate | System of record | Guarantee needed | Read models |
+|-----------|------------------|------------------|-------------|
+| [Name] | [relational/document/event store] | [atomic per aggregate, integrity, history] | [projections: cache, search, vector - rebuildable] |
+
+**Reason:** [Derived from the aggregate's consistency boundary and query shape - see knowledge/persistence/data-modeling-decisions.md. Relational is the default; leaving it requires a measured reason.]
+
 **Proceed with this design?** [Wait for user confirmation]
 ```
 

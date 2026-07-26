@@ -10,7 +10,7 @@ rules:
   static_analysis: ["PHPSTAN001", "PHPSTAN002", "PHPSTAN003", "PHPSTAN004", "PHPSTAN005", "DEPTRAC001"]
 
 hooks:
-  validators: ["hooks/php-validator.sh", "hooks/layer-validator.sh"]
+  validators: ["hooks/php-validator.sh", "hooks/layer-validator.sh", "hooks/persistence-validator.sh"]
 
 static_analysis:
   tools: ["static-analysis/phpstan.sh"]

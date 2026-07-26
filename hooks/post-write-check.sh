@@ -240,6 +240,7 @@ case "$EXT" in
         if config_php_enabled; then
             pack_run_validators "$FILE_PATH" "php"
             pack_run_validators "$FILE_PATH" "php_layers"
+            pack_run_validators "$FILE_PATH" "php_persistence"
             _run_static_analysis "$FILE_PATH"
         fi
         ;;
@@ -247,6 +248,7 @@ case "$EXT" in
         if config_ts_enabled; then
             pack_run_validators "$FILE_PATH" "typescript"
             pack_run_validators "$FILE_PATH" "typescript_layers"
+            pack_run_validators "$FILE_PATH" "typescript_persistence"
             _run_static_analysis "$FILE_PATH"
         fi
         ;;
