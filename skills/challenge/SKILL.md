@@ -10,6 +10,7 @@ background: false
 
 ## Live Context
 
+- Codemap: !`bash ~/.claude/craftsman-codemap.sh 2>/dev/null | head -40 || echo "codemap unavailable"`
 - Working tree diff: !`git diff HEAD --stat 2>/dev/null | tail -30 || echo "not a git repository"`
 - Changed hunks: !`git diff HEAD 2>/dev/null | head -400`
 - Recent commits: !`git log --oneline -10 2>/dev/null`

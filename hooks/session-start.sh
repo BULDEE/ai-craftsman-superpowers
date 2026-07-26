@@ -87,6 +87,34 @@ esac
 WRAPPER
 chmod +x "${HOME}/.claude/craftsman-instincts.sh" 2>/dev/null || true
 
+# Codemap bridge (ADR-0022): cached by content hash of the tracked file list,
+# refreshed here and consumed by review skills via dynamic context injection.
+cat > "${HOME}/.claude/craftsman-codemap.sh" <<WRAPPER
+#!/usr/bin/env bash
+set -uo pipefail
+DATA_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
+PROJECT_HASH=\$(echo -n "\$PWD" | shasum -a 256 | cut -d' ' -f1)
+CACHE="\${DATA_DIR}/codemap-\${PROJECT_HASH}"
+HASH_FILE="\${CACHE}.hash"
+CURRENT_HASH=\$(git ls-files 2>/dev/null | shasum | cut -d' ' -f1 || echo "no-git")
+if [[ -f "\$CACHE" && -f "\$HASH_FILE" && "\$(cat "\$HASH_FILE" 2>/dev/null)" == "\$CURRENT_HASH" ]]; then
+    cat "\$CACHE"
+    exit 0
+fi
+mkdir -p "\$DATA_DIR" 2>/dev/null || true
+python3 "${SCRIPT_DIR}/lib/codemap.py" "\$PWD" | tee "\$CACHE"
+printf '%s' "\$CURRENT_HASH" > "\$HASH_FILE" 2>/dev/null || true
+WRAPPER
+chmod +x "${HOME}/.claude/craftsman-codemap.sh" 2>/dev/null || true
+
+# Conventions bridge (ADR-0022): used by /craftsman:setup
+cat > "${HOME}/.claude/craftsman-conventions.sh" <<WRAPPER
+#!/usr/bin/env bash
+set -uo pipefail
+exec python3 "${SCRIPT_DIR}/lib/conventions.py" "\${1:-analyze}" "\$PWD" "\${@:2}"
+WRAPPER
+chmod +x "${HOME}/.claude/craftsman-conventions.sh" 2>/dev/null || true
+
 # Detect project type from filesystem
 detect_project_type() {
     local has_php=false has_ts=false

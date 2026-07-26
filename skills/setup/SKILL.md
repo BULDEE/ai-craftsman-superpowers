@@ -12,6 +12,29 @@ disable-model-invocation: true
 |---------|-------------|
 | `/craftsman:setup` | Full interactive setup (default) |
 | `/craftsman:setup --quick` | Zero-question auto-setup with smart defaults |
+| `/craftsman:setup --refresh` | Regenerate observed artifacts (conventions skill, codemap) |
+
+---
+
+## Setup by Observation (ADR-0022)
+
+Every mode (including `--quick`) ends with the observation step. The repository answers most setup questions itself; only ask the user what observation cannot determine (strictness preference, pack opt-ins).
+
+1. Run the conventions analyzer and SHOW the user what was inferred before writing anything:
+   ```bash
+   bash ~/.claude/craftsman-conventions.sh analyze
+   ```
+2. On confirmation (automatic in `--quick` and `--refresh`), generate the project conventions skill:
+   ```bash
+   bash ~/.claude/craftsman-conventions.sh generate "$PWD/.claude/skills"
+   ```
+   This writes `.claude/skills/project-conventions/SKILL.md` (`user-invocable: false`, loaded as background knowledge, shareable via git, freely editable).
+3. Warm the codemap cache (review skills inject it as live context):
+   ```bash
+   bash ~/.claude/craftsman-codemap.sh >/dev/null
+   ```
+
+Regeneration is always explicit (`--refresh`), never silent: the generated file records its generation date and inputs.
 
 ---
 

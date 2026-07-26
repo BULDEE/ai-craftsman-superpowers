@@ -356,6 +356,23 @@ test_agent_hooks() {
     fi
 }
 
+test_observation() {
+    echo ""
+    log_info "Testing setup-by-observation generators (functional)"
+
+    local obs_test="$SCRIPT_DIR/core/test-observation.sh"
+
+    if [[ -f "$obs_test" ]]; then
+        if bash "$obs_test" > /dev/null 2>&1; then
+            log_pass "Observation generator tests pass"
+        else
+            log_fail "Observation generator tests failed - run tests/core/test-observation.sh for details"
+        fi
+    else
+        log_skip "Observation generator tests (tests/core/test-observation.sh not found)"
+    fi
+}
+
 test_instincts() {
     echo ""
     log_info "Testing instinct pipeline and context budgets (functional)"
