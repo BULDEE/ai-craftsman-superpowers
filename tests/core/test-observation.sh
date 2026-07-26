@@ -81,6 +81,44 @@ else
     log_fail "codemap directories" "$MAP"
 fi
 
+echo ""
+echo "=== Situational Signals ==="
+
+SIGNALS=$(python3 "$CONVENTIONS" signals "$FIXTURE" 2>&1)
+if echo "$SIGNALS" | jq -e '.existing_project == false and .has_tests == true' >/dev/null 2>&1; then
+    log_pass "signals: young repo with tests reads as greenfield"
+else
+    log_fail "signals" "$SIGNALS"
+fi
+
+NOGIT="/tmp/craftsman-signals-$$"
+mkdir -p "$NOGIT/src"
+git -C "$NOGIT" init -q 2>/dev/null
+for index in $(seq 1 25); do
+    git -C "$NOGIT" -c user.email=t@t -c user.name=t commit -qm "c$index" --allow-empty 2>/dev/null
+done
+SIGNALS=$(python3 "$CONVENTIONS" signals "$NOGIT" 2>&1)
+if echo "$SIGNALS" | jq -e '.existing_project == true and .legacy_signal == true' >/dev/null 2>&1; then
+    log_pass "signals: 25 commits, no tests, no CI reads as legacy"
+else
+    log_fail "legacy signal" "$SIGNALS"
+fi
+
+if echo "$SIGNALS" | jq -e '.commit_count == 25 and .has_tests == false and .has_ci == false' >/dev/null 2>&1; then
+    log_pass "signals: reports commit_count, has_tests and has_ci"
+else
+    log_fail "signal keys" "$SIGNALS"
+fi
+
+mkdir -p "$NOGIT/.github/workflows" "$NOGIT/tests"
+SIGNALS=$(python3 "$CONVENTIONS" signals "$NOGIT" 2>&1)
+if echo "$SIGNALS" | jq -e '.has_ci == true and .has_tests == true and .legacy_signal == false' >/dev/null 2>&1; then
+    log_pass "signals: tests plus CI clears the legacy signal"
+else
+    log_fail "legacy signal cleared" "$SIGNALS"
+fi
+rm -rf "$NOGIT"
+
 rm -rf "$FIXTURE"
 
 test_summary
