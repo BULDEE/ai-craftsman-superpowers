@@ -356,6 +356,23 @@ test_agent_hooks() {
     fi
 }
 
+test_verify_loop() {
+    echo ""
+    log_info "Testing deterministic verification loop (functional)"
+
+    local vloop_test="$SCRIPT_DIR/core/test-verify-loop.sh"
+
+    if [[ -f "$vloop_test" ]]; then
+        if bash "$vloop_test" > /dev/null 2>&1; then
+            log_pass "Verification loop tests pass"
+        else
+            log_fail "Verification loop tests failed - run tests/core/test-verify-loop.sh for details"
+        fi
+    else
+        log_skip "Verification loop tests (tests/core/test-verify-loop.sh not found)"
+    fi
+}
+
 test_observation() {
     echo ""
     log_info "Testing setup-by-observation generators (functional)"

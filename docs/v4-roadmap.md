@@ -1,6 +1,6 @@
 # v4.0.0 Roadmap - The Self-Learning Craftsman System
 
-> Status: **decided, in progress**. The decisions below are recorded as ADRs 0016-0023 and are being implemented for the 4.0.0 release. Current stable is the 3.9.x line.
+> Status: **delivered in 4.0.0** (2026-07-26). The decisions below are recorded as ADRs 0016-0023. The 3.9.x line remains available and frozen for Claude Code < 2.1.218.
 
 ## Direction
 

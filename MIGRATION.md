@@ -2,7 +2,7 @@
 
 Breaking changes only. Minor/patch upgrades never require manual action - see [CHANGELOG.md](CHANGELOG.md) for the full history.
 
-## 3.x → 4.0.0 (upcoming)
+## 3.x → 4.0.0 (current)
 
 **What changes:** v4 is a clean break to a native-first architecture (full rationale in [docs/v4-roadmap.md](docs/v4-roadmap.md) and ADRs 0016-0023). No backward compatibility with 3.x config or older Claude Code versions.
 

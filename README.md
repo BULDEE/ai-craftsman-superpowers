@@ -5,7 +5,7 @@
 🇬🇧 **English** | [🇫🇷 Français](README.fr.md)
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A52.1.218-blueviolet)](https://code.claude.com)
 [![Version](https://img.shields.io/github/v/release/BULDEE/ai-craftsman-superpowers?label=version)](CHANGELOG.md)
 [![CI](https://img.shields.io/github/actions/workflow/status/BULDEE/ai-craftsman-superpowers/ci.yml?label=CI)](.github/workflows/ci.yml)
 [![Commands](https://img.shields.io/badge/Commands-18%2B-orange)](COMMANDS-QUICK-REF.md)
@@ -32,10 +32,10 @@ DDD, Clean Architecture, and TDD methodology enforced through hooks, commands, a
 
 What makes this plugin genuinely unique in the Claude Code ecosystem:
 
-1. **Correction Learning System** - records every violation fix you make and injects correction trends at next session start. SQLite-backed feedback loop that progressively teaches Claude the exact patterns your codebase rejects. Cross-file detection suggests project-wide fixes when 3+ files share the same violation.
+1. **Correction Learning System (closed loop)** - records every violation fix, injects correction trends at session start, and promotes recurring fixes (3+ across 3+ files) into candidate instincts you approve in `/craftsman:metrics`. Approved instincts become project skills with provenance - Claude stops making the mistake instead of being reminded about it.
 2. **Rules Engine with 3-Level Inheritance** - Global → Project → Directory overrides. Short form (`PHP001: warn`) or long form (custom regex rules). Legacy code coexists with strict new code via directory-level relaxation.
 3. **Cognitive Bias Detector** - real-time detection of acceleration bias, scope creep, and over-optimization in your prompts, bilingual FR/EN, context-aware to reduce false positives.
-4. **Real-Time Quality Gate** - 3-level progressive validation on every Write/Edit: regex (<50ms, always on) → static analysis (<2s, PHPStan/ESLint) → architecture (<2s, deptrac/dependency-cruiser). Degrades gracefully with zero tools installed.
+4. **Real-Time Quality Gate** - progressive validation on every Write/Edit: regex (<50ms, always on) → LSP semantics (live, when your language server is installed) → static analysis (<2s, PHPStan/ESLint) → architecture (<2s, deptrac/dependency-cruiser). Degrades gracefully with zero tools installed.
 5. **Multi-Provider CI Pipeline** - the same rules engine runs in hooks (real-time) and CI (pipeline) with zero drift, across GitHub Actions, GitLab CI, Bitbucket Pipelines, and Jenkins.
 6. **Metrics & Trend Analysis** - SQLite-backed tracking of violations, corrections, and sessions, with 7-day/30-day trend views to identify your most-violated rules.
 
@@ -43,7 +43,7 @@ What makes this plugin genuinely unique in the Claude Code ecosystem:
 
 ## Requirements
 
-- Claude Code v1.0.33 or later (`claude --version` to check)
+- Claude Code v2.1.218 or later (`claude --version` to check). Older versions: install the frozen 3.9.x line.
 
 ## Installation
 
@@ -177,9 +177,9 @@ Priority order: explicit user instruction → project `CLAUDE.md` → plugin (sk
 
 Put DISC profile/communication style/personal biases in your **global** CLAUDE.md, architecture/key entities/project rules in your **project** CLAUDE.md, and let the **plugin** handle code enforcement and design patterns. Full guidance: [CLAUDE.md Best Practices Guide](docs/guides/claude-md-best-practices.md).
 
-## Roadmap: v4.0.0 - The Self-Learning Craftsman System
+## What's New in v4.0.0 - The Self-Learning Craftsman System
 
-The next major version is decided and in progress: a **clean break** targeting Claude Code >= 2.1.218, with no backward compatibility (the 3.9.x line stays available and frozen). Headlines:
+v4 is a **clean break** targeting Claude Code >= 2.1.218, with no backward compatibility (the 3.9.x line stays available and frozen). Headlines:
 
 - **Closed learning loop**: recurring corrections become candidate instincts you review in `/craftsman:metrics`; approved ones are codified as project skills. Detection stays automatic, codification stays human-gated.
 - **Native-first architecture**: workflows become forked skills with live context injection, bash agent-hook wrappers become native Haiku-tiered `agent`/`prompt` hooks, verification uses `asyncRewake` and `TaskCompleted` gates.

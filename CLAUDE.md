@@ -4,14 +4,14 @@
 
 Claude Code plugin that transforms Claude into a disciplined Senior Software Craftsman. DDD, Clean Architecture, TDD methodology enforced through hooks, commands, agents, and a rules engine.
 
-**Current version:** 3.9.0
+**Current version:** 4.0.0
 **Stack:** Bash (hooks/CI), Markdown (skills/agents/templates), Python (metrics helpers), YAML (config)
 
 ## Development Rules
 
 - All hook scripts MUST use `exit 0` (pass) or `exit 2` (block). NEVER `exit 1`.
 - Hook command output MUST be valid JSON (`jq -n` pattern).
-- Agent hook prompts use `$ARGUMENTS` for tool input injection.
+- Semantic verification runs in headless Haiku subprocesses via `hooks/lib/haiku-verify.sh` (never native agent/prompt hook types: no option gating, see ADR-0018). Always guard with `CRAFTSMAN_HEADLESS_VERIFY`.
 - The `metrics-query.py` helper MUST be used for all SQLite writes (parameterized queries). NEVER use string interpolation in SQL.
 - All writes to `session-state.json` MUST use atomic writes (`tempfile.mkstemp() + os.rename()`). Known TOCTOU window between read and rename when multiple async hooks fire simultaneously - acceptable at current hook frequencies but do not add file-locking without benchmarking first.
 - CI adapters follow the `adapter_detect/run/annotate/comment/exit` interface.
@@ -25,7 +25,7 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
 bash tests/run-tests.sh
 
 # Run hook tests only
-bash tests/hooks/test-hooks.sh
+bash tests/core/test-hooks.sh
 
 # Run template validation only
 bash tests/templates/test-templates.sh

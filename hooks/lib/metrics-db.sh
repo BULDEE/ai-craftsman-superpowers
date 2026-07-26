@@ -93,8 +93,18 @@ _metrics_migrate_writes_count() {
     fi
 }
 
+# v4: when CLAUDE_PLUGIN_DATA points somewhere new, adopt the legacy DB by
+# copy (never delete the original) so history survives the move (ADR-0023).
+_metrics_migrate_legacy_location() {
+    local legacy_db="${HOME}/.claude/plugins/data/craftsman/metrics.db"
+    [[ "$METRICS_DB" == "$legacy_db" ]] && return 0
+    [[ -f "$METRICS_DB" || ! -f "$legacy_db" ]] && return 0
+    cp "$legacy_db" "$METRICS_DB" 2>/dev/null || true
+}
+
 metrics_init() {
     mkdir -p "$METRICS_DB_DIR"
+    _metrics_migrate_legacy_location
     _metrics_create_core_tables
     _metrics_create_corrections_table
     _metrics_migrate_severity_info

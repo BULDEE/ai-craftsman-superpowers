@@ -723,16 +723,17 @@ else
     log_fail "post-compact-verify.sh" "missing or not executable"
 fi
 
-# Test: Total hook event count (12 events wired)
+# Test: Total hook event count (13 events wired; TaskCompleted added in v4)
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 events = list(d['hooks'].keys())
-assert len(events) == 12, f'Expected 12 hook events, got {len(events)}: {events}'
+assert len(events) == 13, f'Expected 13 hook events, got {len(events)}: {events}'
+assert 'TaskCompleted' in events
 " 2>/dev/null; then
-    log_pass "Total hook events: 12 (was 7, +5 new)"
+    log_pass "Total hook events: 13 (TaskCompleted evidence gate wired)"
 else
-    log_fail "Hook event count" "expected 12"
+    log_fail "Hook event count" "expected 13 incl. TaskCompleted"
 fi
 
 # =============================================================================

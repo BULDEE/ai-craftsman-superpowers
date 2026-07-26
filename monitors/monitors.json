@@ -1,0 +1,7 @@
+[
+  {
+    "name": "craftsman-test-failures",
+    "command": "touch \"${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/craftsman}/test-failures.log\" 2>/dev/null; tail -n 0 -F \"${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/craftsman}/test-failures.log\" 2>/dev/null",
+    "description": "Streams test-suite failures recorded by the craftsman verification hooks so failures surface as notifications even when they happen in background commands (ADR-0023)."
+  }
+]

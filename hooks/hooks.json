@@ -57,7 +57,18 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-bash-test-verify.sh\"",
-            "async": true
+            "async": true,
+            "asyncRewake": true
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/task-completed-verify.sh\""
           }
         ]
       }

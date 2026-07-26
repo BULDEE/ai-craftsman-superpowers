@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-07-26
+
+Clean break to a native-first, self-learning architecture. **Requires Claude Code >= 2.1.218**; no backward compatibility with 3.x config (the 3.9.x line stays available and frozen). Full rationale: ADRs 0016-0023 and [docs/v4-roadmap.md](docs/v4-roadmap.md). Upgrade steps: [MIGRATION.md](MIGRATION.md).
+
+### Added
+- **Instinct pipeline** (ADR-0020): recurring fixed corrections (3+ across 3+ files) become candidate instincts; `/craftsman:metrics` surfaces them for human review; approval generates a learned skill in `.claude/skills/craftsman-learned/` with provenance (`user-invocable: false`). Rejection is sticky until significant new evidence. Promotion is never automatic.
+- **Context budgets and kill switches** (ADR-0021): `context_budget.session_start_max_chars` (default 4000), `context_budget.max_learned_skills` (default 6), and `hooks.disabled` in `.craft-config.yml`, enforced at session start (trends dropped first, routing truncated second) and in `hook-profile.sh`. Config contract in `schemas/craft-config.schema.json`.
+- **Setup by observation** (ADR-0022): `/craftsman:setup` analyzes git history and layout, shows what it inferred, and generates `.claude/skills/project-conventions/SKILL.md`; a content-hash-cached codemap is injected into review skills as live context. `--refresh` regenerates both.
+- **Level 1.5 semantic validation** (ADR-0019): `.lsp.json` ships intelephense for PHP, activating only when the binary is already installed; TS/Python/Rust point at official LSP plugins. Healthcheck reports detected servers.
+- **Deterministic verification loop** (ADR-0023): a failing test run revokes verification evidence and wakes the session (`asyncRewake`) on regression; a `TaskCompleted` gate requires evidence before a task is marked complete (block in strict, warn in moderate); a background monitor streams recorded test failures.
+- **Auto-fix via `updatedInput`**: a Write missing only `declare(strict_types=1)` is corrected in place instead of blocked, with the violation kept as learning signal.
+
+### Changed
+- **All workflows are skills** (ADR-0017): `commands/*.md` became `skills/<name>/SKILL.md`; invocations are unchanged. `/craftsman:challenge` runs as a forked skill bound to the architect agent with live context (codemap, diff, 7-day violations). Deliberate workflows are `disable-model-invocation: true`.
+- **Semantic verification is headless** (ADR-0018): DDD verification moved from Stop (where it was dead: no `tool_input`) to PostToolUse Write|Edit and runs in a Haiku `claude -p` subprocess; final review on Stop uses the same mechanism with a 2-rewake budget. Zero main-context cost; `agent_hooks: false` still disables everything.
+- Metrics database honors `${CLAUDE_PLUGIN_DATA}`; a legacy `~/.claude/plugins/data/craftsman/metrics.db` is adopted by copy on first run.
+
+### Removed
+- `commands/` directory (flat command files), `output-styles/`, and the v3 systemMessage-based agent hook wrappers.
+- Support for Claude Code < 2.1.218.
+
 ## [3.9.0] - 2026-07-14
 
 ### Added

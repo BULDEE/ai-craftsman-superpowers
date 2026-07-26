@@ -5,7 +5,7 @@
 [🇬🇧 English](README.md) | 🇫🇷 **Français**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A51.0.33-blueviolet)](https://code.claude.com)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A52.1.218-blueviolet)](https://code.claude.com)
 [![Version](https://img.shields.io/github/v/release/BULDEE/ai-craftsman-superpowers?label=version)](CHANGELOG.md)
 [![CI](https://img.shields.io/github/actions/workflow/status/BULDEE/ai-craftsman-superpowers/ci.yml?label=CI)](.github/workflows/ci.yml)
 [![Commands](https://img.shields.io/badge/Commands-18%2B-orange)](COMMANDS-QUICK-REF.md)
@@ -32,10 +32,10 @@ DDD, Clean Architecture et méthodologie TDD appliquées via des hooks, des comm
 
 Ce qui rend ce plugin réellement unique dans l'écosystème Claude Code :
 
-1. **Correction Learning System** : enregistre chaque correction de violation que vous effectuez et injecte les tendances de correction au démarrage de la session suivante. Boucle de feedback adossée à SQLite qui apprend progressivement à Claude les patterns exacts que votre codebase rejette. La détection inter-fichiers suggère des corrections à l'échelle du projet quand 3 fichiers ou plus partagent la même violation.
+1. **Correction Learning System (boucle fermée)** : enregistre chaque correction de violation, injecte les tendances au démarrage de session, et promeut les corrections récurrentes (3+ sur 3+ fichiers) en instincts candidats que vous validez dans `/craftsman:metrics`. Les instincts approuvés deviennent des skills projet avec provenance : Claude cesse de faire l'erreur au lieu d'en être rappelé.
 2. **Rules Engine avec héritage à 3 niveaux** : surcharges Global → Projet → Répertoire. Forme courte (`PHP001: warn`) ou forme longue (règles regex custom). Le code legacy coexiste avec du code neuf strict via la relaxation par répertoire.
 3. **Détecteur de biais cognitifs** : détection en temps réel du biais d'accélération, du scope creep et de la sur-optimisation dans vos prompts, bilingue FR/EN, contextuel pour réduire les faux positifs.
-4. **Quality Gate temps réel** : validation progressive à 3 niveaux sur chaque Write/Edit : regex (<50ms, toujours actif) → analyse statique (<2s, PHPStan/ESLint) → architecture (<2s, deptrac/dependency-cruiser). Dégradation gracieuse sans aucun outil installé.
+4. **Quality Gate temps réel** : validation progressive sur chaque Write/Edit : regex (<50ms, toujours actif) → sémantique LSP (en direct, si votre serveur de langage est installé) → analyse statique (<2s, PHPStan/ESLint) → architecture (<2s, deptrac/dependency-cruiser). Dégradation gracieuse sans aucun outil installé.
 5. **Pipeline CI multi-provider** : le même rules engine tourne dans les hooks (temps réel) et en CI (pipeline) avec zéro dérive, sur GitHub Actions, GitLab CI, Bitbucket Pipelines et Jenkins.
 6. **Métriques & analyse de tendances** : suivi SQLite des violations, corrections et sessions, avec vues de tendances à 7 et 30 jours pour identifier vos règles les plus violées.
 
@@ -43,7 +43,7 @@ Ce qui rend ce plugin réellement unique dans l'écosystème Claude Code :
 
 ## Prérequis
 
-- Claude Code v1.0.33 ou plus récent (`claude --version` pour vérifier)
+- Claude Code v2.1.218 ou plus récent (`claude --version` pour vérifier). Versions plus anciennes : installez la branche gelée 3.9.x.
 
 ## Installation
 
@@ -177,9 +177,9 @@ Ordre de priorité : instruction utilisateur explicite → `CLAUDE.md` de projet
 
 Mettez le profil DISC/style de communication/biais personnels dans votre CLAUDE.md **global**, l'architecture/entités clés/règles projet dans votre CLAUDE.md **projet**, et laissez le **plugin** gérer l'application des règles de code et les design patterns. Guide complet : [CLAUDE.md Best Practices Guide](docs/guides/claude-md-best-practices.md).
 
-## Roadmap : v4.0.0 - Le système craftsman auto-apprenant
+## Nouveautés v4.0.0 - Le système craftsman auto-apprenant
 
-La prochaine version majeure est décidée et en cours : une **rupture nette** ciblant Claude Code >= 2.1.218, sans rétrocompatibilité (la branche 3.9.x reste disponible et gelée). Les grandes lignes :
+v4 est une **rupture nette** ciblant Claude Code >= 2.1.218, sans rétrocompatibilité (la branche 3.9.x reste disponible et gelée). Les grandes lignes :
 
 - **Boucle d'apprentissage fermée** : les corrections récurrentes deviennent des instincts candidats que vous validez dans `/craftsman:metrics` ; les instincts approuvés sont codifiés en skills projet. La détection reste automatique, la codification reste validée par un humain.
 - **Architecture native-first** : les workflows deviennent des skills forkés avec injection de contexte en direct, les wrappers bash de hooks agents deviennent des hooks natifs `agent`/`prompt` sur Haiku, la vérification s'appuie sur `asyncRewake` et les gates `TaskCompleted`.
