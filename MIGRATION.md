@@ -2,38 +2,25 @@
 
 Breaking changes only. Minor/patch upgrades never require manual action - see [CHANGELOG.md](CHANGELOG.md) for the full history.
 
-## 4.2.x → 4.3.0
-
-**What changes:** additive. The structural ratchet, the adversarial design panel, the security rules, and situational onboarding all arrive without breaking existing configs.
-
-**Action required:**
-- Nothing mandatory. The ratchet is inert until a project opts in: run `/craftsman:setup` (or `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/lib/ratchet.py" init src --baseline .craftsman-baseline.json`) to photograph the current state, then commit `.craftsman-baseline.json` so CI and teammates measure against the same reference.
-- `RATCHET001` ships advisory while its metric core is validated on real work. Set `RATCHET001: block` in `.craft-config.yml` to enforce it immediately.
-- SEC001-003 block by default in strict mode. If a legitimate pattern trips them, use the standard rule overrides or an inline `craftsman-ignore: SEC001` with a reason.
-
-## 4.1.x → 4.2.0
-
-**What changes:** the optional knowledge-rag MCP server (Ollama + local vector store) is removed ([ADR-0024](docs/adr/0024-okf-knowledge-bundle.md)). The plugin's knowledge is now an [OKF v0.2](https://github.com/GoogleCloudPlatform/knowledge-catalog) bundle with a deterministic rule-to-concept lookup.
-
-**Action required:**
-- If you used `/craftsman:knowledge` and the RAG server: they no longer exist. Your indexed documents in `~/.claude/ai-craftsman-superpowers/knowledge/` are untouched plain files; point your own memory tooling (Obsidian, claude-mem, any MCP knowledge source) at them. The 4.1.x line retains the server.
-- Everyone else: nothing. Installations get faster (no Node MCP process, no 115 MB install) and `/craftsman:healthcheck` no longer reports Ollama.
-
 ## 3.x → 4.0.0
 
-**What changes:** v4 is a clean break to a native-first architecture (full rationale in [docs/v4-roadmap.md](docs/v4-roadmap.md) and ADRs 0016-0023). No backward compatibility with 3.x config or older Claude Code versions.
+**What changes:** v4 is a clean break to a native-first architecture, with security hardening against untrusted repositories. Full rationale in ADRs 0016-0027. No backward compatibility with 3.x config or older Claude Code versions.
 
 **Requirements:**
 - Claude Code **>= 2.1.218** (`claude --version` to check). Older versions must stay on the 3.9.x line, which remains available and frozen.
 
 **Breaking changes:**
-- `commands/*.md` are removed; every workflow is now a skill (`skills/<name>/SKILL.md`). User-facing invocations are unchanged: `/craftsman:design`, `/craftsman:challenge`, etc. keep working. Anything that referenced plugin command file paths directly must point at the skill paths instead.
+- `commands/*.md` are removed; every workflow is now a skill (`skills/<name>/SKILL.md`). User-facing invocations are unchanged: `/craftsman:design`, `/craftsman:challenge`, and the rest keep working. Anything referencing plugin command file paths must point at the skill paths instead.
 - `output-styles/` is removed; the plugin activates its main-thread agent via plugin `settings.json`.
-- The bash agent-hook wrappers (`agent-ddd-verifier.sh`, `agent-sentry-context.sh`, `agent-final-review.sh`, `subagent-quality-gate.sh`) are replaced by native `agent`/`prompt` hooks. If you disabled them via `agent_hooks: false`, that option still works and now costs nothing when off.
-- `.craft-config.yml` gains a `v: 4` marker plus new `context_budget` and `hooks.disabled` keys, validated by a JSON schema. Run `/craftsman:setup` after upgrading: it migrates a 3.x config in place and shows you what it inferred. A 3.x config without `v: 4` is reported by `/craftsman:healthcheck` but not silently interpreted.
-- The metrics database moves from `~/.claude/plugins/data/craftsman/` to `${CLAUDE_PLUGIN_DATA}`. Migration is automatic on first run (the old file is copied, never deleted).
+- The bash agent-hook wrappers are replaced by headless Haiku verification. If you disabled them with `agent_hooks: false`, that still works and now costs nothing when off.
+- **Level 2 static analysis (PHPStan, ESLint, deptrac, dependency-cruiser) no longer runs by default.** It executes the tools a project ships and the configs they auto-discover, which is running the repository's code. To re-enable it for every project on your machine, add `trust_project_tools: true` to your own `~/.claude/.craft-config.yml`. A project file cannot grant it. Levels 1, 1.5 and 3, the rules engine, the security rules, and the ratchet are unaffected.
+- **External packs are declared in your global config only.** `packs.external[].path` in a project `.craft-config.yml` is ignored, because those packs are sourced as shell code. Move any declaration to `~/.claude/.craft-config.yml`.
+- The `knowledge-rag` MCP server and `/craftsman:knowledge` are removed. Indexed documents under `~/.claude/ai-craftsman-superpowers/knowledge/` are untouched plain files; point your own memory tooling at them.
+- `.craft-config.yml` gains a `v: 4` marker plus `context_budget`, `hooks.disabled`, `guided`, and `trust_project_tools`, validated by a JSON schema. Run `/craftsman:setup` after upgrading: it migrates a 3.x config in place and shows what it inferred.
+- The metrics database moves to `${CLAUDE_PLUGIN_DATA}`. Migration is automatic on first run (the old file is copied, never deleted).
 
-**New after upgrade:** LSP-backed Level 1.5 validation (activates only if your language server is already installed), learned-skill promotion with human review in `/craftsman:metrics`, setup by observation (generated project-conventions skill and codemap), `asyncRewake` test-failure wake-ups, and a `TaskCompleted` evidence gate following your `strictness` setting.
+**Optional after upgrading:**
+- The structural ratchet is inert until you opt in. Run `/craftsman:setup`, or `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/lib/ratchet.py" init src --baseline .craftsman-baseline.json`, then commit `.craftsman-baseline.json` so CI and teammates measure against the same reference. `RATCHET001` ships advisory; set it to `block` to enforce.
 
 ## 2.x / 3.x → 3.7.0
 

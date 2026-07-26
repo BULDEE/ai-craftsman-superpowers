@@ -35,7 +35,7 @@ What makes this plugin genuinely unique in the Claude Code ecosystem:
 1. **Correction Learning System (closed loop)** - records every violation fix, injects correction trends at session start, and promotes recurring fixes (3+ across 3+ files) into candidate instincts you approve in `/craftsman:metrics`. Approved instincts become project skills with provenance - Claude stops making the mistake instead of being reminded about it.
 2. **Rules Engine with 3-Level Inheritance** - Global → Project → Directory overrides. Short form (`PHP001: warn`) or long form (custom regex rules). Legacy code coexists with strict new code via directory-level relaxation.
 3. **Cognitive Bias Detector** - real-time detection of acceleration bias, scope creep, and over-optimization in your prompts, bilingual FR/EN, context-aware to reduce false positives.
-4. **Real-Time Quality Gate** - progressive validation on every Write/Edit: regex (<50ms, always on) → LSP semantics (live, when your language server is installed) → static analysis (<2s, PHPStan/ESLint) → architecture (<2s, deptrac/dependency-cruiser). Degrades gracefully with zero tools installed.
+4. **Real-Time Quality Gate** - progressive validation on every Write/Edit: regex (<50ms, always on) → LSP semantics (live, when your language server is installed) → static analysis and architecture (PHPStan/ESLint/deptrac, opt-in per machine because running a project's analysers runs its code, see [SECURITY.md](SECURITY.md)). Degrades gracefully with zero tools installed.
 5. **Multi-Provider CI Pipeline** - the same rules engine runs in hooks (real-time) and CI (pipeline) with zero drift, across GitHub Actions, GitLab CI, Bitbucket Pipelines, and Jenkins.
 6. **Metrics & Trend Analysis** - SQLite-backed tracking of violations, corrections, and sessions, with 7-day/30-day trend views to identify your most-violated rules.
 7. **Structural Ratchet** - a committed baseline records each file's structural high-water mark (complexity, size, longest function, import fan-out, suppression count). A file you touch may improve or stay equal, never regress: the mark tightens automatically on a green pass and only loosens through a documented, counted suppression. Enforced identically in hooks and CI; untouched legacy is never punished for debt it already had.
@@ -43,6 +43,18 @@ What makes this plugin genuinely unique in the Claude Code ecosystem:
 9. **Security and Situational Onboarding** - SEC001-003 (hardcoded secrets, dynamic eval, SQL by concatenation) verified in hooks and CI with their doctrine routed on block; setup observes the repository and asks at most four plain-language questions, and guided mode makes every block explain itself.
 
 > No other Claude Code plugin combines all of these: learning from past mistakes, enterprise rule customization, cognitive protection, real-time validation, zero CI drift, and measurable quality trends.
+
+
+## Opening an Untrusted Repository
+
+The plugin's hooks run automatically, so a cloned repository is untrusted input: its file names, contents, config files, and any tool it vendors. Two capabilities that would execute repository-supplied code are therefore off unless **you** allow them in your own `~/.claude/.craft-config.yml`, and a project file can never grant them:
+
+| Capability | Why it is gated |
+|------------|-----------------|
+| `trust_project_tools: true` | Level 2 runs `vendor/bin/phpstan` and `node_modules/.bin/eslint` and the configs they auto-discover. ESLint's flat config is executable JavaScript by design; PHPStan's `bootstrapFiles` requires arbitrary PHP. |
+| `packs.external[].path` | External pack validators are sourced as shell code. |
+
+Everything else keeps working on an untrusted repository: the rules engine, layer, persistence and security rules, the structural ratchet, metrics, and the CI gate are the plugin's own code. `tests/core/test-hostile-repo.sh` reproduces each attack this model covers and asserts it fails. Full detail: [SECURITY.md](SECURITY.md).
 
 ## Requirements
 

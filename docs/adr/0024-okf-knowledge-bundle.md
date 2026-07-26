@@ -38,7 +38,7 @@ Verification note: the "OKF replaces RAG" framing circulating in blog posts is *
 
 ### Negative
 
-- Users who had adopted the RAG server lose it (v4.2 breaking change; documented in MIGRATION.md). The 4.1.x line retains it.
+- Users who had adopted the RAG server lose it (v4.0.0 breaking change; documented in MIGRATION.md). The 3.9.x line retains it.
 - Exact-match lookup does not answer fuzzy questions ("how do I structure modules?"); that remains the job of the model reading the bundle, which is what it already did.
 
 ### Neutral

@@ -1,6 +1,6 @@
 # v4.0.0 Roadmap - The Self-Learning Craftsman System
 
-> Status: **delivered in 4.0.0** (2026-07-26). The decisions below are recorded as ADRs 0016-0023. The 3.9.x line remains available and frozen for Claude Code < 2.1.218.
+> Status: **delivered in 4.0.0** (2026-07-26). The decisions below are recorded as ADRs 0016-0027. The 3.9.x line remains available and frozen for Claude Code < 2.1.218.
 
 ## Direction
 
@@ -17,7 +17,10 @@ v3 made Claude a disciplined craftsman: rules enforced in real time, zero CI dri
 | 3 | Semantic Level 1.5 via `.lsp.json`, activating only on already-installed language servers | [0019](adr/0019-established-tooling-first.md) |
 | 4 | Correction learning closes the loop: candidate instincts, human review in `/craftsman:metrics`, generated learned skills; context budgets and per-hook kill switches | [0020](adr/0020-instinct-promotion-human-review.md), [0021](adr/0021-context-budgets-and-kill-switches.md) |
 | 5 | Setup by observation: generated project-conventions skill and cached codemap injected into reviewers | [0022](adr/0022-setup-by-observation.md) |
-| 6 | Deterministic verification: `asyncRewake` test failures, `TaskCompleted` evidence gate, optional `monitors/` watchers; `bin/`, `${CLAUDE_PLUGIN_DATA}`, config schema, community marketplace submission | [0023](adr/0023-deterministic-verification-loop.md) |
+| 6 | Deterministic verification: `asyncRewake` test failures, `TaskCompleted` evidence gate, optional `monitors/` watchers; `bin/`, `${CLAUDE_PLUGIN_DATA}`, config schema | [0023](adr/0023-deterministic-verification-loop.md) |
+| 7 | Knowledge as an OKF bundle with deterministic rule-to-concept lookup; the vector RAG layer removed | [0024](adr/0024-okf-knowledge-bundle.md) |
+| 8 | Structural ratchet, adversarial design panel, security rules, situational onboarding and guided mode | [0025](adr/0025-structural-ratchet.md), [0026](adr/0026-adversarial-design-panel.md), [0027](adr/0027-situational-onboarding.md) |
+| 9 | Security hardening against hostile repositories: consent for project tools and external packs, symlink refusal, bounded reads, escaped output, shape-parsed verdicts | recorded in `SECURITY.md` and `tests/core/test-hostile-repo.sh` |
 
 ## What stays
 
@@ -38,7 +41,8 @@ v3 made Claude a disciplined craftsman: rules enforced in real time, zero CI dri
 1. **Determinism first, semantics on top**: what a regex or schema can decide never goes through a model; models add the judgment regex cannot make ([ADR-0018](adr/0018-native-prompt-agent-hooks.md)).
 2. **The plugin orchestrates, never substitutes**: your stack's established tools (PHPStan, ESLint, language servers, test runners) stay authoritative; the plugin detects, uses, and degrades gracefully ([ADR-0019](adr/0019-established-tooling-first.md)).
 3. **Nothing learns without approval**: automatic detection, human-gated codification ([ADR-0020](adr/0020-instinct-promotion-human-review.md)).
-4. **Context is a budget, not a landfill**: every injection is capped and every hook individually disableable ([ADR-0021](adr/0021-context-budgets-and-kill-switches.md)).
+4. **Opening a repository is not consenting to run it**: anything that executes repository-supplied code (external packs, the project's own analysers) is off unless the machine owner allowed it in their own global config. A project file can never grant itself that permission ([SECURITY.md](../SECURITY.md)).
+5. **Context is a budget, not a landfill**: every injection is capped and every hook individually disableable ([ADR-0021](adr/0021-context-budgets-and-kill-switches.md)).
 
 ## Migration
 

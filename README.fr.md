@@ -35,7 +35,7 @@ Ce qui rend ce plugin réellement unique dans l'écosystème Claude Code :
 1. **Correction Learning System (boucle fermée)** : enregistre chaque correction de violation, injecte les tendances au démarrage de session, et promeut les corrections récurrentes (3+ sur 3+ fichiers) en instincts candidats que vous validez dans `/craftsman:metrics`. Les instincts approuvés deviennent des skills projet avec provenance : Claude cesse de faire l'erreur au lieu d'en être rappelé.
 2. **Rules Engine avec héritage à 3 niveaux** : surcharges Global → Projet → Répertoire. Forme courte (`PHP001: warn`) ou forme longue (règles regex custom). Le code legacy coexiste avec du code neuf strict via la relaxation par répertoire.
 3. **Détecteur de biais cognitifs** : détection en temps réel du biais d'accélération, du scope creep et de la sur-optimisation dans vos prompts, bilingue FR/EN, contextuel pour réduire les faux positifs.
-4. **Quality Gate temps réel** : validation progressive sur chaque Write/Edit : regex (<50ms, toujours actif) → sémantique LSP (en direct, si votre serveur de langage est installé) → analyse statique (<2s, PHPStan/ESLint) → architecture (<2s, deptrac/dependency-cruiser). Dégradation gracieuse sans aucun outil installé.
+4. **Quality Gate temps réel** : validation progressive sur chaque Write/Edit : regex (<50ms, toujours actif) → sémantique LSP (en direct, si votre serveur de langage est installé) → analyse statique et architecture (PHPStan/ESLint/deptrac, activation explicite par machine car exécuter les analyseurs d'un projet revient à exécuter son code, voir [SECURITY.md](SECURITY.md)). Dégradation gracieuse sans aucun outil installé.
 5. **Pipeline CI multi-provider** : le même rules engine tourne dans les hooks (temps réel) et en CI (pipeline) avec zéro dérive, sur GitHub Actions, GitLab CI, Bitbucket Pipelines et Jenkins.
 6. **Métriques & analyse de tendances** : suivi SQLite des violations, corrections et sessions, avec vues de tendances à 7 et 30 jours pour identifier vos règles les plus violées.
 7. **Cliquet structurel** : un baseline committé enregistre le high-water mark structurel de chaque fichier (complexité, taille, plus longue fonction, fan-out d'imports, nombre de suppressions). Un fichier que vous touchez peut s'améliorer ou rester égal, jamais régresser : la marque se resserre automatiquement au passage vert et ne se desserre que par une suppression documentée et comptée. Appliqué à l'identique dans les hooks et en CI ; le legacy non touché n'est jamais puni pour une dette qu'il avait déjà.
@@ -43,6 +43,18 @@ Ce qui rend ce plugin réellement unique dans l'écosystème Claude Code :
 9. **Sécurité et onboarding situationnel** : SEC001-003 (secrets en dur, eval dynamique, SQL par concaténation) vérifiés dans les hooks et en CI avec routage de la doctrine au blocage ; le setup observe le dépôt et pose au plus quatre questions en langage courant, et le mode guidé fait que chaque blocage s'explique.
 
 > Aucun autre plugin Claude Code ne combine tout cela : apprentissage des erreurs passées, personnalisation des règles de niveau entreprise, protection cognitive, validation temps réel, zéro dérive CI, et tendances qualité mesurables.
+
+
+## Ouvrir un dépôt non fiable
+
+Les hooks du plugin s'exécutent automatiquement : un dépôt cloné est donc une entrée non fiable (noms de fichiers, contenus, fichiers de config, et tout outil qu'il embarque). Deux capacités qui exécuteraient du code fourni par le dépôt sont éteintes sauf si **vous** les autorisez dans votre propre `~/.claude/.craft-config.yml`, et un fichier projet ne peut jamais les accorder :
+
+| Capacité | Pourquoi elle est verrouillée |
+|----------|-------------------------------|
+| `trust_project_tools: true` | Le Level 2 exécute `vendor/bin/phpstan`, `node_modules/.bin/eslint` et les configs qu'ils découvrent seuls. La config plate d'ESLint est du JavaScript exécutable par conception ; `bootstrapFiles` de PHPStan charge du PHP arbitraire. |
+| `packs.external[].path` | Les validators d'un pack externe sont sourcés comme du code shell. |
+
+Tout le reste continue de fonctionner sur un dépôt non fiable : rules engine, règles de couches, de persistence et de sécurité, cliquet structurel, métriques et gate CI sont notre propre code. `tests/core/test-hostile-repo.sh` rejoue chaque attaque de ce modèle et vérifie qu'elle échoue. Détail complet : [SECURITY.md](SECURITY.md).
 
 ## Prérequis
 

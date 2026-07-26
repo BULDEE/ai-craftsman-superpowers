@@ -86,7 +86,7 @@ else
     log_fail "missing modes documentation table"
 fi
 
-# --- Situational onboarding (v4.3) ---
+# --- Situational onboarding (v4.0) ---
 
 grep -q "craftsman-conventions.sh signals" "$SETUP_CMD" \
     && log_pass "setup consults situational signals" \

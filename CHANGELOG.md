@@ -5,61 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.3.0] - 2026-07-26
-
-Structural debt can no longer enter through the gaps between rules.
-
-### Added
-- **Structural ratchet** ([ADR-0025](docs/adr/0025-structural-ratchet.md)): `.craftsman-baseline.json` records a per-file high-water mark (approximated complexity, file lines, longest function, import fan-out, suppression count). A touched file may improve or stay equal, never regress. The mark tightens automatically on a green pass and only loosens through a documented `craftsman-ignore`, which is itself counted and ratcheted. The hook and `craftsman-ci` run the identical check; CI never writes the baseline. Untouched files and relaxed directories are never evaluated, so legacy is not punished for debt it already had. Ships advisory: set `RATCHET001: block` to make it a hard gate.
-- **Adversarial design panel** ([ADR-0026](docs/adr/0026-adversarial-design-panel.md)): three headless Haiku contradictors (YAGNI, invariants and aggregate boundaries, feasibility) attack the design during `/craftsman:design` Phase 2, before any code exists. Every objection must land in a retained or dismissed table in Phase 3. Reuses the existing `agent_hooks` gate and recursion guard; cost is announced; the code-level refutation panel stays opt-in.
-- **Security rules SEC001-003**: hardcoded secrets, dynamic eval/exec, and SQL built by concatenation or template interpolation, verified by the same validators in hooks and CI. Environment reads and parameterized queries are explicitly safe. New OKF doctrine `knowledge/security/secure-by-design.md` and `knowledge/security/owasp-layer-mapping.md`, routed automatically when a security rule blocks. The tooling detector learned the security toolchain per stack (dependency audits, secret scanners, SAST).
-- **Situational onboarding** ([ADR-0027](docs/adr/0027-situational-onboarding.md)): `/craftsman:setup --global` records a workshop profile once per machine; project init observes the repository (including a legacy signal from history plus absence of tests or CI) and then asks at most four plain-language questions whose answers derive strictness, the baseline mode, and guided mode. `--quick` still bypasses everything.
-- **Guided mode** (`guided: true`): gate exigency is unchanged and help is maximized. Every block appends a plain-language explanation and points at the doctrine that explains the rule, so the gate teaches at the moment of friction instead of assuming expertise.
-
-## [4.2.0] - 2026-07-26
-
-### Added
-- **OKF knowledge bundle** ([ADR-0024](docs/adr/0024-okf-knowledge-bundle.md)): every `knowledge/` concept carries [Open Knowledge Format v0.2](https://github.com/GoogleCloudPlatform/knowledge-catalog) frontmatter (`type`, `title`, `tags`, `status`, plus a custom `rules` field). A root `index.md` declares the bundle.
-- **Deterministic doctrine lookup** (`knowledge_lookup.py`): exact frontmatter match routes a rule or tag to the concepts explaining it. A quality-gate block now points at the doctrine behind the rule (`Doctrine: persistence/repository-pattern`) with zero embeddings and no index to maintain. Skills reach it via `~/.claude/craftsman-knowledge.sh`.
-
-### Removed
-- **knowledge-rag MCP server** (breaking): the Ollama-backed vector RAG layer, its `/craftsman:knowledge` skill, pack.yml and root-manifest declarations, healthcheck probes, and 115 MB of dependencies. External memory tools remain external; the bundle itself is plain Markdown any of them can read. The 4.1.x line retains the server. Supersedes ADR-0002 and ADR-0003.
-
-## [4.1.0] - 2026-07-26
-
-Sharpens v4 against what the ecosystem does better, without widening the scope.
-
-### Added
-- **Persistence craft**: `knowledge/persistence/` (repository boundary, migration discipline with expand-contract, storage choice derived from aggregates, read/write separation) plus rules enforced by the same validators in hooks and CI: LAYER004 (raw SQL/DQL or a database client inside Domain), DB001 (`SELECT *`), DB002 (migration without `down()`), DB003 (query inside a loop). `/craftsman:design` now produces a persistence mapping per aggregate.
-- **Outcome Contracts**: every skill states its Outcome, its Done-when condition, and the Evidence that proves it; the frontmatter validator enforces all three.
-- **Tooling detection** (`tooling_detect.py`): reads the project's manifests to report the quality tools it already declares with their report commands, and suggests the community standard only when nothing is declared. Nothing is installed automatically.
-- **Living legacy audit**: `LEGACY-AUDIT.md` is committed and diffed between runs (RESOLVED/NEW), with a mandatory "looks bad but is actually fine" section and file:line citations for every finding.
-- **Cross-project instinct scoping**: instincts stay project-scoped until the same rule is approved in 2+ projects; `global-candidates` and `promote` then offer human-reviewed global promotion.
-- **Cross-harness doctrine export**: `craftsman-ci export` renders the active rules as `AGENTS.md`, `.cursor/rules/craftsman.mdc`, and `.github/copilot-instructions.md`, so teammates on other harnesses read the same doctrine. Enforcement stays in hooks and CI.
-- **Local dashboard**: `/craftsman:metrics --dashboard` aggregates every tracked repository into a self-contained HTML page served on localhost (quality score, per-repository breakdown, top rules, corrections, instincts, 30-day trend).
-
-### Changed
-- The correction-learning differentiator is now stated as what is verifiable: the only learning loop fed by a rules engine that enforces the same rules in hooks and CI with zero drift.
-
 ## [4.0.0] - 2026-07-26
 
-Clean break to a native-first, self-learning architecture. **Requires Claude Code >= 2.1.218**; no backward compatibility with 3.x config (the 3.9.x line stays available and frozen). Full rationale: ADRs 0016-0023 and [docs/v4-roadmap.md](docs/v4-roadmap.md). Upgrade steps: [MIGRATION.md](MIGRATION.md).
+A clean break to a native-first, self-learning, security-hardened plugin.
+**Requires Claude Code >= 2.1.218**; no backward compatibility with 3.x config.
+The 3.9.x line stays available and frozen for older installations. Rationale:
+ADRs 0016-0027. Upgrade steps: [MIGRATION.md](MIGRATION.md).
 
 ### Added
-- **Instinct pipeline** (ADR-0020): recurring fixed corrections (3+ across 3+ files) become candidate instincts; `/craftsman:metrics` surfaces them for human review; approval generates a learned skill in `.claude/skills/craftsman-learned/` with provenance (`user-invocable: false`). Rejection is sticky until significant new evidence. Promotion is never automatic.
-- **Context budgets and kill switches** (ADR-0021): `context_budget.session_start_max_chars` (default 4000), `context_budget.max_learned_skills` (default 6), and `hooks.disabled` in `.craft-config.yml`, enforced at session start (trends dropped first, routing truncated second) and in `hook-profile.sh`. Config contract in `schemas/craft-config.schema.json`.
-- **Setup by observation** (ADR-0022): `/craftsman:setup` analyzes git history and layout, shows what it inferred, and generates `.claude/skills/project-conventions/SKILL.md`; a content-hash-cached codemap is injected into review skills as live context. `--refresh` regenerates both.
-- **Level 1.5 semantic validation** (ADR-0019): `.lsp.json` ships intelephense for PHP, activating only when the binary is already installed; TS/Python/Rust point at official LSP plugins. Healthcheck reports detected servers.
-- **Deterministic verification loop** (ADR-0023): a failing test run revokes verification evidence and wakes the session (`asyncRewake`) on regression; a `TaskCompleted` gate requires evidence before a task is marked complete (block in strict, warn in moderate); a background monitor streams recorded test failures.
-- **Auto-fix via `updatedInput`**: a Write missing only `declare(strict_types=1)` is corrected in place instead of blocked, with the violation kept as learning signal.
+
+- **Structural ratchet** ([ADR-0025](docs/adr/0025-structural-ratchet.md)): a committed `.craftsman-baseline.json` holds each file's structural high-water mark (approximated complexity, file lines, longest function, import fan-out, suppression count). A file you touch may improve or stay equal, never regress. The mark tightens automatically on a green pass and only loosens through a documented `craftsman-ignore`, itself counted and ratcheted. The hook and `craftsman-ci` run the identical check; CI never writes the baseline. Untouched files and relaxed directories are never evaluated, so legacy is not punished for debt it already had. Ships advisory: set `RATCHET001: block` to make it a hard gate.
+- **Correction learning closes the loop** ([ADR-0020](docs/adr/0020-instinct-promotion-human-review.md)): recurring fixed corrections (3+ across 3+ files) become candidate instincts; `/craftsman:metrics` surfaces them for human review; approval generates a learned skill with provenance. Instincts stay project-scoped until the same rule is approved in 2+ projects, then global promotion is offered. Promotion is never automatic.
+- **Adversarial design panel** ([ADR-0026](docs/adr/0026-adversarial-design-panel.md)): three headless Haiku contradictors (YAGNI, invariants and aggregate boundaries, feasibility) attack the design during `/craftsman:design` Phase 2, before any code exists. Every objection must land in a retained or dismissed table.
+- **Persistence craft**: `knowledge/persistence/` plus rules verified in hooks and CI: LAYER004 (raw SQL/DQL or a database client inside Domain), DB001 (`SELECT *`), DB002 (migration without `down()`), DB003 (query inside a loop). `/craftsman:design` ends with a persistence mapping per aggregate.
+- **Security rules SEC001-003**: hardcoded secrets, dynamic eval/exec, and SQL built by concatenation, verified by the same validators in hooks and CI, with OKF doctrine routed automatically when one blocks.
+- **Knowledge as an OKF bundle** ([ADR-0024](docs/adr/0024-okf-knowledge-bundle.md)): every concept carries [Open Knowledge Format v0.2](https://github.com/GoogleCloudPlatform/knowledge-catalog) frontmatter, and `knowledge_lookup.py` routes a rule or tag to the concepts explaining it by exact match. A quality-gate block now points at the doctrine behind the rule.
+- **Level 1.5 semantic validation** ([ADR-0019](docs/adr/0019-established-tooling-first.md)): `.lsp.json` ships intelephense for PHP, activating only when the binary is already installed.
+- **Deterministic verification loop** ([ADR-0023](docs/adr/0023-deterministic-verification-loop.md)): a failing test run revokes verification evidence and wakes the session on regression; a `TaskCompleted` gate requires evidence before a task is marked complete; a background monitor streams recorded test failures.
+- **Situational onboarding and guided mode** ([ADR-0027](docs/adr/0027-situational-onboarding.md)): `--global` records a workshop profile once per machine; project init observes the repository then asks at most four plain-language questions. With `guided: true`, every block additionally explains its doctrine in plain language.
+- **Living legacy audit**: `LEGACY-AUDIT.md` is committed and diffed between runs (RESOLVED/NEW), with a mandatory "looks bad but is actually fine" section. `tooling_detect.py` reports the quality tools a project already declares and suggests standards only when nothing is declared; nothing is ever installed.
+- **Outcome Contracts**: every skill states its Outcome, its Done-when condition, and the Evidence that proves it; the validator enforces all three.
+- **Cross-harness doctrine export**: `craftsman-ci export` renders the active rules as `AGENTS.md`, `.cursor/rules/craftsman.mdc`, and `.github/copilot-instructions.md`.
+- **Local dashboard**: `/craftsman:metrics --dashboard` aggregates every tracked repository into a self-contained page served on localhost.
+- **Context budgets and kill switches** ([ADR-0021](docs/adr/0021-context-budgets-and-kill-switches.md)): `context_budget` and `hooks.disabled` in `.craft-config.yml`, enforced at session start and in `hook-profile.sh`.
 
 ### Changed
-- **All workflows are skills** (ADR-0017): `commands/*.md` became `skills/<name>/SKILL.md`; invocations are unchanged. `/craftsman:challenge` runs as a forked skill bound to the architect agent with live context (codemap, diff, 7-day violations). Deliberate workflows are `disable-model-invocation: true`.
-- **Semantic verification is headless** (ADR-0018): DDD verification moved from Stop (where it was dead: no `tool_input`) to PostToolUse Write|Edit and runs in a Haiku `claude -p` subprocess; final review on Stop uses the same mechanism with a 2-rewake budget. Zero main-context cost; `agent_hooks: false` still disables everything.
-- Metrics database honors `${CLAUDE_PLUGIN_DATA}`; a legacy `~/.claude/plugins/data/craftsman/metrics.db` is adopted by copy on first run.
+
+- **All workflows are skills** ([ADR-0017](docs/adr/0017-skills-over-commands.md)): `commands/*.md` became `skills/<name>/SKILL.md`; invocations are unchanged. `/craftsman:challenge` runs as a forked skill bound to the architect agent with live context.
+- **Semantic verification is headless** ([ADR-0018](docs/adr/0018-native-prompt-agent-hooks.md)): DDD verification moved from Stop (where it was dead) to PostToolUse and runs in a Haiku subprocess. Zero main-context cost; `agent_hooks: false` still disables everything.
+- Metrics honour `${CLAUDE_PLUGIN_DATA}`; a legacy database is adopted by copy on first run.
+
+### Security
+
+Hardened against a hostile repository: opening or editing one must not execute
+its code. Each fix has a test in `tests/core/test-hostile-repo.sh` that
+reproduces the attack and asserts it fails.
+
+- **Level 2 static analysis is off by default** (breaking): the gate resolved and executed `vendor/bin/phpstan` and `node_modules/.bin/eslint` from the working directory. A shell script at `vendor/bin/phpstan` in a cloned repository ran arbitrary code on the first PHP edit, with no config file and no phpstan installation involved. Running a project's analysers means running its code (eslint's flat config is executable JavaScript, phpstan's `bootstrapFiles` requires arbitrary PHP), so it is now consent: set `trust_project_tools: true` in your own global config. A repository cannot grant it to itself. A trusted phpstan additionally runs against a pinned configuration.
+- **External packs are declared by the machine owner only**: `packs.external[].path` was read from the project config and its validators are sourced as shell code, so opening a cloned repository executed its code at session start. Only `~/.claude/.craft-config.yml` is honoured now.
+- **No Python source splicing in the GitLab adapter**: an attacker-chosen filename reached the source text of a `python3 -c` call, giving code execution inside the CI job with its token in scope. The body travels through stdin.
+- **Rule ids are constrained**: they are YAML keys from repository-controlled config and were used raw as filenames, so `../../..` escaped the rules store. Constrained at both entry points with a structural guard at the sink, which also closes injection into generated learned-skill frontmatter.
+- **Dashboard output is escaped** and the server answers for exactly one file; it previously rooted at the directory holding `metrics.db`, so injected script could read the cross-project history over localhost.
+- **Symlinks are refused**: git tracks symlinks as real entries, so `src/Thing.php -> ~/.ssh/id_rsa` is a legal commit and the hotspot audit followed it, reading a file outside the repository. Readers now require a regular, non-symlinked file resolving inside the project.
+- **Reads are bounded**: measuring a 94 MB file cost 506 MB of memory and 4.4 seconds, and a size cap alone does not help because `getsize` on a symlink to `/dev/zero` reports 0. Source analysis declines anything past 2 MB or any non-regular file.
+- **Verification verdicts are parsed by shape** before reaching the session: the headless verifiers read files the plugin did not write, and their reply was forwarded verbatim, which is an indirect prompt-injection path. Findings must look like `path:line something`, capped in count and length. Directory names are flattened for the same reason before entering an injected codemap.
+- **Shipped CI template hardened**: actions pinned to verified commit SHAs and least-privilege permissions declared. Also: paths are anchored so a filename cannot be read as a flag, and the CI report uses `mktemp` instead of a predictable name.
 
 ### Removed
-- `commands/` directory (flat command files), `output-styles/`, and the v3 systemMessage-based agent hook wrappers.
+
+- `commands/` (flat command files), `output-styles/`, the v3 systemMessage-based agent hook wrappers.
+- The `knowledge-rag` MCP server, its `/craftsman:knowledge` skill, the Ollama dependency, and 115 MB of dependencies. Supersedes ADR-0002 and ADR-0003.
 - Support for Claude Code < 2.1.218.
 
 ## [3.9.0] - 2026-07-14

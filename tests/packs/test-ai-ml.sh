@@ -54,7 +54,7 @@ else
     log_fail "Setup script exists" "file not found"
 fi
 
-# Test: no MCP server shipped (removed in v4.2, ADR-0024)
+# Test: no MCP server shipped (removed in v4.0.0, ADR-0024)
 if ! grep -q "mcpServers:" "$ROOT_DIR/packs/ai-ml/pack.yml" && [[ ! -d "$ROOT_DIR/packs/ai-ml/mcp" ]]; then
     log_pass "no MCP server declared or shipped (ADR-0024)"
 else
