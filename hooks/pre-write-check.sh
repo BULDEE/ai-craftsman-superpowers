@@ -89,6 +89,31 @@ if config_ts_enabled; then
 fi
 
 # =============================================================================
+# Auto-fix (ADR-0018): a Write missing only strict_types is corrected in
+# place via updatedInput instead of blocking. The violation is still
+# surfaced as additionalContext so the correction learning loop keeps its
+# signal.
+# =============================================================================
+
+TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
+
+if [[ $VIOLATION_COUNT -eq 1 && "$TOOL_NAME" == "Write" && "$EXT" == "php" ]] \
+   && [[ "$VIOLATIONS" == PHP001* ]] \
+   && echo "$FILE_CONTENT" | head -1 | grep -q "^<?php" 2>/dev/null; then
+    FIXED_CONTENT=$(printf '%s\n' "$FILE_CONTENT" | awk 'NR==1 && $0 ~ /^<\?php/ {print; print ""; print "declare(strict_types=1);"; next} {print}')
+    echo "$INPUT" | jq --arg content "$FIXED_CONTENT" \
+    '{
+        hookSpecificOutput: {
+            hookEventName: "PreToolUse",
+            permissionDecision: "allow",
+            updatedInput: (.tool_input | .content = $content),
+            additionalContext: "PHP001 auto-fixed: declare(strict_types=1) was missing and has been inserted after the <?php tag. Include it yourself in future PHP files."
+        }
+    }'
+    exit 0
+fi
+
+# =============================================================================
 # Output Decision
 # =============================================================================
 

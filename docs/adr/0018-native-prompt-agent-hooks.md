@@ -24,14 +24,15 @@ Claude Code has since removed the original blocker and added the missing pieces:
 
 ## Decision
 
-Replace the bash wrapper hooks (`agent-ddd-verifier.sh`, `agent-sentry-context.sh`, `agent-final-review.sh`, `subagent-quality-gate.sh`) with native hook types in v4.0.0:
+Move semantic verification out of the main conversation in v4.0.0. Implementation note (2026-07-26): the native `"type": "agent"` / `"type": "prompt"` hook types have no per-plugin-option gating mechanism, so using them directly would reintroduce the exact regression ADR-0009 fixed (users with `agent_hooks: false` unable to turn verification off). The agent-hook concept is therefore implemented as thin, gated command wrappers that spawn **headless Haiku subprocesses** (`claude -p --model claude-haiku-4-5 --allowedTools Read,Grep,Glob`, see `hooks/lib/haiku-verify.sh`):
 
-- **DDD semantic verification** (PostToolUse on Write|Edit for domain files): `"type": "agent"` with a verification prompt scoped to layer violations, aggregate boundaries, and controller leaks. The subagent reads the file itself; nothing is injected into the main context except a verdict.
-- **Cheap classification decisions** (is this a violation, is this commit message conventional): `"type": "prompt"` pinned to `claude-haiku-4-5-20251001`.
-- **Gating**: the `if` field plus plugin option checks. The bash pre-gates disappear.
-- `post-write-check.sh` (regex Level 1) and the rules engine remain `command` hooks: deterministic checks stay deterministic (no model in the loop for what a regex can decide).
+- **DDD semantic verification** moves from Stop (where `tool_input` is empty and the v3 hook was effectively dead) to PostToolUse on Write|Edit, `async` + `asyncRewake`: the subprocess reads the file itself and the main conversation is woken (exit 2) only on a real violation.
+- **Final architecture review** (Stop, strict mode): same headless mechanism over the session's changed files, with a rewake budget of 2 per session to prevent review/fix/review loops.
+- **Recursion guard**: the subprocess loads plugins too; `CRAFTSMAN_HEADLESS_VERIFY=1` short-circuits every verification wrapper inside it.
+- **Auto-fix**: a Write missing only `strict_types` is corrected via PreToolUse `updatedInput` (`permissionDecision: allow`) instead of blocking, with the violation surfaced as context so correction learning keeps its signal.
+- `post-write-check.sh` (regex Level 1) and the rules engine remain plain `command` hooks: deterministic checks stay deterministic (no model in the loop for what a regex can decide).
 
-This restores the model tiering of ADR-0010: Haiku for verification, the main model for construction.
+This restores the model tiering of ADR-0010: Haiku for verification, the main model for construction. If Claude Code later adds option-gating for native `agent`/`prompt` hooks, `haiku-verify.sh` is the single seam to swap.
 
 ## Consequences
 

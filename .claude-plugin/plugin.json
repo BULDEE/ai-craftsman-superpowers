@@ -46,7 +46,7 @@
     "agent_hooks": {
       "type": "boolean",
       "title": "Agent Hooks",
-      "description": "Enable AI agent hooks (DDD verifier, Sentry context, architecture review). Each Write/Edit triggers ~4 Haiku API calls (~$0.15-0.30/session). Disable to reduce API costs.",
+      "description": "Enable background Haiku verification (DDD verifier on Write/Edit, final architecture review on Stop). Runs headless claude -p subprocesses on the Haiku tier: no main-context cost, wakes the session only when a violation is found. Disable to skip all model-based verification.",
       "default": true
     },
     "packs": {

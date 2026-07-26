@@ -42,6 +42,12 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-write-check.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-ddd-verifier.sh\"",
+            "async": true,
+            "asyncRewake": true
           }
         ]
       },
@@ -136,18 +142,14 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-ddd-verifier.sh\"",
-            "async": true
-          },
-          {
-            "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-sentry-context.sh\"",
             "async": true
           },
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-final-review.sh\"",
-            "async": true
+            "async": true,
+            "asyncRewake": true
           }
         ]
       }

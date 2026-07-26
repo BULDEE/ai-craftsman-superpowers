@@ -485,31 +485,35 @@ echo "=== Agent Hook Schema Tests ==="
 
 HOOKS_FILE="$ROOT_DIR/hooks/hooks.json"
 
-# Test: PostToolUse has 1 command hook (post-write-check only - agent hooks moved to Stop)
+# Test: PostToolUse Write|Edit has post-write-check + async DDD verifier (ADR-0018)
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 hooks = d['hooks']['PostToolUse'][0]['hooks']
-assert len(hooks) == 1, f'Expected 1 hook, got {len(hooks)}'
-assert hooks[0]['type'] == 'command'
+assert len(hooks) == 2, f'Expected 2 hooks, got {len(hooks)}'
 assert 'post-write-check.sh' in hooks[0]['command']
+ddd = hooks[1]
+assert 'agent-ddd-verifier.sh' in ddd['command']
+assert ddd.get('async') is True and ddd.get('asyncRewake') is True
 " 2>/dev/null; then
-    log_pass "PostToolUse has 1 command hook (post-write-check)"
+    log_pass "PostToolUse: post-write-check + async DDD verifier (asyncRewake)"
 else
-    log_fail "PostToolUse hook count" "expected 1 command hook"
+    log_fail "PostToolUse hook group" "expected post-write-check + async ddd-verifier"
 fi
 
-# Test: DDD verifier in Stop hook (moved from PostToolUse for latency reduction)
+# Test: DDD verifier is NOT on Stop anymore (dead there: no tool_input) and
+# final review rewakes on Stop (ADR-0018)
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 stop_hooks = d['hooks']['Stop'][0]['hooks']
-ddd_found = any('agent-ddd-verifier.sh' in h['command'] for h in stop_hooks)
-assert ddd_found, 'DDD verifier not found in Stop hooks'
+assert not any('agent-ddd-verifier.sh' in h['command'] for h in stop_hooks)
+fr = [h for h in stop_hooks if 'agent-final-review.sh' in h['command']]
+assert len(fr) == 1 and fr[0].get('async') is True and fr[0].get('asyncRewake') is True
 " 2>/dev/null; then
-    log_pass "Stop DDD verifier: command hook with gate script"
+    log_pass "Stop group: DDD verifier removed, final review async+asyncRewake"
 else
-    log_fail "Stop DDD verifier" "missing or invalid"
+    log_fail "Stop hook group" "expected final-review asyncRewake, no ddd-verifier"
 fi
 
 # Test: DDD verifier script has agent_hooks gate
@@ -567,16 +571,18 @@ else
     log_fail "InstructionsLoaded channel status" "missing channel_status_summary"
 fi
 
-# Test: Stop has 3 command hooks (ddd-verifier + sentry-context + final-review)
+# Test: Stop has 2 command hooks (sentry-context + final-review); the DDD
+# verifier lives on PostToolUse in v4 (ADR-0018)
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 hooks = d['hooks']['Stop'][0]['hooks']
-assert len(hooks) == 3, f'Expected 3 Stop hooks, got {len(hooks)}'
+assert len(hooks) == 2, f'Expected 2 Stop hooks, got {len(hooks)}'
 assert all(h['type'] == 'command' for h in hooks)
-assert 'agent-final-review.sh' in hooks[2]['command']
+assert 'agent-sentry-context.sh' in hooks[0]['command']
+assert 'agent-final-review.sh' in hooks[1]['command']
 " 2>/dev/null; then
-    log_pass "Stop: 3 command hooks (ddd-verifier, sentry, final-review)"
+    log_pass "Stop: 2 command hooks (sentry, final-review)"
 else
     log_fail "Stop hook" "missing or invalid"
 fi
@@ -730,7 +736,7 @@ else
 fi
 
 # =============================================================================
-# Plugin Integrity Tests (badges, bin/, output-styles)
+# Plugin Integrity Tests (badges, bin/)
 # =============================================================================
 echo ""
 echo "=== Plugin Integrity Tests ==="
@@ -744,12 +750,11 @@ for exe in craftsman-ci craftsman-validate; do
     fi
 done
 
-# Test: output-styles exist
-STYLE_COUNT=$(find "$ROOT_DIR/output-styles" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
-if [[ "$STYLE_COUNT" -ge 2 ]]; then
-    log_pass "output-styles: $STYLE_COUNT style files found"
+# Test: output-styles removed in v4 (ADR-0016)
+if [[ ! -d "$ROOT_DIR/output-styles" ]]; then
+    log_pass "output-styles/ removed (v4 clean break)"
 else
-    log_fail "output-styles" "expected >= 2 style files, got $STYLE_COUNT"
+    log_fail "output-styles" "directory should not exist in v4"
 fi
 
 # Test: All agents have effort field in plugin.json
