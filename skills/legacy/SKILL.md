@@ -70,6 +70,16 @@ When `--from` is given, use that data as the **complexity** axis and still compu
 
 ### Process
 
+0. **Detect the project's own tooling FIRST.** The plugin consumes what the stack already declares; it never imposes a second opinion:
+
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/hooks/lib/tooling_detect.py" "$PWD"
+   ```
+
+   - Tools declared → run their report command and use it as the complexity axis (same as `--from`, without asking the user for a path).
+   - Nothing declared → show the suggestions the detector printed, ask whether to adopt one, and proceed with the built-in ranking meanwhile. Never install anything without an explicit yes.
+   - Record which source was used in the report header: the audit must say where its numbers came from.
+
 1. **Confirm it runs.** Ask whether the project runs and tests pass locally. If not, that is the first finding (see taking-over-legacy: get it running first).
 2. **Get the hotspot signal.** Combine churn with complexity:
 
@@ -91,19 +101,37 @@ When `--from` is given, use that data as the **complexity** axis and still compu
 4. **Rank modules by risk.** Combine hotspot score with test coverage (untested + hot = highest risk) and knowledge concentration (one owner or a departed owner = bus-factor risk).
 5. **Recommend the first test.** Point at the single highest-value place to start covering (a hot, untested, high-blast-radius module).
 
-### Output: `LEGACY-AUDIT.md`
+### Output: `LEGACY-AUDIT.md` (a living, versioned document)
+
+The audit is committed to the repository and **re-run over time**. On a re-run, read the existing `LEGACY-AUDIT.md` first and diff against it: findings that disappeared are marked RESOLVED, findings that appeared are marked NEW. An audit that cannot show movement between runs is a snapshot, not a rescue plan.
 
 Use native Mermaid diagrams (no external tool):
 
 ```markdown
 # Legacy Audit - <project>
 
-> Complexity source: <SonarQube report | PHPStan | CodeScene | built-in structural_metrics fallback>
+> Run: <date> | Previous run: <date or "first run">
+> Complexity source: <project's own tool (name + command) | --from report | built-in structural_metrics fallback>
+
+## Movement since last run
+| Finding | Status |
+|---------|--------|
+| `src/LegacyTaxEngine.php` god class | RESOLVED (split in #142) |
+| `src/Billing/Invoice.php` hotspot | NEW |
+| `src/Auth/Session.php` untested | UNCHANGED (3 runs) |
 
 ## Hotspots (refactor top-right first)
 | File | Complexity | Churn (12mo) | Quadrant | Risk |
 |------|-----------|--------------|----------|------|
 | ... | ... | ... | top-right | HIGH |
+
+## Looks bad but is actually fine (MANDATORY section)
+
+State at least one thing that pattern-matches to debt but should be left alone, with the reason. An audit that flags everything is noise: the value is in the discernment.
+
+| Code | Why it looks bad | Why it is fine |
+|------|------------------|----------------|
+| `src/Legacy/PriceTable.php` (900 lines) | huge file, no tests | pure data table, changed twice in 5 years, zero branching |
 
 ## Dependency Map
 ```mermaid
@@ -119,6 +147,8 @@ graph TD
 ## Talking to Management
 <one-paragraph business framing from communicating-tech-debt.md>
 ```
+
+Every finding cites `file:line`. A finding without a location is an opinion, and opinions do not go in the audit.
 
 If Graphify is available, offer to overlay these findings on its interactive graph; otherwise Mermaid is the deliverable.
 

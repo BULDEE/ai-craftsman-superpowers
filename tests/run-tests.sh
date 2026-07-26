@@ -375,6 +375,23 @@ test_agent_hooks() {
     fi
 }
 
+test_tooling_detect() {
+    echo ""
+    log_info "Testing tooling detector (functional)"
+
+    local td_test="$SCRIPT_DIR/core/test-tooling-detect.sh"
+
+    if [[ -f "$td_test" ]]; then
+        if bash "$td_test" > /dev/null 2>&1; then
+            log_pass "Tooling detector tests pass"
+        else
+            log_fail "Tooling detector tests failed - run tests/core/test-tooling-detect.sh for details"
+        fi
+    else
+        log_skip "Tooling detector tests (tests/core/test-tooling-detect.sh not found)"
+    fi
+}
+
 test_verify_loop() {
     echo ""
     log_info "Testing deterministic verification loop (functional)"
