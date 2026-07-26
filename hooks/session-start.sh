@@ -77,7 +77,7 @@ PROJECT_HASH=\$(echo -n "\$PWD" | shasum -a 256 | cut -d' ' -f1)
 CMD="\${1:-candidates}"
 shift 2>/dev/null || true
 case "\$CMD" in
-    approve|reject)
+    approve|reject|global-candidates|promote)
         exec python3 "${SCRIPT_DIR}/lib/instincts.py" "\$CMD" "\$DB" "\$@"
         ;;
     *)

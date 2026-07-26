@@ -153,3 +153,20 @@ For each candidate, show the user the rule, confidence, occurrence count, and ev
   ```
 
 Also list what is already codified with `bash ~/.claude/craftsman-instincts.sh list approved` and offer retirement (delete the generated skill directory) for instincts the user no longer wants. Never approve or reject without an explicit user decision: automatic promotion is forbidden by ADR-0020.
+
+### Step 10: Cross-Project Promotion (scoping)
+
+An instinct approved in a single project stays project-scoped: it belongs to that codebase, and injecting it elsewhere is contamination. When the SAME rule has been approved in two or more independent projects, it stops being a codebase quirk and starts describing how you work. Only then is global promotion offered:
+
+```bash
+bash ~/.claude/craftsman-instincts.sh global-candidates
+```
+
+Present each candidate with its project count, then promote only on an explicit user decision:
+
+```bash
+bash ~/.claude/craftsman-instincts.sh promote <RULE> "$HOME/.claude/skills"
+```
+
+This writes `~/.claude/skills/learned-global-<rule>/SKILL.md` (`user-invocable: false`), applied across all projects. The same rule as project scope holds: never promote automatically, and retirement is deleting the file.
+

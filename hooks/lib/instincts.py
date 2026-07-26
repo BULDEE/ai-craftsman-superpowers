@@ -7,6 +7,8 @@ Subcommands:
   pending-count <db> <project_hash>         print number of candidates awaiting review
   approve <db> <id> <skills_dir>            generate learned skill, mark approved
   reject <db> <id>                          mark rejected (re-proposed only on new evidence)
+  global-candidates <db>                    rules approved in 2+ projects (promotion candidates)
+  promote <db> <rule> <skills_dir>          generate a global learned skill for a rule
 
 Promotion is never automatic: `candidates` only records what a human may
 approve. Generated skills carry provenance and are plain files the user
@@ -210,6 +212,66 @@ def reject(conn: sqlite3.Connection, instinct_id: int) -> None:
     print(f"rejected: #{instinct_id}")
 
 
+GLOBAL_TEMPLATE = """---
+description: Cross-project learned instinct for rule {rule}. Confirmed in {project_count} independent projects; apply the fix pattern proactively when writing matching code.
+user-invocable: false
+---
+
+# Global Learned Instinct: {rule}
+
+This correction was approved independently in **{project_count} projects**, so it reflects how you work rather than one codebase's quirk. Apply it proactively.
+
+## Pattern
+
+{pattern}
+
+## Provenance
+
+- Confirmed in {project_count} projects ({occurrences} corrections total)
+- Promoted from project scope by human review on {today} via /craftsman:metrics
+- Delete this file to retire the instinct globally
+"""
+
+
+def global_candidates(conn: sqlite3.Connection) -> list[tuple]:
+    """Rules approved in 2+ distinct projects and not yet promoted globally."""
+    return conn.execute(
+        "SELECT rule, COUNT(DISTINCT project_hash) AS projects, SUM(occurrences),"
+        " MAX(COALESCE(pattern_summary, ''))"
+        " FROM instincts WHERE status = 'approved'"
+        " GROUP BY rule HAVING projects >= 2"
+    ).fetchall()
+
+
+def _cmd_global_candidates(conn: sqlite3.Connection, _args: list[str]) -> None:
+    rows = global_candidates(conn)
+    if not rows:
+        print("no global candidates")
+        return
+    for rule, projects, occurrences, _summary in rows:
+        print(f"{rule} [global-candidate] projects={projects} corrections={occurrences}")
+
+
+def _cmd_promote(conn: sqlite3.Connection, args: list[str]) -> None:
+    """Promote a rule to global scope. Human-invoked only, never automatic."""
+    rule, skills_dir = args[0], args[1]
+    match = [row for row in global_candidates(conn) if row[0] == rule]
+    if not match:
+        print(f"error: {rule} is not approved in 2+ projects", file=sys.stderr)
+        sys.exit(1)
+    _rule, projects, occurrences, summary = match[0]
+    skill_dir = Path(skills_dir) / f"learned-global-{_slugify(rule)}"
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    (skill_dir / "SKILL.md").write_text(GLOBAL_TEMPLATE.format(
+        rule=rule,
+        project_count=projects,
+        occurrences=occurrences,
+        pattern=summary or f"See the {rule} rule definition in the active pack validators.",
+        today=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+    ))
+    print(f"promoted: {skill_dir / 'SKILL.md'}")
+
+
 def _cmd_candidates(conn: sqlite3.Connection, args: list[str]) -> None:
     refresh_candidates(conn, args[0])
     list_instincts(conn, args[0], "candidate")
@@ -242,11 +304,13 @@ COMMANDS = {
     "list": (_cmd_list, 1),
     "approve": (_cmd_approve, 2),
     "reject": (_cmd_reject, 1),
+    "global-candidates": (_cmd_global_candidates, 0),
+    "promote": (_cmd_promote, 2),
 }
 
 
 def main() -> None:
-    if len(sys.argv) < 4 or sys.argv[1] not in COMMANDS:
+    if len(sys.argv) < 3 or sys.argv[1] not in COMMANDS:
         print(__doc__, file=sys.stderr)
         sys.exit(1)
     handler, min_args = COMMANDS[sys.argv[1]]

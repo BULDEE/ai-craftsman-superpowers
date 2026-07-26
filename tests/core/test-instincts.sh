@@ -125,6 +125,49 @@ else
 fi
 
 echo ""
+echo "=== Cross-Project Promotion (scoping) ==="
+
+# Same rule approved in a second project
+sqlite3 "$DB" "INSERT INTO corrections (project_hash, rule, file_pattern, action) VALUES
+  ('otherhash','PHP001','app/X/**/*.php','fixed'),
+  ('otherhash','PHP001','app/Y/**/*.php','fixed'),
+  ('otherhash','PHP001','app/Z/**/*.php','fixed');"
+python3 "$INSTINCTS" candidates "$DB" "otherhash" >/dev/null 2>&1
+OTHER_ID=$(sqlite3 "$DB" "SELECT id FROM instincts WHERE rule='PHP001' AND project_hash='otherhash';")
+python3 "$INSTINCTS" approve "$DB" "$OTHER_ID" "$SKILLS_DIR" >/dev/null 2>&1
+
+OUTPUT=$(python3 "$INSTINCTS" global-candidates "$DB" 2>&1)
+if echo "$OUTPUT" | grep -q "PHP001 \[global-candidate\] projects=2"; then
+    log_pass "rule approved in 2 projects becomes a global candidate"
+else
+    log_fail "global candidate detection" "$OUTPUT"
+fi
+
+# A rule approved in one project only must NOT be a global candidate
+if echo "$OUTPUT" | grep -q "TS002"; then
+    log_fail "scoping" "single-project rule leaked into global candidates"
+else
+    log_pass "single-project rule stays project-scoped (no contamination)"
+fi
+
+GLOBAL_DIR="$TEST_DIR/global"
+python3 "$INSTINCTS" promote "$DB" "PHP001" "$GLOBAL_DIR" >/dev/null 2>&1
+GFILE="$GLOBAL_DIR/learned-global-php001/SKILL.md"
+if [[ -f "$GFILE" ]] && grep -q "user-invocable: false" "$GFILE" && grep -q "2 projects" "$GFILE"; then
+    log_pass "promote generates a global skill with cross-project provenance"
+else
+    log_fail "promotion output" "missing or malformed $GFILE"
+fi
+
+EXIT_CODE=0
+python3 "$INSTINCTS" promote "$DB" "TS002" "$GLOBAL_DIR" >/dev/null 2>&1 || EXIT_CODE=$?
+if [[ $EXIT_CODE -ne 0 ]]; then
+    log_pass "promote refuses a rule not approved in 2+ projects"
+else
+    log_fail "promotion guard" "should refuse single-project rule"
+fi
+
+echo ""
 echo "=== Context Budget Config (ADR-0021) ==="
 
 source "$ROOT_DIR/hooks/lib/config.sh"
