@@ -36,7 +36,7 @@ bash tests/templates/test-templates.sh
 These are the 6 genuine features that differentiate AI Craftsman Superpowers:
 
 ### 1. Correction Learning System
-Records every violation fix users make and injects correction trends at next session start. SQLite-backed feedback loop that progressively teaches Claude the exact patterns your codebase rejects. Cross-file pattern detection suggests project-wide fixes when 3+ files share the same violation. Unique in the ecosystem - no other Claude Code plugin creates this behavioral feedback loop.
+Records every violation fix users make, injects correction trends at next session start, and promotes recurring fixes into human-reviewed learned skills. SQLite-backed feedback loop that progressively teaches Claude the exact patterns your codebase rejects. Cross-file pattern detection suggests project-wide fixes when 3+ files share the same violation. Differentiator: the only learning loop coupled to a verified rules engine - what is learned comes from violations the same engine enforces in hooks and CI with zero drift.
 
 ### 2. Rules Engine with 3-Level Inheritance
 Enterprise-ready rule customization: Global → Project → Directory overrides. Short form (`PHP001: warn`) and long form (custom rules with regex, message, severity, languages, paths). Legacy code coexists with strict new code via directory-level relaxation. Python-backed YAML parser with bash 3.2 shell compatibility.
