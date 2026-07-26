@@ -1,3 +1,10 @@
+---
+type: reference
+title: "Refactoring Katas: Deliberate Practice"
+description: "Refactoring is a motor skill: you get good at it by repetition under constraints, the way musicians and martial artists do. A **kata** is a small, self-contained coding exercise yo"
+tags: [refactoring, practice, katas]
+status: stable
+---
 # Refactoring Katas: Deliberate Practice
 
 > The emphasis is on how you work, not just what you accomplish.

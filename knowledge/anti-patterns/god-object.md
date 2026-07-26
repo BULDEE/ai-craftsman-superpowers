@@ -1,3 +1,10 @@
+---
+type: anti-pattern
+title: "Anti-Pattern: God Object"
+description: "A single class that knows too much and does too much: it orchestrates, persists, formats, validates, and decides. Everything routes through it, so every change touches it. This plu"
+tags: [cohesion, srp]
+status: stable
+---
 # Anti-Pattern: God Object
 
 ## What It Is

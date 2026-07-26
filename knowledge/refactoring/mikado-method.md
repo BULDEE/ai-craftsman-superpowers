@@ -1,3 +1,10 @@
+---
+type: methodology
+title: "The Mikado Method"
+description: "The Mikado Method is how you make a large change in a codebase full of **unknown unknowns** without ever leaving it broken. Instead of a big risky branch, you discover the graph of"
+tags: [refactoring, planning, graphs]
+status: stable
+---
 # The Mikado Method
 
 > "You can't anticipate what needs to be done first, but you regularly check where you are going so you can adapt to whatever comes up."

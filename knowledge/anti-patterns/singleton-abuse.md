@@ -1,3 +1,10 @@
+---
+type: anti-pattern
+title: "Anti-Pattern: Singleton Abuse"
+description: "Reaching for the Singleton pattern (a class with one global instance and a static access point) as the default way to share objects. It looks convenient, so configuration, database"
+tags: [coupling, testability]
+status: stable
+---
 # Anti-Pattern: Singleton Abuse
 
 ## What It Is

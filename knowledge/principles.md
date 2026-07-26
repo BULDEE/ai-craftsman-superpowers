@@ -1,3 +1,11 @@
+---
+type: principle
+title: "Software Principles"
+description: "// BAD: Multiple responsibilities"
+tags: [solid, kiss, dry, yagni]
+rules: [PHP002, PHP004, TS002]
+status: stable
+---
 # Software Principles
 
 ## SOLID

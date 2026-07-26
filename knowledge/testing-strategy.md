@@ -1,3 +1,10 @@
+---
+type: methodology
+title: "Testing Strategy"
+description: "A test suite is an asset only if it stays fast, trustworthy, and cheap to maintain. More than half of test-automation efforts fail not for lack of tests but because the suite grows"
+tags: [testing, pyramid, coverage]
+status: stable
+---
 # Testing Strategy
 
 > "Working code is a low bar." - the whole point of tests is to keep code *changeable*, not merely working today.

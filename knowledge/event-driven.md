@@ -1,3 +1,10 @@
+---
+type: pattern
+title: "Event-Driven Architecture"
+description: "Event-Driven Architecture (EDA) is about **design**, not tools. Kafka and RabbitMQ are implementations, not architecture."
+tags: [architecture, events, messaging]
+status: stable
+---
 # Event-Driven Architecture
 
 ## Core Insight

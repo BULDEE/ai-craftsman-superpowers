@@ -47,13 +47,6 @@ for f in rag.md mlops.md agent-design.md; do
     fi
 done
 
-# Test: MCP server source exists
-if [[ -f "$ROOT_DIR/packs/ai-ml/mcp/knowledge-rag/package.json" ]]; then
-    log_pass "MCP server package.json exists"
-else
-    log_fail "MCP server package.json exists" "file not found"
-fi
-
 # Test: setup script exists
 if [[ -f "$ROOT_DIR/packs/ai-ml/scripts/setup.sh" ]]; then
     log_pass "Setup script exists"
@@ -61,11 +54,11 @@ else
     log_fail "Setup script exists" "file not found"
 fi
 
-# Test: mcpServers declared in pack.yml
-if grep -q "mcpServers:" "$ROOT_DIR/packs/ai-ml/pack.yml"; then
-    log_pass "mcpServers declared in pack.yml"
+# Test: no MCP server shipped (removed in v4.2, ADR-0024)
+if ! grep -q "mcpServers:" "$ROOT_DIR/packs/ai-ml/pack.yml" && [[ ! -d "$ROOT_DIR/packs/ai-ml/mcp" ]]; then
+    log_pass "no MCP server declared or shipped (ADR-0024)"
 else
-    log_fail "mcpServers declared in pack.yml" "not found"
+    log_fail "MCP removal" "pack still declares or ships an MCP server"
 fi
 
 echo ""

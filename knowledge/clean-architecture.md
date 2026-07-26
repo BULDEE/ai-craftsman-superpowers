@@ -1,3 +1,11 @@
+---
+type: methodology
+title: "Clean Architecture"
+description: "Clean Architecture is one actionable synthesis of the layered-architecture family: Hexagonal (Ports & Adapters), DCI, and BCE. They share one objective: **separation of concerns by"
+tags: [architecture, layers, dependency-rule]
+rules: [LAYER001, LAYER002, LAYER003]
+status: stable
+---
 # Clean Architecture
 
 > "Source code dependencies must point only inward, toward higher-level policies." - Robert C. Martin

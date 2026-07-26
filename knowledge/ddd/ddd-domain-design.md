@@ -1,3 +1,11 @@
+---
+type: methodology
+title: "DDD Tactical Design: Domain Modeling"
+description: "Tactical Domain-Driven Design gives the building blocks for a domain model that is expressive, invariant-safe, and independent of any framework. These patterns are language-agnosti"
+tags: [ddd, aggregates, value-objects, entities]
+rules: [PHP003, PHP004, PHP005]
+status: stable
+---
 # DDD Tactical Design: Domain Modeling
 
 > "The heart of software is its ability to solve domain-related problems for its user." - Eric Evans

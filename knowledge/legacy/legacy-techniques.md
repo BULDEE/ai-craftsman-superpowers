@@ -1,3 +1,10 @@
+---
+type: methodology
+title: "Legacy Code Techniques"
+description: "Legacy code is not old code; it is code you are **afraid to change** because nothing tells you when you break it. The way out is always the same loop: get a safety net around the p"
+tags: [legacy, seams, dependency-breaking]
+status: stable
+---
 # Legacy Code Techniques
 
 > Legacy code is simply code without tests.

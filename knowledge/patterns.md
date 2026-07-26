@@ -1,3 +1,10 @@
+---
+type: reference
+title: "Design Patterns"
+description: "interface NotificationFactory"
+tags: [design-patterns, gof, ddd]
+status: stable
+---
 # Design Patterns
 
 > Reference: [refactoring.guru/design-patterns](https://refactoring.guru/design-patterns)

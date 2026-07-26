@@ -1,3 +1,10 @@
+---
+type: methodology
+title: "Data Modeling Decisions - Choosing Storage from the Domain"
+description: "Storage choice is an architecture decision, and it is derived from the aggregate design, not from fashion. Model the domain first; the aggregates then tell you what the storage mus"
+tags: [persistence, storage-choice, sql, nosql, vector]
+status: stable
+---
 # Data Modeling Decisions - Choosing Storage from the Domain
 
 Storage choice is an architecture decision, and it is derived from the aggregate design, not from fashion. Model the domain first; the aggregates then tell you what the storage must guarantee.

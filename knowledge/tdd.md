@@ -1,3 +1,10 @@
+---
+type: methodology
+title: "Test-Driven Development (TDD)"
+description: "TDD, which rose to prominence with Extreme Programming in the late 1990s, is a pillar of the craft. It is **not a testing technique**: it is a design and development technique whos"
+tags: [testing, red-green-refactor]
+status: stable
+---
 # Test-Driven Development (TDD)
 
 > "You must write a failing test before you write any production code." - Robert C. Martin, The Three Laws of TDD

@@ -101,55 +101,6 @@ hc_check_channels() {
     fi
 }
 
-hc_check_ollama() {
-    local packs
-    packs=$(pack_loaded 2>/dev/null || echo "")
-
-    if ! echo "$packs" | grep -q "ai-ml"; then
-        return
-    fi
-
-    local response
-    response=$(curl -s --max-time 2 "http://localhost:11434/api/tags" 2>/dev/null) || {
-        _hc_record "ollama" "error" "not running - run: ollama serve"
-        return
-    }
-
-    local model
-    model=$(echo "$response" | python3 -c "import sys,json; models=json.load(sys.stdin).get('models',[]); print(models[0]['name'] if models else 'none')" 2>/dev/null || echo "unknown")
-    _hc_record "ollama" "ok" "running (${model})"
-}
-
-hc_check_knowledge() {
-    local packs
-    packs=$(pack_loaded 2>/dev/null || echo "")
-
-    if ! echo "$packs" | grep -q "ai-ml"; then
-        return
-    fi
-
-    local kb_dir="${HOME}/.claude/ai-craftsman-superpowers/knowledge"
-    local db_path="${kb_dir}/.index/knowledge.db"
-
-    if [[ ! -f "$db_path" ]]; then
-        db_path="${kb_dir}/knowledge.db"
-    fi
-
-    if [[ -f "$db_path" ]]; then
-        local chunks sources
-        chunks=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM chunks;" 2>/dev/null || echo "0")
-        sources=$(sqlite3 "$db_path" "SELECT COUNT(DISTINCT source) FROM chunks;" 2>/dev/null || echo "0")
-
-        if [[ "$chunks" -gt 0 ]]; then
-            _hc_record "knowledge" "ok" "${chunks} chunks / ${sources} sources"
-        else
-            _hc_record "knowledge" "warn" "DB empty - run /craftsman:knowledge sync"
-        fi
-    else
-        _hc_record "knowledge" "error" "DB missing - run /craftsman:knowledge sync"
-    fi
-}
-
 hc_check_superpowers() {
     local sp_dir=""
     for d in "${HOME}/.claude/plugins/cache/claude-plugins-official/superpowers"/* "${HOME}/.claude/plugins/superpowers"; do
@@ -228,8 +179,6 @@ hc_run_all() {
     hc_check_metrics_db
     hc_check_channels
     hc_check_lsp
-    hc_check_ollama
-    hc_check_knowledge
     hc_check_superpowers
     hc_check_session_bridge
 }

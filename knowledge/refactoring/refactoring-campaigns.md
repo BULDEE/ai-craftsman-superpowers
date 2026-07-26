@@ -1,3 +1,10 @@
+---
+type: methodology
+title: "Refactoring Campaigns"
+description: "A refactoring **campaign** is a deliberate, multi-file improvement effort, not a one-off tidy-up. The danger in a large legacy codebase is drowning: a static-analysis tool reports "
+tags: [refactoring, hotspots, churn]
+status: stable
+---
 # Refactoring Campaigns
 
 > "When everything is urgent, nothing is."

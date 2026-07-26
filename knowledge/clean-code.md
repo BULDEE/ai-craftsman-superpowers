@@ -1,3 +1,10 @@
+---
+type: methodology
+title: "Clean Code Principles"
+description: "Names should tell WHY something exists, WHAT it does, and HOW it's used."
+tags: [readability, functions, naming]
+status: stable
+---
 # Clean Code Principles
 
 > "Clean code reads like well-written prose." - Robert C. Martin

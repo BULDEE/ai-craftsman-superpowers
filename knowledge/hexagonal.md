@@ -1,3 +1,11 @@
+---
+type: pattern
+title: "Hexagonal Architecture (Ports & Adapters)"
+description: "Hexagonal Architecture is the same idea as [[clean-architecture]] seen from the outside in. Instead of concentric circles it draws one **application hexagon** surrounded by **adapt"
+tags: [architecture, ports-adapters]
+rules: [LAYER001, LAYER004]
+status: stable
+---
 # Hexagonal Architecture (Ports & Adapters)
 
 > An application should be driven equally by users, programs, automated tests, or batch scripts, and be developed and tested in isolation from its eventual run-time devices and databases.

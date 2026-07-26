@@ -375,6 +375,23 @@ test_agent_hooks() {
     fi
 }
 
+test_okf_knowledge() {
+    echo ""
+    log_info "Testing OKF knowledge bundle (functional)"
+
+    local okf_test="$SCRIPT_DIR/core/test-okf-knowledge.sh"
+
+    if [[ -f "$okf_test" ]]; then
+        if bash "$okf_test" > /dev/null 2>&1; then
+            log_pass "OKF knowledge bundle tests pass"
+        else
+            log_fail "OKF tests failed - run tests/core/test-okf-knowledge.sh for details"
+        fi
+    else
+        log_skip "OKF tests (tests/core/test-okf-knowledge.sh not found)"
+    fi
+}
+
 test_dashboard() {
     echo ""
     log_info "Testing metrics dashboard (functional)"

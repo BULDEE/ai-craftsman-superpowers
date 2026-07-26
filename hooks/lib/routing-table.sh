@@ -32,7 +32,6 @@ _register_pack_routes() {
     local routes=""
     if echo "$packs" | grep -q "ai-ml"; then
         routes="${routes}
-- Manage knowledge base, add/sync documents → /craftsman:knowledge
 - Design RAG pipeline, semantic search → /craftsman:rag
 - Design AI agent, autonomous workflow → /craftsman:agent-design
 - ML pipeline audit, production readiness → /craftsman:mlops"

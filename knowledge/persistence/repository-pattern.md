@@ -1,3 +1,11 @@
+---
+type: pattern
+title: "Repository Pattern - The Persistence Boundary"
+description: "The Repository is the only door between the domain and storage. Domain code speaks in aggregates; storage speaks in rows, documents, or vectors. The Repository translates, in both "
+tags: [persistence, ddd, boundaries]
+rules: [LAYER004]
+status: stable
+---
 # Repository Pattern - The Persistence Boundary
 
 The Repository is the only door between the domain and storage. Domain code speaks in aggregates; storage speaks in rows, documents, or vectors. The Repository translates, in both directions, and nothing else crosses.

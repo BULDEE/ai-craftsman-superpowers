@@ -1,3 +1,11 @@
+---
+type: methodology
+title: "Migration Discipline - Schema Changes Are Code"
+description: "Migrations are the highest-risk code you ship: they run once, in production, with data you cannot regenerate. Treat them with more discipline than feature code, not less."
+tags: [persistence, migrations, expand-contract]
+rules: [DB002]
+status: stable
+---
 # Migration Discipline - Schema Changes Are Code
 
 Migrations are the highest-risk code you ship: they run once, in production, with data you cannot regenerate. Treat them with more discipline than feature code, not less.

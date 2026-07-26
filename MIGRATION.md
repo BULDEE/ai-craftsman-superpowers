@@ -2,7 +2,15 @@
 
 Breaking changes only. Minor/patch upgrades never require manual action - see [CHANGELOG.md](CHANGELOG.md) for the full history.
 
-## 3.x → 4.0.0 (current)
+## 4.1.x → 4.2.0
+
+**What changes:** the optional knowledge-rag MCP server (Ollama + local vector store) is removed ([ADR-0024](docs/adr/0024-okf-knowledge-bundle.md)). The plugin's knowledge is now an [OKF v0.2](https://github.com/GoogleCloudPlatform/knowledge-catalog) bundle with a deterministic rule-to-concept lookup.
+
+**Action required:**
+- If you used `/craftsman:knowledge` and the RAG server: they no longer exist. Your indexed documents in `~/.claude/ai-craftsman-superpowers/knowledge/` are untouched plain files; point your own memory tooling (Obsidian, claude-mem, any MCP knowledge source) at them. The 4.1.x line retains the server.
+- Everyone else: nothing. Installations get faster (no Node MCP process, no 115 MB install) and `/craftsman:healthcheck` no longer reports Ollama.
+
+## 3.x → 4.0.0
 
 **What changes:** v4 is a clean break to a native-first architecture (full rationale in [docs/v4-roadmap.md](docs/v4-roadmap.md) and ADRs 0016-0023). No backward compatibility with 3.x config or older Claude Code versions.
 

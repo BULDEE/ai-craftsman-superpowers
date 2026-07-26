@@ -1,3 +1,10 @@
+---
+type: pattern
+title: "Strangler Fig"
+description: "The strangler fig is a vine that grows around a host tree, gradually taking over until the original rots away and the vine stands on its own. Applied to software (Fowler), it is th"
+tags: [legacy, migration, incremental]
+status: stable
+---
 # Strangler Fig
 
 > "The most important reason to consider a strangler fig application over a cut-over rewrite is reduced risk." - Martin Fowler

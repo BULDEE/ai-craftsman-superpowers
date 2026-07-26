@@ -1,3 +1,10 @@
+---
+type: methodology
+title: "Refactoring Techniques"
+description: "Reference: [refactoring.guru/refactoring](https://refactoring.guru/refactoring)"
+tags: [refactoring, behavior-preservation]
+status: stable
+---
 # Refactoring Techniques
 
 > "Refactoring is a disciplined technique for restructuring code, altering its internal structure without changing its external behavior." - Martin Fowler

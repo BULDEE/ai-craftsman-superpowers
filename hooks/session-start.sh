@@ -107,6 +107,14 @@ printf '%s' "\$CURRENT_HASH" > "\$HASH_FILE" 2>/dev/null || true
 WRAPPER
 chmod +x "${HOME}/.claude/craftsman-codemap.sh" 2>/dev/null || true
 
+# Knowledge bridge (ADR-0024): deterministic OKF lookup for skills.
+cat > "${HOME}/.claude/craftsman-knowledge.sh" <<WRAPPER
+#!/usr/bin/env bash
+set -uo pipefail
+exec python3 "${SCRIPT_DIR}/lib/knowledge_lookup.py" "${SCRIPT_DIR}/../knowledge" "\$@"
+WRAPPER
+chmod +x "${HOME}/.claude/craftsman-knowledge.sh" 2>/dev/null || true
+
 # Dashboard bridge: aggregates the metrics database into a local HTML report.
 cat > "${HOME}/.claude/craftsman-dashboard.sh" <<WRAPPER
 #!/usr/bin/env bash

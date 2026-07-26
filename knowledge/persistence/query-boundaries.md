@@ -1,3 +1,11 @@
+---
+type: methodology
+title: "Query Boundaries - Reads Are Not Writes"
+description: "The write model protects invariants; reads just need shaped data, fast. Forcing reads through aggregates produces N+1 storms and bloated repositories; letting writes bypass aggrega"
+tags: [persistence, cqrs, n-plus-one, read-models]
+rules: [DB001, DB003]
+status: stable
+---
 # Query Boundaries - Reads Are Not Writes
 
 The write model protects invariants; reads just need shaped data, fast. Forcing reads through aggregates produces N+1 storms and bloated repositories; letting writes bypass aggregates corrupts state. Keep the two paths distinct.

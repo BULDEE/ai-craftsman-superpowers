@@ -1,3 +1,11 @@
+---
+type: anti-pattern
+title: "Anti-Pattern: Anemic Domain Model"
+description: "An entity that is just a data bag - only getters and setters, no behavior."
+tags: [ddd, domain, behavior]
+rules: [PHP004]
+status: stable
+---
 # Anti-Pattern: Anemic Domain Model
 
 ## What It Is

@@ -24,7 +24,6 @@
 - [Skills Reference](./reference/skills.md) - All available skills and usage
 - [Agents Reference](./reference/agents.md) - Code review agents
 - [Knowledge Base](./reference/knowledge.md) - Built-in knowledge
-- [MCP Servers](./reference/mcp-servers.md) - RAG and integrations
 
 ## Roadmap
 
@@ -35,8 +34,8 @@
 All major decisions are documented as ADRs (Architecture Decision Records):
 
 - [ADR-0001: Skills over Prompts](./adr/0001-skills-over-prompts.md)
-- [ADR-0002: Ollama over OpenAI for Local RAG](./adr/0002-ollama-over-openai.md)
-- [ADR-0003: SQLite over pgvector](./adr/0003-sqlite-over-pgvector.md)
+- [ADR-0002: Ollama over OpenAI for Local RAG](./adr/0002-ollama-over-openai.md) (superseded by ADR-0024)
+- [ADR-0003: SQLite over pgvector](./adr/0003-sqlite-over-pgvector.md) (superseded by ADR-0024)
 - [ADR-0004: 3P Agent Pattern](./adr/0004-3p-agent-pattern.md)
 - [ADR-0005: Knowledge-First Architecture](./adr/0005-knowledge-first-architecture.md)
 - [ADR-0006: Project-Specific Knowledge](./adr/0006-project-specific-knowledge.md)
@@ -60,6 +59,7 @@ All major decisions are documented as ADRs (Architecture Decision Records):
 - [ADR-0021: Context Budgets and Kill Switches](./adr/0021-context-budgets-and-kill-switches.md)
 - [ADR-0022: Setup by Observation](./adr/0022-setup-by-observation.md)
 - [ADR-0023: Deterministic Verification Loop](./adr/0023-deterministic-verification-loop.md)
+- [ADR-0024: Knowledge as an OKF Bundle](./adr/0024-okf-knowledge-bundle.md)
 
 ## Philosophy
 

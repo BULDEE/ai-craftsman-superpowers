@@ -46,7 +46,6 @@ One-line cheat sheet for every `/craftsman:*` command. See [README.md](README.md
 | `/craftsman:setup` | Interactive setup wizard. `--quick` for zero-question auto-setup |
 | `/craftsman:team` | Create and manage agent teams for collaborative tasks |
 | `/craftsman:healthcheck` | Diagnose plugin installation and hook status |
-| `/craftsman:knowledge` | Manage the AI/architecture knowledge base: add, sync, list, status, remove documents |
 
 ## CI/CD Integration
 

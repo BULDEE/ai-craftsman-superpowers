@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2026-07-26
+
+### Added
+- **OKF knowledge bundle** ([ADR-0024](docs/adr/0024-okf-knowledge-bundle.md)): every `knowledge/` concept carries [Open Knowledge Format v0.2](https://github.com/GoogleCloudPlatform/knowledge-catalog) frontmatter (`type`, `title`, `tags`, `status`, plus a custom `rules` field). A root `index.md` declares the bundle.
+- **Deterministic doctrine lookup** (`knowledge_lookup.py`): exact frontmatter match routes a rule or tag to the concepts explaining it. A quality-gate block now points at the doctrine behind the rule (`Doctrine: persistence/repository-pattern`) with zero embeddings and no index to maintain. Skills reach it via `~/.claude/craftsman-knowledge.sh`.
+
+### Removed
+- **knowledge-rag MCP server** (breaking): the Ollama-backed vector RAG layer, its `/craftsman:knowledge` skill, pack.yml and root-manifest declarations, healthcheck probes, and 115 MB of dependencies. External memory tools remain external; the bundle itself is plain Markdown any of them can read. The 4.1.x line retains the server. Supersedes ADR-0002 and ADR-0003.
+
 ## [4.1.0] - 2026-07-26
 
 Sharpens v4 against what the ecosystem does better, without widening the scope.

@@ -46,6 +46,5 @@ hc_json
 4. If any checks fail, provide specific fix instructions:
    - missing deps → `brew install <dep>` (macOS) or `apt-get install <dep>` (Linux)
    - missing config → `Run /craftsman:setup`
-   - Ollama down → `ollama serve`
    - Knowledge DB empty → `/craftsman:knowledge sync`
    - Channels open → `/craftsman:healthcheck` will show cooldown status

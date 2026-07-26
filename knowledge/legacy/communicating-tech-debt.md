@@ -1,3 +1,10 @@
+---
+type: methodology
+title: "Communicating Technical Debt"
+description: "Refactoring is often blocked not by difficulty but by a failure to communicate. Managers and clients do not fund 'code quality'; they fund outcomes. This file is the craft of trans"
+tags: [legacy, communication, business]
+status: stable
+---
 # Communicating Technical Debt
 
 > Focus on the code, not the coder.

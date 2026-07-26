@@ -121,7 +121,7 @@ Toutes les commandes s'invoquent explicitement avec `/craftsman:nom-de-commande`
 | Méthodologie de base | `design`, `debug`, `plan`, `challenge`, `verify`, `workflow`, `spec`, `refactor`, `legacy`, `test`, `git`, `parallel` |
 | Scaffolding | `scaffold entity/usecase/component/hook/api-resource/pack` |
 | Ingénierie AI/ML | `rag`, `mlops`, `agent-design` |
-| Utilitaires | `metrics`, `setup`, `team`, `healthcheck`, `knowledge` |
+| Utilitaires | `metrics`, `setup`, `team`, `healthcheck` |
 | CI/CD | `ci` |
 
 Les scaffolders proposent une variante de template avant de générer le code (ex. `bounded-context` vs `event-sourced` pour les entités) : voir [Template Variants](skills/scaffold/SKILL.md#template-variants-v210).
@@ -157,19 +157,9 @@ Utilisez `/craftsman:ci export` ou `craftsman-ci.sh init --provider` en CLI.
 
 Également appliqué par des hooks : le [Circuit Breaker](docs/reference/hooks.md#circuit-breaker-v210) protège l'intégration Sentry pendant les pannes, et l'[Iron Law Pattern](docs/reference/hooks.md#iron-law-pattern-v210) bloque les changements d'architecture impulsifs faits sans passage préalable par `/craftsman:design`. Comportement complet des hooks, codes de sortie et IDs de règles : [référence des hooks](docs/reference/hooks.md).
 
-## Avancé : Knowledge Base RAG (optionnel)
+## Le knowledge en bundle OKF
 
-Un serveur MCP **optionnel** ajoute du RAG sur vos documents locaux. Totalement inerte tant que le pack `ai-ml` n'est pas activé : zéro erreur pour les utilisateurs qui n'en ont pas besoin.
-
-```bash
-brew install ollama && ollama pull nomic-embed-text
-ollama serve
-
-mkdir -p ~/.claude/ai-craftsman-superpowers/knowledge
-cp ~/your-docs/*.pdf ~/.claude/ai-craftsman-superpowers/knowledge/
-```
-
-Voir le [guide Local RAG](docs/guides/local-rag-ollama.md) et la [référence MCP](docs/reference/mcp-servers.md) pour la mise en place complète, et [ADR-0002](docs/adr/0002-ollama-over-openai.md) pour la justification d'Ollama plutôt qu'un provider cloud.
+Le savoir méthodologique du plugin (Clean Architecture, DDD, persistence, legacy, refactoring) est livré en bundle [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) : du Markdown curé avec frontmatter YAML, versionné dans git, relu en PR. Un lookup déterministe route chaque règle vers le concept qui l'explique (un blocage LAYER004 pointe vers le doc repository-pattern), sans embedding, sans index, sans service externe. Vos propres outils de mémoire (Obsidian, claude-mem, tout consommateur OKF) lisent le bundle directement : c'est du Markdown sur disque.
 
 ## Configuration CLAUDE.md
 

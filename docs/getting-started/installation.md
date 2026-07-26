@@ -157,4 +157,3 @@ npm run index:ollama
 
 - [First Steps](./first-steps.md) - Your first skill usage
 - [Core Concepts](./concepts.md) - Understanding the architecture
-- [Local RAG Guide](../guides/local-rag-ollama.md) - Detailed RAG setup

@@ -1,3 +1,10 @@
+---
+type: pattern
+title: "3P Agent Architecture Pattern"
+description: "The 3P Pattern (Perceive → Plan → Perform) is a structured approach to building software agents that interact with their environment through a clear cognitive loop."
+tags: [ai-agents, 3p]
+status: stable
+---
 # 3P Agent Architecture Pattern
 
 ## Overview

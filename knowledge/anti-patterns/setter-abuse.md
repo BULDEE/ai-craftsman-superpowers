@@ -1,3 +1,11 @@
+---
+type: anti-pattern
+title: "Anti-Pattern: Setter Abuse"
+description: "Using public setters to modify entity state instead of behavior methods."
+tags: [encapsulation, immutability]
+rules: [PHP004, TS002]
+status: stable
+---
 # Anti-Pattern: Setter Abuse
 
 ## What It Is

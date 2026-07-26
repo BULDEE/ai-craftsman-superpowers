@@ -1,3 +1,11 @@
+---
+type: anti-pattern
+title: "Anti-Pattern: Primitive Obsession"
+description: "Modeling domain concepts with raw primitives (`string`, `int`, `float`, arrays) instead of dedicated value objects. An email is a `string`, money is a `float`, a user id is an `int"
+tags: [value-objects, types]
+rules: [TS003]
+status: stable
+---
 # Anti-Pattern: Primitive Obsession
 
 ## What It Is

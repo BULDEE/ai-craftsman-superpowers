@@ -329,6 +329,18 @@ if [[ $CRITICAL_COUNT -gt 0 ]]; then
         [[ -n "$vline" ]] && echo "  ✗ $vline" >&2
     done <<< "$(echo -e "$CRITICAL_VIOLATIONS")"
     echo "Fix these or add: // craftsman-ignore: <RULE_ID>" >&2
+
+    # OKF doctrine pointer (ADR-0024): route the first blocked rule to the
+    # concept that explains it - deterministic frontmatter match, no index.
+    FIRST_RULE=$(echo -e "$CRITICAL_VIOLATIONS" | head -1 | cut -d: -f1)
+    if [[ -n "$FIRST_RULE" ]] && command -v python3 >/dev/null 2>&1; then
+        DOCTRINE=$(python3 "${SCRIPT_DIR}/lib/knowledge_lookup.py" \
+            "${CLAUDE_PLUGIN_ROOT:-$(dirname "$SCRIPT_DIR")}/knowledge" by-rule "$FIRST_RULE" 2>/dev/null | head -2)
+        if [[ -n "$DOCTRINE" ]]; then
+            echo "Doctrine (knowledge/):" >&2
+            echo "$DOCTRINE" | sed 's/^/  → /' >&2
+        fi
+    fi
     if [[ -n "$pattern_msg" ]]; then
         echo -e "$pattern_msg" >&2
     fi

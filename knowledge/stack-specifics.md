@@ -1,3 +1,10 @@
+---
+type: reference
+title: "Stack-Specific Rules Reference"
+description: "declare(strict_types=1);"
+tags: [symfony, react, stack]
+status: stable
+---
 # Stack-Specific Rules Reference
 
 ## PHP (Symfony)

@@ -1,3 +1,10 @@
+---
+type: pattern
+title: "Microservices Patterns"
+description: "**Problem:** Services need to find each other without hardcoded addresses."
+tags: [architecture, distributed]
+status: stable
+---
 # Microservices Patterns
 
 ## 10 Essential Patterns

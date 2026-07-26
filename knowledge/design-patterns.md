@@ -1,3 +1,10 @@
+---
+type: reference
+title: "Design Patterns (merged)"
+description: "All design-pattern content now lives in a single reference:"
+tags: [design-patterns, gof]
+status: stable
+---
 # Design Patterns (merged)
 
 > **Deprecated (v3.6.0).** This file was merged into `knowledge/patterns.md` and will be removed in v4.0.

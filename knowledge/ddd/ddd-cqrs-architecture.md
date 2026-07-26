@@ -1,3 +1,11 @@
+---
+type: methodology
+title: "DDD + CQRS Architecture"
+description: "This file is the structural companion to [[ddd/ddd-domain-design]]: how the tactical building blocks are arranged into layers, how use cases orchestrate them, and how Command-Query"
+tags: [ddd, cqrs, use-cases, layers]
+rules: [LAYER003]
+status: stable
+---
 # DDD + CQRS Architecture
 
 > "Treat the domain model as the heart, and keep everything else at arm's length."

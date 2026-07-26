@@ -13,7 +13,7 @@ Yes. Core methodology commands (`design`, `debug`, `plan`, `challenge`, `verify`
 The `pre-push-verify.sh` hook warns (does not block) `git push` when verification hasn't run in the session, encouraging evidence-based completion claims over "should work" assumptions. It's warning-only by design so it never blocks trivial changes (docs, config) - see [Troubleshooting](TROUBLESHOOTING.md).
 
 **Does anything leave my machine?**
-Only if you opt in. Edited file content goes to the Anthropic API only when `agent_hooks: true` (the default). Sentry lookups only happen if you configure `sentry_org`/`sentry_project`. Metrics and RAG embeddings are always local (SQLite, Ollama). Full breakdown in [SECURITY.md](SECURITY.md#data--network-transparency).
+Only if you opt in. Edited file content goes to the Anthropic API only when `agent_hooks: true` (the default). Sentry lookups only happen if you configure `sentry_org`/`sentry_project`. Metrics are always local (SQLite). Full breakdown in [SECURITY.md](SECURITY.md#data--network-transparency).
 
 **How is this different from just writing a good CLAUDE.md?**
 A CLAUDE.md is instructions Claude can choose to follow. This plugin's Level 1/2/3 validation hooks and blocking exit codes make certain violations impossible to skip, not just discouraged. See [Why Craftsman?](README.md#why-craftsman---6-core-differentiators).

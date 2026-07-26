@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR-0024: Knowledge as an OKF Bundle](0024-okf-knowledge-bundle.md) (2026-07-26). The RAG layer this decision belonged to was removed; the reasoning below was sound within that premise.
 
 ## Date
 

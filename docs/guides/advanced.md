@@ -291,67 +291,21 @@ Include:
 
 ---
 
-## Lesson 4: Custom Knowledge Indexing
+## Lesson 4: The Knowledge Bundle (OKF)
 
-### Adding Your Own Documents
+The plugin's methodology knowledge lives in `knowledge/` as an [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) bundle: Markdown concepts with YAML frontmatter (`type`, `tags`, and the custom `rules` field that links enforcement rules to the concept explaining them).
 
-The MCP supports two knowledge base modes:
-
-**Option 1: Global Knowledge (shared across all projects)**
+Deterministic lookup, no embeddings:
 
 ```bash
-# 1. Add documents to global knowledge directory
-mkdir -p ~/.claude/ai-craftsman-superpowers/knowledge
-cp ~/new-papers/*.pdf ~/.claude/ai-craftsman-superpowers/knowledge/
+# Which concept explains a rule the gate just flagged?
+bash ~/.claude/craftsman-knowledge.sh by-rule LAYER004
 
-# 2. Re-index
-cd ai-pack/mcp/knowledge-rag
-npm run index:ollama
-
-# Output:
-# Mode: GLOBAL knowledge base
-# Processing: new-paper.pdf
-#   - Pages: 15
-#   - Chunks: 42
-#   - Done
+# Everything about persistence
+bash ~/.claude/craftsman-knowledge.sh by-tag persistence
 ```
 
-**Option 2: Project-Specific Knowledge (recommended)**
-
-```bash
-# 1. Create project knowledge directory
-mkdir -p .claude/ai-craftsman-superpowers/knowledge
-
-# 2. Add project-specific documents
-cp specs.pdf architecture.md .claude/ai-craftsman-superpowers/knowledge/
-
-# 3. Index from project root
-npx tsx /path/to/ai-pack/mcp/knowledge-rag/scripts/index-pdfs.ts
-
-# 4. Add to .gitignore
-echo ".claude/ai-craftsman-superpowers/knowledge/.index/" >> .gitignore
-```
-
-### Custom Source Directory
-
-```bash
-# Index specific directory
-npm run index:ollama /path/to/your/documents
-```
-
-### Verifying Indexation
-
-```
-> List my knowledge sources
-
-# Shows all indexed documents with:
-# - Document name
-# - Page count
-# - Chunk count
-# - Topics detected
-```
-
----
+To extend it, add a Markdown file with frontmatter under `knowledge/` (or your project's own bundle) and it becomes routable immediately: no re-indexing step exists because there is no index. Lesson 1 (RAG pipeline design) still applies when YOU build retrieval products; the plugin itself does not need one for 35 curated files.
 
 ## Lesson 5: Extending MCP Server
 

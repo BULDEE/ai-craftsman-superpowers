@@ -1,3 +1,10 @@
+---
+type: methodology
+title: "Taking Over a Legacy Codebase"
+description: "Inheriting an unfamiliar, undocumented, under-tested codebase is the most common and most daunting legacy situation. This file is the playbook for the first days: how to gain a foo"
+tags: [legacy, onboarding, audit]
+status: stable
+---
 # Taking Over a Legacy Codebase
 
 > Make it better, not perfect. Improve the system by 1% and let it compound.

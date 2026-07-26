@@ -1,3 +1,10 @@
+---
+type: reference
+title: "Integrating With Analysis Tools"
+description: "A frequent, fair objection: 'We already have static-analysis and complexity tools. Are you duplicating them?' The answer is no, and this file is the explicit boundary so the answer"
+tags: [tooling, reports, action-layer]
+status: stable
+---
 # Integrating With Analysis Tools
 
 > This plugin is the **action layer**, not another analysis tool. It consumes what SonarQube, PHPStan, ESLint, deptrac, and CodeScene find, and turns it into SOLID/Clean transformations enforced in the AI loop.

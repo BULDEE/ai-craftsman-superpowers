@@ -1,3 +1,10 @@
+---
+type: anti-pattern
+title: "Anti-Pattern: Sync Expectations in Async Handlers"
+description: "Source: https://symfony.com/doc/current/messenger.html"
+tags: [concurrency, async]
+status: stable
+---
 # Anti-Pattern: Sync Expectations in Async Handlers
 
 Source: https://symfony.com/doc/current/messenger.html

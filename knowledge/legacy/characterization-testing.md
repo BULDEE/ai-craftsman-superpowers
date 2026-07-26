@@ -1,3 +1,10 @@
+---
+type: methodology
+title: "Characterization Testing"
+description: "When you must change code that has **no tests**, you cannot start from the specification: you do not yet know what the code is supposed to do, only what it *does*. A characterizati"
+tags: [legacy, testing, feathers]
+status: stable
+---
 # Characterization Testing
 
 > A characterization test documents the actual behavior of a piece of code, not the behavior it was supposed to have.

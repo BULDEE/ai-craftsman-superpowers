@@ -121,7 +121,7 @@ All commands are explicitly invoked with `/craftsman:command-name`. Full referen
 | Core methodology | `design`, `debug`, `plan`, `challenge`, `verify`, `workflow`, `spec`, `refactor`, `legacy`, `test`, `git`, `parallel` |
 | Scaffolding | `scaffold entity/usecase/component/hook/api-resource/pack` |
 | AI/ML engineering | `rag`, `mlops`, `agent-design` |
-| Utilities | `metrics`, `setup`, `team`, `healthcheck`, `knowledge` |
+| Utilities | `metrics`, `setup`, `team`, `healthcheck` |
 | CI/CD | `ci` |
 
 Scaffolders offer a template variant before generating code (e.g. `bounded-context` vs `event-sourced` for entities) - see [Template Variants](skills/scaffold/SKILL.md#template-variants-v210).
@@ -157,19 +157,9 @@ Use `/craftsman:ci export` or `craftsman-ci.sh init --provider` from the CLI.
 
 Also enforced by hooks: the [Circuit Breaker](docs/reference/hooks.md#circuit-breaker-v210) protects Sentry integration during outages, and the [Iron Law Pattern](docs/reference/hooks.md#iron-law-pattern-v210) blocks impulsive architecture changes made without a prior `/craftsman:design` pass. Full hook behavior, exit codes, and rule IDs: [Hooks Reference](docs/reference/hooks.md).
 
-## Advanced: Knowledge Base RAG (optional)
+## Knowledge as an OKF Bundle
 
-An **optional** MCP server adds RAG over your local documents. Fully inert unless the `ai-ml` pack is enabled - zero errors for users who don't need it.
-
-```bash
-brew install ollama && ollama pull nomic-embed-text
-ollama serve
-
-mkdir -p ~/.claude/ai-craftsman-superpowers/knowledge
-cp ~/your-docs/*.pdf ~/.claude/ai-craftsman-superpowers/knowledge/
-```
-
-See [Local RAG Setup Guide](docs/guides/local-rag-ollama.md) and [MCP Reference](docs/reference/mcp-servers.md) for the full setup, and [ADR-0002](docs/adr/0002-ollama-over-openai.md) for why Ollama over a cloud provider.
+The plugin's methodology knowledge (Clean Architecture, DDD, persistence, legacy, refactoring) ships as an [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) bundle: curated Markdown with YAML frontmatter, versioned in git, reviewed in PRs. A deterministic lookup routes rules to the concept that explains them (a LAYER004 block points at the repository-pattern doc) with zero embeddings, zero index, zero external services. Your own memory tools (Obsidian, claude-mem, any OKF consumer) can read the bundle directly - it is plain Markdown on disk.
 
 ## CLAUDE.md Configuration
 
