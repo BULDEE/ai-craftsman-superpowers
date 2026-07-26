@@ -81,14 +81,23 @@ jobs:
           import json
           import sys
 
+          # Mirrors the supported set asserted in tests/core/test-hooks.sh.
+          # Keep both in sync when Claude Code adds a hook event.
           VALID_HOOK_EVENTS = [
-              "SessionStart", "PreToolUse", "PostToolUse",
-              "PostToolUseFailure", "SubagentStop",
+              "SessionStart", "Setup", "UserPromptSubmit", "UserPromptExpansion",
+              "PreToolUse", "PermissionRequest", "PermissionDenied",
+              "PostToolUse", "PostToolUseFailure", "PostToolBatch",
+              "Notification", "MessageDisplay",
+              "SubagentStart", "SubagentStop",
+              "TaskCreated", "TaskCompleted", "TeammateIdle",
+              "Stop", "StopFailure",
+              "InstructionsLoaded", "ConfigChange", "CwdChanged", "FileChanged",
+              "WorktreeCreate", "WorktreeRemove",
               "PreCompact", "PostCompact",
-              "UserPromptSubmit", "FileChanged", "Notification",
-              "InstructionsLoaded", "Stop", "SessionEnd"
+              "Elicitation", "ElicitationResult",
+              "SessionEnd"
           ]
-          VALID_HOOK_TYPES = ["command", "agent"]
+          VALID_HOOK_TYPES = ["command", "http", "mcp_tool", "prompt", "agent"]
           VALID_AGENT_MODELS = ["haiku", "sonnet", "opus"]
 
           with open("hooks/hooks.json") as f:

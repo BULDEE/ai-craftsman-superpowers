@@ -15,7 +15,6 @@ import sqlite3
 import sys
 import webbrowser
 from datetime import datetime, timezone
-from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
