@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2026-07-26
+
+Sharpens v4 against what the ecosystem does better, without widening the scope.
+
+### Added
+- **Persistence craft**: `knowledge/persistence/` (repository boundary, migration discipline with expand-contract, storage choice derived from aggregates, read/write separation) plus rules enforced by the same validators in hooks and CI: LAYER004 (raw SQL/DQL or a database client inside Domain), DB001 (`SELECT *`), DB002 (migration without `down()`), DB003 (query inside a loop). `/craftsman:design` now produces a persistence mapping per aggregate.
+- **Outcome Contracts**: every skill states its Outcome, its Done-when condition, and the Evidence that proves it; the frontmatter validator enforces all three.
+- **Tooling detection** (`tooling_detect.py`): reads the project's manifests to report the quality tools it already declares with their report commands, and suggests the community standard only when nothing is declared. Nothing is installed automatically.
+- **Living legacy audit**: `LEGACY-AUDIT.md` is committed and diffed between runs (RESOLVED/NEW), with a mandatory "looks bad but is actually fine" section and file:line citations for every finding.
+- **Cross-project instinct scoping**: instincts stay project-scoped until the same rule is approved in 2+ projects; `global-candidates` and `promote` then offer human-reviewed global promotion.
+- **Cross-harness doctrine export**: `craftsman-ci export` renders the active rules as `AGENTS.md`, `.cursor/rules/craftsman.mdc`, and `.github/copilot-instructions.md`, so teammates on other harnesses read the same doctrine. Enforcement stays in hooks and CI.
+- **Local dashboard**: `/craftsman:metrics --dashboard` aggregates every tracked repository into a self-contained HTML page served on localhost (quality score, per-repository breakdown, top rules, corrections, instincts, 30-day trend).
+
+### Changed
+- The correction-learning differentiator is now stated as what is verifiable: the only learning loop fed by a rules engine that enforces the same rules in hooks and CI with zero drift.
+
 ## [4.0.0] - 2026-07-26
 
 Clean break to a native-first, self-learning architecture. **Requires Claude Code >= 2.1.218**; no backward compatibility with 3.x config (the 3.9.x line stays available and frozen). Full rationale: ADRs 0016-0023 and [docs/v4-roadmap.md](docs/v4-roadmap.md). Upgrade steps: [MIGRATION.md](MIGRATION.md).

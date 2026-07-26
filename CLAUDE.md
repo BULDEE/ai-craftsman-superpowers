@@ -4,7 +4,7 @@
 
 Claude Code plugin that transforms Claude into a disciplined Senior Software Craftsman. DDD, Clean Architecture, TDD methodology enforced through hooks, commands, agents, and a rules engine.
 
-**Current version:** 4.0.0
+**Current version:** 4.1.0
 **Stack:** Bash (hooks/CI), Markdown (skills/agents/templates), Python (metrics helpers), YAML (config)
 
 ## Development Rules
