@@ -124,7 +124,7 @@ All commands are explicitly invoked with `/craftsman:command-name`. Full referen
 | Utilities | `metrics`, `setup`, `team`, `healthcheck`, `knowledge` |
 | CI/CD | `ci` |
 
-Scaffolders offer a template variant before generating code (e.g. `bounded-context` vs `event-sourced` for entities) - see [Template Variants](commands/scaffold.md#template-variants-v210).
+Scaffolders offer a template variant before generating code (e.g. `bounded-context` vs `event-sourced` for entities) - see [Template Variants](skills/scaffold/SKILL.md#template-variants-v210).
 
 ## Specialized Agents
 

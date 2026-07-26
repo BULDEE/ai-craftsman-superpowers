@@ -2,7 +2,7 @@
 
 Complete reference for all available commands.
 
-> **Note:** As of v1.0.0, all user-invocable workflows are now in `commands/` instead of `skills/`. See [ADR-0007](../adr/0007-commands-over-skills.md) for rationale.
+> **Note:** As of v4.0.0, every workflow lives in `skills/<name>/SKILL.md` with frontmatter-controlled invocation (fork, agent binding, dynamic context). See [ADR-0017](../adr/0017-skills-over-commands.md) for rationale.
 
 ## Core Pack (Always Enabled)
 

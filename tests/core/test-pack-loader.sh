@@ -191,7 +191,7 @@ _pack_reset
 export CLAUDE_PLUGIN_OPTION_stack="symfony"
 
 SYMLINK_ROOT="/tmp/craftsman-symlink-test-$$"
-mkdir -p "$SYMLINK_ROOT/agents" "$SYMLINK_ROOT/commands"
+mkdir -p "$SYMLINK_ROOT/agents" "$SYMLINK_ROOT/skills"
 
 SYMLINK_PACK_DIR="$TEST_PACKS_DIR/test-symlink"
 mkdir -p "$SYMLINK_PACK_DIR/agents" "$SYMLINK_PACK_DIR/commands"
@@ -222,10 +222,10 @@ else
     log_fail "Symlink creation" "agents/my-agent.md symlink missing"
 fi
 
-if [[ -L "$SYMLINK_ROOT/commands/my-command.md" ]]; then
-    log_pass "Symlink created for pack command: my-command.md"
+if [[ -L "$SYMLINK_ROOT/skills/my-command/SKILL.md" ]]; then
+    log_pass "Skill symlink created for pack command: skills/my-command/SKILL.md"
 else
-    log_fail "Symlink creation" "commands/my-command.md symlink missing"
+    log_fail "Symlink creation" "skills/my-command/SKILL.md symlink missing"
 fi
 
 # Symlinks must RESOLVE, not just exist. On BSD/macOS, realpath lacks
@@ -237,10 +237,10 @@ else
     log_fail "Agent symlink broken" "target: '$(readlink "$SYMLINK_ROOT/agents/my-agent.md")'"
 fi
 
-if [[ -e "$SYMLINK_ROOT/commands/my-command.md" ]]; then
+if [[ -e "$SYMLINK_ROOT/skills/my-command/SKILL.md" ]]; then
     log_pass "Command symlink target resolves (non-empty, valid)"
 else
-    log_fail "Command symlink broken" "target: '$(readlink "$SYMLINK_ROOT/commands/my-command.md")'"
+    log_fail "Command symlink broken" "target: '$(readlink "$SYMLINK_ROOT/skills/my-command/SKILL.md")'"
 fi
 
 if [[ ! -e "$SYMLINK_ROOT/agents/stale-agent.md" ]]; then
@@ -286,7 +286,7 @@ export CLAUDE_PLUGIN_OPTION_stack="symfony"
 
 INTEG_ROOT="/tmp/craftsman-integ-symlink-$$"
 mkdir -p "$INTEG_ROOT/packs/test-pack/agents" "$INTEG_ROOT/packs/test-pack/commands"
-mkdir -p "$INTEG_ROOT/agents" "$INTEG_ROOT/commands"
+mkdir -p "$INTEG_ROOT/agents" "$INTEG_ROOT/skills"
 
 cat > "$INTEG_ROOT/packs/test-pack/pack.yml" <<'YAML'
 name: test-pack
@@ -312,10 +312,10 @@ else
     log_fail "Integration: agent symlink creation" "agents/test-agent.md symlink missing"
 fi
 
-if [[ -L "$INTEG_ROOT/commands/test-cmd.md" ]]; then
-    log_pass "Integration: command symlink created in commands/"
+if [[ -L "$INTEG_ROOT/skills/test-cmd/SKILL.md" ]]; then
+    log_pass "Integration: pack skill symlink created in skills/test-cmd/"
 else
-    log_fail "Integration: command symlink creation" "commands/test-cmd.md symlink missing"
+    log_fail "Integration: pack skill symlink creation" "skills/test-cmd/SKILL.md symlink missing"
 fi
 
 # =============================================================================

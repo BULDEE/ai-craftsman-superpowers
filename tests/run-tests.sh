@@ -107,42 +107,36 @@ test_skill_structure() {
         return 1
     fi
 
-    # Test 3: Has name field
-    if grep -q "^name:" "$skill_file"; then
-        log_pass "Has 'name' field"
-    else
-        log_fail "Missing 'name' field"
-    fi
-
-    # Test 4: Has description field
+    # Test 3: Has description field (skill name comes from the directory name)
     if grep -q "^description:" "$skill_file"; then
         log_pass "Has 'description' field"
     else
         log_fail "Missing 'description' field"
     fi
 
-    # Test 5: Has model field (new requirement)
-    if grep -q "^model:" "$skill_file"; then
-        local model=$(grep "^model:" "$skill_file" | head -1 | cut -d: -f2 | tr -d ' ')
-        if [[ "$model" =~ ^(haiku|sonnet|opus)$ ]]; then
-            log_pass "Has valid 'model' field: $model"
+    # Test 4: Has effort field (project convention, session-init exempt)
+    if grep -q "^effort:" "$skill_file"; then
+        local effort=$(grep "^effort:" "$skill_file" | head -1 | cut -d: -f2 | tr -d ' ')
+        if [[ "$effort" =~ ^(quick|medium|heavy)$ ]]; then
+            log_pass "Has valid 'effort' field: $effort"
         else
-            log_fail "Invalid model value: $model (must be haiku|sonnet|opus)"
+            log_fail "Invalid effort value: $effort (must be quick|medium|heavy)"
         fi
     else
-        # session-init is allowed to not have model
         if [[ "$skill_name" == "session-init" ]]; then
-            log_skip "'model' field (session-init exempt)"
+            log_skip "'effort' field (session-init exempt)"
         else
-            log_fail "Missing 'model' field"
+            log_fail "Missing 'effort' field"
         fi
     fi
 
-    # Test 6: Has allowed-tools field
-    if grep -q "^allowed-tools:" "$skill_file"; then
-        log_pass "Has 'allowed-tools' field"
-    else
-        log_warn "Missing 'allowed-tools' field (not required but recommended)"
+    # Test 5: context: fork requires an agent binding
+    if grep -q "^context: fork" "$skill_file"; then
+        if grep -q "^agent:" "$skill_file"; then
+            log_pass "Forked skill declares an 'agent' binding"
+        else
+            log_fail "context: fork without 'agent' binding"
+        fi
     fi
 
     # Test 7: Line count check

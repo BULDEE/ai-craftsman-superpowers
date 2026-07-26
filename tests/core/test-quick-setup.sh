@@ -10,7 +10,7 @@ ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
-SETUP_CMD="$ROOT_DIR/commands/setup.md"
+SETUP_CMD="$ROOT_DIR/skills/setup/SKILL.md"
 
 echo ""
 echo "=== Quick Setup Tests ==="

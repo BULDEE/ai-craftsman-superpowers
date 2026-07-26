@@ -1,6 +1,7 @@
 ---
 description: "Quality metrics dashboard. Use when reviewing violation trends, session history, or correction patterns from the local SQLite database."
 effort: quick
+disable-model-invocation: true
 ---
 
 # /craftsman:metrics - Quality Metrics Dashboard

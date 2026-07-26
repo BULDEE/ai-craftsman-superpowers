@@ -9,6 +9,7 @@ paths:
   - "**/*.go"
   - "**/*.rs"
 effort: medium
+disable-model-invocation: true
 ---
 
 # /craftsman:refactor - Systematic Refactoring

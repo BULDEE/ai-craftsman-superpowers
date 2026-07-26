@@ -10,7 +10,7 @@ ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
-LEGACY_CMD="$ROOT_DIR/commands/legacy.md"
+LEGACY_CMD="$ROOT_DIR/skills/legacy/SKILL.md"
 
 echo ""
 echo "=== Legacy Command Tests ==="

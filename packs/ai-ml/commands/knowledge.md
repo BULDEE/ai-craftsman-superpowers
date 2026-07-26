@@ -1,6 +1,7 @@
 ---
 description: "Manage the AI/Architecture knowledge base - add, sync, list, status, remove documents. Use when needing to update indexed sources or check knowledge base health."
 effort: quick
+disable-model-invocation: true
 ---
 
 # /craftsman:knowledge - Knowledge Base Management

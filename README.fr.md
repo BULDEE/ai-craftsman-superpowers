@@ -124,7 +124,7 @@ Toutes les commandes s'invoquent explicitement avec `/craftsman:nom-de-commande`
 | Utilitaires | `metrics`, `setup`, `team`, `healthcheck`, `knowledge` |
 | CI/CD | `ci` |
 
-Les scaffolders proposent une variante de template avant de générer le code (ex. `bounded-context` vs `event-sourced` pour les entités) : voir [Template Variants](commands/scaffold.md#template-variants-v210).
+Les scaffolders proposent une variante de template avant de générer le code (ex. `bounded-context` vs `event-sourced` pour les entités) : voir [Template Variants](skills/scaffold/SKILL.md#template-variants-v210).
 
 ## Agents spécialisés
 

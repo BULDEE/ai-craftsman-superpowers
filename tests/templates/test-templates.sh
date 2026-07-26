@@ -290,7 +290,7 @@ echo ""
 echo "--- Section 8: Scaffolder Template Selection ---"
 
 for cmd in entity usecase; do
-    cmd_file="$ROOT_DIR/commands/${cmd}.md"
+    cmd_file="$ROOT_DIR/skills/${cmd}/SKILL.md"
     if [[ -f "$cmd_file" ]]; then
         if grep -q "## Template Selection" "$cmd_file" 2>/dev/null; then
             pass "${cmd}.md: has Template Selection section"
@@ -312,7 +312,7 @@ for cmd in entity usecase; do
 done
 
 for cmd in component hook; do
-    cmd_file="$ROOT_DIR/commands/${cmd}.md"
+    cmd_file="$ROOT_DIR/skills/${cmd}/SKILL.md"
     if [[ -f "$cmd_file" ]]; then
         if grep -q "## Template Selection" "$cmd_file" 2>/dev/null; then
             pass "${cmd}.md: has Template Selection section"

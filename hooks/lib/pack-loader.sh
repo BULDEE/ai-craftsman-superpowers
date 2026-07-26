@@ -252,6 +252,22 @@ _sync_symlink_type() {
     done
 }
 
+# Pack workflows are flat .md files inside the pack; the plugin exposes them
+# as skills/<name>/SKILL.md symlinks (skill layout requires one dir per skill).
+_sync_pack_skills() {
+    local pack_dir="$1"
+    local skills_root="$2"
+    [[ ! -d "$pack_dir/commands" ]] && return
+    for src_file in "$pack_dir/commands/"*.md; do
+        [[ ! -f "$src_file" ]] && continue
+        local name rel_path
+        name=$(basename "$src_file" .md)
+        mkdir -p "$skills_root/$name"
+        rel_path=$(_pack_relpath "$skills_root/$name" "$src_file")
+        ln -sf "$rel_path" "$skills_root/$name/SKILL.md"
+    done
+}
+
 pack_sync_symlinks() {
     local root="${CLAUDE_PLUGIN_ROOT:-$(pwd)}"
     local packs_dir="${_PACKS_DIR:-$root/packs}"
@@ -259,8 +275,11 @@ pack_sync_symlinks() {
     for f in "$root/agents/"*.md; do
         [[ -L "$f" ]] && rm -- "$f"
     done
-    for f in "$root/commands/"*.md; do
+    for f in "$root/skills/"*/SKILL.md; do
         [[ -L "$f" ]] && rm -- "$f"
+    done
+    for d in "$root/skills/"*/; do
+        rmdir "$d" 2>/dev/null || true
     done
 
     local pack_name
@@ -268,6 +287,6 @@ pack_sync_symlinks() {
         [[ -z "$pack_name" ]] && continue
         local pack_dir="$packs_dir/$pack_name"
         _sync_symlink_type "$pack_dir" "agents" "$root/agents"
-        _sync_symlink_type "$pack_dir" "commands" "$root/commands"
+        _sync_pack_skills "$pack_dir" "$root/skills"
     done <<< "$(pack_loaded)"
 }

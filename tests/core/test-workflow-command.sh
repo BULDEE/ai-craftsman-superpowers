@@ -10,7 +10,7 @@ ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
-WORKFLOW_CMD="$ROOT_DIR/commands/workflow.md"
+WORKFLOW_CMD="$ROOT_DIR/skills/workflow/SKILL.md"
 
 echo ""
 echo "=== Workflow Command Tests ==="

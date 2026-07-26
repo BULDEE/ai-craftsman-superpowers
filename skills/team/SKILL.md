@@ -1,6 +1,7 @@
 ---
 description: "Multi-agent orchestration with native Claude Code teams. Use when facing 2+ independent tasks needing parallel work, full-stack features requiring backend+frontend agents, code reviews needing multiple specialist perspectives, or security audits."
 effort: heavy
+disable-model-invocation: true
 ---
 
 # /craftsman:team - Agent Team Manager (Native Teams)

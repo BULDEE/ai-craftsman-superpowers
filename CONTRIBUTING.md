@@ -80,7 +80,7 @@ Before submitting a new command, agent, or skill, check it for:
 - [ ] Output format examples
 - [ ] Bias protection section
 - [ ] Example in `/examples/{command-name}/`
-- [ ] Tests in `/tests/commands/`
+- [ ] Tests in `/tests/core/`
 
 See [ADR-0007](docs/adr/0007-commands-over-skills.md) for the rationale behind the commands structure.
 
@@ -142,7 +142,7 @@ Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 ```
 ai-craftsman-superpowers/
 ├── .claude-plugin/             # Plugin manifest
-├── commands/                   # User-invocable commands (22 *.md files)
+├── skills/                     # Workflows as skills/<name>/SKILL.md (invoked as /craftsman:<name>)
 ├── agents/                     # Reviewers (5) + Craftsmen (7) = 12 agents
 ├── hooks/                      # Automated validation (6 scripts + 4 agent hooks)
 ├── knowledge/                  # Patterns & principles

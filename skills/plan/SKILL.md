@@ -1,6 +1,7 @@
 ---
 description: "Structured planning for multi-step tasks. Use when starting features requiring 3+ steps, migrating or refactoring large codebases, or when task complexity clearly exceeds a single change."
 effort: heavy
+disable-model-invocation: true
 ---
 
 # /craftsman:plan - Structured Planning & Execution

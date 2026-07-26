@@ -4,6 +4,7 @@ paths:
   - "src/Domain/**/*.php"
   - "src/domain/**/*.ts"
 effort: medium
+disable-model-invocation: true
 ---
 
 # /craftsman:design - Senior Domain-Driven Design

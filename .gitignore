@@ -22,9 +22,9 @@ agents/backend-craftsman.md
 agents/frontend-craftsman.md
 agents/react-reviewer.md
 agents/symfony-reviewer.md
-commands/agent-design.md
-commands/mlops.md
-commands/rag.md
+skills/agent-design/
+skills/mlops/
+skills/rag/
 
 # Logs
 *.log

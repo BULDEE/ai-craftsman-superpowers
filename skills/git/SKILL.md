@@ -1,6 +1,7 @@
 ---
 description: Safe git workflow with destructive command protection. Use when committing changes, creating branches, managing git workflow, or handling merge conflicts.
 effort: quick
+disable-model-invocation: true
 ---
 
 # /craftsman:git - Safe Git Workflow
