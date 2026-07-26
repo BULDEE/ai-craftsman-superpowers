@@ -28,7 +28,7 @@
 
 DDD, Clean Architecture et méthodologie TDD appliquées via des hooks, des commandes et un rules engine : pas seulement suggéré dans un prompt, mais réellement bloqué en cas de violation.
 
-## Pourquoi Craftsman ? - 6 différenciateurs clés
+## Pourquoi Craftsman ? - Différenciateurs clés
 
 Ce qui rend ce plugin réellement unique dans l'écosystème Claude Code :
 
@@ -38,8 +38,11 @@ Ce qui rend ce plugin réellement unique dans l'écosystème Claude Code :
 4. **Quality Gate temps réel** : validation progressive sur chaque Write/Edit : regex (<50ms, toujours actif) → sémantique LSP (en direct, si votre serveur de langage est installé) → analyse statique (<2s, PHPStan/ESLint) → architecture (<2s, deptrac/dependency-cruiser). Dégradation gracieuse sans aucun outil installé.
 5. **Pipeline CI multi-provider** : le même rules engine tourne dans les hooks (temps réel) et en CI (pipeline) avec zéro dérive, sur GitHub Actions, GitLab CI, Bitbucket Pipelines et Jenkins.
 6. **Métriques & analyse de tendances** : suivi SQLite des violations, corrections et sessions, avec vues de tendances à 7 et 30 jours pour identifier vos règles les plus violées.
+7. **Cliquet structurel** : un baseline committé enregistre le high-water mark structurel de chaque fichier (complexité, taille, plus longue fonction, fan-out d'imports, nombre de suppressions). Un fichier que vous touchez peut s'améliorer ou rester égal, jamais régresser : la marque se resserre automatiquement au passage vert et ne se desserre que par une suppression documentée et comptée. Appliqué à l'identique dans les hooks et en CI ; le legacy non touché n'est jamais puni pour une dette qu'il avait déjà.
+8. **Panel de contradiction au design** : trois contradicteurs (YAGNI, invariants et frontières, faisabilité) attaquent le design pendant `/craftsman:design`, avant qu'une ligne existe. Chaque objection atterrit dans une table retenue ou écartée : le silence n'est pas une option. Contredire un design coûte bien moins cher que contredire le code bâti dessus.
+9. **Sécurité et onboarding situationnel** : SEC001-003 (secrets en dur, eval dynamique, SQL par concaténation) vérifiés dans les hooks et en CI avec routage de la doctrine au blocage ; le setup observe le dépôt et pose au plus quatre questions en langage courant, et le mode guidé fait que chaque blocage s'explique.
 
-> Aucun autre plugin Claude Code ne combine les 6 : apprentissage des erreurs passées, personnalisation des règles de niveau entreprise, protection cognitive, validation temps réel, zéro dérive CI, et tendances qualité mesurables.
+> Aucun autre plugin Claude Code ne combine tout cela : apprentissage des erreurs passées, personnalisation des règles de niveau entreprise, protection cognitive, validation temps réel, zéro dérive CI, et tendances qualité mesurables.
 
 ## Prérequis
 
@@ -106,7 +109,7 @@ Nouveau sur la méthodologie ? Commencez par le [guide débutant](docs/guides/be
 
 ## Modèle de coût API (optionnel)
 
-Les 6 différenciateurs ci-dessus fonctionnent avec **zéro coût API** au-delà de votre usage normal de Claude Code : validation regex, rules engine, détection de biais, export CI et métriques sont tous locaux.
+Les différenciateurs ci-dessus fonctionnent avec **zéro coût API** au-delà de votre usage normal de Claude Code : validation regex, rules engine, détection de biais, export CI et métriques sont tous locaux.
 
 Une couche optionnelle ajoute une analyse sémantique plus profonde via des hooks agents Haiku (violations de couches DDD, contexte d'erreur Sentry, revue d'architecture) : ~0,15-0,30 $ par session (50 opérations Write/Edit).
 

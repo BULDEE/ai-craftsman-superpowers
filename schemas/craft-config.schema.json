@@ -40,6 +40,19 @@
       },
       "additionalProperties": false
     },
+    "guided": {
+      "type": "boolean",
+      "default": false,
+      "description": "Guided mode: gate exigency is unchanged, every block additionally explains its doctrine in plain language (ADR-0027)."
+    },
+    "preferred_tools": {
+      "type": "object",
+      "description": "Workshop profile: quality tools this developer prefers per stack. Proposals for project init; nothing is ever installed (ADR-0019).",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    },
     "hooks": {
       "type": "object",
       "properties": {

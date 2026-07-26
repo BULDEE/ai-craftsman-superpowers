@@ -126,6 +126,24 @@ Layer validation uses both file path detection (`*/Domain/*`) and namespace scan
 | DB002 | warning | Migration with `up()` must have `down()` | No (warning) |
 | DB003 | warning | Query call inside a loop (N+1 heuristic) | No (warning) |
 
+### Structural Ratchet (PostToolUse + CI)
+
+| Rule | Severity | Check | Blocking |
+|------|----------|-------|----------|
+| RATCHET001 | advisory | A touched file must not regress its committed structural baseline (complexity, file lines, longest function, import fan-out, suppression count) | No by default; set `RATCHET001: block` to enforce |
+
+The baseline lives in `.craftsman-baseline.json` at the repository root, is committed, and only moves one way: a green pass tightens it, nothing loosens it except a documented `craftsman-ignore` (itself counted and ratcheted). Untouched files and relaxed directories are never evaluated. See [ADR-0025](../adr/0025-structural-ratchet.md).
+
+### Security Rules (PostToolUse + CI)
+
+| Rule | Severity | Check | Blocking |
+|------|----------|-------|----------|
+| SEC001 | critical | Hardcoded secret (API key, token, password literal, private key block) | Yes |
+| SEC002 | critical | Dynamic eval/exec on non-literal input | Yes |
+| SEC003 | critical | SQL built by concatenation or template interpolation | Yes |
+
+Reads from the environment (`getenv`, `$_ENV`, `process.env`, `import.meta.env`) and parameterized queries are explicitly safe. Doctrine: [`knowledge/security/secure-by-design.md`](../../knowledge/security/secure-by-design.md).
+
 Persistence validation ships with the symfony and react packs and runs through the same validators in hooks and CI. The reasoning behind each rule lives in [`knowledge/persistence/`](../../knowledge/persistence/): repository boundaries, migration discipline, storage choice, and read/write separation.
 
 ## 3-Level Validation

@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.0] - 2026-07-26
+
+Structural debt can no longer enter through the gaps between rules.
+
+### Added
+- **Structural ratchet** ([ADR-0025](docs/adr/0025-structural-ratchet.md)): `.craftsman-baseline.json` records a per-file high-water mark (approximated complexity, file lines, longest function, import fan-out, suppression count). A touched file may improve or stay equal, never regress. The mark tightens automatically on a green pass and only loosens through a documented `craftsman-ignore`, which is itself counted and ratcheted. The hook and `craftsman-ci` run the identical check; CI never writes the baseline. Untouched files and relaxed directories are never evaluated, so legacy is not punished for debt it already had. Ships advisory: set `RATCHET001: block` to make it a hard gate.
+- **Adversarial design panel** ([ADR-0026](docs/adr/0026-adversarial-design-panel.md)): three headless Haiku contradictors (YAGNI, invariants and aggregate boundaries, feasibility) attack the design during `/craftsman:design` Phase 2, before any code exists. Every objection must land in a retained or dismissed table in Phase 3. Reuses the existing `agent_hooks` gate and recursion guard; cost is announced; the code-level refutation panel stays opt-in.
+- **Security rules SEC001-003**: hardcoded secrets, dynamic eval/exec, and SQL built by concatenation or template interpolation, verified by the same validators in hooks and CI. Environment reads and parameterized queries are explicitly safe. New OKF doctrine `knowledge/security/secure-by-design.md` and `knowledge/security/owasp-layer-mapping.md`, routed automatically when a security rule blocks. The tooling detector learned the security toolchain per stack (dependency audits, secret scanners, SAST).
+- **Situational onboarding** ([ADR-0027](docs/adr/0027-situational-onboarding.md)): `/craftsman:setup --global` records a workshop profile once per machine; project init observes the repository (including a legacy signal from history plus absence of tests or CI) and then asks at most four plain-language questions whose answers derive strictness, the baseline mode, and guided mode. `--quick` still bypasses everything.
+- **Guided mode** (`guided: true`): gate exigency is unchanged and help is maximized. Every block appends a plain-language explanation and points at the doctrine that explains the rule, so the gate teaches at the moment of friction instead of assuming expertise.
+
 ## [4.2.0] - 2026-07-26
 
 ### Added

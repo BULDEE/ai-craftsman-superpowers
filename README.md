@@ -28,7 +28,7 @@
 
 DDD, Clean Architecture, and TDD methodology enforced through hooks, commands, and a rules engine - not just suggested in a prompt, but actually blocked when violated.
 
-## Why Craftsman? - 6 Core Differentiators
+## Why Craftsman? - Core Differentiators
 
 What makes this plugin genuinely unique in the Claude Code ecosystem:
 
@@ -38,8 +38,11 @@ What makes this plugin genuinely unique in the Claude Code ecosystem:
 4. **Real-Time Quality Gate** - progressive validation on every Write/Edit: regex (<50ms, always on) → LSP semantics (live, when your language server is installed) → static analysis (<2s, PHPStan/ESLint) → architecture (<2s, deptrac/dependency-cruiser). Degrades gracefully with zero tools installed.
 5. **Multi-Provider CI Pipeline** - the same rules engine runs in hooks (real-time) and CI (pipeline) with zero drift, across GitHub Actions, GitLab CI, Bitbucket Pipelines, and Jenkins.
 6. **Metrics & Trend Analysis** - SQLite-backed tracking of violations, corrections, and sessions, with 7-day/30-day trend views to identify your most-violated rules.
+7. **Structural Ratchet** - a committed baseline records each file's structural high-water mark (complexity, size, longest function, import fan-out, suppression count). A file you touch may improve or stay equal, never regress: the mark tightens automatically on a green pass and only loosens through a documented, counted suppression. Enforced identically in hooks and CI; untouched legacy is never punished for debt it already had.
+8. **Adversarial Design Panel** - three contradictors (YAGNI, invariants and boundaries, feasibility) attack a design during `/craftsman:design`, before any code exists. Every objection lands in a retained or dismissed table: silence is not an option. Contradicting a design costs far less than contradicting the code built on it.
+9. **Security and Situational Onboarding** - SEC001-003 (hardcoded secrets, dynamic eval, SQL by concatenation) verified in hooks and CI with their doctrine routed on block; setup observes the repository and asks at most four plain-language questions, and guided mode makes every block explain itself.
 
-> No other Claude Code plugin combines all 6: learning from past mistakes, enterprise rule customization, cognitive protection, real-time validation, zero CI drift, and measurable quality trends.
+> No other Claude Code plugin combines all of these: learning from past mistakes, enterprise rule customization, cognitive protection, real-time validation, zero CI drift, and measurable quality trends.
 
 ## Requirements
 
@@ -106,7 +109,7 @@ New to the methodology? Start with the [Beginner Guide](docs/guides/beginner.md)
 
 ## API Cost Model (optional)
 
-The 6 differentiators above work with **zero API cost** beyond your normal Claude Code usage - regex validation, the rules engine, bias detection, CI export, and metrics are all local.
+The differentiators above work with **zero API cost** beyond your normal Claude Code usage - regex validation, the rules engine, bias detection, CI export, and metrics are all local.
 
 One optional layer adds deeper semantic analysis via Haiku agent hooks (DDD layer violations, Sentry error context, architecture review): ~$0.15-0.30 per session (50 Write/Edit operations).
 

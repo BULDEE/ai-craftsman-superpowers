@@ -28,6 +28,9 @@ stack:
 #   WARN-PHP001, WARN-TS001
 #   LAYER004: raw SQL/DQL or a database client inside the Domain layer
 #   DB001: SELECT * | DB002: migration without down() | DB003: query inside a loop (N+1)
+#   RATCHET001: structural regression on a touched file (advisory by default,
+#     set `RATCHET001: block` to make the ratchet a hard gate)
+#   SEC001: hardcoded secret | SEC002: dynamic eval/exec | SEC003: SQL by concatenation
 # Custom rules use long form with pattern, message, severity, languages
 rules:
   # Examples (uncomment to customize):

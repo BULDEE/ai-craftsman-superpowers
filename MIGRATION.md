@@ -2,6 +2,15 @@
 
 Breaking changes only. Minor/patch upgrades never require manual action - see [CHANGELOG.md](CHANGELOG.md) for the full history.
 
+## 4.2.x → 4.3.0
+
+**What changes:** additive. The structural ratchet, the adversarial design panel, the security rules, and situational onboarding all arrive without breaking existing configs.
+
+**Action required:**
+- Nothing mandatory. The ratchet is inert until a project opts in: run `/craftsman:setup` (or `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/lib/ratchet.py" init src --baseline .craftsman-baseline.json`) to photograph the current state, then commit `.craftsman-baseline.json` so CI and teammates measure against the same reference.
+- `RATCHET001` ships advisory while its metric core is validated on real work. Set `RATCHET001: block` in `.craft-config.yml` to enforce it immediately.
+- SEC001-003 block by default in strict mode. If a legitimate pattern trips them, use the standard rule overrides or an inline `craftsman-ignore: SEC001` with a reason.
+
 ## 4.1.x → 4.2.0
 
 **What changes:** the optional knowledge-rag MCP server (Ollama + local vector store) is removed ([ADR-0024](docs/adr/0024-okf-knowledge-bundle.md)). The plugin's knowledge is now an [OKF v0.2](https://github.com/GoogleCloudPlatform/knowledge-catalog) bundle with a deterministic rule-to-concept lookup.
