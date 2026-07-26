@@ -1,5 +1,5 @@
 ---
-description: "Quality metrics dashboard. Use when reviewing violation trends, session history, or correction patterns from the local SQLite database."
+description: "Quality metrics and local dashboard. Use when reviewing violation trends, session history, correction patterns, or rendering the aggregated multi-repository dashboard (--dashboard)."
 effort: quick
 disable-model-invocation: true
 ---
@@ -170,3 +170,14 @@ bash ~/.claude/craftsman-instincts.sh promote <RULE> "$HOME/.claude/skills"
 
 This writes `~/.claude/skills/learned-global-<rule>/SKILL.md` (`user-invocable: false`), applied across all projects. The same rule as project scope holds: never promote automatically, and retirement is deleting the file.
 
+### Step 11: Dashboard (`--dashboard`)
+
+When `$ARGUMENTS` contains `--dashboard`, skip the textual report and render the aggregated view instead:
+
+```bash
+bash ~/.claude/craftsman-dashboard.sh --serve
+```
+
+This aggregates every repository recorded in the metrics database into one self-contained HTML page served on `127.0.0.1:8787` (add a port number after `--serve` to change it): quality score, violations per repository, most-violated rules, corrections applied, learned instincts, and the 30-day trend. Nothing leaves the machine.
+
+Without `--serve`, the page is written next to the database and its path is printed. `--json` emits the same aggregates as machine-readable data.

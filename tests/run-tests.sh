@@ -375,6 +375,23 @@ test_agent_hooks() {
     fi
 }
 
+test_dashboard() {
+    echo ""
+    log_info "Testing metrics dashboard (functional)"
+
+    local dash_test="$SCRIPT_DIR/core/test-dashboard.sh"
+
+    if [[ -f "$dash_test" ]]; then
+        if bash "$dash_test" > /dev/null 2>&1; then
+            log_pass "Dashboard tests pass"
+        else
+            log_fail "Dashboard tests failed - run tests/core/test-dashboard.sh for details"
+        fi
+    else
+        log_skip "Dashboard tests (tests/core/test-dashboard.sh not found)"
+    fi
+}
+
 test_tooling_detect() {
     echo ""
     log_info "Testing tooling detector (functional)"

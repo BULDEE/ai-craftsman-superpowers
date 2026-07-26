@@ -107,6 +107,15 @@ printf '%s' "\$CURRENT_HASH" > "\$HASH_FILE" 2>/dev/null || true
 WRAPPER
 chmod +x "${HOME}/.claude/craftsman-codemap.sh" 2>/dev/null || true
 
+# Dashboard bridge: aggregates the metrics database into a local HTML report.
+cat > "${HOME}/.claude/craftsman-dashboard.sh" <<WRAPPER
+#!/usr/bin/env bash
+set -uo pipefail
+DB="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db"
+exec python3 "${SCRIPT_DIR}/lib/dashboard.py" "\$DB" "\$@"
+WRAPPER
+chmod +x "${HOME}/.claude/craftsman-dashboard.sh" 2>/dev/null || true
+
 # Conventions bridge (ADR-0022): used by /craftsman:setup
 cat > "${HOME}/.claude/craftsman-conventions.sh" <<WRAPPER
 #!/usr/bin/env bash
