@@ -8,8 +8,8 @@
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A52.1.218-blueviolet)](https://code.claude.com)
 [![Version](https://img.shields.io/github/v/release/BULDEE/ai-craftsman-superpowers?label=version)](CHANGELOG.md)
 [![CI](https://img.shields.io/github/actions/workflow/status/BULDEE/ai-craftsman-superpowers/ci.yml?label=CI)](.github/workflows/ci.yml)
-[![Commands](https://img.shields.io/badge/Commands-18%2B-orange)](COMMANDS-QUICK-REF.md)
-[![Agents](https://img.shields.io/badge/Agents-6%2B-red)](#specialized-agents)
+[![Skills](https://img.shields.io/badge/Skills-21-orange)](COMMANDS-QUICK-REF.md)
+[![Agents](https://img.shields.io/badge/Agents-12-red)](#specialized-agents)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 **Transform Claude into a disciplined Senior Software Craftsman**
@@ -26,7 +26,30 @@
 
 ---
 
-DDD, Clean Architecture, and TDD methodology enforced through hooks, commands, and a rules engine - not just suggested in a prompt, but actually blocked when violated.
+## A prompt asks. This enforces.
+
+You can write "always use final classes" in your `CLAUDE.md`. Claude will
+follow it, until the context fills up, or the task gets long, or the tenth file
+of a refactor. Instructions decay. That is not a discipline problem, it is an
+architecture problem: nothing in the loop is checking.
+
+Craftsman puts the check in the loop. The same rules run as hooks on every
+Write, as a gate in your CI, and as the criteria a reviewer agent reads. A
+violation does not produce a gentle reminder in the next paragraph. It returns
+exit 2 and the write does not happen.
+
+Three things follow from that, and they are what make this plugin different
+from a well-written prompt:
+
+| | |
+|---|---|
+| **It blocks** | One rules engine, enforced identically in hooks and CI. No drift between what your editor allows and what your pipeline rejects. |
+| **It learns** | Every violation you fix is recorded. A pattern that recurs across files becomes a candidate instinct you approve, and Claude stops making that mistake instead of being reminded about it. |
+| **It proves** | "Done" requires evidence. A task cannot be marked complete without a verification record, and a failing test run revokes one that already exists. |
+
+And it does this on the cheapest model that can do each job: mechanical work on
+Haiku, pattern application on Sonnet, architectural judgment on Opus. You do
+not pick, and you do not pay Opus rates to format a commit message.
 
 ## Why Craftsman? - Core Differentiators
 
@@ -41,8 +64,9 @@ What makes this plugin genuinely unique in the Claude Code ecosystem:
 7. **Structural Ratchet** - a committed baseline records each file's structural high-water mark (complexity, size, longest function, import fan-out, suppression count). A file you touch may improve or stay equal, never regress: the mark tightens automatically on a green pass and only loosens through a documented, counted suppression. Enforced identically in hooks and CI; untouched legacy is never punished for debt it already had.
 8. **Adversarial Design Panel** - three contradictors (YAGNI, invariants and boundaries, feasibility) attack a design during `/craftsman:design`, before any code exists. Every objection lands in a retained or dismissed table: silence is not an option. Contradicting a design costs far less than contradicting the code built on it.
 9. **Security and Situational Onboarding** - SEC001-003 (hardcoded secrets, dynamic eval, SQL by concatenation) verified in hooks and CI with their doctrine routed on block; setup observes the repository and asks at most four plain-language questions, and guided mode makes every block explain itself.
+10. **Per-Task Model Tiering** - each skill declares the cheapest model that can do its job and how hard it should think, enforced for the turn it runs in. Formatting a commit runs on Haiku at low effort; an architecture review runs on Opus at high. Tiers are aliases, so they follow model releases, and you can remap a whole tier with one environment variable. See [Model Tiering Explained](docs/guides/model-tiering-explained.md).
 
-> No other Claude Code plugin combines all of these: learning from past mistakes, enterprise rule customization, cognitive protection, real-time validation, zero CI drift, and measurable quality trends.
+> No other Claude Code plugin combines all of these: learning from past mistakes, enterprise rule customization, cognitive protection, real-time validation, zero CI drift, measurable quality trends, and per-task model economics.
 
 
 ## Opening an Untrusted Repository
@@ -187,7 +211,7 @@ Put DISC profile/communication style/personal biases in your **global** CLAUDE.m
 v4 is a **clean break** targeting Claude Code >= 2.1.218, with no backward compatibility (the 3.9.x line stays available and frozen). Headlines:
 
 - **Closed learning loop**: recurring corrections become candidate instincts you review in `/craftsman:metrics`; approved ones are codified as project skills. Detection stays automatic, codification stays human-gated.
-- **Native-first architecture**: workflows become forked skills with live context injection, bash agent-hook wrappers become native Haiku-tiered `agent`/`prompt` hooks, verification uses `asyncRewake` and `TaskCompleted` gates.
+- **Native-first architecture**: workflows become forked skills with live context injection, and verification uses `asyncRewake` plus a `TaskCompleted` gate. Semantic verification runs on Haiku in headless subprocesses behind gated command hooks rather than native `agent`/`prompt` hook types, which offer no per-plugin option gating and would take away your ability to turn verification off ([ADR-0018](docs/adr/0018-native-prompt-agent-hooks.md)).
 - **Semantic Level 1.5**: LSP-backed validation between the regex gate and static analysis, activating only on language servers you already have installed - the plugin orchestrates your stack's tooling, never substitutes for it.
 - **Context discipline**: every injection capped by configurable budgets, every hook individually disableable.
 
@@ -195,7 +219,7 @@ Full plan and phases: [docs/v4-roadmap.md](docs/v4-roadmap.md). Decisions: ADRs 
 
 ## Architecture Decisions
 
-24 ADRs cover the reasoning behind every major design choice - see [`/docs/adr`](docs/adr/). Start with [ADR-0016: v4 Clean Break](docs/adr/0016-v4-clean-break-native-first.md) and [ADR-0005: Knowledge-First Architecture](docs/adr/0005-knowledge-first-architecture.md) if you're evaluating the plugin's design.
+28 ADRs cover the reasoning behind every major design choice - see [`/docs/adr`](docs/adr/). Start with [ADR-0016: v4 Clean Break](docs/adr/0016-v4-clean-break-native-first.md) and [ADR-0005: Knowledge-First Architecture](docs/adr/0005-knowledge-first-architecture.md) if you're evaluating the plugin's design.
 
 ## Using with Superpowers Plugin
 

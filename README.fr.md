@@ -8,8 +8,8 @@
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A52.1.218-blueviolet)](https://code.claude.com)
 [![Version](https://img.shields.io/github/v/release/BULDEE/ai-craftsman-superpowers?label=version)](CHANGELOG.md)
 [![CI](https://img.shields.io/github/actions/workflow/status/BULDEE/ai-craftsman-superpowers/ci.yml?label=CI)](.github/workflows/ci.yml)
-[![Commands](https://img.shields.io/badge/Commands-18%2B-orange)](COMMANDS-QUICK-REF.md)
-[![Agents](https://img.shields.io/badge/Agents-6%2B-red)](#agents-spécialisés)
+[![Skills](https://img.shields.io/badge/Skills-21-orange)](COMMANDS-QUICK-REF.md)
+[![Agents](https://img.shields.io/badge/Agents-12-red)](#agents-spécialisés)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 **Transformez Claude en Senior Software Craftsman discipliné**
@@ -26,7 +26,32 @@
 
 ---
 
-DDD, Clean Architecture et méthodologie TDD appliquées via des hooks, des commandes et un rules engine : pas seulement suggéré dans un prompt, mais réellement bloqué en cas de violation.
+## Un prompt demande. Ceci impose.
+
+Vous pouvez écrire « toujours des classes final » dans votre `CLAUDE.md`. Claude
+va s'y tenir, jusqu'à ce que le contexte se remplisse, ou que la tâche
+s'allonge, ou qu'arrive le dixième fichier d'un refactor. Les instructions se
+délitent. Ce n'est pas un problème de discipline, c'est un problème
+d'architecture : rien dans la boucle ne vérifie.
+
+Craftsman met la vérification dans la boucle. Les mêmes règles tournent en
+hooks à chaque Write, en gate dans votre CI, et comme critères lus par les
+agents de revue. Une violation ne produit pas un rappel poli au paragraphe
+suivant. Elle renvoie exit 2 et l'écriture n'a pas lieu.
+
+Trois conséquences en découlent, et ce sont elles qui distinguent ce plugin
+d'un prompt bien écrit :
+
+| | |
+|---|---|
+| **Il bloque** | Un seul rules engine, appliqué à l'identique en hooks et en CI. Aucune dérive entre ce que votre éditeur autorise et ce que votre pipeline refuse. |
+| **Il apprend** | Chaque violation que vous corrigez est enregistrée. Un motif qui se répète sur plusieurs fichiers devient un instinct candidat que vous approuvez, et Claude cesse de commettre l'erreur au lieu qu'on la lui rappelle. |
+| **Il prouve** | « Terminé » exige des preuves. Une tâche ne peut pas être marquée complète sans trace de vérification, et un test qui échoue révoque une trace existante. |
+
+Le tout sur le modèle le moins cher capable de faire le travail : le mécanique
+sur Haiku, l'application de patterns sur Sonnet, le jugement architectural sur
+Opus. Vous ne choisissez pas, et vous ne payez pas le tarif Opus pour formater
+un message de commit.
 
 ## Pourquoi Craftsman ? - Différenciateurs clés
 
@@ -41,8 +66,9 @@ Ce qui rend ce plugin réellement unique dans l'écosystème Claude Code :
 7. **Cliquet structurel** : un baseline committé enregistre le high-water mark structurel de chaque fichier (complexité, taille, plus longue fonction, fan-out d'imports, nombre de suppressions). Un fichier que vous touchez peut s'améliorer ou rester égal, jamais régresser : la marque se resserre automatiquement au passage vert et ne se desserre que par une suppression documentée et comptée. Appliqué à l'identique dans les hooks et en CI ; le legacy non touché n'est jamais puni pour une dette qu'il avait déjà.
 8. **Panel de contradiction au design** : trois contradicteurs (YAGNI, invariants et frontières, faisabilité) attaquent le design pendant `/craftsman:design`, avant qu'une ligne existe. Chaque objection atterrit dans une table retenue ou écartée : le silence n'est pas une option. Contredire un design coûte bien moins cher que contredire le code bâti dessus.
 9. **Sécurité et onboarding situationnel** : SEC001-003 (secrets en dur, eval dynamique, SQL par concaténation) vérifiés dans les hooks et en CI avec routage de la doctrine au blocage ; le setup observe le dépôt et pose au plus quatre questions en langage courant, et le mode guidé fait que chaque blocage s'explique.
+10. **Tiering de modèle par tâche** : chaque skill déclare le modèle le moins cher capable de faire son travail et l'effort de réflexion associé, appliqué le temps de son exécution. Formater un commit tourne sur Haiku en effort `low` ; une revue d'architecture sur Opus en `high`. Les paliers sont des alias, donc ils suivent les sorties de modèles, et une variable d'environnement suffit à remapper un palier entier. Voir [Model Tiering Explained](docs/guides/model-tiering-explained.md).
 
-> Aucun autre plugin Claude Code ne combine tout cela : apprentissage des erreurs passées, personnalisation des règles de niveau entreprise, protection cognitive, validation temps réel, zéro dérive CI, et tendances qualité mesurables.
+> Aucun autre plugin Claude Code ne combine tout cela : apprentissage des erreurs passées, personnalisation des règles de niveau entreprise, protection cognitive, validation temps réel, zéro dérive CI, tendances qualité mesurables, et économie de modèle par tâche.
 
 
 ## Ouvrir un dépôt non fiable
@@ -187,7 +213,7 @@ Mettez le profil DISC/style de communication/biais personnels dans votre CLAUDE.
 v4 est une **rupture nette** ciblant Claude Code >= 2.1.218, sans rétrocompatibilité (la branche 3.9.x reste disponible et gelée). Les grandes lignes :
 
 - **Boucle d'apprentissage fermée** : les corrections récurrentes deviennent des instincts candidats que vous validez dans `/craftsman:metrics` ; les instincts approuvés sont codifiés en skills projet. La détection reste automatique, la codification reste validée par un humain.
-- **Architecture native-first** : les workflows deviennent des skills forkés avec injection de contexte en direct, les wrappers bash de hooks agents deviennent des hooks natifs `agent`/`prompt` sur Haiku, la vérification s'appuie sur `asyncRewake` et les gates `TaskCompleted`.
+- **Architecture native-first** : les workflows deviennent des skills forkés avec injection de contexte en direct, et la vérification s'appuie sur `asyncRewake` et un gate `TaskCompleted`. La vérification sémantique tourne sur Haiku dans des sous-processus headless derrière des hooks `command` conditionnés, et non via les types de hooks natifs `agent`/`prompt` : ceux-ci n'offrent aucun gating par option de plugin et vous retireraient la possibilité de désactiver la vérification ([ADR-0018](docs/adr/0018-native-prompt-agent-hooks.md)).
 - **Niveau 1.5 sémantique** : validation LSP entre le gate regex et l'analyse statique, activée uniquement sur les serveurs de langage déjà installés : le plugin orchestre l'outillage de votre stack, il ne s'y substitue jamais.
 - **Discipline de contexte** : chaque injection plafonnée par des budgets configurables, chaque hook désactivable individuellement.
 
@@ -195,7 +221,7 @@ Plan complet et phases : [docs/v4-roadmap.md](docs/v4-roadmap.md). Décisions : 
 
 ## Décisions d'architecture
 
-24 ADR couvrent le raisonnement derrière chaque choix de conception majeur : voir [`/docs/adr`](docs/adr/). Commencez par [ADR-0016: v4 Clean Break](docs/adr/0016-v4-clean-break-native-first.md) et [ADR-0005: Knowledge-First Architecture](docs/adr/0005-knowledge-first-architecture.md) si vous évaluez la conception du plugin.
+28 ADR couvrent le raisonnement derrière chaque choix de conception majeur : voir [`/docs/adr`](docs/adr/). Commencez par [ADR-0016: v4 Clean Break](docs/adr/0016-v4-clean-break-native-first.md) et [ADR-0005: Knowledge-First Architecture](docs/adr/0005-knowledge-first-architecture.md) si vous évaluez la conception du plugin.
 
 ## Utilisation avec le plugin Superpowers
 
