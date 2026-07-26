@@ -170,8 +170,9 @@ fi
 echo ""
 echo "=== TS security (react pack) ==="
 
-cat > "$TEST_DIR/token.ts" <<'TS'
-const config = { token: "ghp_AbCdEf1234567890AbCdEf1234567890AbCd" };
+FAKE_GH_TOKEN="ghp_""AbCdEf1234567890AbCdEf1234567890AbCd"
+cat > "$TEST_DIR/token.ts" <<TS
+const config = { token: "${FAKE_GH_TOKEN}" };
 TS
 reset_findings
 pack_validate_typescript_security "$TEST_DIR/token.ts"

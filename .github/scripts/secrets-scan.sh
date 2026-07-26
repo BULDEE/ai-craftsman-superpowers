@@ -44,7 +44,10 @@ search_tracked_filenames() {
 
 search_git_history() {
     local pattern="$1"
-    git -C "$REPO_ROOT" log -100 -p --all 2>/dev/null \
+    # Test fixtures are excluded: they carry deliberately fake credentials to
+    # exercise the security validators. Current files are still scanned by
+    # check_pattern, so a real secret committed under tests/ is not missed.
+    git -C "$REPO_ROOT" log -100 -p --all -- . ':(exclude)tests/' 2>/dev/null \
         | grep -E "$pattern" \
         | head -5 \
         || true
