@@ -67,6 +67,26 @@ exec python3 "${SCRIPT_DIR}/lib/session_state.py" set-verified
 WRAPPER
 chmod +x "${HOME}/.claude/craftsman-set-verified.sh" 2>/dev/null || true
 
+# Same bridge pattern for the instinct pipeline (ADR-0020): /craftsman:metrics
+# runs via the Bash tool without CLAUDE_PLUGIN_ROOT, so bake resolved paths in.
+cat > "${HOME}/.claude/craftsman-instincts.sh" <<WRAPPER
+#!/usr/bin/env bash
+set -uo pipefail
+DB="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db"
+PROJECT_HASH=\$(echo -n "\$PWD" | shasum -a 256 | cut -d' ' -f1)
+CMD="\${1:-candidates}"
+shift 2>/dev/null || true
+case "\$CMD" in
+    approve|reject)
+        exec python3 "${SCRIPT_DIR}/lib/instincts.py" "\$CMD" "\$DB" "\$@"
+        ;;
+    *)
+        exec python3 "${SCRIPT_DIR}/lib/instincts.py" "\$CMD" "\$DB" "\$PROJECT_HASH" "\$@"
+        ;;
+esac
+WRAPPER
+chmod +x "${HOME}/.claude/craftsman-instincts.sh" 2>/dev/null || true
+
 # Detect project type from filesystem
 detect_project_type() {
     local has_php=false has_ts=false
@@ -91,11 +111,22 @@ config_ts_enabled && TS_STATUS="ON"
 PACK_STATUS=$(_init_packs 2>/dev/null || echo "PACKS:error")
 MSG="Craftsman active | Stack: ${STACK} | Strictness: ${STRICTNESS} | PHP rules: ${PHP_STATUS} | TS rules: ${TS_STATUS} | Metrics: initialized | ${PACK_STATUS}"
 
-# Correction learning: inject trends from past sessions (requires python3)
+# Correction learning: trends kept separate so the context budget can drop
+# them first (ADR-0021 priority order)
+CORRECTION_TRENDS=""
 if $HAS_PYTHON3; then
     CORRECTION_TRENDS=$(metrics_correction_trends 2>/dev/null || true)
-    if [[ -n "$CORRECTION_TRENDS" ]]; then
-        MSG="${MSG} | Learning: ${CORRECTION_TRENDS}"
+fi
+
+# Instinct pipeline (ADR-0020): surface pending candidates without injecting
+# their content; review happens in /craftsman:metrics.
+PENDING_INSTINCTS=""
+if $HAS_PYTHON3; then
+    _pending=$(python3 "${SCRIPT_DIR}/lib/instincts.py" pending-count \
+        "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db" \
+        "$(metrics_project_hash)" 2>/dev/null || echo 0)
+    if [[ "$_pending" =~ ^[0-9]+$ ]] && [[ "$_pending" -gt 0 ]]; then
+        PENDING_INSTINCTS="Instincts: ${_pending} candidate(s) pending review - run /craftsman:metrics"
     fi
 fi
 
@@ -140,13 +171,38 @@ MSG="${MSG} | ${HC_SUMMARY}"
 
 # Command routing table
 ROUTING=$(routing_table 2>/dev/null || echo "")
-if [[ -n "$ROUTING" ]]; then
-    MSG="${MSG}
 
-${ROUTING}"
+# =============================================================================
+# Context budget assembly (ADR-0021). Priority when over budget:
+# core status + warnings > pending instincts > routing table > trends.
+# Trends are dropped first, then the routing table is truncated.
+# =============================================================================
+BUDGET=$(config_session_start_max_chars)
+
+assemble_msg() {
+    local include_trends="$1" routing_text="$2"
+    local out="${MSG}"
+    [[ "$include_trends" == "yes" && -n "$CORRECTION_TRENDS" ]] && out="${out} | Learning: ${CORRECTION_TRENDS}"
+    [[ -n "$PENDING_INSTINCTS" ]] && out="${out} | ${PENDING_INSTINCTS}"
+    out="${out}${WARNINGS}"
+    [[ -n "$routing_text" ]] && out="${out}
+
+${routing_text}"
+    printf '%s' "$out"
+}
+
+FULL=$(assemble_msg "yes" "$ROUTING")
+if [[ "${#FULL}" -gt "$BUDGET" ]]; then
+    FULL=$(assemble_msg "no" "$ROUTING")
+fi
+if [[ "${#FULL}" -gt "$BUDGET" ]]; then
+    _head_len=$(( ${#FULL} - ${#ROUTING} ))
+    _room=$(( BUDGET - _head_len ))
+    [[ "$_room" -lt 0 ]] && _room=0
+    FULL=$(assemble_msg "no" "$(printf '%s' "$ROUTING" | head -c "$_room")")
 fi
 
-jq -n --arg msg "${MSG}${WARNINGS}" '{
+jq -n --arg msg "$FULL" '{
     systemMessage: $msg
 }'
 

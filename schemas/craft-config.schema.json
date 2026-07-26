@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/BULDEE/ai-craftsman-superpowers/schemas/craft-config.schema.json",
+  "title": ".craft-config.yml (v4)",
+  "description": "Craftsman plugin configuration. YAML file validated against this schema by /craftsman:healthcheck and CI. See ADR-0021.",
+  "type": "object",
+  "properties": {
+    "v": {
+      "type": "integer",
+      "const": 4,
+      "description": "Config format version. v4 configs must declare v: 4; older configs are migrated by /craftsman:setup."
+    },
+    "strictness": {
+      "type": "string",
+      "enum": ["strict", "moderate", "relaxed"]
+    },
+    "stack": {
+      "type": "string",
+      "enum": ["symfony", "react", "fullstack", "other"]
+    },
+    "packs": {
+      "type": ["string", "object"],
+      "description": "Comma-separated pack names, or a mapping with an external list."
+    },
+    "context_budget": {
+      "type": "object",
+      "properties": {
+        "session_start_max_chars": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 4000,
+          "description": "Hard cap on session-start injection. 0 disables the injection entirely."
+        },
+        "max_learned_skills": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 6,
+          "description": "Maximum learned-instinct skills surfaced per session (ADR-0020)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "hooks": {
+      "type": "object",
+      "properties": {
+        "disabled": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Hook ids to disable, e.g. [bias-detector, agent-sentry-context]. Inline YAML list form."
+        }
+      },
+      "additionalProperties": false
+    },
+    "rules": {
+      "type": "object",
+      "description": "Rule overrides, short form (PHP001: warn) or long form. See rules engine docs."
+    },
+    "sentry_org": { "type": "string" },
+    "sentry_project": { "type": "string" }
+  },
+  "additionalProperties": true
+}

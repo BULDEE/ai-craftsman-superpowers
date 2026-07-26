@@ -19,12 +19,30 @@
 #   standard,strict    - skipped when profile=minimal (secondary/costed hooks)
 # =============================================================================
 
+# Ensure the config lib (hooks.disabled parsing) is available even for hooks
+# that only source hook-profile.sh.
+if ! declare -F config_hooks_disabled_csv >/dev/null 2>&1; then
+    # shellcheck source=hooks/lib/config.sh
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/config.sh" 2>/dev/null || true
+fi
+
 _hook_profile_is_disabled() {
     local hook_id="$1"
     local dry_run="$2"
-    [[ ",${CRAFTSMAN_DISABLED_HOOKS:-}," == *",${hook_id},"* ]] || return 1
+    local disabled="${CRAFTSMAN_DISABLED_HOOKS:-}"
+
+    # Merge config-file kill switches (hooks.disabled, ADR-0021) when the
+    # config lib is loaded; hooks that source config.sh get yaml-level
+    # opt-outs for free, env var opt-outs always work.
+    if declare -F config_hooks_disabled_csv >/dev/null 2>&1; then
+        local from_config
+        from_config=$(config_hooks_disabled_csv)
+        [[ -n "$from_config" ]] && disabled="${disabled},${from_config}"
+    fi
+
+    [[ ",${disabled}," == *",${hook_id},"* ]] || return 1
     if [[ "$dry_run" == "true" ]]; then
-        echo "HOOK_PROFILE: ${hook_id} skipped (CRAFTSMAN_DISABLED_HOOKS)" >&2
+        echo "HOOK_PROFILE: ${hook_id} skipped (disabled hooks list)" >&2
     fi
     return 0
 }

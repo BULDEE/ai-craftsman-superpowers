@@ -356,6 +356,23 @@ test_agent_hooks() {
     fi
 }
 
+test_instincts() {
+    echo ""
+    log_info "Testing instinct pipeline and context budgets (functional)"
+
+    local instincts_test="$SCRIPT_DIR/core/test-instincts.sh"
+
+    if [[ -f "$instincts_test" ]]; then
+        if bash "$instincts_test" > /dev/null 2>&1; then
+            log_pass "Instinct pipeline tests pass"
+        else
+            log_fail "Instinct pipeline tests failed - run tests/core/test-instincts.sh for details"
+        fi
+    else
+        log_skip "Instinct pipeline tests (tests/core/test-instincts.sh not found)"
+    fi
+}
+
 test_config_protection() {
     echo ""
     log_info "Testing config-protection hook (functional)"

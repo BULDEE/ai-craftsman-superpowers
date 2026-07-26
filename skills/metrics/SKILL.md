@@ -126,3 +126,24 @@ Add to the report:
 ```
 
 Prefer the team's existing tool report when one exists (`/craftsman:legacy audit --from <report>`); this built-in ranking is the zero-dependency fallback. See `knowledge/tooling-integration.md` and `knowledge/refactoring/refactoring-campaigns.md`.
+
+### Step 9: Instinct Review (ADR-0020)
+
+The correction learning loop promotes recurring corrections into learned skills, with you as the gate. List pending candidates:
+
+```bash
+bash ~/.claude/craftsman-instincts.sh candidates
+```
+
+For each candidate, show the user the rule, confidence, occurrence count, and evidence, then ask what to do:
+
+- **Approve** (generates `.claude/skills/craftsman-learned/learned-<rule>/SKILL.md` with provenance, loaded automatically as background knowledge):
+  ```bash
+  bash ~/.claude/craftsman-instincts.sh approve <id> "$PWD/.claude/skills/craftsman-learned"
+  ```
+- **Reject** (not re-proposed unless significant new evidence accumulates):
+  ```bash
+  bash ~/.claude/craftsman-instincts.sh reject <id>
+  ```
+
+Also list what is already codified with `bash ~/.claude/craftsman-instincts.sh list approved` and offer retirement (delete the generated skill directory) for instincts the user no longer wants. Never approve or reject without an explicit user decision: automatic promotion is forbidden by ADR-0020.

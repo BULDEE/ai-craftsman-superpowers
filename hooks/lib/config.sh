@@ -146,3 +146,68 @@ config_external_packs() {
         fi
     done < "$config_file"
 }
+
+# =============================================================================
+# v4 context budgets and per-hook kill switches (ADR-0021)
+# =============================================================================
+
+# Parse a nested "section: / key: value" pair from a yml file (2-space indent).
+_config_parse_nested_yml_value() {
+    local section="$1" key="$2" file="$3"
+    awk -v section="$section" -v key="$key" '
+        $0 ~ "^" section ":" { in_section = 1; next }
+        /^[a-zA-Z]/ { in_section = 0 }
+        in_section && $1 == key ":" { gsub(/["'"'"']/, "", $2); print $2; exit }
+    ' "$file" 2>/dev/null
+}
+
+_config_resolve_nested() {
+    local section="$1" key="$2" default="$3"
+    local value=""
+    if [[ -f "$PWD/.craft-config.yml" ]]; then
+        value=$(_config_parse_nested_yml_value "$section" "$key" "$PWD/.craft-config.yml")
+    fi
+    if [[ -z "$value" && -f "${HOME}/.claude/.craft-config.yml" ]]; then
+        value=$(_config_parse_nested_yml_value "$section" "$key" "${HOME}/.claude/.craft-config.yml")
+    fi
+    [[ -n "$value" ]] && echo "$value" || echo "$default"
+}
+
+config_session_start_max_chars() {
+    local v
+    v=$(_config_resolve_nested "context_budget" "session_start_max_chars" "4000")
+    [[ "$v" =~ ^[0-9]+$ ]] && echo "$v" || echo "4000"
+}
+
+config_max_learned_skills() {
+    local v
+    v=$(_config_resolve_nested "context_budget" "max_learned_skills" "6")
+    [[ "$v" =~ ^[0-9]+$ ]] && echo "$v" || echo "6"
+}
+
+# Comma-separated list of disabled hook ids from hooks.disabled (inline form:
+# disabled: [a, b]). Merged with CRAFTSMAN_DISABLED_HOOKS by hook-profile.sh.
+config_hooks_disabled_csv() {
+    local raw=""
+    if [[ -f "$PWD/.craft-config.yml" ]]; then
+        raw=$(_config_parse_nested_inline_list "hooks" "disabled" "$PWD/.craft-config.yml")
+    fi
+    if [[ -z "$raw" && -f "${HOME}/.claude/.craft-config.yml" ]]; then
+        raw=$(_config_parse_nested_inline_list "hooks" "disabled" "${HOME}/.claude/.craft-config.yml")
+    fi
+    echo "$raw"
+}
+
+_config_parse_nested_inline_list() {
+    local section="$1" key="$2" file="$3"
+    awk -v section="$section" -v key="$key" '
+        $0 ~ "^" section ":" { in_section = 1; next }
+        /^[a-zA-Z]/ { in_section = 0 }
+        in_section && $1 == key ":" {
+            sub(/^[^:]*:[[:space:]]*/, "")
+            gsub(/[\[\]"'"'"' ]/, "")
+            print
+            exit
+        }
+    ' "$file" 2>/dev/null
+}
