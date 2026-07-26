@@ -80,6 +80,38 @@ else
     log_fail "json mode" "invalid JSON output"
 fi
 
+echo ""
+echo "=== Security tooling is always surfaced ==="
+
+cat > "$FIXTURE/php/composer.json" <<'JSON'
+{ "require-dev": { "phpstan/phpstan": "^1.0", "roave/security-advisories": "dev-latest" } }
+JSON
+
+OUT=$(python3 "$DETECT" "$FIXTURE/php")
+if echo "$OUT" | grep -q "composer audit"; then
+    log_pass "security: composer audit always suggested for php"
+else
+    log_fail "security detection" "$OUT"
+fi
+
+if echo "$OUT" | grep -qi "gitleaks\|semgrep"; then
+    log_pass "security: scanner suggestion present"
+else
+    log_fail "scanner suggestion" "$OUT"
+fi
+
+if echo "$OUT" | grep -q "Roave Security Advisories"; then
+    log_pass "security: declared roave/security-advisories consumed"
+else
+    log_fail "roave detection" "$OUT"
+fi
+
+if python3 "$DETECT" "$FIXTURE/php" --json | jq -e '.security.php[0].command' >/dev/null 2>&1; then
+    log_pass "--json exposes the security suggestions with their commands"
+else
+    log_fail "security json" "no .security.php entries"
+fi
+
 rm -rf "$FIXTURE"
 
 test_summary

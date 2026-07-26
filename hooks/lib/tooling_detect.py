@@ -21,6 +21,7 @@ DECLARED = {
         ("phpmetrics", "PhpMetrics", "vendor/bin/phpmetrics --report-json=phpmetrics.json ."),
         ("deptrac", "Deptrac", "vendor/bin/deptrac analyse --formatter=json"),
         ("phpunit", "PHPUnit", "vendor/bin/phpunit --coverage-text"),
+        ("roave/security-advisories", "Roave Security Advisories", "composer audit --format=json"),
     ]),
     "javascript": ("package.json", [
         ("eslint", "ESLint", "npx eslint . --format json"),
@@ -55,6 +56,38 @@ SUGGEST = {
     "go": [("golangci-lint", "https://golangci-lint.run/usage/install/")],
 }
 
+# Security is never "already covered": these are suggested for every detected
+# language, declared or not, as (tool, command, what it catches). ADR-0019: the
+# detector suggests, the human decides, nothing is ever installed.
+SECURITY_SUGGEST = {
+    "php": [
+        ("composer audit", "composer audit",
+         "known CVEs in declared dependencies, ships with Composer 2.4+"),
+        ("gitleaks", "brew install gitleaks", "committed secrets, history included"),
+        ("Psalm taint analysis", "composer require --dev vimeo/psalm",
+         "injection paths from input to sink, run with --taint-analysis"),
+    ],
+    "javascript": [
+        ("npm audit", "npm audit", "known CVEs in the dependency tree, ships with npm"),
+        ("gitleaks", "brew install gitleaks", "committed secrets, history included"),
+        ("semgrep", "brew install semgrep", "SAST rules for injection, eval, unsafe sinks"),
+    ],
+    "python": [
+        ("pip-audit", "pip install pip-audit", "known CVEs in installed packages"),
+        ("bandit", "pip install bandit", "eval/exec, subprocess shell, weak crypto"),
+        ("gitleaks", "brew install gitleaks", "committed secrets, history included"),
+    ],
+    "rust": [
+        ("cargo-audit", "cargo install cargo-audit", "RustSec advisories for the lockfile"),
+        ("gitleaks", "brew install gitleaks", "committed secrets, history included"),
+    ],
+    "go": [
+        ("govulncheck", "go install golang.org/x/vuln/cmd/govulncheck@latest",
+         "vulnerabilities reachable from your call graph"),
+        ("gitleaks", "brew install gitleaks", "committed secrets, history included"),
+    ],
+}
+
 CHURN_TOOLS = [
     ("code-maat", "Churn/coupling analysis (Adam Tornhill): https://github.com/adamtornhill/code-maat"),
     ("git-of-theseus", "Long-range churn: pip install git-of-theseus"),
@@ -71,8 +104,19 @@ def _manifest_text(root: Path, manifest: str) -> str:
         return ""
 
 
+def _security_for(languages: dict) -> dict:
+    security: dict = {}
+    for lang in languages:
+        entries = SECURITY_SUGGEST.get(lang, [])
+        security[lang] = [
+            {"tool": tool, "command": command, "catches": catches}
+            for tool, command, catches in entries
+        ]
+    return security
+
+
 def detect(root: Path) -> dict:
-    result: dict = {"languages": {}, "churn": [], "suggestions": {}}
+    result: dict = {"languages": {}, "churn": [], "suggestions": {}, "security": {}}
     for lang, (manifest, tools) in DECLARED.items():
         text = _manifest_text(root, manifest)
         if not text:
@@ -86,6 +130,7 @@ def detect(root: Path) -> dict:
             result["suggestions"][lang] = [
                 {"tool": label, "install": how} for label, how in SUGGEST.get(lang, [])
             ]
+    result["security"] = _security_for(result["languages"])
     result["churn"] = [
         {"tool": label, "how": how} for label, how in CHURN_TOOLS
     ]
@@ -102,6 +147,19 @@ def _render_language(lang: str, info: dict) -> list[str]:
     return lines
 
 
+def _render_security(security: dict) -> list[str]:
+    if not security:
+        return []
+    lines = ["", "## Security (verify these run in CI)"]
+    for lang, entries in security.items():
+        for entry in entries:
+            lines.append(
+                f"- {lang}: {entry['tool']} -> `{entry['command']}` ({entry['catches']})"
+            )
+    lines.append("- doctrine: knowledge/security/secure-by-design.md (SEC001-SEC003)")
+    return lines
+
+
 def render(result: dict) -> str:
     lines = ["## Declared tooling"]
     if not result["languages"]:
@@ -114,6 +172,7 @@ def render(result: dict) -> str:
         for lang, entries in result["suggestions"].items():
             for entry in entries:
                 lines.append(f"- {lang}: {entry['tool']} -> `{entry['install']}`")
+    lines.extend(_render_security(result.get("security", {})))
     lines.append("")
     lines.append("## Churn (always available from git; dedicated tools optional)")
     for entry in result["churn"]:

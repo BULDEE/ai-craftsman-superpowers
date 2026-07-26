@@ -51,6 +51,20 @@ else
     log_fail "rule routing DB002" "$OUT"
 fi
 
+OUT=$(python3 "$LOOKUP" "$BUNDLE" by-rule SEC001)
+if echo "$OUT" | grep -q "security/secure-by-design"; then
+    log_pass "by-rule SEC001 routes to secure-by-design"
+else
+    log_fail "SEC001 routing" "$OUT"
+fi
+
+OUT=$(python3 "$LOOKUP" "$BUNDLE" by-tag security)
+if [[ $(echo "$OUT" | grep -c .) -eq 2 ]]; then
+    log_pass "by-tag security returns the 2 security concepts"
+else
+    log_fail "security tag routing" "$OUT"
+fi
+
 OUT=$(python3 "$LOOKUP" "$BUNDLE" by-tag persistence)
 if [[ $(echo "$OUT" | grep -c .) -eq 4 ]]; then
     log_pass "by-tag persistence returns the 4 persistence concepts"

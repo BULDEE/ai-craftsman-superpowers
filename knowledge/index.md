@@ -10,6 +10,7 @@ Curated engineering doctrine consumed by the craftsman plugin's skills, agents, 
 - Method: tdd, testing-strategy, clean-code, principles, refactoring-techniques
 - DDD: ddd/ddd-domain-design, ddd/ddd-cqrs-architecture
 - Persistence: persistence/repository-pattern, persistence/migration-discipline, persistence/data-modeling-decisions, persistence/query-boundaries
+- Security: security/secure-by-design, security/owasp-layer-mapping
 - Legacy: legacy/taking-over-legacy, legacy/characterization-testing, legacy/legacy-techniques, legacy/strangler-fig, legacy/communicating-tech-debt
 - Refactoring: refactoring/code-smells, refactoring/mikado-method, refactoring/refactoring-campaigns, refactoring/refactoring-katas
 - Anti-patterns: anti-patterns/anemic-domain, anti-patterns/god-object, anti-patterns/primitive-obsession, anti-patterns/setter-abuse, anti-patterns/singleton-abuse, anti-patterns/sync-in-async
