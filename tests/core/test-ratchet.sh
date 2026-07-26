@@ -279,4 +279,41 @@ fi
 cd "$PREV_PWD"
 rm -rf "$WORK3"
 
+echo ""
+echo "=== Project boundary ==="
+
+WORK6="/tmp/craftsman-ratchet-boundary-$$"
+OUTSIDE="/tmp/craftsman-ratchet-outside-$$"
+mkdir -p "$WORK6/src" "$OUTSIDE"
+PREV_PWD="$PWD"
+cd "$WORK6"
+
+cat > src/In.php <<'PHP'
+<?php
+final class In {}
+PHP
+cat > "$OUTSIDE/Out.php" <<'PHP'
+<?php
+final class Out {}
+PHP
+
+python3 "$RATCHET" init src --baseline .craftsman-baseline.json >/dev/null
+python3 "$RATCHET" check "$OUTSIDE/Out.php" --baseline .craftsman-baseline.json >/dev/null 2>&1
+python3 "$RATCHET" update "$OUTSIDE/Out.php" --baseline .craftsman-baseline.json >/dev/null 2>&1
+
+if ! grep -q "craftsman-ratchet-outside" .craftsman-baseline.json; then
+    log_pass "file outside the project never enters the baseline"
+else
+    log_fail "project boundary" "absolute outside path leaked into the committed baseline"
+fi
+
+if ! grep -qE '"path":"/' .craftsman-baseline.json; then
+    log_pass "baseline holds only project-relative paths"
+else
+    log_fail "absolute path" "$(grep -oE '"path":"[^"]*"' .craftsman-baseline.json | head -2)"
+fi
+
+cd "$PREV_PWD"
+rm -rf "$WORK6" "$OUTSIDE"
+
 test_summary

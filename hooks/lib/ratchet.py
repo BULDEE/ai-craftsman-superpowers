@@ -100,16 +100,28 @@ def save_baseline(path: Path, entries: dict) -> None:
     path.write_text("[\n" + ",\n".join(rendered) + "\n]\n")
 
 
-def _relative(path: Path) -> str:
+def _relative(path: Path):
+    """Project-relative path, or None when the file lives outside the project.
+
+    Outside files are never recorded: an absolute path written into a committed
+    baseline leaks local directory structure to everyone who clones the
+    repository, and adds entries no teammate can act on.
+    """
     try:
         return str(path.resolve().relative_to(Path.cwd()))
     except ValueError:
-        return str(path)
+        return None
 
 
-def _current_entry(file_path: Path) -> dict:
+def _current_entry(file_path: Path):
+    """Measured entry keyed by project-relative path, or None when the file
+    lives outside the project. Only the writing paths (check, update, init)
+    consult this: `measure` stays a pure read with no project constraint."""
+    relative = _relative(file_path)
+    if relative is None:
+        return None
     entry = measure(file_path)
-    entry["path"] = _relative(file_path)
+    entry["path"] = relative
     return entry
 
 
@@ -132,6 +144,8 @@ def _cmd_check(args) -> int:
     baseline_file = _baseline_path(args)
     entries = load_baseline(baseline_file)
     current = _current_entry(file_path)
+    if current is None:
+        return 0
     known = entries.get(current["path"])
     if known is None:
         entries[current["path"]] = current
@@ -154,6 +168,8 @@ def _cmd_update(args) -> int:
     baseline_file = _baseline_path(args)
     entries = load_baseline(baseline_file)
     current = _current_entry(file_path)
+    if current is None:
+        return 0
     known = entries.get(current["path"], current)
     tightened = {"path": current["path"]}
     for name in RATCHETED_METRICS:
@@ -183,6 +199,8 @@ def _cmd_init(args) -> int:
     entries = {}
     for source in _iter_sources(roots):
         entry = _current_entry(source)
+        if entry is None:
+            continue
         entries[entry["path"]] = entry
     save_baseline(baseline_file, entries)
     print(f"baseline: {len(entries)} files -> {baseline_file}")
