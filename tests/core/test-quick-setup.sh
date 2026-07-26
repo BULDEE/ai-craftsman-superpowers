@@ -86,4 +86,37 @@ else
     log_fail "missing modes documentation table"
 fi
 
+# --- Situational onboarding (v4.3) ---
+
+grep -q "craftsman-conventions.sh signals" "$SETUP_CMD" \
+    && log_pass "setup consults situational signals" \
+    || log_fail "signals step" "missing"
+
+grep -q -- "--global" "$SETUP_CMD" \
+    && log_pass "setup documents --global workshop profile" \
+    || log_fail "--global" "missing"
+
+grep -q "preferred_tools:" "$SETUP_CMD" \
+    && log_pass "workshop profile records preferred_tools" \
+    || log_fail "preferred_tools key" "missing"
+
+SITU_COUNT=0
+grep -qc "AskUserQuestion" "$SETUP_CMD" >/dev/null && \
+SITU_COUNT=$(grep -c "Existing project or a new one\|Prototype or heading to production\|Solo or team\|Maximum help or maximum autonomy" "$SETUP_CMD")
+[[ "$SITU_COUNT" -eq 4 ]] \
+    && log_pass "exactly 4 situational questions documented" \
+    || log_fail "situational questions" "found $SITU_COUNT"
+
+grep -q "guided: true" "$SETUP_CMD" \
+    && log_pass "guided mode key documented" \
+    || log_fail "guided" "missing"
+
+grep -q "ratchet.py.*init\|craftsman-baseline" "$SETUP_CMD" \
+    && log_pass "setup bootstraps the ratchet baseline" \
+    || log_fail "baseline bootstrap" "missing"
+
+grep -q "committed" "$SETUP_CMD" \
+    && log_pass "baseline commit instruction present" \
+    || log_fail "baseline commit instruction" "missing"
+
 test_summary

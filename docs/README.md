@@ -60,6 +60,9 @@ All major decisions are documented as ADRs (Architecture Decision Records):
 - [ADR-0022: Setup by Observation](./adr/0022-setup-by-observation.md)
 - [ADR-0023: Deterministic Verification Loop](./adr/0023-deterministic-verification-loop.md)
 - [ADR-0024: Knowledge as an OKF Bundle](./adr/0024-okf-knowledge-bundle.md)
+- [ADR-0025: Structural Ratchet](./adr/0025-structural-ratchet.md)
+- [ADR-0026: Adversarial Design Panel](./adr/0026-adversarial-design-panel.md)
+- [ADR-0027: Situational Onboarding](./adr/0027-situational-onboarding.md)
 
 ## Philosophy
 

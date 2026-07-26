@@ -19,6 +19,7 @@ disable-model-invocation: true
 | `/craftsman:setup` | Full interactive setup (default) |
 | `/craftsman:setup --quick` | Zero-question auto-setup with smart defaults |
 | `/craftsman:setup --refresh` | Regenerate observed artifacts (conventions skill, codemap) |
+| `/craftsman:setup --global` | Workshop profile: asked once per machine, inherited by every project |
 
 ---
 
@@ -41,6 +42,120 @@ Every mode (including `--quick`) ends with the observation step. The repository 
    ```
 
 Regeneration is always explicit (`--refresh`), never silent: the generated file records its generation date and inputs.
+
+---
+
+## Workshop Profile (`--global`)
+
+Asked once per machine, then never again. It records how this developer usually works, not what the current project is. The answers are written to `~/.claude/.craft-config.yml` and every project inherits them through the 3-level config (global, then project, then directory).
+
+Two questions, no more:
+
+1. **Which stack(s) do you usually work in?** Propose what is already installed on the machine, and map the answer to packs.
+2. **Which quality tools do you like in each stack?** Propose the community standards from the tooling detector catalog:
+
+   ```bash
+   python3 "${CLAUDE_PLUGIN_ROOT}/hooks/lib/tooling_detect.py" "$PWD" --json
+   ```
+
+   The detector reports both what is declared here and what it suggests per stack (linters, architecture checkers, test runners, and the security section: secret scanners, dependency audit). For the workshop profile only the suggestion catalog matters, not this repository.
+
+Record the answers under a `preferred_tools:` key:
+
+```yaml
+preferred_tools:
+  php: ["PHPStan", "Deptrac", "PHPUnit"]
+  javascript: ["ESLint", "Vitest"]
+  security: ["Gitleaks"]
+```
+
+**Nothing is ever installed (ADR-0019).** A preference is a proposal that project init will offer later. Say this out loud when you write the profile so nobody expects a `composer require` or an `npm install` to have run.
+
+---
+
+## Situational Init (default project flow)
+
+The default flow when `/craftsman:setup` runs inside a project. Observe first, then ask at most four short questions. Never ask what the repository has already answered.
+
+### Step A: Observe
+
+```bash
+bash ~/.claude/craftsman-conventions.sh signals
+```
+
+It prints one JSON line:
+
+```json
+{"existing_project": true, "commit_count": 412, "has_tests": true, "has_ci": false, "legacy_signal": true}
+```
+
+Read it as: `existing_project` becomes true past 20 commits, `legacy_signal` is true when an existing project has no tests or no CI. These are prefills, not decisions. The user still confirms.
+
+### Step B: Confirm (4 questions maximum)
+
+One `AskUserQuestion` call, every answer prefilled from the signals. Wording matters: these questions are read by people who have never heard of a ratchet, a baseline, or a doctrine. No jargon, no rule codes, no acronyms. Ask exactly these four and nothing else:
+
+| Question | Prefilled from | What it decides |
+|---|---|---|
+| Existing project or a new one? | `existing_project` | how the baseline is taken |
+| Prototype or heading to production? | `legacy_signal`, `has_tests` | strictness: `moderate` or `strict` |
+| Solo or team? | `has_ci` | whether a CI template and a doctrine export are proposed |
+| Maximum help or maximum autonomy? | nothing, ask plainly | `guided: true` or `guided: false` |
+
+Offer plain answers, never internal vocabulary:
+
+- Question 1: "It already exists" / "I am starting it right now"
+- Question 2: "It is a prototype, I am exploring" / "It is going to production"
+- Question 3: "I work alone on it" / "We are several on it"
+- Question 4: "Explain every blocked change to me" / "Just block, stay short"
+
+Mapping, applied silently:
+
+| Answer | Effect |
+|---|---|
+| Already exists | photograph the current state as the baseline |
+| Starting right now | baseline starts empty, zero tolerance from the first file |
+| Prototype | `strictness: moderate` |
+| Going to production | `strictness: strict` |
+| Alone | no CI proposal |
+| Several | propose `craftsman-ci init` (pipeline template) and `craftsman-ci export` (shareable doctrine) |
+| Explain every blocked change | `guided: true` |
+| Just block, stay short | `guided: false` |
+
+With `guided: true`, every quality gate block gains a plain-language paragraph explaining why the rule exists and where to read more. Turn it off later by flipping the key.
+
+### Step C: Show the derived config before writing it
+
+Same contract as the rest of this skill: display what was inferred, wait for confirmation, then write. The displayed block must include the two keys the four questions produced:
+
+```yaml
+strictness: "strict"
+guided: true
+```
+
+### Step D: Bootstrap the structural baseline
+
+The baseline is the photograph of the code as it is today. It is what lets the plugin demand better without punishing anyone for debt they inherited.
+
+```bash
+python3 "${CLAUDE_PLUGIN_ROOT}/hooks/lib/ratchet.py" init src --baseline .craftsman-baseline.json
+```
+
+Pass the source paths the project actually uses (`src`, `app`, `lib`, `packages/*/src`). The command prints how many files it recorded.
+
+- **New project**: the baseline is empty, so the very first file is already held to the full standard. Zero tolerance costs nothing when there is nothing to fix.
+- **Existing project**: the current state is photographed as is. Nothing that already exists is reported as a violation. Only a file that gets structurally worse than its photograph is blocked, and improving one updates its entry. Legacy is never punished for debt it already had.
+
+Then tell the user, explicitly:
+
+```
+.craftsman-baseline.json must be committed. It is the shared reference:
+without it in git, CI and your teammates measure against a different photograph.
+```
+
+### Step E: `--quick` skips the questions
+
+`--quick` bypasses the four questions entirely. It keeps the observed defaults (existing project detection, strict strictness, `guided: false`) and still runs Step D, so a quick setup ends with a valid `.craftsman-baseline.json` like any other.
 
 ---
 
