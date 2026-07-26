@@ -181,6 +181,45 @@ else
     log_fail "path handling" "in-project pattern broke: $INSIDE"
 fi
 
+echo ""
+echo "=== A huge file cannot exhaust memory on every write ==="
+
+HUGE_DIR="$WORK/huge-repo"
+mkdir -p "$HUGE_DIR"
+python3 -c "
+import sys
+open(sys.argv[1], 'w').write('<?php\n' + ('// pad\n' * 400000))
+" "$HUGE_DIR/huge.php"
+
+cd "$HUGE_DIR"
+OUT=$(python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure huge.php 2>/dev/null)
+if [[ -z "$OUT" ]]; then
+    log_pass "oversized source file is skipped, not loaded into memory"
+else
+    log_fail "unbounded read" "measured a file past the size cap: $OUT"
+fi
+
+python3 "$ROOT_DIR/hooks/lib/ratchet.py" init . --baseline "$HUGE_DIR/b.json" >/dev/null 2>&1
+if ! grep -q "huge.php" "$HUGE_DIR/b.json" 2>/dev/null; then
+    log_pass "oversized file never enters the baseline"
+else
+    log_fail "unbounded read" "oversized file recorded in the baseline"
+fi
+
+SMALL="$HUGE_DIR/small.php"
+printf '<?php\nfinal class Small {}\n' > "$SMALL"
+if [[ -n "$(python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure "$SMALL" 2>/dev/null)" ]]; then
+    log_pass "normal source files are still measured"
+else
+    log_fail "size cap too aggressive" "a normal file was skipped"
+fi
+
+if python3 "$ROOT_DIR/hooks/lib/structural_metrics.py" "$HUGE_DIR/huge.php" php >/dev/null 2>&1; then
+    log_pass "structural analysis returns without reading the oversized file"
+else
+    log_pass "structural analysis declines the oversized file"
+fi
+
 cd "$PREV_PWD"
 rm -rf "$WORK"
 

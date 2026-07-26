@@ -34,6 +34,7 @@
 # splitting them would scatter the brace/string state and hurt readability.
 # craftsman-ignore: PY002
 # =============================================================================
+import os
 import re
 import sys
 
@@ -120,8 +121,16 @@ def count_params(header):
     return params
 
 
+# This runs on every write. A hostile repository can ship an enormous file,
+# and reading it costs several times its size once split into lines; source
+# code past this point is not worth analysing.
+MAX_SOURCE_BYTES = 2 * 1024 * 1024
+
+
 def analyze(path, lang):
     try:
+        if os.path.getsize(path) > MAX_SOURCE_BYTES:
+            return []
         with open(path, 'r', encoding='utf-8', errors='replace') as handle:
             raw = handle.read()
     except OSError:

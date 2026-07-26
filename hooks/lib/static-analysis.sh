@@ -10,6 +10,10 @@
 
 sa_analyze_file() {
     local file="$1"
+    # External tools read a leading dash as a flag, and the path charset allows
+    # one. Anchoring a relative path with ./ makes it unambiguously a path, so a
+    # file named "-c" or "--config" cannot become an option.
+    [[ "$file" == /* || "$file" == ./* ]] || file="./$file"
     local ext="${file##*.}"
     local lang=""
     case "$ext" in

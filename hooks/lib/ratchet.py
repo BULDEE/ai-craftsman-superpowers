@@ -25,6 +25,10 @@ import sys
 from pathlib import Path
 
 SUPPORTED_EXTS = {".php", ".ts", ".tsx", ".py", ".sh"}
+# Reading a file costs roughly five times its size in memory once split into
+# lines. A hostile repository can ship a 1 GB "source" file, and this runs on
+# every write: anything past this size is not code worth measuring.
+MAX_SOURCE_BYTES = 2 * 1024 * 1024
 BASELINE_NAME = ".craftsman-baseline.json"
 RATCHETED_METRICS = ["complexity", "file_lines", "max_fn_lines", "fan_out", "ignores"]
 
@@ -126,7 +130,12 @@ def _current_entry(file_path: Path):
 
 
 def _skipped(file_path: Path) -> bool:
-    return not file_path.is_file() or file_path.suffix not in SUPPORTED_EXTS
+    if not file_path.is_file() or file_path.suffix not in SUPPORTED_EXTS:
+        return True
+    try:
+        return file_path.stat().st_size > MAX_SOURCE_BYTES
+    except OSError:
+        return True
 
 
 def _cmd_measure(args) -> int:

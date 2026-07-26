@@ -14,6 +14,8 @@ import sys
 from pathlib import Path
 
 RESERVED = {"index.md", "log.md"}
+# Frontmatter lives in the first few lines; never read a whole file to find it.
+MAX_CONCEPT_BYTES = 1024 * 1024
 
 
 def _parse_frontmatter(text: str) -> dict:
@@ -38,6 +40,11 @@ def _parse_frontmatter(text: str) -> dict:
 def _concepts(bundle: Path):
     for path in sorted(bundle.rglob("*.md")):
         if path.name in RESERVED:
+            continue
+        try:
+            if path.stat().st_size > MAX_CONCEPT_BYTES:
+                continue
+        except OSError:
             continue
         fields = _parse_frontmatter(path.read_text(errors="ignore"))
         if fields:
