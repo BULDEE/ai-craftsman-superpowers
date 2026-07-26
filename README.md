@@ -224,7 +224,7 @@ Pragmatism over dogmatism: 80% coverage on critical paths beats 100% everywhere;
 
 Command hooks and reviewer agents are read-only except for the local metrics DB and session state. Agent hooks (Haiku) never modify files. Violations block (exit 2); bias detection only warns (exit 0).
 
-**No telemetry, no analytics, no phone-home.** With `agent_hooks: false` and no Sentry config, zero network activity. Edited file content only reaches the Anthropic API when `agent_hooks: true` (default); Sentry is only queried if configured; metrics and RAG embeddings never leave your machine. Full breakdown: [SECURITY.md](SECURITY.md#data--network-transparency).
+**No telemetry, no analytics, no phone-home.** With `agent_hooks: false` and no Sentry config, zero network activity. Edited file content only reaches the Anthropic API when `agent_hooks: true` (default); Sentry is only queried if configured; metrics never leave your machine. Full breakdown: [SECURITY.md](SECURITY.md#data--network-transparency).
 
 ### Pre-Installation Verification
 
@@ -244,7 +244,7 @@ grep -r "curl\|wget\|fetch\|http" hooks/
 
 **By design:** code rule violations block, bias detection only warns; no auto-commit; commands are explicitly invoked, never auto-triggered; methodology is opinionated (DDD/Clean Architecture).
 
-**Current constraints:** PHP/TypeScript get full rule coverage, other languages basic support only; RAG requires Ollama (no cloud embedding providers); bias detection patterns are EN/FR only; auto-fixing violations and IDE plugins are not supported by design.
+**Current constraints:** PHP/TypeScript get full rule coverage, other languages basic support only; bias detection patterns are EN/FR only; metrics are per-machine, not shared across a team; auto-fixing violations and IDE plugins are not supported by design.
 
 More detail in the [FAQ](FAQ.md).
 

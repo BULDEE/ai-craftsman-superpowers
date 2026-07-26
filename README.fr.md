@@ -224,7 +224,7 @@ Pragmatisme plutôt que dogmatisme : 80 % de couverture sur les chemins critique
 
 Les command hooks et agents reviewers sont en lecture seule, sauf pour la base de métriques locale et l'état de session. Les agent hooks (Haiku) ne modifient jamais de fichiers. Les violations bloquent (exit 2) ; la détection de biais avertit seulement (exit 0).
 
-**Pas de télémétrie, pas d'analytics, pas de phone-home.** Avec `agent_hooks: false` et sans config Sentry, zéro activité réseau. Le contenu des fichiers édités n'atteint l'API Anthropic que si `agent_hooks: true` (défaut) ; Sentry n'est interrogé que si configuré ; les métriques et embeddings RAG ne quittent jamais votre machine. Détail complet : [SECURITY.md](SECURITY.md#data--network-transparency).
+**Pas de télémétrie, pas d'analytics, pas de phone-home.** Avec `agent_hooks: false` et sans config Sentry, zéro activité réseau. Le contenu des fichiers édités n'atteint l'API Anthropic que si `agent_hooks: true` (défaut) ; Sentry n'est interrogé que si configuré ; les métriques ne quittent jamais votre machine. Détail complet : [SECURITY.md](SECURITY.md#data--network-transparency).
 
 ### Vérification avant installation
 
@@ -244,7 +244,7 @@ grep -r "curl\|wget\|fetch\|http" hooks/
 
 **Par conception :** les violations de règles de code bloquent, la détection de biais avertit seulement ; pas d'auto-commit ; les commandes sont explicitement invoquées, jamais auto-déclenchées ; la méthodologie est opinionated (DDD/Clean Architecture).
 
-**Contraintes actuelles :** PHP/TypeScript ont une couverture de règles complète, les autres langages n'ont qu'un support basique ; le RAG exige Ollama (aucun provider d'embeddings cloud) ; les patterns de détection de biais sont EN/FR uniquement ; la correction automatique des violations et les plugins IDE ne sont pas supportés par conception.
+**Contraintes actuelles :** PHP/TypeScript ont une couverture de règles complète, les autres langages n'ont qu'un support basique ; les métriques sont locales à la machine, pas partagées entre équipiers ; les patterns de détection de biais sont EN/FR uniquement ; la correction automatique des violations et les plugins IDE ne sont pas supportés par conception.
 
 Plus de détails dans la [FAQ](FAQ.md).
 

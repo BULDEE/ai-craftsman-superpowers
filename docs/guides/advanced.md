@@ -59,26 +59,72 @@ Claude asks:
 - Do you need source citations?
 ```
 
-**Phase 2 - Architecture Decision:**
+**Phase 2 - The decision before the components:**
+
+The first question is not which vector database. It is **whether to embed at
+all**. A vector store is a read model, and like any read model it needs a
+measured reason to exist - the same rule the persistence doctrine applies to a
+denormalised SQL table. Skipping this question is how teams end up maintaining
+an index lifecycle for a corpus that fits in a directory listing.
+
 ```
-COMPONENT DECISIONS:
+IS AN EMBEDDING INDEX JUSTIFIED?
 
-Vector DB: SQLite (in-memory search)
-REASON: <500 docs, simplicity
-TRADE-OFF: Won't scale past 10K
+Corpus is curated, stable, and named by humans
+  → Deterministic lookup. Match on frontmatter/tags, let the model read
+    the file. No index, no rebuild, no drift.
+  → This is what the plugin does with its own knowledge/ bundle.
 
-Embedding Model: nomic-embed-text (Ollama)
-REASON: Local, free, good quality
-TRADE-OFF: Slightly lower than OpenAI
+Queries are keyword-shaped over a mid-size corpus
+  → Lexical index (SQLite FTS5, ripgrep). Cheap, exact, debuggable.
 
-Chunking: Recursive, 512 tokens, 100 overlap
-REASON: Preserves context, good retrieval
-TRADE-OFF: More chunks = more storage
-
-Retrieval: Vector + Reranking
-REASON: High accuracy needed
-TRADE-OFF: Additional latency
+Corpus is large, heterogeneous, or churns; queries are fuzzy and
+paraphrased; users cannot name what they are looking for
+  → Embeddings earn their cost. Now pick the components.
 ```
+
+Only the third branch reaches component selection:
+
+```
+COMPONENT DECISIONS (third branch only):
+
+Vector DB: start with the store you already run (SQLite, pgvector)
+REASON: One less service; migrate when measurement says so
+TRADE-OFF: Re-platforming later costs a reindex
+
+Embedding Model: local (Ollama) vs hosted
+REASON: Local keeps private data in-house and costs nothing per query
+TRADE-OFF: A local model runtime is a dependency every install must carry
+
+Chunking: recursive, 512 tokens, 100 overlap
+REASON: Preserves context across boundaries
+TRADE-OFF: More chunks, more storage, more near-duplicate hits
+
+Retrieval: vector + reranking
+REASON: Reranking recovers the precision chunking loses
+TRADE-OFF: Additional latency per query
+```
+
+### Retrieval tiers in practice
+
+Real setups usually combine sources rather than picking one, because each
+answers a different kind of question:
+
+| Tier | Holds | Answers |
+|---|---|---|
+| Curated bundle (this plugin's `knowledge/`) | Doctrine you enforce, versioned in git, reviewed on write | "Which rule explains this block, and why does it exist?" |
+| Team vault (Obsidian or similar, MCP-connected) | Organisational context, decisions, meeting output | "What did we decide about this, and when?" |
+| Session memory (claude-mem or similar) | What happened in prior sessions | "What was I doing, and what did I already try?" |
+
+The plugin consumes these as-is and never re-indexes them: its bundle is plain
+Markdown on disk, so the same tools can read it too. See
+[ADR-0024](../adr/0024-okf-knowledge-bundle.md) for the reasoning, including
+why the plugin removed its own vector layer.
+
+> Beware the "format X replaces RAG" framing that circulates whenever a new
+> knowledge format ships. The Open Knowledge Format specification says nothing
+> about vectors. Retrieval architecture is decided by your corpus and your
+> queries, not by a format announcement.
 
 **Phase 3 - Implementation:**
 
@@ -307,56 +353,23 @@ bash ~/.claude/craftsman-knowledge.sh by-tag persistence
 
 To extend it, add a Markdown file with frontmatter under `knowledge/` (or your project's own bundle) and it becomes routable immediately: no re-indexing step exists because there is no index. Lesson 1 (RAG pipeline design) still applies when YOU build retrieval products; the plugin itself does not need one for 35 curated files.
 
-## Lesson 5: Extending MCP Server
+## Lesson 5: Extending the Plugin
 
-### Adding New Tools
+The plugin ships no MCP server as of v4.0.0 ([ADR-0024](../adr/0024-okf-knowledge-bundle.md)),
+so there is no server to extend and no build step to run. Extension happens
+through the plugin's own surfaces instead:
 
-Edit `ai-pack/mcp/knowledge-rag/src/tools/`:
+| You want to add | Where it goes | Picked up |
+|---|---|---|
+| A new workflow | `skills/<name>/SKILL.md` | `/reload-plugins` |
+| A new specialist | `agents/<name>.md` | `/reload-plugins` |
+| Language rules | `packs/<pack>/hooks/*-validator.sh` | Next hook run |
+| Reference material | `knowledge/<topic>.md` with frontmatter | Immediately, no indexing |
+| A whole language | A new pack - see [Creating Packs](../creating-packs.md) | Pack loader |
 
-```typescript
-// src/tools/summarize-source.ts
-export class SummarizeSourceTool {
-  static readonly schema = {
-    name: "summarize_source",
-    description: "Summarize a specific document from knowledge base",
-    inputSchema: {
-      type: "object",
-      properties: {
-        source: { type: "string", description: "Document name" }
-      },
-      required: ["source"]
-    }
-  };
+Each surface is validated in CI, so a malformed skill or agent fails the build
+rather than silently not loading.
 
-  execute(input: { source: string }): SummaryOutput {
-    const chunks = this.store.getChunksBySource(input.source);
-    return { summary: this.generateSummary(chunks) };
-  }
-}
-```
-
-### Registering Tools
-
-Edit `src/index.ts`:
-
-```typescript
-import { SummarizeSourceTool } from "./tools/summarize-source.js";
-
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: [
-    SearchKnowledgeTool.schema,
-    ListSourcesTool.schema,
-    SummarizeSourceTool.schema  // Add new tool
-  ]
-}));
-```
-
-### Rebuild and Test
-
-```bash
-npm run build
-# Restart Claude Code
-```
 
 ---
 

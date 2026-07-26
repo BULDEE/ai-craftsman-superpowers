@@ -11,12 +11,23 @@ The plugin uses Claude Code hooks to automatically enforce code quality rules. H
 | Event | Hook | Purpose |
 |-------|------|---------|
 | SessionStart | `session-start.sh` | Initialization, config loading, first-run detection |
+| PreToolUse | `config-protection.sh` | Refuse writes that would tamper with plugin configuration |
 | PreToolUse | `pre-write-check.sh` | Validate content **before** file write (layer violations) |
+| PreToolUse | `pre-push-verify.sh` | Validate git push commands for safety |
 | PostToolUse | `post-write-check.sh` | Validate file **after** write (all rules) |
+| PostToolUse | `post-bash-test-verify.sh` | Read recorded test runs; a failing run revokes verification evidence |
+| PostToolUseFailure | `tool-failure-tracker.sh` | Record failed tool calls for correction learning |
+| TaskCompleted | `task-completed-verify.sh` | Evidence gate: block a task from being marked complete without verification ([ADR-0023](../adr/0023-deterministic-verification-loop.md)) |
 | UserPromptSubmit | `bias-detector.sh` | Detect cognitive biases in prompts |
 | FileChanged | `file-changed.sh` | Track file modifications for correction learning |
-| PreToolUse | `pre-push-verify.sh` | Validate git push commands for safety |
+| SubagentStop | `subagent-quality-gate.sh` | Apply the quality gate to work produced by a subagent |
+| PreCompact | `pre-compact-save.sh` | Persist session state before context compaction |
+| PostCompact | `post-compact-verify.sh` | Restore and re-verify state after compaction |
 | SessionEnd | `session-metrics.sh` | Record session summary to metrics database |
+
+All 13 wired events are listed above. `exit 2` blocks the action; `exit 0`
+passes. Strictness (`strict` / `moderate` / `relaxed`) decides whether a given
+finding blocks or only warns.
 
 ### Agent Hooks (v1.3.0+)
 

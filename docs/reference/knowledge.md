@@ -18,7 +18,7 @@ Priority (highest to lowest):
 
 ## Core Knowledge
 
-Located in `core/knowledge/`
+Located in `knowledge/`
 
 ### principles.md
 
@@ -66,7 +66,7 @@ Event-Driven Architecture patterns (Martin Fowler):
 
 ## Symfony Pack Knowledge
 
-Located in `symfony-pack/knowledge/`
+Located in `packs/symfony/knowledge/`
 
 ### canonical/
 
@@ -89,7 +89,7 @@ What NOT to do:
 
 ## React Pack Knowledge
 
-Located in `react-pack/knowledge/`
+Located in `packs/react/knowledge/`
 
 ### canonical/
 
@@ -107,7 +107,7 @@ Located in `react-pack/knowledge/`
 
 ## AI Pack Knowledge
 
-Located in `ai-pack/knowledge/`
+Located in `packs/ai-ml/knowledge/`
 
 ### rag-architecture.md
 
@@ -170,8 +170,8 @@ Skills reference knowledge:
 ## Context
 
 Load knowledge from:
-- `core/knowledge/principles.md`
-- `ai-pack/knowledge/rag-architecture.md`
+- `knowledge/principles.md`
+- `packs/ai-ml/knowledge/rag-architecture.md`
 ```
 
 ### In Conversation

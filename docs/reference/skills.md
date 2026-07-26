@@ -268,23 +268,35 @@ Check security, tests, and style.
 
 ## Quick Reference Table
 
-| Command | Pack | Purpose |
-|---------|------|---------|
-| `/craftsman:design` | Core | DDD entity design |
-| `/craftsman:debug` | Core | Systematic debugging |
-| `/craftsman:test` | Core | Test strategy |
-| `/craftsman:refactor` | Core | Code improvement |
-| `/craftsman:plan` | Core | Task breakdown |
-| `/craftsman:challenge` | Core | Architecture review |
-| `/craftsman:spec` | Core | Specifications |
-| `/craftsman:git` | Core | Git operations |
-| `/craftsman:verify` | Core | Evidence-based verification |
-| `/craftsman:parallel` | Core | Parallel agent orchestration |
-| `/craftsman:scaffold` | Core | Unified scaffolder (entity, usecase, component, hook, api-resource, pack) |
-| `/craftsman:rag` | AI | RAG pipeline design |
-| `/craftsman:mlops` | AI | MLOps audit |
-| `/craftsman:agent-design` | AI | Agent design |
-| `/craftsman:metrics` | Utility | Quality metrics dashboard |
-| `/craftsman:setup` | Utility | Interactive setup wizard |
-| `/craftsman:team` | Core | Agent team management |
-| `/craftsman:ci` | Core | CI/CD quality gate export |
+Every skill declares the cheapest model tier that can do its job, and how hard
+that model should think. Both are enforced for the turn the skill runs in, so a
+review does not silently run on whatever model you happen to have selected. See
+[Model Tiering Explained](../guides/model-tiering-explained.md) for the
+reasoning and the four ways to override it.
+
+| Command | Pack | Purpose | Model | Effort |
+|---------|------|---------|-------|--------|
+| `/craftsman:design` | Core | DDD entity, value object, and aggregate design | `opus` | `high` |
+| `/craftsman:debug` | Core | Systematic debugging (ReAct) | `opus` | `high` |
+| `/craftsman:challenge` | Core | Architecture review and code challenge | `opus` | `high` |
+| `/craftsman:refactor` | Core | Refactoring with behaviour preservation | `opus` | `high` |
+| `/craftsman:plan` | Core | Task breakdown for multi-step work | `opus` | `xhigh` |
+| `/craftsman:legacy` | Core | Legacy rescue: hotspots, characterization tests, strangler-fig | `opus` | `xhigh` |
+| `/craftsman:team` | Core | Multi-agent orchestration | `opus` | `xhigh` |
+| `/craftsman:parallel` | Core | Parallel agent orchestration | `opus` | `xhigh` |
+| `/craftsman:spec` | Core | Specification-first development (BDD/TDD) | `sonnet` | `medium` |
+| `/craftsman:test` | Core | Test strategy and authoring | `sonnet` | `medium` |
+| `/craftsman:scaffold` | Core | Unified scaffolder (entity, usecase, component, hook, api-resource, pack) | `sonnet` | `medium` |
+| `/craftsman:workflow` | Core | Guided development pipeline | `sonnet` | `medium` |
+| `/craftsman:ci` | Core | CI/CD quality gate export | `sonnet` | `medium` |
+| `/craftsman:verify` | Core | Evidence-based verification | `haiku` | `low` |
+| `/craftsman:git` | Core | Git operations with destructive-command protection | `haiku` | `low` |
+| `/craftsman:rag` | AI | RAG pipeline design | `opus` | `xhigh` |
+| `/craftsman:mlops` | AI | MLOps production-readiness audit | `opus` | `xhigh` |
+| `/craftsman:agent-design` | AI | Agent design (3P pattern) | `opus` | `xhigh` |
+| `/craftsman:setup` | Utility | Interactive setup and onboarding | `sonnet` | `medium` |
+| `/craftsman:metrics` | Utility | Quality metrics and local dashboard | `haiku` | `low` |
+| `/craftsman:healthcheck` | Utility | Installation and runtime diagnostic | `haiku` | `low` |
+
+`session-init` is an internal skill (`haiku`) that loads craftsman context at
+session start; it is not invoked directly.

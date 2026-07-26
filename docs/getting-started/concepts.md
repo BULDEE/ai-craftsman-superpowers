@@ -41,8 +41,8 @@ This plugin encodes these practices into repeatable skills.
 │                              │                                      │
 │                              ↓                                      │
 │  ┌─────────────────────────────────────────────────────────────┐   │
-│  │                     MCP SERVERS                              │   │
-│  │              knowledge-rag (RAG search)                      │   │
+│  │                   KNOWLEDGE BUNDLE                           │   │
+│  │        curated, git-versioned, deterministic lookup          │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
@@ -111,32 +111,32 @@ This plugin encodes these practices into repeatable skills.
 - `ui-ux-director` - UX, WCAG 2.1 AA
 - `doc-writer` - Technical documentation (Haiku, cost-optimized)
 
-### 5. Hooks (8 events)
+### 5. Hooks (13 events)
 
 **What**: Automated validation running at key lifecycle events.
 
-**Command hooks** (shell scripts): validate code rules, detect biases, record metrics.
-**Agent hooks** (Haiku model): semantic DDD analysis, Sentry error context, project structure analysis, final architecture review.
+**Command hooks** (shell scripts): validate code rules, detect biases, record
+metrics, gate task completion on verification evidence.
+**Agent hooks** (Haiku model): semantic DDD analysis, Sentry error context,
+project structure analysis, final architecture review.
 
-See [Hooks Reference](../reference/hooks.md) for details.
+See [Hooks Reference](../reference/hooks.md) for the full event table.
 
-### 6. MCP Servers & Channels
+### 6. Channels
 
-**What**: External services that extend Claude's capabilities.
+**What**: External context sources the plugin reads from when they are configured.
 
-**knowledge-rag** (optional) - Semantic search over indexed PDFs:
+The plugin **ships no MCP server** as of v4.0.0
+([ADR-0024](../adr/0024-okf-knowledge-bundle.md)). The former `knowledge-rag`
+server was removed: the knowledge base is now a curated, git-versioned bundle
+with deterministic lookup, so there is no embedding pipeline, no local model
+runtime, and no background process to install. Your own memory tooling
+(Obsidian, claude-mem, any MCP-connected source) plugs into Claude Code
+directly and the plugin consumes it rather than duplicating it.
 
-```
-User: "What are the MLOps principles?"
-       ↓
-Claude calls: search_knowledge("MLOps principles")
-       ↓
-MCP Server: Returns relevant chunks from indexed PDFs
-       ↓
-Claude: Answers with grounded, accurate information
-```
-
-**Sentry** (channel, v1.4.0) - Error context injection from Sentry when editing files with known issues. Configured via `plugin.json` channels.
+**Sentry** (channel) - Error context injection from Sentry when editing files
+with known issues. Configured through the plugin's `sentry_org`,
+`sentry_project`, and `sentry_token` settings.
 
 ## The Bias Protection System
 

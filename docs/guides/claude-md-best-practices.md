@@ -283,9 +283,9 @@ make test-e2e      # E2E with Cypress
 │                                                                      │
 │  4. SKILL EXECUTION (e.g., /craftsman:scaffold entity)               │
 │     ├── Load SKILL.md instructions                                   │
-│     ├── MANDATORY: Read canonical examples                           │
-│     │   └── knowledge/canonical/php-entity.php                       │
-│     │   └── knowledge/canonical/php-value-object.php                 │
+│     ├── MANDATORY: Read the knowledge bundle                         │
+│     │   └── knowledge/ddd/  (entities, value objects, aggregates)     │
+│     │   └── packs/symfony/knowledge/  (stack-specific patterns)       │
 │     └── Generate code following patterns                             │
 │                                                                      │
 │  5. CODE WRITTEN                                                     │
@@ -353,7 +353,7 @@ Generate code matching canonical patterns
 ```markdown
 <!-- DON'T DO THIS - Plugin already handles it -->
 <references>
-  <canonical path="~/.claude/knowledge/canonical/">...</canonical>
+  <knowledge path="~/.claude/knowledge/">...</knowledge>
   <patterns path="~/.claude/knowledge/patterns.md">...</patterns>
 </references>
 
@@ -415,7 +415,7 @@ Generate code matching canonical patterns
 | Code rules (guide) | Global | `<must>final class</must>` |
 | Code rules (enforce) | Plugin | `post-write-check.sh` |
 | Design patterns | Plugin | `knowledge/patterns.md` |
-| Canonical examples | Plugin | `knowledge/canonical/` |
+| Reference patterns | Plugin | `knowledge/` bundle |
 | Skill definitions | Plugin | `skills/*/SKILL.md` |
 | Project architecture | Project | `./CLAUDE.md` |
 | Project-specific rules | Project | `./CLAUDE.md` |
