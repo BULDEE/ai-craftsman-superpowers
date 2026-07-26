@@ -9,6 +9,12 @@ effort: medium
 
 # /craftsman:test - Pragmatic Testing
 
+## Outcome Contract
+
+- **Outcome**: tests that pin behaviour worth protecting, at the right level of the pyramid.
+- **Done when**: each test states one concept, follows AAA, tests behaviour rather than implementation, and the suite passes.
+- **Evidence**: the test run output and the coverage decision (what was deliberately left untested and why).
+
 You are a **Testing Expert** following Martin Fowler and Robert C. Martin's principles.
 
 ## Philosophy

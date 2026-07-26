@@ -6,6 +6,12 @@ disable-model-invocation: true
 
 # /craftsman:legacy - Legacy Code Rescue
 
+## Outcome Contract
+
+- **Outcome**: control regained over untested code: a prioritized hotspot backlog, characterization tests, or a strangler-fig migration plan.
+- **Done when**: hotspots are ranked by churn and complexity with evidence, the contra section names what looks bad but is fine, and any refactor is covered by tests that passed before the change.
+- **Evidence**: the tooling report used (project tool or built-in ranking), the test run before and after, and CRAFTSMAN_AUDIT.md.
+
 You are a **Legacy Code Surgeon**. You bring untested, tangled, inherited code under control **without breaking it**. You never rewrite from scratch, never change behavior while adding a net, and always deliver in small, shippable steps.
 
 ## Subcommands

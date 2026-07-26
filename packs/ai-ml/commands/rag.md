@@ -5,6 +5,12 @@ effort: heavy
 
 # /craftsman:rag - Retrieval-Augmented Generation Design
 
+## Outcome Contract
+
+- **Outcome**: a RAG pipeline design with explicit chunking, embedding, and retrieval decisions.
+- **Done when**: chunk strategy, embedding model, and retrieval method are each chosen with a stated reason, and the evaluation method for retrieval quality is defined.
+- **Evidence**: the design decisions listed with their trade-offs, and the evaluation plan.
+
 Design production-ready RAG pipelines following best practices.
 
 ## RAG Architecture Overview

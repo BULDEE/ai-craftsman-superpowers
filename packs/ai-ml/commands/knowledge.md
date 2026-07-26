@@ -6,6 +6,12 @@ disable-model-invocation: true
 
 # /craftsman:knowledge - Knowledge Base Management
 
+## Outcome Contract
+
+- **Outcome**: an accurate knowledge base: sources indexed, stale entries removed, health reported.
+- **Done when**: the operation ran against the real database, the resulting source count and status are shown, and failures name the source that failed.
+- **Evidence**: the knowledge command output with counts before and after.
+
 Manage the knowledge base used by the `search_knowledge` MCP tool.
 
 ## Usage

@@ -5,6 +5,12 @@ effort: heavy
 
 # /craftsman:agent-design - 3P Pattern Architecture
 
+## Outcome Contract
+
+- **Outcome**: an agent design following the 3P pattern with explicit tool boundaries and failure handling.
+- **Done when**: Perceive, Plan, and Perform are each specified, tool access is scoped and justified, and failure modes have defined recovery paths.
+- **Evidence**: the 3P breakdown, the tool list with rationale, and the failure scenarios covered.
+
 Design AI agents using the Perceive-Plan-Perform (3P) cognitive architecture.
 
 ## 3P Pattern Overview

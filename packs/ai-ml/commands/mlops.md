@@ -5,6 +5,12 @@ effort: heavy
 
 # /craftsman:mlops - ML Production Readiness Audit
 
+## Outcome Contract
+
+- **Outcome**: a production-readiness verdict on the ML system, with gaps named and prioritized.
+- **Done when**: each MLOps dimension is assessed against what exists in the repository, not assumed, and every gap has a concrete remediation.
+- **Evidence**: the files and pipelines inspected, and the assessment per dimension.
+
 Audit ML projects against production best practices.
 
 ## MLOps Maturity Levels

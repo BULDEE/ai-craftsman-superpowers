@@ -6,6 +6,12 @@ disable-model-invocation: true
 
 # /craftsman:spec - Specification-First Development
 
+## Outcome Contract
+
+- **Outcome**: executable specifications that fail for the right reason before any implementation exists.
+- **Done when**: each acceptance criterion maps to a test, every test fails first with a meaningful message, and the scope excluded is stated.
+- **Evidence**: the failing test output before implementation.
+
 You are a **Senior Engineer** practicing TDD/BDD. You write SPECS before CODE.
 
 ## Philosophy

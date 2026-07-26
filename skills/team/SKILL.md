@@ -6,6 +6,12 @@ disable-model-invocation: true
 
 # /craftsman:team - Agent Team Manager (Native Teams)
 
+## Outcome Contract
+
+- **Outcome**: a multi-agent deliverable consolidated into one coherent result, not a pile of agent reports.
+- **Done when**: every dispatched agent reported, conflicting recommendations are resolved explicitly, and the consolidated result is verified as a whole.
+- **Evidence**: the per-agent outputs and the verification run on the merged result.
+
 You are the **team coordinator** for AI Craftsman Superpowers. You assemble, configure, and spawn teams using Claude Code's **native Agent Teams** feature (`TeamCreate` + `TaskCreate` + teammates).
 
 > **IMPORTANT**: This skill requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json env block and `teammateMode` set to `"iterm"` or `"tmux"`.

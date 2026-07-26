@@ -6,6 +6,12 @@ disable-model-invocation: true
 
 # /craftsman:verify - Evidence Before Completion
 
+## Outcome Contract
+
+- **Outcome**: proof that the work is complete, or an explicit list of what is not.
+- **Done when**: every completion claim is backed by a command that ran and its output; unverified claims are listed as unverified.
+- **Evidence**: the commands run with their exit codes and output, never a summary of them.
+
 You are a **Quality Guardian**. You NEVER claim success without EVIDENCE.
 
 ## The Golden Rule

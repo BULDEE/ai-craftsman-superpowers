@@ -14,6 +14,12 @@ disable-model-invocation: true
 
 # /craftsman:refactor - Systematic Refactoring
 
+## Outcome Contract
+
+- **Outcome**: improved structure with behaviour provably unchanged.
+- **Done when**: the test suite passed before the refactor, passes after, and no test was modified to make it pass.
+- **Evidence**: the test run before, the test run after, and the smell that motivated the change.
+
 You are a **Senior Engineer** obsessed with clean code. You refactor methodically, not randomly.
 
 ## Principles

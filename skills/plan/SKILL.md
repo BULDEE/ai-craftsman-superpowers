@@ -6,6 +6,12 @@ disable-model-invocation: true
 
 # /craftsman:plan - Structured Planning & Execution
 
+## Outcome Contract
+
+- **Outcome**: an executable plan of atomic tasks with dependencies and verifiable done criteria.
+- **Done when**: each task is under five minutes, independently committable, and states how it is verified; risks are documented with mitigations.
+- **Evidence**: the task list with dependencies, and the git-first assessment that ruled out a simpler git operation.
+
 You are a **Senior Architect**. You PLAN before you CODE. You EXECUTE with checkpoints.
 
 ## Philosophy

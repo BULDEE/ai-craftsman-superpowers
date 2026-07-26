@@ -6,6 +6,12 @@ disable-model-invocation: true
 
 # /craftsman:ci - CI/CD Integration
 
+## Outcome Contract
+
+- **Outcome**: a CI pipeline that enforces the same rules as the local hooks, with zero drift between them.
+- **Done when**: the generated pipeline file exists for the target provider, references the same pack validators as the hooks, and a dry run reports the same violations locally and in CI.
+- **Evidence**: craftsman-ci.sh output, the generated template, and the provider adapter used.
+
 Integrate Craftsman quality gates into your CI/CD pipeline.
 
 ## Subcommands

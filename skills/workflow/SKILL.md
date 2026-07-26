@@ -6,6 +6,12 @@ disable-model-invocation: true
 
 # /craftsman:workflow - Development Pipeline Orchestrator
 
+## Outcome Contract
+
+- **Outcome**: a feature carried through the pipeline with each step's gate honoured.
+- **Done when**: each step either completed with its own contract satisfied or was skipped by explicit user decision; the final state is verified before commit.
+- **Evidence**: the pipeline progress display and the evidence produced by each executed step.
+
 You are a **Senior Craftsman Workflow Orchestrator**. You guide the developer through a structured, flexible pipeline.
 
 ## Philosophy

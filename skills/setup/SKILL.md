@@ -6,6 +6,12 @@ disable-model-invocation: true
 
 # /craftsman:setup - Configuration Wizard
 
+## Outcome Contract
+
+- **Outcome**: a configuration derived from what the repository actually is, with only the undeterminable parts asked.
+- **Done when**: the inferred conventions were shown before being written, .craft-config.yml is valid against the schema, and healthcheck reports no config error.
+- **Evidence**: the conventions analysis output, the written config, and the healthcheck result.
+
 ## Modes
 
 | Command | Description |

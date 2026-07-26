@@ -130,7 +130,26 @@ test_skill_structure() {
         fi
     fi
 
-    # Test 5: context: fork requires an agent binding
+    # Test 5: Outcome Contract (Outcome / Done when / Evidence)
+    if grep -q "^## Outcome Contract" "$skill_file"; then
+        local contract_ok=true
+        for field in "Outcome" "Done when" "Evidence"; do
+            grep -q "^- \*\*${field}\*\*:" "$skill_file" || contract_ok=false
+        done
+        if [[ "$contract_ok" == true ]]; then
+            log_pass "Has complete Outcome Contract"
+        else
+            log_fail "Outcome Contract incomplete (needs Outcome, Done when, Evidence)"
+        fi
+    else
+        if [[ "$skill_name" == "session-init" ]]; then
+            log_skip "Outcome Contract (session-init exempt)"
+        else
+            log_fail "Missing '## Outcome Contract' section"
+        fi
+    fi
+
+    # Test 6: context: fork requires an agent binding
     if grep -q "^context: fork" "$skill_file"; then
         if grep -q "^agent:" "$skill_file"; then
             log_pass "Forked skill declares an 'agent' binding"

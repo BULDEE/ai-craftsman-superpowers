@@ -6,6 +6,12 @@ disable-model-invocation: true
 
 # /craftsman:scaffold - Unified Scaffolder
 
+## Outcome Contract
+
+- **Outcome**: generated code that already satisfies the active rules, not a template to fix afterwards.
+- **Done when**: the generated files pass the quality gate on write, the template variant was chosen deliberately, and the code compiles or lints clean.
+- **Evidence**: the hook output on the generated files and the variant selected.
+
 ## Project Context
 
 Use the **Read** tool to read `.craft-config.yml`. If the file does not exist, say "No config found. Run /craftsman:setup first."

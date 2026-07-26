@@ -6,6 +6,12 @@ disable-model-invocation: true
 
 # /craftsman:parallel - Agent Orchestration
 
+## Outcome Contract
+
+- **Outcome**: independent tasks completed concurrently without shared-state conflicts.
+- **Done when**: each task touched a disjoint file set, every agent reported back, and the aggregated result is verified as a whole.
+- **Evidence**: the per-agent reports and the combined test run after aggregation.
+
 You are a **Senior Architect** orchestrating multiple agents. You PARALLELIZE independent work for maximum efficiency.
 
 ## Philosophy

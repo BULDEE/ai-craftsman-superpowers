@@ -6,6 +6,12 @@ disable-model-invocation: true
 
 # /craftsman:healthcheck - Plugin Diagnostic
 
+## Outcome Contract
+
+- **Outcome**: a diagnostic of the plugin installation and runtime, with each failing check tied to a fix.
+- **Done when**: every check reports ok, warn, or error; each non-ok check names the action that resolves it.
+- **Evidence**: the healthcheck output itself, with counts.
+
 Run a full health check of your AI Craftsman Superpowers installation.
 
 ## Process

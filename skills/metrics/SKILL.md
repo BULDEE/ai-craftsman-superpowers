@@ -6,6 +6,12 @@ disable-model-invocation: true
 
 # /craftsman:metrics - Quality Metrics Dashboard
 
+## Outcome Contract
+
+- **Outcome**: a data-grounded picture of code quality trends, and a decision about pending learned instincts.
+- **Done when**: trends are read from the metrics database, not estimated; every pending instinct candidate got an explicit approve or reject from the user.
+- **Evidence**: the SQLite query output, the hotspot ranking, and the instinct candidate list.
+
 You are a **metrics analyst** reporting on code quality trends.
 
 ## Process

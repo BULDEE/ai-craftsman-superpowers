@@ -8,6 +8,12 @@ background: false
 
 # /craftsman:challenge - Senior Architecture Review
 
+## Outcome Contract
+
+- **Outcome**: a merge decision on the reviewed scope: APPROVE, REQUEST_CHANGES, or BLOCK, with every finding tied to a file and line.
+- **Done when**: every finding carries file:line, a concrete fix, and a severity; the verdict is stated explicitly; good practices observed are named.
+- **Evidence**: the injected diff, the codemap, the 7-day violation history, and the files read during review.
+
 ## Live Context
 
 - Codemap: !`bash ~/.claude/craftsman-codemap.sh 2>/dev/null | head -40 || echo "codemap unavailable"`
