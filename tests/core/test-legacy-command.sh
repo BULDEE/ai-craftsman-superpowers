@@ -27,7 +27,7 @@ fi
 head -1 "$LEGACY_CMD" | grep -q '^---$' && log_pass "has YAML frontmatter" || log_fail "missing frontmatter"
 grep -q '^description:' "$LEGACY_CMD" && log_pass "has description" || log_fail "missing description"
 grep -q '^effort:' "$LEGACY_CMD" && log_pass "has effort" || log_fail "missing effort"
-grep -q '^effort: heavy' "$LEGACY_CMD" && log_pass "effort is heavy" || log_fail "effort should be heavy"
+grep -q '^effort: xhigh' "$LEGACY_CMD" && log_pass "effort is xhigh" || log_fail "effort should be xhigh"
 
 # --- The 4 modes ---
 for mode in audit cover untangle migrate; do

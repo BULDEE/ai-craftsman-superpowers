@@ -758,17 +758,31 @@ else
     log_fail "output-styles" "directory should not exist in v4"
 fi
 
-# Test: All agents have effort field in plugin.json
+# Test: every agent declares a valid effort level.
+# Agents carry effort in their own frontmatter, not in plugin.json - an earlier
+# version of this test read a plugin.json key that does not exist, so it passed
+# vacuously. Valid values are Claude Code's effort levels.
 if python3 -c "
-import json
-d = json.load(open('$ROOT_DIR/.claude-plugin/plugin.json'))
-agents = d.get('agents', {})
-missing = [n for n, a in agents.items() if 'effort' not in a]
-assert not missing, f'Agents missing effort field: {missing}'
+import glob, os, sys
+
+invalid = []
+for path in sorted(glob.glob('$ROOT_DIR/agents/*.md')):
+    lines = open(path).read().splitlines()
+    if not lines or lines[0] != '---':
+        continue
+    end = next((i for i, l in enumerate(lines[1:], 1) if l == '---'), None)
+    effort = next(
+        (l.split(':', 1)[1].strip() for l in lines[1:end] if l.startswith('effort:')),
+        None,
+    )
+    if effort not in {'low', 'medium', 'high', 'xhigh', 'max'}:
+        invalid.append(f'{os.path.basename(path)}={effort}')
+
+assert not invalid, f'Invalid or missing agent effort: {invalid}'
 " 2>/dev/null; then
-    log_pass "All 11 agents have effort field in plugin.json"
+    log_pass "All agents declare a valid effort level"
 else
-    log_fail "Agent effort fields" "some agents missing effort"
+    log_fail "Agent effort levels" "invalid or missing effort in agents/*.md"
 fi
 
 # =============================================================================

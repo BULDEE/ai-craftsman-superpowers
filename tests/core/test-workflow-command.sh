@@ -43,10 +43,10 @@ else
 fi
 
 effort_val=$(grep '^effort:' "$WORKFLOW_CMD" | head -1 | sed 's/effort: *//')
-if [[ "$effort_val" =~ ^(quick|medium|heavy)$ ]]; then
+if [[ "$effort_val" =~ ^(low|medium|high|xhigh|max)$ ]]; then
     log_pass "effort is valid: $effort_val"
 else
-    log_fail "invalid effort value: $effort_val" "must be quick|medium|heavy"
+    log_fail "invalid effort value: $effort_val" "must be low|medium|high|xhigh|max"
 fi
 
 # --- No name field (per plugin convention) ---

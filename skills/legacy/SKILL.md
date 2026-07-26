@@ -1,6 +1,7 @@
 ---
+model: opus
 description: Legacy code rescue - audit hotspots, cover with characterization tests, break dependencies, and plan strangler-fig migrations. Use when inheriting, taming, testing, or refactoring an untested/undocumented codebase.
-effort: heavy
+effort: xhigh
 disable-model-invocation: true
 ---
 

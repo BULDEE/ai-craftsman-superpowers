@@ -1,6 +1,7 @@
 ---
+model: opus
 description: Design RAG (Retrieval-Augmented Generation) pipelines. Use when building knowledge bases, document Q&A, or semantic search systems.
-effort: heavy
+effort: xhigh
 ---
 
 # /craftsman:rag - Retrieval-Augmented Generation Design

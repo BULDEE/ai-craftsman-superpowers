@@ -1,6 +1,7 @@
 ---
+model: haiku
 description: "Quality metrics and local dashboard. Use when reviewing violation trends, session history, correction patterns, or rendering the aggregated multi-repository dashboard (--dashboard)."
-effort: quick
+effort: low
 disable-model-invocation: true
 ---
 

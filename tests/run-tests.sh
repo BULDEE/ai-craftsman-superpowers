@@ -114,13 +114,16 @@ test_skill_structure() {
         log_fail "Missing 'description' field"
     fi
 
-    # Test 4: Has effort field (project convention, session-init exempt)
+    # Test 4: Has effort field (session-init exempt).
+    # Values are Claude Code's own effort levels: the key is read from the
+    # frontmatter and overrides the session effort level, so anything outside
+    # this set is not a naming preference, it is an unrecognised value.
     if grep -q "^effort:" "$skill_file"; then
         local effort=$(grep "^effort:" "$skill_file" | head -1 | cut -d: -f2 | tr -d ' ')
-        if [[ "$effort" =~ ^(quick|medium|heavy)$ ]]; then
+        if [[ "$effort" =~ ^(low|medium|high|xhigh|max)$ ]]; then
             log_pass "Has valid 'effort' field: $effort"
         else
-            log_fail "Invalid effort value: $effort (must be quick|medium|heavy)"
+            log_fail "Invalid effort value: $effort (must be low|medium|high|xhigh|max)"
         fi
     else
         if [[ "$skill_name" == "session-init" ]]; then
@@ -128,6 +131,22 @@ test_skill_structure() {
         else
             log_fail "Missing 'effort' field"
         fi
+    fi
+
+    # Test 4b: Declares a model tier.
+    # Every skill picks the cheapest tier that can do its job, so a missing
+    # 'model' is a regression: the skill would silently run on whatever the
+    # session happens to be set to, which is the behaviour the tiering exists
+    # to prevent. Aliases only - a pinned id would not follow model releases.
+    if grep -q "^model:" "$skill_file"; then
+        local model=$(grep "^model:" "$skill_file" | head -1 | cut -d: -f2 | tr -d ' ')
+        if [[ "$model" =~ ^(haiku|sonnet|opus|best|fable)$ ]]; then
+            log_pass "Has valid 'model' tier: $model"
+        else
+            log_fail "Invalid model tier: $model (must be haiku|sonnet|opus|best|fable)"
+        fi
+    else
+        log_fail "Missing 'model' field (every skill declares its tier)"
     fi
 
     # Test 5: Outcome Contract (Outcome / Done when / Evidence)

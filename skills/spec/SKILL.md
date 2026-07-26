@@ -1,4 +1,5 @@
 ---
+model: sonnet
 description: Specification-first development (BDD/TDD). Use when implementing new features, creating new components, or when requirements need clarification through tests.
 effort: medium
 disable-model-invocation: true

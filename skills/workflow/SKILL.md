@@ -1,4 +1,5 @@
 ---
+model: sonnet
 description: "Flexible development pipeline. Use when starting a new feature, fixing a complex bug, or when you want guided step-by-step methodology: design -> spec -> plan -> implement -> test -> verify -> commit."
 effort: medium
 disable-model-invocation: true

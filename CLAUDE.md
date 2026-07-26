@@ -15,7 +15,7 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
 - The `metrics-query.py` helper MUST be used for all SQLite writes (parameterized queries). NEVER use string interpolation in SQL.
 - All writes to `session-state.json` MUST use atomic writes (`tempfile.mkstemp() + os.rename()`). Known TOCTOU window between read and rename when multiple async hooks fire simultaneously - acceptable at current hook frequencies but do not add file-locking without benchmarking first.
 - CI adapters follow the `adapter_detect/run/annotate/comment/exit` interface.
-- All commands MUST have `description`, `effort` (quick/medium/heavy) in frontmatter.
+- All commands MUST have `description`, `effort` in frontmatter. `effort` is Claude Code's own frontmatter key, not project metadata: it overrides the session effort level, so only `low`, `medium`, `high`, `xhigh`, `max` are valid.
 - Templates MUST have: top-level heading, `## Mission` section, `## Context Files` section.
 
 ## Testing

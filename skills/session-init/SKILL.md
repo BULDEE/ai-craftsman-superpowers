@@ -1,5 +1,6 @@
 ---
 name: session-init
+model: haiku
 description: Internal skill for session initialization. Loads craftsman context and checks configuration.
 disable-model-invocation: true
 ---

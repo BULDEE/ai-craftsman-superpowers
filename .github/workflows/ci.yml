@@ -368,13 +368,16 @@ jobs:
               echo "  ○ No 'name' field (defaults to '$skill_name')"
             fi
 
-            # 'model' is optional too. Validate the value only when declared.
+            # 'model' is optional. When declared it must be an alias Claude Code
+            # accepts, 'inherit', or a full model id. Aliases track the newest
+            # model of their family, so they survive model releases; a pinned id
+            # does not, which is why the plugin's own skills use aliases.
             if grep -q "^model:" <<< "$frontmatter"; then
               model=$(grep "^model:" <<< "$frontmatter" | head -1 | cut -d: -f2 | tr -d ' ')
-              if [[ "$model" =~ ^(haiku|sonnet|opus|inherit)$ ]]; then
+              if [[ "$model" =~ ^(default|best|fable|opus|sonnet|haiku|opusplan|inherit|opus\[1m\]|sonnet\[1m\]|claude-[a-z0-9.-]+)$ ]]; then
                 echo "  ✓ Has valid 'model' field: $model"
               else
-                echo "  ✗ Invalid model value: $model (must be haiku|sonnet|opus|inherit)"
+                echo "  ✗ Invalid model value: $model"
                 local_failed=1
               fi
             else

@@ -324,94 +324,117 @@ Model tiering puts **expensive capability where it matters** (architecture/plann
 
 ---
 
-## How to Interpret Tiering in Commands
+## The Assignment
 
-When you see command documentation:
+Every skill declares its tier in its own frontmatter. `model` picks the model,
+`effort` picks how hard that model thinks. The two are set together: a cheap
+model at high effort is usually worse value than the next model up.
 
-```markdown
-# /craftsman:design
+| Tier | Effort | Skills | Why this tier |
+|---|---|---|---|
+| `haiku` | `low` | `verify`, `git`, `metrics`, `healthcheck`, `session-init` | Mechanical. Run a command, read the exit code, format the result. No design judgment involved, so a larger model buys nothing. |
+| `sonnet` | `medium` | `spec`, `test`, `scaffold`, `ci`, `setup`, `workflow` | Applying a known pattern within a bounded scope, or walking the user through a guided flow. |
+| `opus` | `high` | `design`, `challenge`, `debug`, `refactor` | Judgment calls with consequences: aggregate boundaries, root causes, behaviour-preserving refactors. Reasoning that spans files. |
+| `opus` | `xhigh` | `plan`, `legacy`, `team`, `parallel`, `agent-design`, `rag`, `mlops` | Same reasoning, sustained over long horizons: campaigns, orchestration, pipeline architecture. |
 
-model: sonnet
-effort: medium
+Reading a declaration:
+
+```yaml
+# skills/design/SKILL.md
+model: opus
+effort: high
 ```
 
-This means:
-- Uses Sonnet model
-- Takes 2-5 minutes typically
-- Cost: $0.008 per use
-- Good for code generation and reasoning
+`high` is Claude Code's *default* effort, so declaring it is an explicit
+statement rather than a change. `xhigh` is genuinely above the default;
+`medium` and `low` sit below it and are the token-saving settings.
+
+### Why aliases and not model ids
+
+Every tier is an alias (`haiku`, `sonnet`, `opus`), never a pinned id like
+`claude-opus-5`. Aliases resolve to the newest model in their family, so the
+plugin follows model releases without a version bump. It also makes the tiering
+remappable - see Overriding below.
+
+Aliases resolve per provider: on the Anthropic API `opus` is Opus 5 and
+`sonnet` is Sonnet 5, but on Microsoft Foundry `opus` is Opus 4.6. The tier is
+a statement about *capability class*, not about a specific model.
+
+### Where Fable 5 fits
+
+Fable 5 is the most capable tier and the natural fit for `legacy`, `team`, and
+`parallel` - work that runs longer than a single sitting. It is deliberately
+**not** the default on them, for three reasons:
+
+- It costs $10/$50 per MTok against Opus 5's $5/$25. Defaulting the longest-running
+  skills to the most expensive tier is the opposite of what tiering is for.
+- It is unavailable under zero data retention, so a `fable` pin would hard-fail
+  for those organisations.
+- Opus 5 is genuinely strong on this work - it is the documented workhorse for
+  agentic and multi-file tasks.
+
+If you want it on those three, `best` is the value to use rather than `fable`:
+it selects Fable 5 where your organisation has access and falls back to the
+latest Opus everywhere else.
 
 ---
 
-## When to Override Tiering
+## Overriding the tiering
 
-### Use Haiku When Sonnet is Overkill
+The tiering is enforced, not advisory: a skill's `model` wins over whatever
+`/model` is set to, for the turn it runs in. That is the point - it is what
+stops a review running on the most expensive tier you happen to have selected.
+The session model returns on your next prompt.
 
-**Don't do:**
-```bash
-/craftsman:design
-> Just add a simple getter method to User class
-```
+You stay in control through four mechanisms, from broadest to narrowest.
 
-**Do:**
-```bash
-/craftsman:scaffold
-> Add getter method to User class. Minimal context needed.
-# Sonnet is still more efficient for this
-```
+### 1. Remap a whole tier (recommended)
 
-### Force Opus When Judgment is Critical
-
-Default commands use Sonnet, but you can optionally request Opus:
+Because every tier is an alias, you decide what each alias resolves to:
 
 ```bash
-/craftsman:challenge --model=opus
-> Architecture review for our payment system
+# Every `model: opus` skill now runs Fable 5
+export ANTHROPIC_DEFAULT_OPUS_MODEL=claude-fable-5
+
+# Or the other way: cap the opus tier at Sonnet for a cost-sensitive project
+export ANTHROPIC_DEFAULT_OPUS_MODEL=claude-sonnet-5
 ```
 
-Use when:
-- Payment processing (critical security)
-- Multi-year strategic decision
-- Security-sensitive components
-- Million-dollar business logic
+`ANTHROPIC_DEFAULT_SONNET_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL`, and
+`ANTHROPIC_DEFAULT_FABLE_MODEL` work the same way. This is the cleanest lever:
+it moves an entire tier at once and needs no changes to the plugin.
 
-### Downgrade to Haiku When Speed Matters
+### 2. Replace an agent outright
 
-Real-time validation in hooks uses Haiku automatically:
-- On file save
-- On git commit
-- On session start
+Project and user `.claude/agents/<name>.md` definitions **override same-named
+plugin agents**. Copy the agent you want to change, edit its `model`, and yours
+wins:
 
-This keeps IDE latency low.
-
----
-
-## Configuration
-
-Model tiering is configured in `CLAUDE.md` and `plugin.json`:
-
-```yaml
-# Plugin config
-commands:
-  design:
-    model: sonnet
-  scaffold:
-    model: sonnet
-  challenge:
-    model: opus
-  verify:
-    model: haiku
-  git:
-    model: haiku
+```bash
+mkdir -p .claude/agents
+cp "$CLAUDE_PLUGIN_ROOT/agents/architect.md" .claude/agents/architect.md
+# edit the model: line - your definition now takes precedence
 ```
 
-Override in project `.craft-config.yml`:
-```yaml
-# Downgrade challenge to sonnet for cost savings
-overrides:
-  challenge:
-    model: sonnet
-```
+### 3. Shadow a skill
+
+Plugin skills are namespaced, so a local copy does not replace them; it sits
+alongside. Copy the skill to `.claude/skills/<name>/SKILL.md` and you get an
+unnamespaced `/design` with your tier, next to the plugin's
+`/craftsman:design`. Use whichever fits the task.
+
+### 4. Pick a different skill
+
+Often the right answer is not overriding a tier but choosing the skill whose
+tier already matches the job. Adding a getter does not need `/craftsman:design`
+at the `opus` tier - `/craftsman:scaffold` at `sonnet` is the tool for it.
+
+### What hooks do
+
+Real-time validation on file save, commit, and session start always runs on
+Haiku regardless of session model, which is what keeps editor latency low.
+Model-based verification can be turned off entirely with the `agent_hooks`
+plugin setting.
 
 ---
 

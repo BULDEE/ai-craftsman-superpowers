@@ -1,6 +1,7 @@
 ---
+model: opus
 description: Systematic debugging using ReAct pattern. Use when encountering bugs, errors, unexpected behavior, test failures, or performance issues. Never guess - investigate methodically.
-effort: medium
+effort: high
 ---
 
 # /craftsman:debug - Systematic Investigation
