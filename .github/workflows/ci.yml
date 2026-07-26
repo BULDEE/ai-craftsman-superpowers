@@ -339,39 +339,46 @@ jobs:
             fi
             echo "  ✓ Has YAML frontmatter"
 
+            # Only the frontmatter block counts. Skill bodies contain YAML
+            # examples whose keys would otherwise be read as declared fields.
+            local frontmatter
+            frontmatter=$(awk 'NR==1 && $0=="---" {f=1; next} f && $0=="---" {exit} f' "$skill_file")
+
             local local_failed=0
 
-            # Check required fields
-            if ! grep -q "^name:" "$skill_file"; then
-              echo "  ✗ Missing 'name' field"
-              local_failed=1
-            else
-              echo "  ✓ Has 'name' field"
-            fi
-
-            if ! grep -q "^description:" "$skill_file"; then
+            # description is what Claude matches a skill on, so it stays required.
+            if ! grep -q "^description:" <<< "$frontmatter"; then
               echo "  ✗ Missing 'description' field"
               local_failed=1
             else
               echo "  ✓ Has 'description' field"
             fi
 
-            # Check model field (except session-init)
-            if [ "$skill_name" != "session-init" ]; then
-              if grep -q "^model:" "$skill_file"; then
-                model=$(grep "^model:" "$skill_file" | head -1 | cut -d: -f2 | tr -d ' ')
-                if [[ "$model" =~ ^(haiku|sonnet|opus)$ ]]; then
-                  echo "  ✓ Has valid 'model' field: $model"
-                else
-                  echo "  ✗ Invalid model value: $model (must be haiku|sonnet|opus)"
-                  local_failed=1
-                fi
+            # 'name' is optional: Claude Code falls back to the directory name.
+            # When it is set, a mismatch changes how the skill is invoked.
+            if grep -q "^name:" <<< "$frontmatter"; then
+              declared_name=$(grep "^name:" <<< "$frontmatter" | head -1 | cut -d: -f2- | tr -d ' "'"'"'')
+              if [ "$declared_name" = "$skill_name" ]; then
+                echo "  ✓ Has 'name' field matching the directory"
               else
-                echo "  ✗ Missing 'model' field"
+                echo "  ✗ 'name' is '$declared_name' but the directory is '$skill_name'"
                 local_failed=1
               fi
             else
-              echo "  ○ 'model' field skipped (session-init exempt)"
+              echo "  ○ No 'name' field (defaults to '$skill_name')"
+            fi
+
+            # 'model' is optional too. Validate the value only when declared.
+            if grep -q "^model:" <<< "$frontmatter"; then
+              model=$(grep "^model:" <<< "$frontmatter" | head -1 | cut -d: -f2 | tr -d ' ')
+              if [[ "$model" =~ ^(haiku|sonnet|opus|inherit)$ ]]; then
+                echo "  ✓ Has valid 'model' field: $model"
+              else
+                echo "  ✗ Invalid model value: $model (must be haiku|sonnet|opus|inherit)"
+                local_failed=1
+              fi
+            else
+              echo "  ○ No 'model' field (inherits the session model)"
             fi
 
             return $local_failed
