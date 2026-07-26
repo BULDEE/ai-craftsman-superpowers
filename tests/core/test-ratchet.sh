@@ -219,11 +219,29 @@ final class Gate {
 }
 PHP
 
+# Default: advisory even in strict mode, while the metric core is validated
+EXIT_CODE=0
+OUT=$(echo "{\"tool_input\":{\"file_path\":\"$WORK3/src/Gate.php\"}}" | \
+    CLAUDE_PLUGIN_ROOT="$ROOT_DIR" bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1) || EXIT_CODE=$?
+if [[ $EXIT_CODE -eq 0 ]] && echo "$OUT" | grep -q "RATCHET001"; then
+    log_pass "default: regression warns without blocking (advisory period)"
+else
+    log_fail "advisory default" "exit=$EXIT_CODE out=$(echo "$OUT" | head -4)"
+fi
+
+# Explicit opt-in: RATCHET001: block makes it a hard gate
+cat > .craft-config.yml <<'YAML'
+v: 4
+strictness: strict
+stack: symfony
+rules:
+  RATCHET001: block
+YAML
 EXIT_CODE=0
 OUT=$(echo "{\"tool_input\":{\"file_path\":\"$WORK3/src/Gate.php\"}}" | \
     CLAUDE_PLUGIN_ROOT="$ROOT_DIR" bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1) || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 2 ]] && echo "$OUT" | grep -q "RATCHET001"; then
-    log_pass "strict mode: structural regression blocks with RATCHET001"
+    log_pass "explicit opt-in: RATCHET001 block stops the regression"
 else
     log_fail "gate block" "exit=$EXIT_CODE out=$(echo "$OUT" | head -4)"
 fi

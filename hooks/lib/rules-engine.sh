@@ -280,6 +280,10 @@ _rules_validate_custom() {
 _rules_is_advisory() {
     case "$1" in
         WARN*|PHP005|NEST001|LOC001|GOD001|PARAM001|CTRL001) return 0 ;;
+        # RATCHET001 ships advisory while the metric core is validated against
+        # real work (ADR-0025). Set `RATCHET001: block` in .craft-config.yml to
+        # opt in early; the default escalates once a full cycle runs clean.
+        RATCHET001) return 0 ;;
     esac
     return 1
 }

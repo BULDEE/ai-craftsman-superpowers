@@ -320,7 +320,7 @@ _should_block() {
         esac
         case "$STRICTNESS" in
             strict)   return 0 ;;
-            moderate) [[ "$rule" == LAYER* || "$rule" == RATCHET* || "$rule" == SEC* ]] && return 0; return 1 ;;
+            moderate) [[ "$rule" == LAYER* || "$rule" == SEC* ]] && return 0; return 1 ;;
             relaxed)  return 1 ;;
             *)        return 0 ;;
         esac

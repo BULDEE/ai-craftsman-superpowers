@@ -18,6 +18,8 @@ cat > .craft-config.yml <<'YAML'
 v: 4
 strictness: strict
 stack: symfony
+rules:
+  RATCHET001: block
 YAML
 
 cat > src/Ok.php <<'PHP'
