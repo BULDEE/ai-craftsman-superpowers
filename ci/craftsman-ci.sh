@@ -67,6 +67,28 @@ if [[ "${1:-}" == "ci" ]]; then
     exit "$exit_code"
 fi
 
+if [[ "${1:-}" == "export" ]]; then
+    shift
+    EXPORT_TARGET="agents-md"
+    if [[ "${1:-}" == "--target" ]]; then
+        EXPORT_TARGET="${2:-agents-md}"
+    fi
+    # The doctrine is rendered FROM the rules engine, so it must be resolved
+    # first: without it every rule falls back to its default severity and the
+    # exported files would contradict what the gate actually enforces.
+    EXPORT_PLUGIN_ROOT="$(dirname "$SCRIPT_DIR")"
+    if [[ -f "$EXPORT_PLUGIN_ROOT/hooks/lib/config.sh" ]]; then
+        source "$EXPORT_PLUGIN_ROOT/hooks/lib/config.sh"
+    fi
+    if [[ -f "$EXPORT_PLUGIN_ROOT/hooks/lib/rules-engine.sh" ]]; then
+        source "$EXPORT_PLUGIN_ROOT/hooks/lib/rules-engine.sh"
+        rules_init "$PWD" "${HOME:-}" 2>/dev/null || true
+    fi
+    source "${SCRIPT_DIR}/doctrine-export.sh"
+    doctrine_export "$EXPORT_TARGET"
+    exit $?
+fi
+
 if [[ "${1:-}" == "init" ]]; then
     shift
     INIT_PROVIDER="github"
@@ -128,10 +150,12 @@ Usage:
   craftsman-ci [--format json|text] [--config FILE] [paths...]
   craftsman-ci ci [--provider github|gitlab|bitbucket|generic] [--config FILE] [paths...]
   craftsman-ci init [--provider github|gitlab|bitbucket|jenkins]
+  craftsman-ci export [--target agents-md|cursor|copilot|all]
 
 Subcommands:
   ci        Run full CI adapter lifecycle (scan, annotate, comment, exit)
   init      Generate CI template for the specified provider
+  export    Render the active rules as agent instruction files (AGENTS.md and friends)
 
 Options:
   --format json|text    Output format (default: text)

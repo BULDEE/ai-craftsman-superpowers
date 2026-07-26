@@ -80,3 +80,16 @@ Run /craftsman:ci export to generate the workflow if missing.
 - The exported workflow uses the same rules as the hooks; they must never diverge.
 - If `ci/craftsman-ci.sh` is not present, warn the user - the workflow depends on it.
 - All shell commands use `|| true` for optional tools (PHPStan, ESLint, deptrac) so the workflow degrades gracefully.
+
+## Cross-Harness Doctrine Export
+
+Teammates using Copilot, Cursor, Codex, Gemini, or Antigravity cannot run craftsman hooks, but they can read instruction files. Export the active rules as those files so the doctrine travels with the repository:
+
+```bash
+craftsman-ci export --target agents-md   # AGENTS.md (read by most agents)
+craftsman-ci export --target cursor      # .cursor/rules/craftsman.mdc
+craftsman-ci export --target copilot     # .github/copilot-instructions.md
+craftsman-ci export --target all
+```
+
+The rules engine remains the single source of truth: severity overrides and ignored rules in `.craft-config.yml` are reflected in the generated files, which carry a do-not-edit header and are regenerated (not hand-maintained). Enforcement is unchanged: hooks locally where craftsman runs, `craftsman-ci` in the pipeline for everyone else. Commit the generated files and re-run the export whenever the rules change.

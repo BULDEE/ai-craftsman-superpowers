@@ -220,3 +220,11 @@ const data = legacyApi() as any; // craftsman-ignore: no-any
 ```
 
 Note: `craftsman-ignore` suppresses inline violations. File-level rules (like PHP001) require fixing the actual issue.
+
+## Cross-Harness Doctrine Export
+
+`craftsman-ci export` renders the active rules as agent instruction files: `AGENTS.md` (the format most agents read), `.cursor/rules/craftsman.mdc`, and `.github/copilot-instructions.md`. Targets: `agents-md`, `cursor`, `copilot`, `all`.
+
+The files are generated from the rules engine, so they always match what the gate enforces: a rule set to `ignore` disappears from them, a rule downgraded to `warn` is labelled as such. They carry a do-not-edit header and re-export is byte-stable, so committing them produces no git churn.
+
+This extends the doctrine to teammates whose harness cannot run craftsman hooks. It does not extend enforcement: those contributors are still gated by `craftsman-ci` in the pipeline, which runs the same validators as the local hooks.
