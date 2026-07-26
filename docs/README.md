@@ -17,6 +17,7 @@
 ## Playbooks
 
 - [Legacy Rescue Playbook](./guides/legacy-rescue.md) - regain control of an untested, inherited codebase with `/craftsman:legacy`
+- [Level 1.5: LSP-Backed Semantic Validation](./guides/semantic-level-1-5.md) - live code intelligence between the regex gate and static analysis
 
 ## Reference Documentation
 

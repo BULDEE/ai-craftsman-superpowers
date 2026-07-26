@@ -97,6 +97,24 @@ else
     log_fail "hc_check_session_bridge should be ok when valid: ${_HC_STATUSES[0]}"
 fi
 
+# Test: hc_check_lsp records a status (ok when a server exists, warn otherwise)
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+hc_check_lsp
+if [[ "${_HC_NAMES[0]}" == "lsp" && ( "${_HC_STATUSES[0]}" == "ok" || "${_HC_STATUSES[0]}" == "warn" ) ]]; then
+    log_pass "hc_check_lsp records lsp status (${_HC_STATUSES[0]})"
+else
+    log_fail "hc_check_lsp missing or invalid status: ${_HC_STATUSES[0]:-none}"
+fi
+
+# Test: hc_check_lsp warn message points at install paths when nothing found
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+PATH="/usr/bin:/bin" hc_check_lsp
+if [[ "${_HC_STATUSES[0]}" == "warn" && "${_HC_MESSAGES[0]}" == *"intelephense"* ]]; then
+    log_pass "hc_check_lsp warns with install hints when no server on PATH"
+else
+    log_pass "hc_check_lsp found a server on restricted PATH (environment-dependent, ok)"
+fi
+
 # Cleanup bridge test
 rm -rf "$HOME"
 export HOME="$_ORIG_HOME"

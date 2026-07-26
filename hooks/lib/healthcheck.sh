@@ -196,6 +196,24 @@ hc_check_session_bridge() {
 
 # --- Aggregate ---
 
+# Level 1.5 semantic validation (ADR-0019): report which language servers
+# are installed. The plugin never installs one; it only uses what the
+# stack already provides.
+hc_check_lsp() {
+    local found="" hints=""
+    command -v intelephense >/dev/null 2>&1 && found="${found} intelephense(php)"
+    command -v typescript-language-server >/dev/null 2>&1 && found="${found} typescript-language-server(ts)"
+    command -v pyright-langserver >/dev/null 2>&1 && found="${found} pyright(python)"
+    command -v rust-analyzer >/dev/null 2>&1 && found="${found} rust-analyzer(rust)"
+
+    if [[ -n "$found" ]]; then
+        _hc_record "lsp" "ok" "level-1.5 active:${found}"
+    else
+        hints="none installed - Level 1.5 inactive; PHP: npm i -g intelephense, TS/Python/Rust: official LSP plugins from claude-plugins-official"
+        _hc_record "lsp" "warn" "$hints"
+    fi
+}
+
 hc_run_all() {
     _HC_NAMES=()
     _HC_STATUSES=()
@@ -209,6 +227,7 @@ hc_run_all() {
     hc_check_packs
     hc_check_metrics_db
     hc_check_channels
+    hc_check_lsp
     hc_check_ollama
     hc_check_knowledge
     hc_check_superpowers
