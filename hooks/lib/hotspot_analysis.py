@@ -77,6 +77,8 @@ def compute_churn(repo, since):
 def complexity_of(abspath):
     """LOC plus structural-finding count as a language-neutral complexity proxy."""
     try:
+        if os.path.islink(abspath) or not os.path.isfile(os.path.realpath(abspath)):
+            return 0, 0
         with open(abspath, "r", encoding="utf-8", errors="replace") as handle:
             loc = sum(1 for _ in handle)
     except OSError:
@@ -112,6 +114,21 @@ def classify(complexity, churn, c_med, ch_med):
     return "bottom-left", "NONE"
 
 
+def _readable_in_repo(abspath, repo):
+    """True when the path is a real file that actually lives inside the repo.
+
+    git tracks symlinks as entries of their own (mode 120000), so a repository
+    can ship "src/Thing.php -> ~/.ssh/id_rsa"; isfile() follows the link and we
+    would read and report on a file outside the repository. Deleted or renamed
+    files still present in history are skipped here too.
+    """
+    if os.path.islink(abspath):
+        return False
+    if not os.path.realpath(abspath).startswith(os.path.realpath(repo) + os.sep):
+        return False
+    return os.path.isfile(abspath)
+
+
 def analyze_repo(repo, since, top):
     churn = compute_churn(repo, since)
     rows = []
@@ -120,8 +137,8 @@ def analyze_repo(repo, since, top):
         if ext not in LANG_BY_EXT:
             continue
         abspath = os.path.join(repo, name)
-        if not os.path.isfile(abspath):
-            continue  # deleted/renamed file still in history
+        if not _readable_in_repo(abspath, repo):
+            continue
         complexity, findings = complexity_of(abspath)
         rows.append({"file": name, "churn": change_count, "complexity": complexity,
                      "loc": complexity - findings * 25, "findings": findings})

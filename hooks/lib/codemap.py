@@ -31,6 +31,8 @@ def _scan(root: Path) -> tuple[Counter, Counter]:
         rel = path.relative_to(root)
         if any(part in SKIP_DIRS for part in rel.parts):
             continue
+        if path.is_symlink():
+            continue
         if path.is_file() and path.suffix in CODE_EXTS:
             by_ext[path.suffix] += 1
             if len(rel.parts) >= 3:
@@ -43,6 +45,20 @@ def _scan(root: Path) -> tuple[Counter, Counter]:
     return by_dir, by_ext
 
 
+def _safe_label(text: str, max_len: int = 60) -> str:
+    """Render an attacker-controlled directory name as one inert line.
+
+    This output is spliced into a skill's own context by dynamic-context
+    substitution, not returned as a tool result, so a name carrying newlines
+    could forge headings or instructions that read as the skill's own text.
+    Newlines are escaped and the label is length-capped.
+    """
+    flattened = text.replace("\r", "").replace("\n", "\\n")
+    if len(flattened) > max_len:
+        return flattened[:max_len] + "..."
+    return flattened
+
+
 def _entry_points(root: Path) -> list[str]:
     return [label for marker, label in ENTRY_MARKERS.items() if (root / marker).exists()]
 
@@ -50,7 +66,10 @@ def _entry_points(root: Path) -> list[str]:
 def render(root: Path) -> str:
     by_dir, by_ext = _scan(root)
     langs = ", ".join(f"{ext[1:]}({n})" for ext, n in by_ext.most_common(8))
-    dirs = "\n".join(f"- {d}/ ({n} files)" for d, n in by_dir.most_common(MAX_DIRS))
+    dirs = "\n".join(
+        f"- {_safe_label(name)}/ ({count} files)"
+        for name, count in by_dir.most_common(MAX_DIRS)
+    )
     entries = ", ".join(_entry_points(root)) or "none detected"
     tests = ", ".join(
         str(p.name) + "/" for p in root.iterdir()

@@ -132,10 +132,17 @@ def _current_entry(file_path: Path):
 def _skipped(file_path: Path) -> bool:
     if not file_path.is_file() or file_path.suffix not in SUPPORTED_EXTS:
         return True
+    # A size cap alone is not enough: os.path.getsize("/dev/zero") is 0, so a
+    # symlink to a character device would sail past it and read forever. Only
+    # regular, non-symlinked files are measured.
+    if file_path.is_symlink():
+        return True
     try:
-        return file_path.stat().st_size > MAX_SOURCE_BYTES
+        stat = file_path.stat()
     except OSError:
         return True
+    from stat import S_ISREG
+    return not S_ISREG(stat.st_mode) or stat.st_size > MAX_SOURCE_BYTES
 
 
 def _cmd_measure(args) -> int:

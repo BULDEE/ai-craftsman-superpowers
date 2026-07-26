@@ -129,6 +129,10 @@ MAX_SOURCE_BYTES = 2 * 1024 * 1024
 
 def analyze(path, lang):
     try:
+        # islink first: getsize on a symlink to /dev/zero reports 0 and the
+        # read below would never end.
+        if os.path.islink(path) or not os.path.isfile(path):
+            return []
         if os.path.getsize(path) > MAX_SOURCE_BYTES:
             return []
         with open(path, 'r', encoding='utf-8', errors='replace') as handle:
