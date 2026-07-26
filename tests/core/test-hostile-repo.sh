@@ -290,6 +290,67 @@ else
     log_fail "prompt injection" "directory name forged a standalone instruction line"
 fi
 
+echo ""
+echo "=== A repo cannot get its own binaries run by the quality gate ==="
+
+TOOLREPO="$WORK/tool-repo"
+mkdir -p "$TOOLREPO/vendor/bin" "$TOOLREPO/src"
+cat > "$TOOLREPO/vendor/bin/phpstan" <<'SH'
+#!/usr/bin/env bash
+printf 'executed' > "$(dirname "$0")/../../PWNED"
+SH
+chmod +x "$TOOLREPO/vendor/bin/phpstan"
+printf '<?php\ndeclare(strict_types=1);\nfinal class T {}\n' > "$TOOLREPO/src/T.php"
+
+_run_level2() {
+    local home="$1"
+    (cd "$TOOLREPO" && HOME="$home" bash -c "
+        source '$ROOT_DIR/hooks/lib/pack-loader.sh'
+        source '$ROOT_DIR/hooks/lib/config.sh'
+        source '$ROOT_DIR/hooks/lib/static-analysis.sh'
+        source '$ROOT_DIR/packs/symfony/static-analysis/phpstan.sh'
+        sa_analyze_file 'src/T.php'
+    " >/dev/null 2>&1)
+}
+
+NO_CONSENT="$WORK/home-no-consent"
+mkdir -p "$NO_CONSENT/.claude"
+rm -f "$TOOLREPO/PWNED"
+_run_level2 "$NO_CONSENT"
+if [[ ! -f "$TOOLREPO/PWNED" ]]; then
+    log_pass "repo-supplied analyser is not executed without the owner's consent"
+else
+    log_fail "RCE" "a binary shipped by the repository ran on a file edit"
+fi
+
+CONSENT="$WORK/home-consent"
+mkdir -p "$CONSENT/.claude"
+printf 'trust_project_tools: true\n' > "$CONSENT/.claude/.craft-config.yml"
+rm -f "$TOOLREPO/PWNED"
+_run_level2 "$CONSENT"
+if [[ -f "$TOOLREPO/PWNED" ]]; then
+    log_pass "the owner can still opt in to running project tools"
+else
+    log_fail "feature removed" "opt-in no longer enables level 2"
+fi
+
+# Consent must not be grantable by the repository itself.
+printf 'trust_project_tools: true\n' > "$TOOLREPO/.craft-config.yml"
+rm -f "$TOOLREPO/PWNED"
+_run_level2 "$NO_CONSENT"
+if [[ ! -f "$TOOLREPO/PWNED" ]]; then
+    log_pass "a repo cannot grant itself permission to run its own tools"
+else
+    log_fail "privilege escalation" "project config granted trust_project_tools"
+fi
+rm -f "$TOOLREPO/.craft-config.yml"
+
+if grep -q -- "--configuration=" "$ROOT_DIR/packs/symfony/static-analysis/phpstan.sh"; then
+    log_pass "phpstan runs against a pinned config, not one auto-discovered from the repo"
+else
+    log_fail "config hijack" "phpstan still auto-discovers phpstan.neon (bootstrapFiles runs PHP)"
+fi
+
 cd "$PREV_PWD"
 rm -rf "$WORK"
 

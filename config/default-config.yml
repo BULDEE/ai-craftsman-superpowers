@@ -70,3 +70,13 @@ paths:
   tests_unit: "tests/Unit"
   tests_integration: "tests/Integration"
   tests_functional: "tests/Functional"
+
+# Level 2 static analysis (PHPStan, ESLint, deptrac, dependency-cruiser) runs
+# the tools the PROJECT ships and the config files they auto-discover, which
+# means running code from the repository. It stays off unless you allow it in
+# YOUR OWN ~/.claude/.craft-config.yml; a project file cannot grant it.
+#
+#   trust_project_tools: true
+#
+# Levels 1, 1.5, and 3, the rules engine, the security rules, and the ratchet
+# are the plugin's own code and are unaffected.

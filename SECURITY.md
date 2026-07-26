@@ -178,3 +178,25 @@ grep -rn "curl\|wget" hooks/ --include='*.sh'
 | 3.x | ✅ Active development |
 | 2.x | ⚠️ Security fixes only |
 | < 2.0 | ❌ |
+
+## Running a session inside an untrusted repository
+
+Opening a repository means the plugin's hooks run while its files are on disk,
+so everything the repository ships is untrusted input: file names, file
+contents, `.craft-config.yml`, `.craft-rules.yml`, and any tool it vendors.
+
+Two capabilities are therefore gated on the machine owner's own global
+`~/.claude/.craft-config.yml`, and a project-level file can never grant either:
+
+- `packs.external[].path` declares packs whose validators are sourced as shell
+  code.
+- `trust_project_tools: true` allows Level 2 static analysis to run the
+  project's own analysers (`vendor/bin/phpstan`, `node_modules/.bin/eslint`)
+  and the configs they auto-discover. ESLint's flat config is executable
+  JavaScript by design and PHPStan's `bootstrapFiles` requires arbitrary PHP,
+  so this is code execution by definition and is off by default.
+
+Everything else keeps working on an untrusted repository: the regex rules,
+layer rules, persistence and security rules, the structural ratchet, metrics,
+and the CI gate are all the plugin's own code. `tests/core/test-hostile-repo.sh`
+reproduces each attack this model covers and asserts it fails.

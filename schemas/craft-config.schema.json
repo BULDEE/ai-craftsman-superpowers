@@ -40,6 +40,12 @@
       },
       "additionalProperties": false
     },
+    "trust_project_tools": {
+      "type": "boolean",
+      "default": false,
+      "description": "Allow Level 2 static analysis to run the PROJECT's own tools (vendor/bin, node_modules/.bin, and the configs they auto-discover). This executes code shipped by the repository, so it is only honoured in the machine owner's global config, never a project one.",
+      "$comment": "global config only"
+    },
     "guided": {
       "type": "boolean",
       "default": false,

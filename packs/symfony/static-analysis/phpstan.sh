@@ -46,8 +46,19 @@ pack_sa_php() {
     fi
 
     if [[ -n "$phpstan" ]]; then
-        local output
-        output=$(timeout 2 $phpstan analyse "$file" --level=max --no-progress --error-format=raw 2>/dev/null) || true
+        # Without an explicit --configuration, PHPStan auto-discovers
+        # phpstan.neon from the working directory, and its bootstrapFiles key
+        # require()s arbitrary PHP before analysis. A trusted phpstan binary is
+        # not enough: pin the config so a repository cannot supply one.
+        local safe_conf output
+        safe_conf=$(mktemp -t craftsman-phpstan.XXXXXX) || safe_conf=""
+        if [[ -n "$safe_conf" ]]; then
+            printf 'parameters:\n    level: max\n' > "$safe_conf"
+            output=$(timeout 2 $phpstan analyse "$file" --configuration="$safe_conf" --no-progress --error-format=raw 2>/dev/null) || true
+            rm -f "$safe_conf"
+        else
+            output=$(timeout 2 $phpstan analyse "$file" --level=max --no-progress --error-format=raw 2>/dev/null) || true
+        fi
         if [[ -n "$output" ]]; then
             while IFS= read -r line; do
                 [[ -z "$line" ]] && continue

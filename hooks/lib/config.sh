@@ -135,6 +135,21 @@ config_packs_dir() {
 # before the developer writes anything. Only the machine owner may declare
 # them, in ~/.claude/.craft-config.yml. Every other key still honours the
 # project override: this one cannot.
+# Level 2 static analysis runs the PROJECT's own tools: vendor/bin/phpstan,
+# node_modules/.bin/eslint, and the config files they auto-discover. In a
+# cloned repository all of those are attacker-supplied, and eslint's flat
+# config is executable JavaScript by design, so running them at all is running
+# the repository's code. Off unless the machine owner opts in globally; every
+# other level (regex rules, layer rules, security rules, the ratchet) is ours
+# and keeps working untouched.
+config_trust_project_tools() {
+    local config_file="${HOME}/.claude/.craft-config.yml"
+    [[ -f "$config_file" ]] || return 1
+    local value
+    value=$(grep -E "^trust_project_tools:" "$config_file" 2>/dev/null | head -1 | awk '{print $2}' | tr -d '"' | tr -d "'")
+    [[ "$value" == "true" ]]
+}
+
 config_external_packs() {
     local config_file="${HOME}/.claude/.craft-config.yml"
     [[ ! -f "$config_file" ]] && return

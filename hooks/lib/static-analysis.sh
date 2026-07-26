@@ -14,6 +14,15 @@ sa_analyze_file() {
     # one. Anchoring a relative path with ./ makes it unambiguously a path, so a
     # file named "-c" or "--config" cannot become an option.
     [[ "$file" == /* || "$file" == ./* ]] || file="./$file"
+
+    # Running the project's analysers means running the project's code (its
+    # binaries under vendor/bin or node_modules/.bin, and the config files they
+    # auto-discover). Refuse unless the machine owner allowed it globally.
+    if declare -F config_trust_project_tools >/dev/null 2>&1; then
+        config_trust_project_tools || return
+    else
+        return
+    fi
     local ext="${file##*.}"
     local lang=""
     case "$ext" in
