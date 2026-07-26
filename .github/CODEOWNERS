@@ -1,0 +1,7 @@
+# Workflow and CI changes alter what runs with repository credentials, so they
+# require an explicit review. A quality-gate plugin that lets its own pipeline
+# be edited without review has no gate at all.
+/.github/workflows/  @woprrr
+/.github/CODEOWNERS  @woprrr
+/ci/                 @woprrr
+/hooks/              @woprrr

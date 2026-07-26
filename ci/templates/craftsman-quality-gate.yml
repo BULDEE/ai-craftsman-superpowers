@@ -5,23 +5,30 @@ on:
   push:
     branches: [main]
 
+# Least privilege: the gate reads the code and, on a pull request, writes a
+# review comment. Without this block the workflow inherits the repository
+# default, which on older repositories is still read/write on everything.
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   quality:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup PHP (if composer.json exists)
         if: ${{ hashFiles('composer.json') != '' }}
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: '8.3'
           tools: composer, phpstan
 
       - name: Setup Node.js (if package.json exists)
         if: ${{ hashFiles('package.json') != '' }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
           cache: 'npm'

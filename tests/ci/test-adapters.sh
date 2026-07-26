@@ -618,4 +618,40 @@ done
 # =============================================================================
 # Summary
 # =============================================================================
+echo ""
+echo "=== Shipped template hardening (supply chain) ==="
+
+TEMPLATE="$ROOT_DIR/ci/templates/craftsman-quality-gate.yml"
+
+# Every action must be pinned to a 40-char commit SHA. A mutable tag lets an
+# attacker who compromises the action repository run code in every user's
+# pipeline with their GITHUB_TOKEN.
+UNPINNED=$(grep -oE "uses: [^@]+@[^ ]+" "$TEMPLATE" | grep -vE "@[0-9a-f]{40}" || true)
+if [[ -z "$UNPINNED" ]]; then
+    log_pass "every action in the shipped template is pinned to a commit SHA"
+else
+    log_fail "unpinned action in shipped template" "$UNPINNED"
+fi
+
+# The template must declare its own permissions: inheriting the repository
+# default can mean read/write on everything.
+if grep -q "^permissions:" "$TEMPLATE"; then
+    log_pass "shipped template declares explicit permissions"
+else
+    log_fail "template permissions" "no permissions block: inherits repository default"
+fi
+
+if grep -qE "^\s+contents: read" "$TEMPLATE"; then
+    log_pass "shipped template grants read-only access to contents"
+else
+    log_fail "template least privilege" "contents is not read-only"
+fi
+
+# pull_request_target on a quality gate would expose secrets to fork PRs.
+if ! grep -q "pull_request_target" "$TEMPLATE"; then
+    log_pass "shipped template avoids pull_request_target"
+else
+    log_fail "dangerous trigger" "pull_request_target exposes secrets to forks"
+fi
+
 test_summary
