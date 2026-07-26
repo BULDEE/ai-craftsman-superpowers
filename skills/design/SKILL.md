@@ -57,14 +57,23 @@ Output your analysis in this format:
 - Has many: [Related entities]
 ```
 
-### Phase 2: Challenge
+### Phase 2: Challenge (adversarial panel)
 
-Ask yourself (and output):
+Write your current design summary (Phase 1 output + intended type/boundaries) to a temp file, then convene the panel:
 
-- Is this really an **Entity** or would a **Value Object** suffice?
-- Is this the right **aggregate boundary**?
-- Am I missing a **domain concept**?
-- What would **break** if I model it differently?
+```bash
+DESIGN_TMP=$(mktemp /tmp/craftsman-design-XXXX.md)
+# Write your Phase 1 analysis + proposed model into $DESIGN_TMP first (Write tool), then:
+bash "${CLAUDE_PLUGIN_ROOT}/hooks/design-panel.sh" "$DESIGN_TMP"
+```
+
+Three contradictors attack the design (YAGNI, invariants/boundaries, feasibility). If the panel is unavailable (agent hooks disabled), fall back to self-challenging with the same three lenses:
+
+- **YAGNI**: unnecessary abstraction, speculative generality, simpler alternatives dismissed without reason. Is this really an **Entity** or would a **Value Object** suffice?
+- **Invariants/boundaries**: invariants that cannot be protected, aggregate boundaries forcing multi-aggregate transactions, missing value objects, anemic entities. Is this the right **aggregate boundary**? Am I missing a **domain concept**?
+- **Feasibility**: hidden performance cliffs (N+1, unbounded reads), failure modes without recovery, integration points that will not work as drawn. What would **break** if I model it differently?
+
+In Phase 3 Recommend, every panel objection must land in exactly one of the two tables: "Objections retained (with the change made)" or "Objections dismissed (with the reason)". Silently ignoring an objection is not allowed.
 
 **Propose 2 alternative approaches** with trade-offs:
 
@@ -92,6 +101,20 @@ State your recommendation clearly:
 **Type:** [Entity | ValueObject | AggregateRoot | Service]
 **Reason:** [One sentence]
 **Trade-off:** [What we give up with this choice]
+
+### Panel Verdict
+
+**Objections retained**
+
+| Lens | Objection | Change made |
+|------|-----------|-------------|
+| [yagni/invariants/feasibility] | [objection, one line] | [what the design now does instead] |
+
+**Objections dismissed**
+
+| Lens | Objection | Reason for dismissal |
+|------|-----------|----------------------|
+| [yagni/invariants/feasibility] | [objection, one line] | [why it does not apply here] |
 
 ### Persistence Mapping
 
