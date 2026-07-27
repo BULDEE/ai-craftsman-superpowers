@@ -123,7 +123,7 @@ def list_instincts(conn: sqlite3.Connection, project_hash: str, status: str | No
 
 
 def _slugify(rule: str) -> str:
-    return "".join(c.lower() if c.isalnum() else "-" for c in rule).strip("-")
+    return "".join(char.lower() if char.isalnum() else "-" for char in rule).strip("-")
 
 
 SKILL_TEMPLATE = """---

@@ -13,14 +13,14 @@ import sys
 
 def _format_table(headers: list[str], rows: list[tuple]) -> str:
     """Format rows as aligned columns with headers (mimics sqlite3 -header -column)."""
-    widths = [len(h) for h in headers]
+    widths = [len(header) for header in headers]
     for row in rows:
         for i, val in enumerate(row):
             widths[i] = max(widths[i], len(str(val) if val is not None else ""))
 
     lines = []
     lines.append("  ".join(h.ljust(widths[i]) for i, h in enumerate(headers)))
-    lines.append("  ".join("-" * w for w in widths))
+    lines.append("  ".join("-" * width for width in widths))
     for row in rows:
         lines.append("  ".join(str(v if v is not None else "").ljust(widths[i]) for i, v in enumerate(row)))
     return "\n".join(lines)
@@ -50,7 +50,7 @@ def _execute_query(db_path: str, query: str, params: list[str]) -> None:
 def _print_select_results(cur: sqlite3.Cursor) -> None:
     rows = cur.fetchall()
     if rows and cur.description:
-        headers = [d[0] for d in cur.description]
+        headers = [column[0] for column in cur.description]
         if len(headers) == 1 and len(rows) == 1:
             print(rows[0][0] if rows[0][0] is not None else 0)
         else:

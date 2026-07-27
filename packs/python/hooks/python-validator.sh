@@ -12,17 +12,21 @@
 # craftsman-ignore: SH001
 # =============================================================================
 
+_PY_PACK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 _check_py001() {
     local file="$1"
+    # Tokenised, not grepped: the regex read raw lines, so a docstring line
+    # starting with an English article looked like a two-letter variable and
+    # the rule blocked writes on prose.
+    command -v python3 >/dev/null 2>&1 || return 0
     local line_number
     while IFS= read -r line_number; do
         [[ -z "$line_number" ]] && continue
-        add_violation "PY001" "line ${line_number}: Single/double-char variable name - use descriptive names"
-    done < <(grep -nE '^\s+((for)\s+)?[a-z]{1,2}\s*[=,[:space:]]' "$file" 2>/dev/null \
-        | grep -vE '\b(i|j|k|x|y|f|e|n|ok|id|os|re|io|db|if|in|is|or|as|do|to|up|no)\b\s*[=,[:space:]]' \
-        | grep -vE '(import|from|#|def |class |return |elif )' \
-        | cut -d: -f1)
+        add_violation "PY001" "$line_number"
+    done < <(python3 "${_PY_PACK_DIR}/python_names.py" "$file" 2>/dev/null)
 }
+
 
 _check_py002() {
     local file="$1"

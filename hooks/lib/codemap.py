@@ -72,8 +72,8 @@ def render(root: Path) -> str:
     )
     entries = ", ".join(_entry_points(root)) or "none detected"
     tests = ", ".join(
-        str(p.name) + "/" for p in root.iterdir()
-        if p.is_dir() and p.name.lower() in {"tests", "test", "spec", "__tests__"}
+        str(entry.name) + "/" for entry in root.iterdir()
+        if entry.is_dir() and entry.name.lower() in {"tests", "test", "spec", "__tests__"}
     ) or "none detected"
     return (
         f"## Codemap\n\nEntry points: {entries}\nLanguages: {langs}\n"
