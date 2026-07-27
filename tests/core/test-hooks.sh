@@ -35,7 +35,41 @@ run_pre_hook() {
 }
 
 # =============================================================================
-# Post-Write Hook Tests
+# Pre-Write Hook Tests - the only place exit 2 actually stops a write
+# =============================================================================
+# PreToolUse is the one Write/Edit event where the hooks reference grants
+# blocking ("Blocks the tool call"). On PostToolUse exit 2 only shows stderr to
+# Claude, because "the tool already ran" - so the post-write assertions below
+# prove detection, not prevention, and are worded accordingly.
+echo ""
+echo "=== Pre-Write Hook Tests (real blocking) ==="
+
+result=$(run_pre_hook "/tmp/craftsman-prewrite-$$/src/Domain/Order.php" \
+    '<?php
+namespace App\Domain;
+use App\Infrastructure\Doctrine\OrderRepository;
+class Order {}')
+if [[ "${result%%|*}" == "2" ]]; then
+    log_pass "PreToolUse refuses the write on a layer violation (exit 2 blocks here)"
+else
+    log_fail "pre-write blocking" "expected exit 2, got ${result%%|*}"
+fi
+
+# Counter-test: the gate must not refuse clean content, or the assertion above
+# would also pass with the validator crashed or matching everything.
+result=$(run_pre_hook "/tmp/craftsman-prewrite-$$/src/Domain/Money.php" \
+    '<?php
+declare(strict_types=1);
+namespace App\Domain;
+final class Money {}')
+if [[ "${result%%|*}" == "0" ]]; then
+    log_pass "PreToolUse lets clean content through (exit 0)"
+else
+    log_fail "pre-write false positive" "expected exit 0, got ${result%%|*}"
+fi
+
+# =============================================================================
+# Post-Write Hook Tests - detection only, exit 2 does not prevent the write
 # =============================================================================
 echo ""
 echo "=== Post-Write Hook Tests ==="
@@ -54,7 +88,7 @@ result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
 exit_code="${result%%|*}"
 output="${result#*|}"
 if [[ "$exit_code" == "2" ]] && echo "$output" | grep -q "PHP001"; then
-    log_pass "Missing strict_types blocks (exit 2, PHP001)"
+    log_pass "Missing strict_types is reported to Claude (exit 2, PHP001)"
 else
     log_fail "Missing strict_types should block" "exit=$exit_code"
 fi
@@ -64,7 +98,7 @@ result=$(run_post_hook "$FIXTURES_DIR/invalid-no-final.php")
 exit_code="${result%%|*}"
 output="${result#*|}"
 if [[ "$exit_code" == "2" ]] && echo "$output" | grep -q "PHP002"; then
-    log_pass "Missing final blocks (exit 2, PHP002)"
+    log_pass "Missing final is reported to Claude (exit 2, PHP002)"
 else
     log_fail "Missing final should block" "exit=$exit_code"
 fi
@@ -74,7 +108,7 @@ result=$(run_post_hook "$FIXTURES_DIR/invalid-any.ts")
 exit_code="${result%%|*}"
 output="${result#*|}"
 if [[ "$exit_code" == "2" ]] && echo "$output" | grep -q "TS001"; then
-    log_pass "TypeScript any blocks (exit 2, TS001)"
+    log_pass "TypeScript any is reported to Claude (exit 2, TS001)"
 else
     log_fail "TypeScript any should block" "exit=$exit_code"
 fi
@@ -114,7 +148,7 @@ result=$(run_post_hook "$FIXTURES_DIR/invalid-layer-violation.php")
 exit_code="${result%%|*}"
 output="${result#*|}"
 if [[ "$exit_code" == "2" ]] && echo "$output" | grep -q "LAYER"; then
-    log_pass "Layer violation blocks (exit 2, LAYER)"
+    log_pass "Layer violation is reported to Claude (exit 2, LAYER)"
 else
     log_fail "Layer violation should block" "exit=$exit_code"
 fi
@@ -215,7 +249,7 @@ result=$(run_post_hook "$FIXTURES_DIR/invalid-layer-violation.php")
 exit_code="${result%%|*}"
 output="${result#*|}"
 if [[ "$exit_code" == "2" ]] && echo "$output" | grep -q "LAYER"; then
-    log_pass "strictness=moderate blocks LAYER violations (exit 2)"
+    log_pass "strictness=moderate reports LAYER violations (exit 2)"
 else
     log_fail "strictness=moderate should block LAYER" "exit=$exit_code"
 fi

@@ -254,8 +254,18 @@ if [[ "${#FULL}" -gt "$BUDGET" ]]; then
     FULL=$(assemble_msg "no" "$(printf '%s' "$ROUTING" | head -c "$_room")")
 fi
 
+# Both channels, because they reach different readers. `systemMessage` is
+# defined as a warning shown to the user; only `additionalContext` enters
+# Claude's context. Emitting the bootstrap as systemMessage alone printed the
+# workshop profile, active packs and correction trends to the terminal and
+# nowhere else - so "inject correction trends at session start", the first
+# thing this plugin advertises, never reached the model at all.
 jq -n --arg msg "$FULL" '{
-    systemMessage: $msg
+    systemMessage: $msg,
+    hookSpecificOutput: {
+        hookEventName: "SessionStart",
+        additionalContext: $msg
+    }
 }'
 
 exit 0

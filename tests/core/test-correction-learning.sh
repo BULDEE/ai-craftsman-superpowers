@@ -56,7 +56,7 @@ result=$(run_post_hook "$FIXTURES_DIR/src/Domain/BadEntity.php")
 exit_code="${result%%|*}"
 
 if [[ "$exit_code" == "2" ]]; then
-    log_pass "Missing strict_types blocks (exit 2)"
+    log_pass "Missing strict_types is reported to Claude (exit 2)"
 else
     log_fail "Missing strict_types should block" "got exit $exit_code"
 fi

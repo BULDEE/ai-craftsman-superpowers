@@ -148,10 +148,17 @@ if [[ $VIOLATION_COUNT -gt 0 ]]; then
         }'
         exit 2
     else
+        # See session-start.sh: systemMessage is user-facing only, so a warning
+        # sent on that channel alone never reaches the model it is meant to steer.
         jq -n --arg v "$(echo -e "$VIOLATIONS")" \
                --arg c "$VIOLATION_COUNT" \
-        '{
-            systemMessage: ("PRE-WRITE WARNING: " + $c + " issue(s) detected:\n" + $v)
+        '(("PRE-WRITE WARNING: " + $c + " issue(s) detected:\n" + $v)) as $body
+         | {
+            systemMessage: $body,
+            hookSpecificOutput: {
+                hookEventName: "PreToolUse",
+                additionalContext: $body
+            }
         }'
         exit 0
     fi

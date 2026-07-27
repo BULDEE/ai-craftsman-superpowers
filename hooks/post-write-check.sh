@@ -427,11 +427,21 @@ if [[ $WARNING_COUNT -gt 0 ]]; then
         done <<< "$PATTERN_SUGGESTIONS"
     fi
 
+    # systemMessage reaches the user, additionalContext reaches Claude. Warnings
+    # went out on systemMessage only, so the model saw every blocking violation
+    # and none of the advisory ones - including the whole structural family,
+    # which is advisory by design and therefore invisible to it.
     jq -n --arg warnings "$(echo -e "$WARNING_VIOLATIONS")" \
            --arg count "$WARNING_COUNT" \
            --arg patterns "$(echo -e "$pattern_msg")" \
-    '{
-        systemMessage: ("WARNINGS: " + $count + " issue(s) detected:\n" + $warnings + (if $patterns != "" then $patterns else "" end))
+    '(("WARNINGS: " + $count + " issue(s) detected:\n" + $warnings
+       + (if $patterns != "" then $patterns else "" end))) as $body
+     | {
+        systemMessage: $body,
+        hookSpecificOutput: {
+            hookEventName: "PostToolUse",
+            additionalContext: $body
+        }
     }'
     exit 0
 fi
