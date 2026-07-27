@@ -95,11 +95,39 @@ _metrics_migrate_writes_count() {
 
 # v4: when CLAUDE_PLUGIN_DATA points somewhere new, adopt the legacy DB by
 # copy (never delete the original) so history survives the move (ADR-0023).
+#
+# Adopted at most once, recorded by a marker. The legacy path is also the
+# fallback this file uses whenever CLAUDE_PLUGIN_DATA is unset, so it collects
+# whatever runs outside the marketplace environment. Without the marker, every
+# such run recreated the legacy database and the next init pulled it back in,
+# which is how test fixtures kept reappearing in the real one after a cleanup.
 _metrics_migrate_legacy_location() {
     local legacy_db="${HOME}/.claude/plugins/data/craftsman/metrics.db"
+    local marker="${METRICS_DB_DIR}/.legacy-adopted"
     [[ "$METRICS_DB" == "$legacy_db" ]] && return 0
-    [[ -f "$METRICS_DB" || ! -f "$legacy_db" ]] && return 0
-    cp "$legacy_db" "$METRICS_DB" 2>/dev/null || true
+    [[ -f "$marker" ]] && return 0
+    if [[ ! -f "$METRICS_DB" && -f "$legacy_db" ]]; then
+        cp "$legacy_db" "$METRICS_DB" 2>/dev/null || true
+    fi
+    : > "$marker" 2>/dev/null || true
+}
+
+# Where a row came from. Four months of test fixtures were indistinguishable
+# from real violations once written, so a cleanup meant guessing at file
+# patterns instead of filtering a column. Harnesses set CRAFTSMAN_METRICS_SOURCE
+# so the next such incident is a DELETE rather than an archaeology exercise.
+metrics_source() {
+    printf '%s' "${CRAFTSMAN_METRICS_SOURCE:-session}"
+}
+
+_metrics_migrate_source_column() {
+    local table
+    for table in violations corrections; do
+        if ! sqlite3 "$METRICS_DB" "PRAGMA table_info(${table});" 2>/dev/null | grep -q '|source|'; then
+            sqlite3 "$METRICS_DB" \
+                "ALTER TABLE ${table} ADD COLUMN source TEXT NOT NULL DEFAULT 'session';" 2>/dev/null
+        fi
+    done
 }
 
 metrics_init() {
@@ -109,20 +137,44 @@ metrics_init() {
     _metrics_create_corrections_table
     _metrics_migrate_severity_info
     _metrics_migrate_writes_count
+    _metrics_migrate_source_column
+}
+
+# The identity of a project is its git toplevel, not the directory the session
+# happened to start in. Hashing $PWD filed the same repository under a
+# different project for every subdirectory worked from, quietly splitting one
+# history into several and truncating every trend built on it.
+_METRICS_PROJECT_ROOT=""
+_METRICS_PROJECT_ROOT_FOR=""
+_metrics_project_root() {
+    # Keyed on $PWD rather than computed once: a hook is one process and would
+    # not notice, but a long-lived shell that changes directory would keep
+    # answering for the project it started in.
+    if [[ "$_METRICS_PROJECT_ROOT_FOR" != "$PWD" ]]; then
+        _METRICS_PROJECT_ROOT_FOR="$PWD"
+        _METRICS_PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")
+    fi
+    printf '%s' "$_METRICS_PROJECT_ROOT"
 }
 
 metrics_project_hash() {
-    echo -n "$PWD" | shasum -a 256 | cut -d' ' -f1
+    _metrics_project_root | tr -d '\n' | shasum -a 256 | cut -d' ' -f1
 }
 
 metrics_file_pattern() {
-    local file="$1"
-    # A prefix strip is not a containment check: when the file is outside the
-    # project it silently no-ops and the absolute path gets recorded. Same
-    # mistake shape as the ratchet baseline bug (see hooks/lib/ratchet.py).
-    local rel_path="$file"
-    [[ "$file" == "$PWD"/* ]] && rel_path="${file#$PWD/}"
-    echo "$rel_path" | sed -E 's/\/[^\/]+\.(php|ts|tsx)$/\/**\/*.\1/'
+    local file="$1" project_root
+    project_root=$(_metrics_project_root)
+    # A prefix strip is not a containment check: an outside file silently kept
+    # its absolute path, so the developer's home directory was recorded into a
+    # database consolidate-metrics.sh is built to share. An outside file has no
+    # project-relative meaning to record in the first place.
+    if [[ "$file" != "$project_root"/* ]]; then
+        printf '%s\n' "<outside-project>"
+        return 0
+    fi
+    # Any extension, not just php|ts|tsx: the narrow list left every .py and
+    # .sh violation carrying a full path through the branch above.
+    echo "${file#"$project_root"/}" | sed -E 's/\/[^\/]+\.([A-Za-z0-9]+)$/\/**\/*.\1/'
 }
 
 metrics_record_violation() {
@@ -134,8 +186,8 @@ metrics_record_violation() {
     local project_hash
     project_hash=$(metrics_project_hash)
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
-        "INSERT INTO violations (project_hash, rule, file_pattern, severity, blocked, ignored) VALUES (?, ?, ?, ?, ?, ?)" \
-        "$project_hash" "$rule" "$file_pattern" "$severity" "$blocked" "$ignored"
+        "INSERT INTO violations (project_hash, rule, file_pattern, severity, blocked, ignored, source) VALUES (?, ?, ?, ?, ?, ?, ?)" \
+        "$project_hash" "$rule" "$file_pattern" "$severity" "$blocked" "$ignored" "$(metrics_source)"
 }
 
 metrics_record_session() {
@@ -176,8 +228,8 @@ metrics_record_correction() {
     local project_hash
     project_hash=$(metrics_project_hash)
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
-        "INSERT INTO corrections (project_hash, rule, file_pattern, action, context) VALUES (?, ?, ?, ?, ?)" \
-        "$project_hash" "$rule" "$file_pattern" "$action" "$context"
+        "INSERT INTO corrections (project_hash, rule, file_pattern, action, context, source) VALUES (?, ?, ?, ?, ?, ?)" \
+        "$project_hash" "$rule" "$file_pattern" "$action" "$context" "$(metrics_source)"
 }
 
 metrics_corrections_30d() {

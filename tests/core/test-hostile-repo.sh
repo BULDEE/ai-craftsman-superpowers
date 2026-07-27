@@ -182,11 +182,24 @@ echo "=== A file outside the project is never recorded by path ==="
 
 source "$ROOT_DIR/hooks/lib/metrics-db.sh"
 cd "$WORK"
+# This block's own heading is the property that matters, and passing the path
+# through unchanged was the opposite of it: absolute paths carrying the
+# developer's home directory were recorded into a database
+# consolidate-metrics.sh exists to share between machines.
 PATTERN=$(metrics_file_pattern "/etc/passwd")
-if [[ "$PATTERN" == "/etc/passwd" ]]; then
-    log_pass "outside path is passed through unchanged, not silently mis-stripped"
+if [[ "$PATTERN" != *"/etc/passwd"* ]]; then
+    log_pass "an outside path is replaced by a marker, never recorded verbatim"
 else
-    log_fail "path handling" "unexpected transform: $PATTERN"
+    log_fail "path leak" "the absolute path was recorded: $PATTERN"
+fi
+
+# The old strip only generalised php|ts|tsx, so every .py and .sh violation
+# kept a full path even inside the project.
+SHELL_PATTERN=$(cd "$WORK" && metrics_file_pattern "$WORK/scripts/deploy.sh")
+if [[ "$SHELL_PATTERN" == "scripts/**/*.sh" ]]; then
+    log_pass "a shell path is generalised like a php one, not left absolute"
+else
+    log_fail "path handling" "shell pattern broke: $SHELL_PATTERN"
 fi
 
 INSIDE=$(cd "$WORK" && metrics_file_pattern "$WORK/src/Domain/User.php")

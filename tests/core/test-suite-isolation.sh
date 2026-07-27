@@ -21,18 +21,38 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
+echo ""
+echo "=== The runner redirects plugin data away from the real database ==="
+
+# Cheap, runs in the default suite. metrics-db.sh falls back to
+# ~/.claude/plugins/data/craftsman when CLAUDE_PLUGIN_DATA is unset, so a
+# runner that does not export it makes every subtest record its fixtures as
+# production violations. The deep audit below cannot catch a regression here:
+# it sets the variable itself, so it would pass while the runner leaked.
+if grep -qE '^[[:space:]]*export CLAUDE_PLUGIN_DATA' "$ROOT_DIR/tests/run-tests.sh"; then
+    log_pass "run-tests.sh exports CLAUDE_PLUGIN_DATA"
+else
+    log_fail "run-tests.sh does not export CLAUDE_PLUGIN_DATA" \
+        "the suite writes its fixtures into ~/.claude/plugins/data/craftsman/metrics.db"
+fi
+
 if [[ "${CRAFTSMAN_ISOLATION_AUDIT:-0}" != "1" ]]; then
     echo ""
     echo "Suite isolation audit skipped (costs a full suite run)."
     echo "Run it with: CRAFTSMAN_ISOLATION_AUDIT=1 bash tests/core/test-suite-isolation.sh"
-    exit 0
+    test_summary
 fi
 
 echo ""
 echo "=== Every subtest leaves the checkout and ~/.claude as it found them ==="
 
 # The same list the runner uses, read from the runner so the two cannot drift.
-mapfile -t SUBTESTS < <(
+# Read in a loop rather than with mapfile: mapfile is bash 4+, and stock macOS
+# ships bash 3.2, which is the platform this audit most needs to run on.
+SUBTESTS=()
+while IFS= read -r subtest; do
+    [[ -n "$subtest" ]] && SUBTESTS+=("$subtest")
+done < <(
     grep -oE 'run_subtest "[^"]+" "\$SCRIPT_DIR/[^"]+"' "$ROOT_DIR/tests/run-tests.sh" \
         | sed 's/.*\$SCRIPT_DIR\///; s/"$//'
 )
@@ -50,6 +70,12 @@ state_signature() {
     git -C "$ROOT_DIR" status --porcelain
     echo "---"
     find "${HOME}/.claude" -maxdepth 1 -type f -exec sh -c \
+        'printf "%s %s\n" "$(shasum -a 256 "$1" | cut -d" " -f1)" "$1"' _ {} \; 2>/dev/null | sort
+    echo "---"
+    # The metrics databases live four levels down, so the maxdepth 1 sweep
+    # above never saw them. That is how this audit reported every subtest
+    # clean while the suite was writing its fixtures into production metrics.
+    find "${HOME}/.claude/plugins/data" -name '*.db' -exec sh -c \
         'printf "%s %s\n" "$(shasum -a 256 "$1" | cut -d" " -f1)" "$1"' _ {} \; 2>/dev/null | sort
 }
 

@@ -17,6 +17,19 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 PLUGIN_DIR="$ROOT_DIR"
 SKILLS_DIR="$ROOT_DIR/skills"
 
+# The suite drives the real hooks, and metrics-db.sh falls back to
+# ~/.claude/plugins/data/craftsman whenever CLAUDE_PLUGIN_DATA is unset. Every
+# unisolated run therefore recorded its own fixtures as production violations,
+# and the correction-learning loop trained on them. Set here rather than per
+# suite so a new suite is covered by default instead of by remembering.
+CLAUDE_PLUGIN_DATA="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-tests.XXXXXX")"
+export CLAUDE_PLUGIN_DATA
+trap 'rm -rf "$CLAUDE_PLUGIN_DATA"' EXIT
+
+# Belt and braces: a subtest that resolves its own database path anyway still
+# tags its rows, so the next contamination is a DELETE and not a guess.
+export CRAFTSMAN_METRICS_SOURCE="test"
+
 # Counters
 TESTS_PASSED=0
 TESTS_FAILED=0
