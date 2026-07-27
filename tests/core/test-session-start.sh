@@ -15,10 +15,14 @@ mkdir -p "$CLAUDE_PLUGIN_DATA"
 
 source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
-# Backup bridge file - session-start.sh overwrites it with test paths
+# Backup bridge files - session-start.sh overwrites them with test paths
 _BRIDGE="${HOME}/.claude/craftsman-session-state-path"
 _BRIDGE_BAK="${_BRIDGE}.test-backup"
 [[ -f "$_BRIDGE" ]] && cp "$_BRIDGE" "$_BRIDGE_BAK"
+
+_DB_BRIDGE="${HOME}/.claude/craftsman-metrics-db-path"
+_DB_BRIDGE_BAK="${_DB_BRIDGE}.test-backup"
+[[ -f "$_DB_BRIDGE" ]] && cp "$_DB_BRIDGE" "$_DB_BRIDGE_BAK"
 
 echo ""
 echo "=== Session Start Hook Tests ==="
@@ -56,6 +60,35 @@ if command -v python3 >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && comman
     fi
 fi
 
+# Test: metrics DB bridge points at the slug-aware path, not the bare fallback.
+# Skills query through the Bash tool, where CLAUDE_PLUGIN_DATA does not exist:
+# without this bridge they read a database no hook has written to since the
+# plugin slug changed, and report a silent instrumentation outage.
+if [[ -f "$_DB_BRIDGE" ]]; then
+    bridged_db=$(cat "$_DB_BRIDGE")
+    if [[ "$bridged_db" == "${CLAUDE_PLUGIN_DATA}/metrics.db" ]]; then
+        log_pass "Metrics DB bridge resolves CLAUDE_PLUGIN_DATA"
+    else
+        log_fail "Metrics DB bridge should point at \${CLAUDE_PLUGIN_DATA}/metrics.db" "got: $bridged_db"
+    fi
+else
+    log_fail "Session start should write ~/.claude/craftsman-metrics-db-path" "file missing"
+fi
+
+# Test: the reporting skills read the bridge instead of hardcoding the fallback.
+# The fallback path may still appear, but only as the `|| echo` arm of a bridge
+# read: any line naming it without also naming the bridge is a hardcoded query.
+# Matching on `sqlite3 <path>` alone is not enough, the original defect assigned
+# the path to a variable first (`DB=~/...; sqlite3 "$DB"`).
+hardcoded=$(grep -n 'plugins/data/craftsman/metrics\.db' \
+    "$ROOT_DIR/skills/metrics/SKILL.md" "$ROOT_DIR/skills/debug/SKILL.md" 2>/dev/null \
+    | grep -v 'craftsman-metrics-db-path')
+if [[ -z "$hardcoded" ]]; then
+    log_pass "Skills query the bridged DB path"
+else
+    log_fail "Skills must not query the bare fallback DB" "hardcoded at: $hardcoded"
+fi
+
 # Test: Auto-setup gate warns when no config
 ORIGINAL_HOME="$HOME"
 export HOME="/tmp/craftsman-fake-home-$$"
@@ -69,8 +102,9 @@ else
 fi
 export HOME="$ORIGINAL_HOME"
 
-# Restore bridge file
+# Restore bridge files
 [[ -f "$_BRIDGE_BAK" ]] && mv "$_BRIDGE_BAK" "$_BRIDGE"
+[[ -f "$_DB_BRIDGE_BAK" ]] && mv "$_DB_BRIDGE_BAK" "$_DB_BRIDGE"
 
 # Cleanup
 rm -rf "$CLAUDE_PLUGIN_DATA" "/tmp/craftsman-fake-home-$$"

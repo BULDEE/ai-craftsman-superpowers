@@ -234,7 +234,15 @@ All violations are recorded in a local SQLite database at:
 ${CLAUDE_PLUGIN_DATA}/metrics.db
 ```
 
-Default location: `~/.claude/plugins/data/craftsman/metrics.db`
+`CLAUDE_PLUGIN_DATA` carries the plugin slug, so the real path is usually
+`~/.claude/plugins/data/craftsman-<marketplace-slug>/metrics.db`. The bare
+`~/.claude/plugins/data/craftsman/metrics.db` is only the fallback used when the
+variable is unset, and it may hold stale history from an earlier slug.
+
+Anything running via the Bash tool (skills, one-off queries) has no
+`CLAUDE_PLUGIN_DATA`, so it must read the resolved path from the bridge file
+`~/.claude/craftsman-metrics-db-path` written at session start. Hardcoding the
+fallback there reads a database no hook writes to.
 
 ### Schema
 
@@ -360,6 +368,6 @@ which deptrac    # Architecture (PHP)
 # Check database location
 echo "${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/craftsman}/metrics.db"
 
-# Query directly
-sqlite3 "$HOME/.claude/plugins/data/craftsman/metrics.db" "SELECT COUNT(*) FROM violations;"
+# Query directly (from a shell without CLAUDE_PLUGIN_DATA, e.g. the Bash tool)
+sqlite3 "$(cat ~/.claude/craftsman-metrics-db-path)" "SELECT COUNT(*) FROM violations;"
 ```

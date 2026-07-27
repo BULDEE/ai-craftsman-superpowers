@@ -51,6 +51,13 @@ fi
 SESSION_STATE_PATH="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
 printf '%s' "$SESSION_STATE_PATH" > "${HOME}/.claude/craftsman-session-state-path" 2>/dev/null || true
 
+# Same bridge for the metrics database. Without it the reporting skills fall
+# back to the plugin-slug-less default and read a database no hook has written
+# since the slug changed: /craftsman:metrics reported 114 violations while the
+# live database held 14222, and concluded the hooks had stopped writing.
+METRICS_DB_PATH="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db"
+printf '%s' "$METRICS_DB_PATH" > "${HOME}/.claude/craftsman-metrics-db-path" 2>/dev/null || true
+
 # Record session start epoch. SessionEnd input has no duration field
 # (only session_id/transcript_path/cwd/reason), so session-metrics.sh
 # derives duration and its violation-count window from this marker.
