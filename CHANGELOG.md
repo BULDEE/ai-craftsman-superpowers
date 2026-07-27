@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.2] - 2026-07-27
+
+CI duration, which on this project is CI cost: the macOS matrix leg bills at
+ten times the Linux rate and was 94% of the spend per run.
+
+### Changed
+
+- **The portable timeout polls adaptively instead of once per second.** The
+  fallback added 163s to the macOS job (175s to 338s) because it slept a full
+  second per call and almost every call finishes in milliseconds. It now polls
+  at 50ms, backing off to 250ms after a second and 1s after ten. Measured in
+  isolation over 50 fast calls: 972ms per call before, 64ms after.
+- **One implementation instead of three.** `hooks/lib/portable-timeout.sh` is
+  the single source; the static-analysis dispatcher, the test helpers and the
+  test runner source it. Three copies of the same fallback is three chances to
+  drift, and this release exists because of a difference nobody noticed.
+- **The workflow cancels superseded runs.** There was no `concurrency` block,
+  so pushing twice ran two full matrices, including two macOS jobs, for one
+  answer that mattered.
+
+### Added
+
+- **A Python floor job.** The test matrix sets up 3.12 on both runners, so it
+  could not see a module that only parses on 3.10+: that is exactly how
+  `instincts.py` shipped broken for every Mac without homebrew and CI stayed
+  green. A separate job imports every hook library under 3.9 in a few seconds.
+  Removing the `__future__` import from instincts.py fails it.
+- The runtime floor is now stated in both READMEs: Python 3.9, and no GNU
+  coreutils required.
+
 ## [4.1.1] - 2026-07-27
 
 Wiring the twenty unrun test suites in 4.1.0 put them on the CI matrix for the
