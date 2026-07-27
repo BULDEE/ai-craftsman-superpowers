@@ -58,7 +58,7 @@ _pt_watch() {
             return 124
         fi
         _pt_sleep "$step_cs"
-        waited_cs=$(( waited_cs + step_cs ))
+        waited_cs=$(( waited_cs + _PT_SLEPT_CS ))
         step_cs=$(_pt_next_step "$waited_cs")
     done
 
@@ -76,14 +76,29 @@ _pt_next_step() {
     fi
 }
 
-# Sleep for a duration given in centiseconds. Both BSD and GNU sleep accept a
-# fraction; POSIX only guarantees whole seconds, so anything under a second
-# falls back to the integer form if the fractional call is rejected.
+# Sleep for a duration given in centiseconds, reporting through _PT_SLEPT_CS
+# how long it actually slept. Both BSD and GNU sleep accept a fraction; POSIX
+# only guarantees whole seconds, so a rejected fractional call falls back to a
+# full second.
+#
+# The caller must credit the real duration, not the requested one. Crediting
+# 5cs for a fallback that slept 100cs inflated every budget twentyfold, so a
+# 2s analyser cap became 40s of blocking hook latency: the exact failure this
+# file exists to prevent. Reported through a variable rather than stdout to
+# keep the poll loop free of a command substitution per iteration.
+_PT_SLEPT_CS=0
+
 _pt_sleep() {
     local cs="$1"
     if [[ $cs -ge 100 ]]; then
         sleep $(( cs / 100 ))
+        _PT_SLEPT_CS=$(( (cs / 100) * 100 ))
         return 0
     fi
-    sleep "0.$(printf '%02d' "$cs")" 2>/dev/null || sleep 1
+    if sleep "0.$(printf '%02d' "$cs")" 2>/dev/null; then
+        _PT_SLEPT_CS=$cs
+    else
+        sleep 1
+        _PT_SLEPT_CS=100
+    fi
 }

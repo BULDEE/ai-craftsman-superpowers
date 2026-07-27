@@ -54,10 +54,10 @@ pack_sa_php() {
         safe_conf=$(mktemp -t craftsman-phpstan.XXXXXX) || safe_conf=""
         if [[ -n "$safe_conf" ]]; then
             printf 'parameters:\n    level: max\n' > "$safe_conf"
-            output=$(sa_timeout 2 $phpstan analyse "$file" --configuration="$safe_conf" --no-progress --error-format=raw 2>/dev/null) || true
+            output=$(sa_timeout "$SA_BUDGET_FILE_SECONDS" $phpstan analyse "$file" --configuration="$safe_conf" --no-progress --error-format=raw 2>/dev/null) || true
             rm -f "$safe_conf"
         else
-            output=$(sa_timeout 2 $phpstan analyse "$file" --level=max --no-progress --error-format=raw 2>/dev/null) || true
+            output=$(sa_timeout "$SA_BUDGET_FILE_SECONDS" $phpstan analyse "$file" --level=max --no-progress --error-format=raw 2>/dev/null) || true
         fi
         if [[ -n "$output" ]]; then
             while IFS= read -r line; do
@@ -83,7 +83,7 @@ pack_sa_php() {
 
     if [[ -n "$deptrac" ]]; then
         local output
-        output=$(sa_timeout 2 $deptrac analyse --no-progress --formatter=compact 2>/dev/null) || true
+        output=$(sa_timeout "$SA_BUDGET_PROJECT_SECONDS" $deptrac analyse --no-progress --formatter=compact 2>/dev/null) || true
         if [[ -n "$output" ]]; then
             local basename_file
             basename_file=$(basename "$file")

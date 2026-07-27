@@ -12,9 +12,28 @@
 # fallback is three chances for them to drift apart.
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/portable-timeout.sh"
 
+# Every analyser was capped at 2 seconds, which is below the cold start of all
+# of them: phpstan, deptrac, eslint and an `npx` that has to resolve a package
+# first. Each one therefore hit the cap, the `|| true` around it flattened the
+# 124 into success, and Levels 2 and 3 reported clean on every file they were
+# supposed to inspect. These are cold-start realistic, and they bound the worst
+# case only: a warm analyser answers well inside a second.
+SA_BUDGET_FILE_SECONDS="${CRAFTSMAN_SA_BUDGET_FILE:-15}"
+SA_BUDGET_PROJECT_SECONDS="${CRAFTSMAN_SA_BUDGET_PROJECT:-30}"
+
 # The pack adapters call sa_timeout; portable_timeout is what it is.
+#
+# A stopped analyser is not a clean file, and no caller can tell the two apart
+# once `|| true` has flattened the status. Announce it so silence is never read
+# as a pass.
 sa_timeout() {
+    local budget="$1" status
     portable_timeout "$@"
+    status=$?
+    if [[ $status -eq 124 ]]; then
+        echo "craftsman: static analysis stopped after ${budget}s, this file was not fully analysed" >&2
+    fi
+    return $status
 }
 
 sa_analyze_file() {
