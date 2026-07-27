@@ -344,6 +344,45 @@ assert_eq "Walk-up: deeper .craft-rules.yml wins for PHP002" "warn" \
 assert_eq "Walk-up: PHP002 outside Infrastructure is block" "block" \
     "$(rules_severity_for_file "$PROJECT_DIR/src/Domain/User.php" "PHP002")"
 
+# A relative path must terminate the walk.
+#
+# The loop stopped on "/" or on the project directory, both absolute, so a
+# relative path never reached either: dirname of "." is "." and it spun
+# forever. craftsman-ci passes paths relative to the working directory, which
+# is how the CI gate came to hang instead of reporting. A timeout is used
+# rather than a plain call because the failure mode is a hang, and a hung
+# assertion reports nothing at all.
+cd "$PROJECT_DIR"
+RELATIVE_SEVERITY=$(timeout 10 bash -c "
+    source '$ROOT_DIR/hooks/lib/rules-engine.sh'
+    rules_init '$PROJECT_DIR' >/dev/null 2>&1
+    rules_severity_for_file 'src/Domain/User.php' 'PHP002'
+" 2>/dev/null)
+RELATIVE_CODE=$?
+cd - >/dev/null
+
+if [[ $RELATIVE_CODE -eq 124 ]]; then
+    log_fail "Walk-up: relative path hangs the walk" \
+        "rules_severity_for_file never returned: dirname of '.' is '.'"
+elif [[ -n "$RELATIVE_SEVERITY" ]]; then
+    log_pass "Walk-up: a relative path terminates and resolves ($RELATIVE_SEVERITY)"
+else
+    log_fail "Walk-up: relative path returned nothing" "got '$RELATIVE_SEVERITY'"
+fi
+
+# Same for the sibling walk that reports which directory supplied the override.
+DEEP_DIR=$(timeout 10 bash -c "
+    source '$ROOT_DIR/hooks/lib/rules-engine.sh'
+    rules_init '$PROJECT_DIR' >/dev/null 2>&1
+    _rules_find_override_directory 'nowhere/at/all/File.php' || true
+" 2>/dev/null)
+if [[ $? -eq 124 ]]; then
+    log_fail "Walk-up: _rules_find_override_directory hangs on a relative path" \
+        "the second walk has the same missing stop condition"
+else
+    log_pass "Walk-up: the override-directory walk terminates on a relative path"
+fi
+
 # =============================================================================
 # 9. No config file => defaults apply
 # =============================================================================

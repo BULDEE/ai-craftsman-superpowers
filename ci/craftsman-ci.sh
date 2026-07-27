@@ -315,36 +315,45 @@ _ts_enabled() {
     esac
 }
 
-_should_block() {
+# block|warn|ignore for this rule on this file, the same three values the hook
+# resolves. It used to be a boolean, which collapsed "ignore" into "warn": a
+# directory that had switched a rule off still had every finding printed in the
+# pipeline while the hook stayed silent on the same file.
+_severity_for() {
     local rule="$1" file="${2:-}"
     if [[ "$RULES_ENGINE_AVAILABLE" == true ]]; then
-        local sev
         # rules_severity_for_file, not rules_severity: the hooks honour a
         # directory-level .craft-rules.yml and CI did not, so a directory a
         # team had deliberately relaxed still failed the pipeline. That is the
         # drift this pipeline exists to not have.
         if [[ -n "$file" ]]; then
-            sev=$(rules_severity_for_file "$file" "$rule")
+            # Absolute, because the walk up to the project root is what makes a
+            # directory override apply. CI is handed paths relative to the
+            # working directory, and a relative walk stops at "." without ever
+            # reaching the root that holds the override.
+            local abs_file="$file"
+            [[ "$abs_file" != /* ]] && abs_file="$PWD/$file"
+            rules_severity_for_file "$abs_file" "$rule"
         else
-            sev=$(rules_severity "$rule")
+            rules_severity "$rule"
         fi
-        [[ "$sev" == "block" ]]
-    else
-        # Standalone fallback, used only when the rules engine could not be
-        # sourced. This list must match _rules_is_advisory in
-        # hooks/lib/rules-engine.sh; tests/ci/test-craftsman-ci.sh fails when
-        # the two diverge.
-        case "$rule" in
-            WARN*|PHP005|NEST001|LOC001|GOD001|PARAM001|CTRL001|RATCHET001) return 1 ;;
-            TS002|TS003|PHP003) return 1 ;;
-        esac
-        case "$STRICTNESS" in
-            strict)   return 0 ;;
-            moderate) [[ "$rule" == LAYER* || "$rule" == SEC* ]] && return 0; return 1 ;;
-            relaxed)  return 1 ;;
-            *)        return 0 ;;
-        esac
+        return 0
     fi
+
+    # Standalone fallback, used only when the rules engine could not be
+    # sourced. This list must match _rules_is_advisory in
+    # hooks/lib/rules-engine.sh; tests/ci/test-craftsman-ci.sh fails when
+    # the two diverge.
+    case "$rule" in
+        WARN*|PHP005|NEST001|LOC001|GOD001|PARAM001|CTRL001|RATCHET001) echo "warn"; return 0 ;;
+        TS002|TS003|PHP003) echo "warn"; return 0 ;;
+    esac
+    case "$STRICTNESS" in
+        strict)   echo "block" ;;
+        moderate) [[ "$rule" == LAYER* || "$rule" == SEC* ]] && echo "block" || echo "warn" ;;
+        relaxed)  echo "warn" ;;
+        *)        echo "block" ;;
+    esac
 }
 
 # =============================================================================
@@ -371,7 +380,14 @@ _add_violation() {
     local rule="$3"
     local message="$4"
 
-    if _should_block "$rule" "$file"; then
+    local severity
+    severity=$(_severity_for "$rule" "$file")
+
+    # The hook drops an ignored rule before it reaches any output. CI has to do
+    # the same or the two disagree on a file the team switched the rule off for.
+    [[ "$severity" == "ignore" ]] && return 0
+
+    if [[ "$severity" == "block" ]]; then
         V_FILES+=("$file")
         V_LINES+=("$line")
         V_RULES+=("$rule")

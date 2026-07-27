@@ -577,8 +577,8 @@ echo "=== No drift between the hooks and the pipeline ==="
 # shared. A copy drifts unless something compares it.
 ENGINE_ADVISORY=$(awk '/^_rules_is_advisory\(\)/,/^}/' "$ROOT_DIR/hooks/lib/rules-engine.sh" \
     | grep -oE "^[[:space:]]+[A-Z0-9*|]+\)" | tr -d ' )' | tr '|' '\n' | sort -u)
-CI_ADVISORY=$(awk '/^_should_block\(\)/,/^}/' "$ROOT_DIR/ci/craftsman-ci.sh" \
-    | grep -E "return 1 ;;" | grep -oE "^[[:space:]]+[A-Z0-9*|]+\)" | tr -d ' )' | tr '|' '\n' | sort -u)
+CI_ADVISORY=$(awk '/^_severity_for\(\)/,/^}/' "$ROOT_DIR/ci/craftsman-ci.sh" \
+    | grep -E 'echo "warn"; return 0 ;;' | grep -oE "^[[:space:]]+[A-Z0-9*|]+\)" | tr -d ' )' | tr '|' '\n' | sort -u)
 
 if [[ -z "$ENGINE_ADVISORY" || -z "$CI_ADVISORY" ]]; then
     log_fail "advisory lists unreadable" \

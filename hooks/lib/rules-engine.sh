@@ -431,28 +431,46 @@ _rules_check_directory_override() {
     return 1
 }
 
+# The severity this one directory declares for the rule, cache first.
+_rules_severity_in_dir() {
+    local directory="$1" rule_id="$2"
+    local directory_key cached
+    directory_key=$(echo "$directory" | sed 's|/|__|g')
+
+    cached=$(_rules_get "dir_cache" "${directory_key}:${rule_id}")
+    if [[ -n "$cached" ]]; then
+        echo "$cached"
+        return 0
+    fi
+
+    _rules_check_directory_override "$directory" "$directory_key" "$rule_id"
+}
+
+# The next directory up, or nothing when the walk is over. The project root and
+# "/" are absolute, so a relative path reaches neither: dirname of "." is "."
+# and the walk spins forever. Whoever calls this decides the path shape, so
+# termination cannot depend on them getting it right.
+_rules_next_dir_up() {
+    local directory="$1"
+    [[ "$directory" == "$_RULES_PROJECT_DIR" || "$directory" == "/" ]] && return 1
+
+    local parent
+    parent=$(dirname "$directory")
+    [[ "$parent" == "$directory" ]] && return 1
+    printf '%s' "$parent"
+}
+
 _rules_search_parent_dirs() {
     local current_directory="$1"
     local rule_id="$2"
 
     while [[ -n "$current_directory" ]]; do
-        local directory_key
-        directory_key=$(echo "$current_directory" | sed 's|/|__|g')
-
-        local cached_severity
-        cached_severity=$(_rules_get "dir_cache" "${directory_key}:${rule_id}")
-        if [[ -n "$cached_severity" ]]; then
-            echo "$cached_severity"
-            return 0
-        fi
-
-        cached_severity=$(_rules_check_directory_override "$current_directory" "$directory_key" "$rule_id") && {
-            echo "$cached_severity"
+        local severity
+        severity=$(_rules_severity_in_dir "$current_directory" "$rule_id") && {
+            echo "$severity"
             return 0
         }
-
-        [[ "$current_directory" == "$_RULES_PROJECT_DIR" || "$current_directory" == "/" ]] && break
-        current_directory=$(dirname "$current_directory")
+        current_directory=$(_rules_next_dir_up "$current_directory") || break
     done
     return 1
 }
@@ -477,7 +495,15 @@ _rules_find_override_directory() {
     while [[ -n "$current_directory" ]]; do
         [[ -f "$current_directory/.craft-rules.yml" ]] && { echo "$current_directory"; return 0; }
         [[ "$current_directory" == "$_RULES_PROJECT_DIR" || "$current_directory" == "/" ]] && break
-        current_directory=$(dirname "$current_directory")
+
+        local parent
+        parent=$(dirname "$current_directory")
+        # The two stops above are absolute, so a relative path never reaches
+        # either: dirname of "." is "." and the walk spins forever. Whoever
+        # calls this decides the path shape, so termination cannot depend on
+        # them getting it right. Stop as soon as dirname stops moving.
+        [[ "$parent" == "$current_directory" ]] && break
+        current_directory="$parent"
     done
     return 1
 }
