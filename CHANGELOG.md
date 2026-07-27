@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.1] - 2026-07-27
+
+Corrects two settings that did not do what the repository believed, and removes
+documentation for a subsystem 4.0.0 deleted.
+
+### Added
+
+- **Per-task model tiering**: every skill declares the cheapest model that can
+  do its job (`haiku` for mechanical work, `sonnet` for bounded pattern
+  application, `opus` for judgment that spans files) alongside its effort
+  level. The tiering was documented in
+  [Model Tiering Explained](docs/guides/model-tiering-explained.md) since v1 but
+  never implemented: no skill declared a model, so every skill ran on whatever
+  the session happened to be set to. Tiers are aliases rather than pinned model
+  ids, so they follow model releases and a whole tier can be remapped with
+  `ANTHROPIC_DEFAULT_*_MODEL`.
+
+### Fixed
+
+- **`effort` used values Claude Code does not recognise.** `effort` is Claude
+  Code's own frontmatter key and accepts `low`, `medium`, `high`, `xhigh`,
+  `max`. Eleven of twenty-one skills declared `quick` or `heavy`, a project
+  convention that predates the key. Agents already used the real levels. The
+  deep-reasoning skills now declare `xhigh`; `high` would have been a no-op
+  because it is the default.
+- **Skills reference** was missing `healthcheck`, `legacy`, and `workflow`, and
+  carried no tier information. The table is now generated from the frontmatter
+  it documents.
+- **Hooks reference** documented 8 of the 13 wired events, omitting the
+  `TaskCompleted` evidence gate introduced in 4.0.0 along with `SubagentStop`,
+  `PostToolUseFailure`, `PreCompact`, and `PostCompact`.
+- **Installation guide** walked new users through building and configuring the
+  `knowledge-rag` MCP server, removed in 4.0.0 by
+  [ADR-0024](docs/adr/0024-okf-knowledge-bundle.md).
+- **Advanced guide** posed the scenario ADR-0024 decided (a few hundred curated
+  Markdown files, technical questions, high accuracy) and answered it with the
+  architecture the plugin abandoned for that case. It now teaches the decision:
+  whether an embedding index is justified at all, with deterministic lookup and
+  a lexical index as first-class outcomes.
+- **README** claimed bash agent-hook wrappers became native Haiku-tiered
+  `agent`/`prompt` hooks. ADR-0018 decided the opposite: all hooks are
+  `type: command` because the native types offer no per-plugin option gating,
+  which would remove the ability to disable verification. Badges also
+  understated the plugin at 18+ commands and 6+ agents against 21 skills and 12
+  agents, and the ADR count was four behind.
+- **CI validators**: the skills validator required `name` and `model`, both
+  optional per Claude Code, and read frontmatter keys from the whole file, so a
+  YAML sample inside a skill body was mistaken for a declared field. The
+  agent-effort test read a `plugin.json` key that does not exist and therefore
+  passed vacuously; it now checks `agents/*.md`.
+- **Secrets scanner** flagged its own test fixtures, failing the pipeline on
+  4.0.0 and gating every other job.
+
 ## [4.0.0] - 2026-07-26
 
 A clean break to a native-first, self-learning, security-hardened plugin.
