@@ -113,6 +113,22 @@ _channels_parse_nested_yml() {
 # Parse channels section from .craft-config.yml and set module vars.
 # Falls back to defaults if no config file or missing keys.
 # =============================================================================
+# Each of these four values comes from the repository's own .craft-config.yml
+# and ends up inside an arithmetic expansion: $(( now + ttl )) in cache_set,
+# $(( count - max_entries )) in cache_evict. Bash evaluates an array subscript
+# there as code, so cache_ttl: "a[$(id > /tmp/pwned)]" executes on the first
+# cached call. Only a plain integer is taken; anything else keeps the default.
+# The 10-digit bound keeps the sum inside a 64-bit signed range.
+_channels_numeric() {
+    local value="$1" default="$2" key="$3"
+    if [[ "$value" =~ ^[0-9]{1,10}$ ]]; then
+        printf '%s' "$value"
+        return 0
+    fi
+    echo "craftsman: ignoring non-numeric '$key' in .craft-config.yml, using $default" >&2
+    printf '%s' "$default"
+}
+
 _channels_load_config() {
     local channel="$1"
 
@@ -125,10 +141,14 @@ _channels_load_config() {
     [[ -f "$config_file" ]] || return 0
 
     local val
-    val=$(_channels_parse_nested_yml "$channel" "circuit_threshold" "$config_file") && _CHANNEL_THRESHOLD="$val"
-    val=$(_channels_parse_nested_yml "$channel" "circuit_cooldown" "$config_file") && _CHANNEL_COOLDOWN="$val"
-    val=$(_channels_parse_nested_yml "$channel" "cache_ttl" "$config_file") && _CHANNEL_CACHE_TTL="$val"
-    val=$(_channels_parse_nested_yml "$channel" "cache_max_entries" "$config_file") && _CHANNEL_CACHE_MAX="$val"
+    val=$(_channels_parse_nested_yml "$channel" "circuit_threshold" "$config_file") \
+        && _CHANNEL_THRESHOLD=$(_channels_numeric "$val" 3 "circuit_threshold")
+    val=$(_channels_parse_nested_yml "$channel" "circuit_cooldown" "$config_file") \
+        && _CHANNEL_COOLDOWN=$(_channels_numeric "$val" 300 "circuit_cooldown")
+    val=$(_channels_parse_nested_yml "$channel" "cache_ttl" "$config_file") \
+        && _CHANNEL_CACHE_TTL=$(_channels_numeric "$val" 3600 "cache_ttl")
+    val=$(_channels_parse_nested_yml "$channel" "cache_max_entries" "$config_file") \
+        && _CHANNEL_CACHE_MAX=$(_channels_numeric "$val" 200 "cache_max_entries")
 }
 
 # =============================================================================

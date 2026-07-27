@@ -32,8 +32,19 @@ _cache_entry_file() {
     echo "$(_cache_channel_dir "$channel")/${hash}.json"
 }
 
+# $(( now + ttl )) and $(( count - max_entries )) below evaluate an array
+# subscript as code, so a caller that forwards an unvalidated config value
+# hands over command execution. channels.sh already filters what it reads from
+# .craft-config.yml; this is the second line, for any other caller.
+_cache_numeric() {
+    local value="$1" default="$2"
+    [[ "$value" =~ ^[0-9]{1,10}$ ]] && { printf '%s' "$value"; return 0; }
+    printf '%s' "$default"
+}
+
 cache_set() {
-    local channel="$1" key="$2" value="$3" ttl="${4:-300}"
+    local channel="$1" key="$2" value="$3" ttl
+    ttl=$(_cache_numeric "${4:-300}" 300)
     local dir
     dir=$(_cache_channel_dir "$channel")
     mkdir -p "$dir"
@@ -79,7 +90,8 @@ cache_get_stale() {
 }
 
 cache_evict() {
-    local channel="$1" max_entries="${2:-100}"
+    local channel="$1" max_entries
+    max_entries=$(_cache_numeric "${2:-100}" 100)
     local dir
     dir=$(_cache_channel_dir "$channel")
     [[ -d "$dir" ]] || return 0

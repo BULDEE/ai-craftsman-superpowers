@@ -33,6 +33,11 @@ LANG_BY_EXT = {
     ".py": "py", ".go": "go", ".rs": "rs", ".sh": "bash",
 }
 
+# Same cap as the write-time gate, taken from it so the two cannot drift.
+# Counting lines is lazy, but a file with no newline in it is one line: a 400MB
+# minified bundle or vendored blob took 952MB of RSS to "count".
+MAX_SOURCE_BYTES = getattr(structural_metrics, "MAX_SOURCE_BYTES", 2 * 1024 * 1024)
+
 
 def parse_args(argv):
     since, top, as_json, path = "12.month", 30, False, "."
@@ -78,6 +83,8 @@ def complexity_of(abspath):
     """LOC plus structural-finding count as a language-neutral complexity proxy."""
     try:
         if os.path.islink(abspath) or not os.path.isfile(os.path.realpath(abspath)):
+            return 0, 0
+        if os.path.getsize(abspath) > MAX_SOURCE_BYTES:
             return 0, 0
         with open(abspath, "r", encoding="utf-8", errors="replace") as handle:
             loc = sum(1 for _ in handle)

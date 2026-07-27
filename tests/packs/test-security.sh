@@ -31,8 +31,8 @@ echo "=== PHP security (symfony pack) ==="
 cat > "$TEST_DIR/Secret.php" <<'PHP'
 <?php
 final class Secret {
-    private string $apiKey = "sk_live_abcdef1234567890abcdef";
-    private string $password = "hunter2secret";
+    private string $apiKey = "sk_live_abcdef1234567890abcdef"; // secrets-scan: allow
+    private string $password = "hunter2secret"; // secrets-scan: allow
 }
 PHP
 reset_findings
@@ -270,7 +270,7 @@ echo "=== Ignore directive ==="
 cat > "$TEST_DIR/Ignored.php" <<'PHP'
 <?php
 final class Ignored {
-    private string $apiKey = "sk_live_abcdef1234567890abcdef"; // craftsman-ignore: SEC001
+    private string $apiKey = "sk_live_abcdef1234567890abcdef"; // craftsman-ignore: SEC001 secrets-scan: allow
 }
 PHP
 reset_findings

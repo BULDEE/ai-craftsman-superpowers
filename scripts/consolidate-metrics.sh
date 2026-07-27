@@ -63,33 +63,77 @@ sql_quote() {
     printf '%s' "${1//$q/$q$q}"
 }
 
-# Per table, the columns that identify a row well enough to detect a re-run.
-# `id` is excluded everywhere: it is reassigned on insert.
-merge_table() {
-    local src_db="$1" table="$2" cols="$3" key="$4"
-    local src_db_sql
-    src_db_sql=$(sql_quote "$src_db")
+# A locked database, a schema that drifted, a source written by an older
+# version: every one of those makes sqlite3 print to stderr and return nothing.
+# With stderr discarded, the empty result read as "0 rows to merge" and the
+# script went on to report a clean consolidation while silently dropping the
+# whole source. Failures are now counted and surfaced.
+MERGE_ERRORS=0
 
-    local pending
-    pending=$(sqlite3 "$TARGET_DB" \
+run_sql() {
+    local label="$1" sql="$2"
+    local err_file out status=0
+    err_file=$(mktemp)
+    out=$(sqlite3 "$TARGET_DB" "$sql" 2>"$err_file") || status=$?
+    if [[ $status -ne 0 || -s "$err_file" ]]; then
+        echo "  ${label}: sqlite failed: $(tr '\n' ' ' < "$err_file")" >&2
+        rm -f "$err_file"
+        return 1
+    fi
+    rm -f "$err_file"
+    printf '%s' "$out"
+}
+
+merge_failed() {
+    local table="$1" reason="$2"
+    echo "  ${table}: NOT MERGED, ${reason}" >&2
+    MERGE_ERRORS=$((MERGE_ERRORS + 1))
+}
+
+count_pending() {
+    local src_db_sql="$1" table="$2" key="$3"
+    run_sql "$table" \
         "ATTACH '${src_db_sql}' AS src;
          SELECT COUNT(*) FROM src.${table} s
          WHERE NOT EXISTS (
              SELECT 1 FROM main.${table} m WHERE ${key}
-         );" 2>/dev/null)
+         );"
+}
 
-    [[ -z "$pending" ]] && pending=0
-    echo "  ${table}: ${pending} row(s) to merge"
-
-    [[ "$EXECUTE" -eq 0 || "$pending" -eq 0 ]] && return 0
-
-    sqlite3 "$TARGET_DB" \
+insert_pending() {
+    local src_db_sql="$1" table="$2" cols="$3" key="$4"
+    run_sql "$table" \
         "ATTACH '${src_db_sql}' AS src;
          INSERT INTO main.${table} (${cols})
          SELECT ${cols} FROM src.${table} s
          WHERE NOT EXISTS (
              SELECT 1 FROM main.${table} m WHERE ${key}
-         );" 2>/dev/null
+         );" >/dev/null
+}
+
+# Per table, the columns that identify a row well enough to detect a re-run.
+# `id` is excluded everywhere: it is reassigned on insert.
+merge_table() {
+    local src_db="$1" table="$2" cols="$3" key="$4"
+    local src_db_sql pending
+    src_db_sql=$(sql_quote "$src_db")
+
+    if ! pending=$(count_pending "$src_db_sql" "$table" "$key"); then
+        merge_failed "$table" "the source could not be read"
+        return 1
+    fi
+    if ! [[ "$pending" =~ ^[0-9]+$ ]]; then
+        merge_failed "$table" "unreadable row count '${pending}'"
+        return 1
+    fi
+
+    echo "  ${table}: ${pending} row(s) to merge"
+    [[ "$EXECUTE" -eq 0 || "$pending" -eq 0 ]] && return 0
+
+    if ! insert_pending "$src_db_sql" "$table" "$cols" "$key"; then
+        merge_failed "$table" "the insert failed"
+        return 1
+    fi
 }
 
 if [[ "$EXECUTE" -eq 1 ]]; then
@@ -128,4 +172,11 @@ if [[ "$EXECUTE" -eq 1 ]]; then
     echo "Sources were left untouched. Remove them once the totals look right."
 else
     echo "Dry run complete."
+fi
+
+if [[ "$MERGE_ERRORS" -gt 0 ]]; then
+    echo ""
+    echo "${MERGE_ERRORS} merge step(s) failed: this consolidation is INCOMPLETE." >&2
+    echo "Do not delete any source database." >&2
+    exit 1
 fi

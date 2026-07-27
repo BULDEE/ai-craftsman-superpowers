@@ -373,6 +373,62 @@ assert_produced_output "codemap runs on the injected tree" "$MAP" && {
 }
 
 echo ""
+echo "=== A repo cannot run commands through a channel number ==="
+
+CHANREPO="$WORK/channel-repo"
+mkdir -p "$CHANREPO"
+CHAN_WITNESS="$WORK/channel-pwned"
+# The YAML reader strips spaces, so the payload uses ${IFS}. It lands in
+# $(( now + ttl )), where bash evaluates an array subscript as a command.
+cat > "$CHANREPO/.craft-config.yml" <<YAML
+channels:
+  sentry:
+    cache_ttl: "a[\$(touch\${IFS}$CHAN_WITNESS)]"
+    cache_max_entries: 200
+YAML
+
+cd "$CHANREPO"
+CHAN_TTL=$(CLAUDE_PLUGIN_DATA="$WORK/chan-data" bash -c "
+    source '$ROOT_DIR/hooks/lib/channel-cache.sh'
+    source '$ROOT_DIR/hooks/lib/channels.sh'
+    _channels_load_config sentry 2>/dev/null
+    cache_set sentry k v \"\$_CHANNEL_CACHE_TTL\"
+    printf '%s' \"\$_CHANNEL_CACHE_TTL\"
+" 2>/dev/null)
+
+if [[ ! -f "$CHAN_WITNESS" ]]; then
+    log_pass "a hostile cache_ttl does not reach the arithmetic evaluator"
+else
+    log_fail "command injection" "config value executed: $CHAN_WITNESS created"
+    rm -f "$CHAN_WITNESS"
+fi
+
+if [[ "$CHAN_TTL" == "3600" ]]; then
+    log_pass "the rejected value falls back to the default rather than propagating"
+else
+    log_fail "channel config" "expected the 3600 default, got '$CHAN_TTL'"
+fi
+
+# The counter-test: a legitimate number still has to get through, or the guard
+# above is satisfied by a loader that discards everything.
+cat > "$CHANREPO/.craft-config.yml" <<'YAML'
+channels:
+  sentry:
+    cache_ttl: 42
+    cache_max_entries: 200
+YAML
+GOOD_TTL=$(CLAUDE_PLUGIN_DATA="$WORK/chan-data" bash -c "
+    source '$ROOT_DIR/hooks/lib/channels.sh'
+    _channels_load_config sentry 2>/dev/null
+    printf '%s' \"\$_CHANNEL_CACHE_TTL\"
+" 2>/dev/null)
+if [[ "$GOOD_TTL" == "42" ]]; then
+    log_pass "a numeric cache_ttl from the same file is still honoured"
+else
+    log_fail "channel config" "legitimate value dropped: got '$GOOD_TTL'"
+fi
+
+echo ""
 echo "=== A repo cannot get its own binaries run by the quality gate ==="
 
 TOOLREPO="$WORK/tool-repo"

@@ -35,8 +35,16 @@ _cb_write() {
     echo "$json" > "$file"
 }
 
+_cb_numeric() {
+    local value="$1" default="$2"
+    [[ "$value" =~ ^[0-9]{1,10}$ ]] && { printf '%s' "$value"; return 0; }
+    printf '%s' "$default"
+}
+
 cb_init() {
-    local channel="$1" threshold="${2:-3}" cooldown="${3:-300}"
+    local channel="$1" threshold cooldown
+    threshold=$(_cb_numeric "${2:-3}" 3)
+    cooldown=$(_cb_numeric "${3:-300}" 300)
     mkdir -p "$_CB_STATE_DIR"
     local file
     file=$(_cb_state_file "$channel")
@@ -62,7 +70,13 @@ cb_state() {
     cooldown=$(jq -r '.cooldown_seconds' "$file" 2>/dev/null)
     now=$(date +%s)
 
-    if [[ "$raw_state" == "open" ]] && [[ -n "$opened_at" ]] && [[ "$opened_at" != "null" ]]; then
+    # $(( now - opened_at )) and -ge both evaluate their operands as arithmetic,
+    # where an array subscript runs as a command. The state file is ours, but it
+    # was written from values a repository supplied, so neither is trusted here.
+    opened_at=$(_cb_numeric "$opened_at" 0)
+    cooldown=$(_cb_numeric "$cooldown" 300)
+
+    if [[ "$raw_state" == "open" ]] && [[ "$opened_at" -gt 0 ]]; then
         local elapsed=$(( now - opened_at ))
         if [[ $elapsed -ge $cooldown ]]; then
             echo "half-open"
@@ -100,8 +114,8 @@ _cb_check_threshold() {
     local now="$3"
 
     local new_failures threshold
-    new_failures=$(jq '.failures + 1' "$file")
-    threshold=$(jq '.threshold' "$file")
+    new_failures=$(_cb_numeric "$(jq '.failures + 1' "$file")" 1)
+    threshold=$(_cb_numeric "$(jq '.threshold' "$file")" 3)
 
     local new_state="closed"
     local opened_at_val="null"
