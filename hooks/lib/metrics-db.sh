@@ -64,7 +64,13 @@ _metrics_migrate_severity_info() {
     local has_info
     has_info=$(sqlite3 "$METRICS_DB" "SELECT sql FROM sqlite_master WHERE name='violations';" 2>/dev/null)
     if [[ -n "$has_info" ]] && ! echo "$has_info" | grep -q "'info'"; then
+        # Wrapped in a transaction, and copying named columns rather than
+        # SELECT *, which maps by position: a schema that had drifted by one
+        # column would have silently shifted every value one place. A failure
+        # midway used to leave violations empty and violations_old orphaned,
+        # with no backup to restore from.
         sqlite3 "$METRICS_DB" <<'MIGRATE'
+BEGIN IMMEDIATE;
 ALTER TABLE violations RENAME TO violations_old;
 CREATE TABLE violations (
     id INTEGER PRIMARY KEY,
@@ -76,9 +82,11 @@ CREATE TABLE violations (
     blocked BOOLEAN NOT NULL DEFAULT 0,
     ignored BOOLEAN NOT NULL DEFAULT 0
 );
-INSERT INTO violations SELECT * FROM violations_old;
+INSERT INTO violations (id, timestamp, project_hash, rule, file_pattern, severity, blocked, ignored)
+    SELECT id, timestamp, project_hash, rule, file_pattern, severity, blocked, ignored FROM violations_old;
 DROP TABLE violations_old;
 CREATE INDEX IF NOT EXISTS idx_violations_project ON violations(project_hash, timestamp);
+COMMIT;
 MIGRATE
     fi
 }
@@ -130,7 +138,17 @@ _metrics_migrate_source_column() {
     done
 }
 
+# The DDL goes through the sqlite3 binary while the DML goes through python.
+# Without sqlite3 no table was ever created, python then made an empty file,
+# every INSERT raised "no such table", and each caller swallowed it: the
+# healthcheck reported 0 rows, indistinguishable from a quiet week. The
+# portability audit that added portable-timeout stopped at `timeout` and never
+# asked which other binary the plugin assumes.
 metrics_init() {
+    if ! command -v sqlite3 >/dev/null 2>&1; then
+        echo "craftsman: sqlite3 not found, metrics are disabled for this session" >&2
+        return 1
+    fi
     mkdir -p "$METRICS_DB_DIR"
     _metrics_migrate_legacy_location
     _metrics_create_core_tables
@@ -177,12 +195,21 @@ metrics_file_pattern() {
     echo "${file#"$project_root"/}" | sed -E 's/\/[^\/]+\.([A-Za-z0-9]+)$/\/**\/*.\1/'
 }
 
+# A rule id is an identifier. 21 rows hold source fragments such as
+# "// Start...')" because the id was taken from whatever the caller passed,
+# and a validator that mis-parses a line then writes that line into the
+# column every trend groups by.
+_metrics_rule_is_valid() {
+    [[ "$1" =~ ^[A-Za-z][A-Za-z0-9_-]{1,39}$ ]]
+}
+
 metrics_record_violation() {
     local rule="$1"
     local file_pattern="$2"
     local severity="$3"
     local blocked="${4:-0}"
     local ignored="${5:-0}"
+    _metrics_rule_is_valid "$rule" || return 0
     local project_hash
     project_hash=$(metrics_project_hash)
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
