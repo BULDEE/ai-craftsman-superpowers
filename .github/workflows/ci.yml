@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+# A push that supersedes another leaves the older run going to completion, and
+# the macOS matrix leg bills at ten times the Linux rate. Two pushes in a row
+# cost two full macOS jobs for one answer that matters.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -513,6 +520,46 @@ jobs:
 
       - name: Run ruff (style, informational)
         run: ruff check hooks/lib/*.py || echo "::warning::ruff found style issues (non-blocking) - see log above"
+
+  python-floor:
+    name: Python Floor (3.9)
+    runs-on: ubuntu-latest
+    needs: [secrets-scan]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      # The test matrix sets up 3.12 on both runners, so it cannot see a
+      # module that only parses on 3.10+. instincts.py annotated `str | None`
+      # and raised TypeError on import under 3.9, which is what
+      # /usr/bin/python3 is on a Mac without homebrew: the whole instinct
+      # pipeline was dead there and CI was green. Importing every module under
+      # the floor costs seconds and closes that hole.
+      - name: Setup Python 3.9
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.9'
+
+      - name: Every hook library imports under the oldest supported Python
+        run: |
+          failed=0
+          for module in hooks/lib/*.py; do
+            if python3 - "$module" <<'PY'
+          import importlib.util, sys
+          spec = importlib.util.spec_from_file_location("m", sys.argv[1])
+          module = importlib.util.module_from_spec(spec)
+          try:
+              spec.loader.exec_module(module)
+          except SystemExit:
+              pass
+          PY
+            then
+              echo "  ok   $module"
+            else
+              echo "  FAIL $module"
+              failed=1
+            fi
+          done
+          exit $failed
 
   run-tests:
     name: Run Test Suite (${{ matrix.os }})

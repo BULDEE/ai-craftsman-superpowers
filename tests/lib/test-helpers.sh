@@ -223,41 +223,12 @@ restore_home_bridges() {
 }
 
 # --- Portable timeout ---
-#
-# `timeout` is GNU coreutils and is absent on a stock macOS. Tests that wrapped
-# a command in it got exit 127 and empty output on those machines, which reads
-# as "the tool produced nothing" rather than "the timeout binary is missing":
-# four assertions failed that way on the macOS CI runner while passing on a Mac
-# with coreutils installed. The fallback is a background job with a watchdog,
-# so the budget still holds where the binary does not exist.
+# The one implementation lives in hooks/lib/portable-timeout.sh, because a copy
+# here would drift from the one the product uses.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../hooks/lib" && pwd)/portable-timeout.sh"
+
 run_with_timeout() {
-    local seconds="$1"; shift
-
-    if command -v timeout >/dev/null 2>&1; then
-        timeout "$seconds" "$@"
-        return $?
-    fi
-    if command -v gtimeout >/dev/null 2>&1; then
-        gtimeout "$seconds" "$@"
-        return $?
-    fi
-
-    # <&0 matters: bash redirects a background job's stdin from /dev/null unless
-    # it is explicitly redirected, and every hook in this repository is fed its
-    # payload on stdin. Without it the command reads nothing and returns as if
-    # there were no input.
-    "$@" <&0 &
-    local pid=$! waited=0
-    while kill -0 "$pid" 2>/dev/null; do
-        if [[ $waited -ge $seconds ]]; then
-            kill -9 "$pid" 2>/dev/null
-            wait "$pid" 2>/dev/null
-            return 124
-        fi
-        sleep 1
-        waited=$((waited + 1))
-    done
-    wait "$pid"
+    portable_timeout "$@"
 }
 
 # --- Summary ---

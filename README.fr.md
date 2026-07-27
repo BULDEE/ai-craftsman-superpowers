@@ -88,6 +88,8 @@ Tout le reste continue de fonctionner sur un dépôt non fiable : rules engine, 
 ## Prérequis
 
 - Claude Code v2.1.218 ou plus récent (`claude --version` pour vérifier). Versions plus anciennes : installez la branche gelée 3.9.x.
+- `python3` 3.9 ou plus récent. Ce plancher est celui de `/usr/bin/python3` sur un Mac sans homebrew ; la CI importe chaque bibliothèque de hook sous 3.9, donc le plancher ne peut pas remonter en silence.
+- `bash`, `grep`, `jq`, `sqlite3`. GNU coreutils n'est pas requis : le plugin fonctionne sur un macOS d'origine.
 
 ## Installation
 

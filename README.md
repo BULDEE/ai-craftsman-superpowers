@@ -85,6 +85,8 @@ Everything else keeps working on an untrusted repository: the rules engine, laye
 ## Requirements
 
 - Claude Code v2.1.218 or later (`claude --version` to check). Older versions: install the frozen 3.9.x line.
+- `python3` 3.9 or later. That is the floor because it is what `/usr/bin/python3` is on a Mac without homebrew; CI imports every hook library under 3.9 so the floor cannot silently rise.
+- `bash`, `grep`, `jq`, `sqlite3`. GNU coreutils is not required: the plugin runs on a stock macOS.
 
 ## Installation
 
