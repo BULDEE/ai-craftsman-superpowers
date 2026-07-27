@@ -22,6 +22,11 @@ _check_php002() {
     grep -q "^class " "$file" 2>/dev/null || return 0
     grep -q "final class" "$file" 2>/dev/null && return 0
     grep -qE "(interface |trait |abstract class )" "$file" 2>/dev/null && return 0
+    # A Doctrine entity cannot be final while the ORM builds lazy-loading
+    # proxies by extending it, so this rule was telling every Symfony project
+    # to break its own persistence layer. Teams on lazy ghosts (ORM 2.14+) can
+    # make entities final; the rule simply stops demanding it either way.
+    grep -qE "#\[\s*ORM\\\\Entity|@ORM\\\\Entity" "$file" 2>/dev/null && return 0
     add_violation "PHP002" "Class should be final"
 }
 

@@ -8,34 +8,48 @@
 #   These are provided by the orchestrator (post-write-check.sh) before sourcing.
 # =============================================================================
 
+# "App" is only the Symfony skeleton's default root namespace. Hardcoding it
+# meant every project that renamed its root, and every package in a monorepo,
+# passed all three layer rules by construction. The root now comes from
+# composer.json (see config_php_namespace_root); "App" remains the fallback
+# when there is no composer.json to read.
+_layer_ns_regex() {
+    local file="$1" root
+    if declare -F config_php_namespace_root >/dev/null 2>&1; then
+        root=$(config_php_namespace_root "$(dirname "$file")")
+    fi
+    [[ -n "${root:-}" ]] || root="App"
+    # A backslash in the root has to survive into the ERE as a literal.
+    printf '%s' "${root//\\/\\\\}"
+}
+
+# In this layer, is the file part of $layer? Path or declared namespace.
+_layer_is() {
+    local file="$1" ns="$2" layer="$3"
+    [[ "$file" == *"/${layer}/"* ]] && return 0
+    grep -qE "namespace\s+${ns}\\\\${layer}" "$file" 2>/dev/null
+}
+
+_layer_imports() {
+    local file="$1" ns="$2" layer="$3"
+    grep -qE "use\s+${ns}\\\\${layer}" "$file" 2>/dev/null
+}
+
 pack_validate_php_layers() {
     local file="$1"
+    local ns
+    ns=$(_layer_ns_regex "$file")
 
-    local is_domain=false
-    local is_application=false
-
-    # Check path OR namespace
-    if [[ "$file" == *"/Domain/"* ]] || grep -qE "namespace\s+App\\\\Domain" "$file" 2>/dev/null; then
-        is_domain=true
-    fi
-    if [[ "$file" == *"/Application/"* ]] || grep -qE "namespace\s+App\\\\Application" "$file" 2>/dev/null; then
-        is_application=true
+    if _layer_is "$file" "$ns" "Domain"; then
+        _layer_imports "$file" "$ns" "Infrastructure" \
+            && add_violation "LAYER001" "Domain imports Infrastructure - DDD layer violation"
+        _layer_imports "$file" "$ns" "Presentation" \
+            && add_violation "LAYER002" "Domain imports Presentation - DDD layer violation"
     fi
 
-    # Domain must not import Infrastructure
-    if [[ "$is_domain" == true ]]; then
-        if grep -qE "use\s+App\\\\Infrastructure" "$file" 2>/dev/null; then
-            add_violation "LAYER001" "Domain imports Infrastructure - DDD layer violation"
-        fi
-        if grep -qE "use\s+App\\\\Presentation" "$file" 2>/dev/null; then
-            add_violation "LAYER002" "Domain imports Presentation - DDD layer violation"
-        fi
+    if _layer_is "$file" "$ns" "Application"; then
+        _layer_imports "$file" "$ns" "Presentation" \
+            && add_violation "LAYER003" "Application imports Presentation - DDD layer violation"
     fi
-
-    # Application must not import Presentation
-    if [[ "$is_application" == true ]]; then
-        if grep -qE "use\s+App\\\\Presentation" "$file" 2>/dev/null; then
-            add_violation "LAYER003" "Application imports Presentation - DDD layer violation"
-        fi
-    fi
+    return 0
 }

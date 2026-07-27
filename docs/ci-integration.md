@@ -190,21 +190,34 @@ bash ci/craftsman-ci.sh --format text
 
 ### Rule codes
 
-| Rule | Language | Description |
-|------|----------|-------------|
-| `PHP001` | PHP | Missing `declare(strict_types=1)` |
-| `PHP002` | PHP | Non-final class |
-| `PHP003` | PHP | Public setter method |
-| `PHP004` | PHP | `new DateTime()` usage |
-| `PHP005` | PHP | Empty catch block (warning) |
-| `TS001` | TypeScript | `any` type usage |
-| `TS002` | TypeScript | Default export |
-| `TS003` | TypeScript | Non-null assertion `!` |
-| `LAYER001` | PHP/TS | Domain imports Infrastructure |
-| `LAYER002` | PHP | Domain imports Presentation |
-| `LAYER003` | PHP | Application imports Presentation |
-| `WARN-PHP001` | PHP | Method with 4+ parameters (warning) |
-| `WARN-TS001` | TypeScript | Function with 4+ parameters (warning) |
+Advisory rules warn whatever the strictness is. Set `RULE: block` in
+`.craft-config.yml` to enforce one in a codebase that has no exception to it.
+
+| Rule | Language | Description | Default |
+|------|----------|-------------|---------|
+| `PHP001` | PHP | Missing `declare(strict_types=1)` | strictness |
+| `PHP002` | PHP | Non-final class (Doctrine entities exempt) | strictness |
+| `PHP003` | PHP | Public setter method | advisory |
+| `PHP004` | PHP | `new DateTime()` usage | strictness |
+| `PHP005` | PHP | Empty catch block | advisory |
+| `TS001` | TypeScript | `any` type usage | strictness |
+| `TS002` | TypeScript | Default export (framework files exempt) | advisory |
+| `TS003` | TypeScript | Non-null assertion `!` | advisory |
+| `LAYER001` | PHP/TS | Domain imports Infrastructure | strictness |
+| `LAYER002` | PHP | Domain imports Presentation | strictness |
+| `LAYER003` | PHP | Application imports Presentation | strictness |
+| `WARN-PHP001` | PHP | Method with 4+ parameters | advisory |
+| `WARN-TS001` | TypeScript | Function with 4+ parameters | advisory |
+
+The layer rules read the project's root namespace from `composer.json`
+(`autoload.psr-4`, preferring the entry mapped to `src/`) and fall back to
+`App` when there is no `composer.json`. `PHP002` skips a class carrying
+`#[ORM\Entity]` or `@ORM\Entity`: a Doctrine proxy extends the entity, so a
+final entity breaks lazy loading. `TS002` skips the files where a framework
+resolves the module by its default export: `page`, `layout`, `route`,
+`middleware`, `loading`, `error`, `not-found`, `template`, `default`,
+`instrumentation`, anything under `pages/`, `*.stories.*`, `*.config.*` and
+`*.d.ts`.
 
 ## Suppressing Rules
 

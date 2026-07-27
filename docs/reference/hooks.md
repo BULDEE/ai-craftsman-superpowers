@@ -102,21 +102,34 @@ export CRAFTSMAN_HOOK_DRY_RUN=true
 
 ### PHP Rules (PostToolUse)
 
+`Blocking` below is the behaviour under the default `strict` strictness. An
+advisory rule warns whatever the strictness is; set `RULE: block` in
+`.craft-config.yml` to enforce one.
+
 | Rule | Severity | Check | Blocking |
 |------|----------|-------|----------|
 | PHP001 | critical | `declare(strict_types=1)` in every PHP file | Yes |
-| PHP002 | critical | All classes must be `final` | Yes |
-| PHP003 | warning | No public setters (`public function set*`) | Yes |
-| PHP004 | warning | No `new DateTime()` - use Clock abstraction | No (warning) |
-| PHP005 | warning | No empty catch blocks | No (warning) |
+| PHP002 | critical | All classes must be `final`, except a Doctrine entity | Yes |
+| PHP003 | advisory | No public setters (`public function set*`) | No (warning) |
+| PHP004 | critical | No `new DateTime()` - use Clock abstraction | Yes |
+| PHP005 | advisory | No empty catch blocks | No (warning) |
+
+PHP002 skips a class carrying `#[ORM\Entity]` or `@ORM\Entity`: a Doctrine
+proxy extends the entity, so a final entity breaks lazy loading.
 
 ### TypeScript Rules (PostToolUse)
 
 | Rule | Severity | Check | Blocking |
 |------|----------|-------|----------|
 | TS001 | critical | No `any` type annotations | Yes |
-| TS002 | warning | No `export default` - use named exports | No (warning) |
-| TS003 | warning | No non-null assertions (`!`) | No (warning) |
+| TS002 | advisory | No `export default` - use named exports | No (warning) |
+| TS003 | advisory | No non-null assertions (`!`) | No (warning) |
+
+TS002 skips the files a framework resolves by their default export: `page`,
+`layout`, `route`, `middleware`, `loading`, `error`, `not-found`, `template`,
+`default`, `instrumentation`, anything under `pages/`, `*.stories.*`,
+`*.config.*` and `*.d.ts`. Both rules take a line-level
+`// craftsman-ignore: TS002` / `TS003`.
 
 ### Layer Rules (PreToolUse + PostToolUse)
 
@@ -127,7 +140,11 @@ export CRAFTSMAN_HOOK_DRY_RUN=true
 | LAYER003 | critical | Application cannot import Presentation | Yes |
 | LAYER004 | critical | Domain cannot contain raw SQL/DQL (PHP) or import a database client (TS) | Yes |
 
-Layer validation uses both file path detection (`*/Domain/*`) and namespace scanning (`namespace App\Domain`) to identify the architectural layer.
+Layer validation uses both file path detection (`*/Domain/*`) and namespace
+scanning to identify the architectural layer. The root namespace comes from
+`composer.json` (`autoload.psr-4`, preferring the entry mapped to `src/`), so a
+project that renamed its root is still checked; `App` is the fallback when
+there is no `composer.json` to read.
 
 ### Persistence Rules (PostToolUse + CI)
 

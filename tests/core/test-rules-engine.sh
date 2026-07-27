@@ -480,10 +480,17 @@ assert_contains "Explain dir: shows ignore" "ignore" "$explain_dir"
 assert_contains "Explain dir: shows directory override" "directory override" "$explain_dir"
 assert_contains "Explain dir: shows file path" "src/Legacy/.craft-rules.yml" "$explain_dir"
 
-# Default severity explain (no config for this rule)
-explain_default=$(rules_explain "TS002")
+# Default severity explain (no config for this rule). TS001 is strictness
+# driven; TS002 is advisory, so pointing at the strictness setting would send
+# the reader to change something that does not govern it.
+explain_default=$(rules_explain "TS001")
 assert_contains "Explain default: shows strictness" "strictness" "$explain_default"
 assert_contains "Explain default: shows block" "block" "$explain_default"
+
+explain_advisory=$(rules_explain "TS002")
+assert_contains "Explain advisory: warns" "warn" "$explain_advisory"
+assert_contains "Explain advisory: names the advisory default" "advisory by default" "$explain_advisory"
+assert_contains "Explain advisory: says how to enforce" "TS002: block" "$explain_advisory"
 
 # =============================================================================
 # 14. Python fallback parser (without PyYAML)

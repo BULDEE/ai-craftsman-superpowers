@@ -314,6 +314,14 @@ _rules_validate_custom() {
 _rules_is_advisory() {
     case "$1" in
         WARN*|PHP005|NEST001|LOC001|GOD001|PARAM001|CTRL001) return 0 ;;
+        # TS002/TS003/PHP003 are design preferences with legitimate exceptions
+        # a regex cannot see: a framework contract that hands you a mutable
+        # DTO, a third-party type whose nullability is wrong, a barrel a build
+        # tool insists on. Blocking a write on those trains the developer to
+        # suppress the rule, and a rule that is always suppressed enforces
+        # nothing while still costing a round trip. Set them to `block` in
+        # .craft-config.yml where the codebase has no such exceptions.
+        TS002|TS003|PHP003) return 0 ;;
         # RATCHET001 ships advisory while the metric core is validated against
         # real work (ADR-0025). Set `RATCHET001: block` in .craft-config.yml to
         # opt in early; the default escalates once a full cycle runs clean.
@@ -539,33 +547,38 @@ rules_message() {
 # Shows where the rule's current severity comes from (traceability).
 # Output: "RULE_ID: severity (source: description)"
 # ---------------------------------------------------------------------------
+_explain_directory_override() {
+    local rule_id="$1" file_path="$2"
+    [[ -n "$file_path" ]] || return 1
+    local directory_severity override_directory
+    directory_severity=$(_rules_find_directory_override "$file_path" "$rule_id") || return 1
+    override_directory=$(_rules_find_override_directory "$file_path")
+    echo "$rule_id: $directory_severity (source: directory override ${override_directory}/.craft-rules.yml)"
+}
+
+_explain_configured() {
+    local rule_id="$1" configured_severity config_source
+    configured_severity=$(_rules_get "severity" "$rule_id")
+    [[ -n "$configured_severity" ]] || return 1
+    config_source="global ~/.claude/.craft-config.yml"
+    [[ -f "$_RULES_PROJECT_DIR/.craft-config.yml" ]] && config_source="project $_RULES_PROJECT_DIR/.craft-config.yml"
+    echo "$rule_id: $configured_severity (source: $config_source)"
+}
+
 rules_explain() {
     local rule_id="$1"
     local file_path="${2:-}"
 
-    # Check directory overrides first (if file path provided)
-    if [[ -n "$file_path" ]]; then
-        local directory_severity
-        directory_severity=$(_rules_find_directory_override "$file_path" "$rule_id") && {
-            local override_directory
-            override_directory=$(_rules_find_override_directory "$file_path")
-            echo "$rule_id: $directory_severity (source: directory override ${override_directory}/.craft-rules.yml)"
-            return 0
-        }
-    fi
+    _explain_directory_override "$rule_id" "$file_path" && return 0
+    _explain_configured "$rule_id" && return 0
 
-    # Check project-level explicit config
-    local configured_severity
-    configured_severity=$(_rules_get "severity" "$rule_id")
-    if [[ -n "$configured_severity" ]]; then
-        local config_source="global ~/.claude/.craft-config.yml"
-        [[ -f "$_RULES_PROJECT_DIR/.craft-config.yml" ]] && config_source="project $_RULES_PROJECT_DIR/.craft-config.yml"
-        echo "$rule_id: $configured_severity (source: $config_source)"
+    # An advisory rule warns whatever the strictness is, so naming the
+    # strictness as the source would send the reader to change a setting that
+    # has no effect on it.
+    if _rules_is_advisory "$rule_id"; then
+        echo "$rule_id: warn (source: advisory by default, set '$rule_id: block' to enforce)"
         return 0
     fi
 
-    # Default severity from strictness
-    local default_severity
-    default_severity=$(_rules_default_severity "$rule_id")
-    echo "$rule_id: $default_severity (source: default strictness '$_RULES_STRICTNESS')"
+    echo "$rule_id: $(_rules_default_severity "$rule_id") (source: default strictness '$_RULES_STRICTNESS')"
 }

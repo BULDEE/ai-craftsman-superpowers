@@ -214,6 +214,49 @@ config_max_learned_skills() {
     [[ "$v" =~ ^[0-9]+$ ]] && echo "$v" || echo "6"
 }
 
+# The LAYER rules used to look for "App\Domain" and "App\Infrastructure"
+# literally. "App" is the Symfony skeleton's default and nothing more: a
+# project that renamed its root namespace, or a monorepo with several, got
+# silent green from every layer rule. The root comes from composer.json's
+# psr-4 map instead, preferring the entry that maps to src/.
+_CONFIG_NS_ROOT_CACHE=""
+_CONFIG_NS_ROOT_FOR=""
+
+config_php_namespace_root() {
+    local start_dir="${1:-$PWD}"
+    if [[ "$_CONFIG_NS_ROOT_FOR" == "$start_dir" && -n "$_CONFIG_NS_ROOT_CACHE" ]]; then
+        printf '%s' "$_CONFIG_NS_ROOT_CACHE"
+        return 0
+    fi
+
+    local dir root=""
+    dir="$(cd "$start_dir" 2>/dev/null && pwd)" || dir=""
+    while [[ -n "$dir" && "$dir" != "/" ]]; do
+        if [[ -f "$dir/composer.json" ]]; then
+            root=$(_config_psr4_root "$dir/composer.json")
+            break
+        fi
+        dir="$(dirname "$dir")"
+    done
+
+    [[ -n "$root" ]] || root="App"
+    _CONFIG_NS_ROOT_FOR="$start_dir"
+    _CONFIG_NS_ROOT_CACHE="$root"
+    printf '%s' "$root"
+}
+
+_config_psr4_root() {
+    local composer="$1" root
+    root=$(jq -r '
+        (.autoload["psr-4"] // {}) as $m
+        | ([$m | to_entries[] | select(.value | tostring | test("^src/?$")) | .key]
+           + [$m | keys[]])
+        | .[0] // empty
+    ' "$composer" 2>/dev/null)
+    # psr-4 keys carry a trailing separator: "App\\" in JSON is App\ once read.
+    printf '%s' "${root%%\\}"
+}
+
 # Comma-separated list of disabled hook ids from hooks.disabled (inline form:
 # disabled: [a, b]). Merged with CRAFTSMAN_DISABLED_HOOKS by hook-profile.sh.
 config_hooks_disabled_csv() {
