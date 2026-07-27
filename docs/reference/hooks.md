@@ -2,7 +2,7 @@
 
 The plugin uses Claude Code hooks to automatically enforce code quality rules. Hooks run as shell scripts and agent prompts triggered by Claude Code events.
 
-**8 hook events** - 7 command hooks + 4 agent hooks.
+**13 hook events wired**, documented below as two groups by what the hook checks: deterministic quality-gate scripts, and headless-Haiku semantic checks ([ADR-0018](../adr/0018-native-prompt-agent-hooks.md)).
 
 ## Hook Events
 
@@ -36,8 +36,8 @@ Agent hooks run AI models (Haiku) for semantic analysis beyond regex patterns:
 | Event | Agent | Model | Purpose | Timeout |
 |-------|-------|-------|---------|---------|
 | PostToolUse | DDD Verifier | Haiku | Layer violations, aggregate boundaries, value objects, naming | 30s |
-| PostToolUse | Sentry Context | Haiku | Error context from Sentry MCP for edited files | 30s |
 | InstructionsLoaded | Project Analyzer | Haiku | Architectural context map + correction trends + channel status | 20s |
+| Stop | Sentry Context | Haiku | Error context from Sentry MCP for edited files | 30s |
 | Stop | Final Reviewer | Haiku | Architecture validation before session end (strict mode only) | 30s |
 
 **DDD Verifier** checks:
