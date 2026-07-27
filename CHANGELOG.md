@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.1] - 2026-07-27
+
+Wiring the twenty unrun test suites in 4.1.0 put them on the CI matrix for the
+first time, and both runners went red. Every failure was a "works on my
+machine" dependency this repository had been carrying unnoticed.
+
+### Fixed
+
+- **Level 2 and Level 3 static analysis never ran on a stock macOS.** All five
+  analyser invocations (PHPStan, deptrac, ESLint, dependency-cruiser) were
+  wrapped in `timeout`, which is GNU coreutils and is not installed by default
+  on macOS. The call failed with 127, the `|| true` swallowed it, and the
+  plugin reported a clean gate having run nothing. `sa_timeout` uses `timeout`
+  or `gtimeout` when present and falls back to a background job with a
+  watchdog, so the budget holds either way. Verified by running the analyser
+  path on a PATH with no coreutils: it now executes, and did not before.
+- **The instinct pipeline was dead on a stock macOS.** `hooks/lib/instincts.py`
+  annotated a parameter `str | None`, which Python evaluates at runtime from
+  3.10; `/usr/bin/python3` on a Mac without homebrew is 3.9 and raised
+  TypeError on import. `from __future__ import annotations` keeps the syntax
+  and restores 3.9.
+- **`sed -i ''` is BSD syntax** and GNU sed reads the empty string as the
+  script, leaving the file untouched. Fixed in `test-validate-pack.sh`, which
+  failed on Linux, and in `scripts/bump-version.sh`, which would have silently
+  skipped a version bump for any contributor on Linux.
+
+### Testing
+
+- The test harness gained the same portable timeout. A subtest budget that
+  silently disappears is how a hanging suite goes unbounded.
+- The fallback initially broke every stdin-fed hook: bash redirects a
+  background job's stdin from `/dev/null` unless it is explicitly redirected.
+  `<&0` restores it.
+
 ## [4.1.0] - 2026-07-27
 
 ### Security
