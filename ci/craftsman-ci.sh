@@ -221,9 +221,17 @@ if [[ "$PACKS_AVAILABLE" == true && -d "$PLUGIN_ROOT/packs" ]]; then
     pack_loader_init 2>/dev/null || true
 fi
 
-# Default scan path
+# Default scan paths. "src/" alone was not a default, it was an assumption: a
+# Laravel app/, a monorepo packages/, a Next.js app/ matched nothing, and the
+# pipeline then reported clean having opened no file at all. Every common
+# source root that actually exists is scanned; main() refuses to pass on an
+# empty scan, so a layout not listed here fails loudly instead of silently.
 if [[ ${#SCAN_PATHS[@]} -eq 0 ]]; then
-    SCAN_PATHS=("src/")
+    DEFAULT_SCAN_USED=true
+    for _candidate in src app lib libs packages apps; do
+        [[ -d "$_candidate" ]] && SCAN_PATHS+=("$_candidate/")
+    done
+    [[ ${#SCAN_PATHS[@]} -eq 0 ]] && SCAN_PATHS=(".")
 fi
 
 # =============================================================================
@@ -373,6 +381,7 @@ W_MESSAGES=()
 W_SEVERITIES=()
 
 FILES_SCANNED=0
+FILES_DISCOVERED=0
 
 _add_violation() {
     local file="$1"
@@ -386,6 +395,17 @@ _add_violation() {
     # The hook drops an ignored rule before it reaches any output. CI has to do
     # the same or the two disagree on a file the team switched the rule off for.
     [[ "$severity" == "ignore" ]] && return 0
+
+    # An empty answer means the resolver failed, not that the finding is minor.
+    # Testing only for "block" turned any rules-engine failure into a pipeline
+    # of warnings and a green build. Unknown resolves to block.
+    case "$severity" in
+        block|warn) ;;
+        *)
+            echo "craftsman-ci: severity unresolved for ${rule}, treating as block" >&2
+            severity="block"
+            ;;
+    esac
 
     if [[ "$severity" == "block" ]]; then
         V_FILES+=("$file")
@@ -447,6 +467,11 @@ metrics_init() { :; }
 scan_file() {
     local file="$1"
     local ext="${file##*.}"
+
+    # Discovered, as distinct from scanned. A file skipped because stack: says
+    # this project has no PHP is a deliberate exclusion and a legitimate pass.
+    # A repository where nothing was found at all is a gate that never ran.
+    case "$ext" in php|ts|tsx) FILES_DISCOVERED=$((FILES_DISCOVERED + 1)) ;; esac
 
     # Set globals for pack validator compatibility
     _CI_CURRENT_FILE="$file"
@@ -546,9 +571,16 @@ scan_paths() {
         if [[ -f "$path" ]]; then
             scan_file "$path"
         elif [[ -d "$path" ]]; then
+            # Dependency and build trees are not the project's code, and the
+            # walk had no exclusions at all: harmless while the default was
+            # src/, ruinous the moment a path resolves to the repository root.
             while IFS= read -r file; do
                 scan_file "$file"
-            done < <(find "$path" -type f \( -name "*.php" -o -name "*.ts" -o -name "*.tsx" \) 2>/dev/null | sort)
+            done < <(find "$path" \
+                \( -name vendor -o -name node_modules -o -name .git \
+                   -o -name dist -o -name build -o -name var \) -prune -o \
+                -type f \( -name "*.php" -o -name "*.ts" -o -name "*.tsx" \) -print \
+                2>/dev/null | sort)
         fi
     done
 }
@@ -698,6 +730,21 @@ main() {
 
     local total_violations=${#V_FILES[@]}
     local total_warnings=${#W_FILES[@]}
+
+    # A gate that opened no file has not passed, it has not run. Reporting
+    # clean on files_scanned=0 is the failure mode secrets-scan.sh already
+    # guards with assert_scanner_is_live, and this pipeline had no equivalent:
+    # any repository whose sources sit outside the default roots got a green
+    # build with nothing inspected.
+    if [[ $FILES_DISCOVERED -eq 0 ]]; then
+        {
+            echo "craftsman-ci: no source file was found, so this is not a pass."
+            echo "  scanned: ${SCAN_PATHS[*]}"
+            echo "  stack:   ${STACK} (php=$(_php_enabled && echo on || echo off), ts=$(_ts_enabled && echo on || echo off))"
+            echo "  Pass the source paths explicitly, or set stack: in .craft-config.yml."
+        } >&2
+        exit 2
+    fi
 
     if [[ $total_violations -gt 0 ]]; then
         exit 2

@@ -13,7 +13,14 @@ adapter_run() {
     local report_file="${1:-craftsman-report.json}"
     local extra_args=("${@:2}")
 
-    bash "${CI_DIR}/craftsman-ci.sh" --format json "${extra_args[@]}" > "$report_file" 2>&1 || true
+    # Streams kept apart. Folding stderr into the report meant any writer to
+    # it corrupted the JSON, and the answer had been to silence every
+    # diagnostic in the pipeline rather than to separate the two. Diagnostics
+    # go to the build log, where a human reads them, and the report stays
+    # parseable.
+    bash "${CI_DIR}/craftsman-ci.sh" --format json "${extra_args[@]}" \
+        > "$report_file" 2> "${report_file}.log" || true
+    [[ -s "${report_file}.log" ]] && cat "${report_file}.log" >&2
     echo "$report_file"
 }
 
@@ -35,17 +42,33 @@ adapter_annotate() {
 
     local report_id="craftsman-quality-gate"
 
+    # An unreadable report is not a clean one. These three defaulted to 0 on a
+    # parse failure and the gate below then published a green PASSED against
+    # the commit: adapter_compute_exit was hardened for exactly this and the
+    # annotation path was left behind.
     local violations warnings files_scanned result
-    violations=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['violations'])" < "$report_file" 2>/dev/null || echo "0")
-    warnings=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['warnings'])" < "$report_file" 2>/dev/null || echo "0")
-    files_scanned=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['files_scanned'])" < "$report_file" 2>/dev/null || echo "0")
+    violations=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['violations'])" < "$report_file" 2>/dev/null) || violations=""
+    warnings=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['warnings'])" < "$report_file" 2>/dev/null) || warnings=""
+    files_scanned=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['files_scanned'])" < "$report_file" 2>/dev/null) || files_scanned=""
 
-    if [[ "$violations" -gt 0 ]]; then
+    if [[ ! "$violations" =~ ^[0-9]+$ || ! "$files_scanned" =~ ^[0-9]+$ ]]; then
+        echo "Bitbucket adapter: ${report_file} is unreadable, reporting FAILED rather than a green gate" >&2
+        # -1 rather than a placeholder string: these land in JSON NUMBER
+        # fields, and it reads as the sentinel it is.
+        violations=-1 ; warnings=-1 ; files_scanned=-1
+        result="FAILED"
+    elif [[ "$violations" -gt 0 || "$files_scanned" -eq 0 ]]; then
         result="FAILED"
     else
         result="PASSED"
     fi
 
+    _bb_put_summary "$result" "$files_scanned" "$violations" "$warnings"
+    _bb_put_annotations "$report_file"
+}
+
+_bb_put_summary() {
+    local result="$1" files_scanned="$2" violations="$3" warnings="$4"
     curl -sf \
         -X PUT \
         -H "Authorization: Bearer ${token}" \
@@ -63,7 +86,10 @@ adapter_annotate() {
         }" \
         "${api_url}/repositories/${workspace}/${repo_slug}/commit/${commit}/reports/${report_id}" \
         >/dev/null 2>&1
+}
 
+_bb_put_annotations() {
+    local report_file="$1"
     python3 -c "
 import json, sys
 report = json.load(sys.stdin)

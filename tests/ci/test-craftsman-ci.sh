@@ -403,13 +403,16 @@ else
     log_fail "Specific file scan should report 1 file" "exit=$exit_code files=$files_scanned"
 fi
 
-# Non-existent path: graceful handling
+# Non-existent path: a gate that found nothing has not passed, it has not run.
+# Exiting 0 here is what made a renamed source directory, or a layout the
+# default paths never matched, produce a green pipeline for as long as nobody
+# noticed. secrets-scan.sh guards the same failure with assert_scanner_is_live.
 result=$(run_ci --format json "/nonexistent/path/")
 exit_code="${result%%|*}"
-if [[ "$exit_code" == "0" ]]; then
-    log_pass "Non-existent path: exits 0 gracefully (no files, no violations)"
+if [[ "$exit_code" == "2" ]]; then
+    log_pass "Non-existent path: refuses to pass on an empty scan"
 else
-    log_fail "Non-existent path should exit 0" "got exit $exit_code"
+    log_fail "Non-existent path should exit 2" "got exit $exit_code"
 fi
 
 # =============================================================================
