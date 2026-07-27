@@ -343,6 +343,65 @@ else
 fi
 
 # =============================================================================
+# 9b. The sweep only owns what the packs put there
+#
+# pack_sync_symlinks runs on SessionStart against the live checkout. It used to
+# remove every symlink under agents/ and skills/*/SKILL.md and rmdir every
+# skill directory, then recreate only what the loaded packs provide. Anything
+# else a developer had put there was deleted and never restored, and a core
+# skill's directory was one failed rmdir away from going with it.
+# =============================================================================
+echo ""
+echo "=== Integration: The sweep leaves everything it does not own ==="
+
+OUTSIDE="$INTEG_ROOT/outside"
+mkdir -p "$OUTSIDE"
+printf -- '---\nname: mine\n---\n' > "$OUTSIDE/mine.md"
+ln -sf "$OUTSIDE/mine.md" "$INTEG_ROOT/agents/mine.md"
+
+mkdir -p "$INTEG_ROOT/skills/core-skill"
+printf -- '---\nname: core\n---\n' > "$INTEG_ROOT/skills/core-skill/SKILL.md"
+
+mkdir -p "$INTEG_ROOT/skills/borrowed"
+ln -sf "$OUTSIDE/mine.md" "$INTEG_ROOT/skills/borrowed/SKILL.md"
+
+_pack_reset
+CLAUDE_PLUGIN_ROOT="$INTEG_ROOT" pack_loader_init "$INTEG_ROOT/packs"
+CLAUDE_PLUGIN_ROOT="$INTEG_ROOT" pack_sync_symlinks
+
+if [[ -L "$INTEG_ROOT/agents/mine.md" ]]; then
+    log_pass "an agent symlink pointing outside packs/ survives the sweep"
+else
+    log_fail "sweep too wide" "deleted a symlink no pack created"
+fi
+
+if [[ -f "$INTEG_ROOT/skills/core-skill/SKILL.md" ]]; then
+    log_pass "a core skill and its directory survive the sweep"
+else
+    log_fail "sweep too wide" "removed a core skill"
+fi
+
+if [[ -L "$INTEG_ROOT/skills/borrowed/SKILL.md" ]]; then
+    log_pass "a skill symlink pointing outside packs/ survives the sweep"
+else
+    log_fail "sweep too wide" "deleted a skill symlink no pack created"
+fi
+
+# The counter-test: it must still remove what a pack did create, or the three
+# assertions above are satisfied by a sweep that stopped working.
+if [[ -L "$INTEG_ROOT/agents/test-agent.md" ]]; then
+    _pack_reset
+    _PACKS_DIR="$INTEG_ROOT/packs" CLAUDE_PLUGIN_ROOT="$INTEG_ROOT" pack_sync_symlinks
+    if [[ -L "$INTEG_ROOT/agents/test-agent.md" || -e "$INTEG_ROOT/agents/test-agent.md" ]]; then
+        log_fail "sweep too narrow" "a pack symlink survived with no pack loaded"
+    else
+        log_pass "a pack symlink is still removed once its pack is not loaded"
+    fi
+else
+    log_fail "no pack symlink to test with" "the counter-test would pass vacuously"
+fi
+
+# =============================================================================
 # 10. Integration: Real files not deleted by cleanup
 # =============================================================================
 echo ""

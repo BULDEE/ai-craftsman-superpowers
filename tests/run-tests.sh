@@ -81,6 +81,42 @@ log_skip() {
     TESTS_SKIPPED=$((TESTS_SKIPPED + 1))
 }
 
+# run_subtest "<label>" "<path to test script>"
+#
+# Every wrapper used to run its subtest with output discarded and, on failure,
+# tell you to run the script yourself. For a failure that only happens in the
+# suite, that advice cannot work: by the time you re-run it, whatever the other
+# tests left behind is gone, the script passes on its own, and the failure
+# reads as noise. The failing output is kept and printed here instead.
+run_subtest() {
+    local label="$1" script="$2"
+
+    if [[ ! -f "$script" ]]; then
+        log_skip "$label (${script#$ROOT_DIR/} not found)"
+        return 0
+    fi
+
+    local out
+    out=$(mktemp)
+    if bash "$script" > "$out" 2>&1; then
+        log_pass "$label"
+        rm -f "$out"
+        return 0
+    fi
+
+    log_fail "$label - ${script#$ROOT_DIR/}"
+    local total
+    total=$(wc -l < "$out" | tr -d ' ')
+    if [[ "$total" -gt 25 ]]; then
+        echo "    --- failing assertions ---"
+        grep -E "✗" "$out" | sed 's/^/    /' | head -20
+        echo "    --- last 25 of $total lines ---"
+    fi
+    tail -25 "$out" | sed 's/^/    /'
+    echo "    --- full output kept at: $out ---"
+    return 1
+}
+
 # Test: SKILL.md exists and has valid frontmatter
 test_skill_structure() {
     local skill_dir="$1"
@@ -364,221 +400,91 @@ test_hook_behavior() {
     echo ""
     log_info "Testing hook behavior (functional)"
 
-    local hook_test="$SCRIPT_DIR/core/test-hooks.sh"
-
-    if [[ -f "$hook_test" ]]; then
-        if bash "$hook_test" > /dev/null 2>&1; then
-            log_pass "Hook behavior tests pass"
-        else
-            log_fail "Hook behavior tests failed - run tests/core/test-hooks.sh for details"
-        fi
-    else
-        log_skip "Hook behavior tests (tests/core/test-hooks.sh not found)"
-    fi
+    run_subtest "Hook behavior tests pass" "$SCRIPT_DIR/core/test-hooks.sh" || true
 }
 
 test_agent_hooks() {
     echo ""
     log_info "Testing agent hook gates (functional)"
 
-    local agent_test="$SCRIPT_DIR/core/test-agent-hooks.sh"
-
-    if [[ -f "$agent_test" ]]; then
-        if bash "$agent_test" > /dev/null 2>&1; then
-            log_pass "Agent hook gate tests pass"
-        else
-            log_fail "Agent hook gate tests failed - run tests/core/test-agent-hooks.sh for details"
-        fi
-    else
-        log_skip "Agent hook gate tests (tests/core/test-agent-hooks.sh not found)"
-    fi
+    run_subtest "Agent hook gate tests pass" "$SCRIPT_DIR/core/test-agent-hooks.sh" || true
 }
 
 test_hostile_repo() {
     echo ""
     log_info "Testing hostile-repository invariants (functional)"
 
-    local hostile_test="$SCRIPT_DIR/core/test-hostile-repo.sh"
-
-    if [[ -f "$hostile_test" ]]; then
-        if bash "$hostile_test" > /dev/null 2>&1; then
-            log_pass "Hostile-repository invariants hold"
-        else
-            log_fail "Hostile-repo tests failed - run tests/core/test-hostile-repo.sh for details"
-        fi
-    else
-        log_skip "Hostile-repo tests (tests/core/test-hostile-repo.sh not found)"
-    fi
+    run_subtest "Hostile-repository invariants hold" "$SCRIPT_DIR/core/test-hostile-repo.sh" || true
 }
 
 test_ratchet() {
     echo ""
     log_info "Testing structural ratchet (functional)"
 
-    local ratchet_test="$SCRIPT_DIR/core/test-ratchet.sh"
-
-    if [[ -f "$ratchet_test" ]]; then
-        if bash "$ratchet_test" > /dev/null 2>&1; then
-            log_pass "Structural ratchet tests pass"
-        else
-            log_fail "Ratchet tests failed - run tests/core/test-ratchet.sh for details"
-        fi
-    else
-        log_skip "Ratchet tests (tests/core/test-ratchet.sh not found)"
-    fi
+    run_subtest "Structural ratchet tests pass" "$SCRIPT_DIR/core/test-ratchet.sh" || true
 }
 
 test_design_panel() {
     echo ""
     log_info "Testing adversarial design panel (functional)"
 
-    local panel_test="$SCRIPT_DIR/core/test-design-panel.sh"
-
-    if [[ -f "$panel_test" ]]; then
-        if bash "$panel_test" > /dev/null 2>&1; then
-            log_pass "Design panel tests pass"
-        else
-            log_fail "Design panel tests failed - run tests/core/test-design-panel.sh for details"
-        fi
-    else
-        log_skip "Design panel tests (tests/core/test-design-panel.sh not found)"
-    fi
+    run_subtest "Design panel tests pass" "$SCRIPT_DIR/core/test-design-panel.sh" || true
 }
 
 test_okf_knowledge() {
     echo ""
     log_info "Testing OKF knowledge bundle (functional)"
 
-    local okf_test="$SCRIPT_DIR/core/test-okf-knowledge.sh"
-
-    if [[ -f "$okf_test" ]]; then
-        if bash "$okf_test" > /dev/null 2>&1; then
-            log_pass "OKF knowledge bundle tests pass"
-        else
-            log_fail "OKF tests failed - run tests/core/test-okf-knowledge.sh for details"
-        fi
-    else
-        log_skip "OKF tests (tests/core/test-okf-knowledge.sh not found)"
-    fi
+    run_subtest "OKF knowledge bundle tests pass" "$SCRIPT_DIR/core/test-okf-knowledge.sh" || true
 }
 
 test_dashboard() {
     echo ""
     log_info "Testing metrics dashboard (functional)"
 
-    local dash_test="$SCRIPT_DIR/core/test-dashboard.sh"
-
-    if [[ -f "$dash_test" ]]; then
-        if bash "$dash_test" > /dev/null 2>&1; then
-            log_pass "Dashboard tests pass"
-        else
-            log_fail "Dashboard tests failed - run tests/core/test-dashboard.sh for details"
-        fi
-    else
-        log_skip "Dashboard tests (tests/core/test-dashboard.sh not found)"
-    fi
+    run_subtest "Dashboard tests pass" "$SCRIPT_DIR/core/test-dashboard.sh" || true
 }
 
 test_tooling_detect() {
     echo ""
     log_info "Testing tooling detector (functional)"
 
-    local td_test="$SCRIPT_DIR/core/test-tooling-detect.sh"
-
-    if [[ -f "$td_test" ]]; then
-        if bash "$td_test" > /dev/null 2>&1; then
-            log_pass "Tooling detector tests pass"
-        else
-            log_fail "Tooling detector tests failed - run tests/core/test-tooling-detect.sh for details"
-        fi
-    else
-        log_skip "Tooling detector tests (tests/core/test-tooling-detect.sh not found)"
-    fi
+    run_subtest "Tooling detector tests pass" "$SCRIPT_DIR/core/test-tooling-detect.sh" || true
 }
 
 test_verify_loop() {
     echo ""
     log_info "Testing deterministic verification loop (functional)"
 
-    local vloop_test="$SCRIPT_DIR/core/test-verify-loop.sh"
-
-    if [[ -f "$vloop_test" ]]; then
-        if bash "$vloop_test" > /dev/null 2>&1; then
-            log_pass "Verification loop tests pass"
-        else
-            log_fail "Verification loop tests failed - run tests/core/test-verify-loop.sh for details"
-        fi
-    else
-        log_skip "Verification loop tests (tests/core/test-verify-loop.sh not found)"
-    fi
+    run_subtest "Verification loop tests pass" "$SCRIPT_DIR/core/test-verify-loop.sh" || true
 }
 
 test_observation() {
     echo ""
     log_info "Testing setup-by-observation generators (functional)"
 
-    local obs_test="$SCRIPT_DIR/core/test-observation.sh"
-
-    if [[ -f "$obs_test" ]]; then
-        if bash "$obs_test" > /dev/null 2>&1; then
-            log_pass "Observation generator tests pass"
-        else
-            log_fail "Observation generator tests failed - run tests/core/test-observation.sh for details"
-        fi
-    else
-        log_skip "Observation generator tests (tests/core/test-observation.sh not found)"
-    fi
+    run_subtest "Observation generator tests pass" "$SCRIPT_DIR/core/test-observation.sh" || true
 }
 
 test_instincts() {
     echo ""
     log_info "Testing instinct pipeline and context budgets (functional)"
 
-    local instincts_test="$SCRIPT_DIR/core/test-instincts.sh"
-
-    if [[ -f "$instincts_test" ]]; then
-        if bash "$instincts_test" > /dev/null 2>&1; then
-            log_pass "Instinct pipeline tests pass"
-        else
-            log_fail "Instinct pipeline tests failed - run tests/core/test-instincts.sh for details"
-        fi
-    else
-        log_skip "Instinct pipeline tests (tests/core/test-instincts.sh not found)"
-    fi
+    run_subtest "Instinct pipeline tests pass" "$SCRIPT_DIR/core/test-instincts.sh" || true
 }
 
 test_config_protection() {
     echo ""
     log_info "Testing config-protection hook (functional)"
 
-    local cfg_test="$SCRIPT_DIR/core/test-config-protection.sh"
-
-    if [[ -f "$cfg_test" ]]; then
-        if bash "$cfg_test" > /dev/null 2>&1; then
-            log_pass "Config-protection tests pass"
-        else
-            log_fail "Config-protection tests failed - run tests/core/test-config-protection.sh for details"
-        fi
-    else
-        log_skip "Config-protection tests (tests/core/test-config-protection.sh not found)"
-    fi
+    run_subtest "Config-protection tests pass" "$SCRIPT_DIR/core/test-config-protection.sh" || true
 }
 
 test_security_invariants() {
     echo ""
     log_info "Testing security invariants (functional)"
 
-    local sec_test="$SCRIPT_DIR/core/test-security-invariants.sh"
-
-    if [[ -f "$sec_test" ]]; then
-        if bash "$sec_test" > /dev/null 2>&1; then
-            log_pass "Security invariant tests pass"
-        else
-            log_fail "Security invariant tests failed - run tests/core/test-security-invariants.sh for details"
-        fi
-    else
-        log_skip "Security invariant tests (tests/core/test-security-invariants.sh not found)"
-    fi
+    run_subtest "Security invariant tests pass" "$SCRIPT_DIR/core/test-security-invariants.sh" || true
 }
 
 # Test: Config resolution (unit tests)
@@ -586,17 +492,7 @@ test_config_resolution() {
     echo ""
     log_info "Testing config resolution (unit)"
 
-    local config_test="$SCRIPT_DIR/core/test-config.sh"
-
-    if [[ -f "$config_test" ]]; then
-        if bash "$config_test" > /dev/null 2>&1; then
-            log_pass "Config resolution tests pass"
-        else
-            log_fail "Config resolution tests failed - run tests/core/test-config.sh for details"
-        fi
-    else
-        log_skip "Config resolution tests (tests/core/test-config.sh not found)"
-    fi
+    run_subtest "Config resolution tests pass" "$SCRIPT_DIR/core/test-config.sh" || true
 }
 
 # Test: Pack-specific test suites
@@ -613,11 +509,7 @@ test_pack_suites() {
     for test_file in "$packs_dir"/test-*.sh; do
         [[ -f "$test_file" ]] || continue
         local name=$(basename "$test_file")
-        if bash "$test_file" > /dev/null 2>&1; then
-            log_pass "Pack suite passes: $name"
-        else
-            log_fail "Pack suite failed: $name - run tests/packs/$name for details"
-        fi
+        run_subtest "Pack suite passes: $name" "$test_file" || true
     done
 }
 
@@ -626,17 +518,7 @@ test_craftsman_ci() {
     echo ""
     log_info "Testing craftsman-ci CLI (functional)"
 
-    local ci_test="$SCRIPT_DIR/ci/test-craftsman-ci.sh"
-
-    if [[ -f "$ci_test" ]]; then
-        if bash "$ci_test" > /dev/null 2>&1; then
-            log_pass "craftsman-ci CLI tests pass"
-        else
-            log_fail "craftsman-ci CLI tests failed - run tests/ci/test-craftsman-ci.sh for details"
-        fi
-    else
-        log_skip "craftsman-ci CLI tests (tests/ci/test-craftsman-ci.sh not found)"
-    fi
+    run_subtest "craftsman-ci CLI tests pass" "$SCRIPT_DIR/ci/test-craftsman-ci.sh" || true
 }
 
 # Test: Bias detector (functional tests)
@@ -644,17 +526,7 @@ test_bias_detector() {
     echo ""
     log_info "Testing bias detector (functional)"
 
-    local bias_test="$SCRIPT_DIR/core/test-bias-detector.sh"
-
-    if [[ -f "$bias_test" ]]; then
-        if bash "$bias_test" > /dev/null 2>&1; then
-            log_pass "Bias detector tests pass"
-        else
-            log_fail "Bias detector tests failed - run tests/core/test-bias-detector.sh for details"
-        fi
-    else
-        log_skip "Bias detector tests (tests/core/test-bias-detector.sh not found)"
-    fi
+    run_subtest "Bias detector tests pass" "$SCRIPT_DIR/core/test-bias-detector.sh" || true
 }
 
 # Test: Correction learning (functional tests)
@@ -662,17 +534,7 @@ test_correction_learning() {
     echo ""
     log_info "Testing correction learning (functional)"
 
-    local correction_test="$SCRIPT_DIR/core/test-correction-learning.sh"
-
-    if [[ -f "$correction_test" ]]; then
-        if bash "$correction_test" > /dev/null 2>&1; then
-            log_pass "Correction learning tests pass"
-        else
-            log_fail "Correction learning tests failed - run tests/core/test-correction-learning.sh for details"
-        fi
-    else
-        log_skip "Correction learning tests (tests/core/test-correction-learning.sh not found)"
-    fi
+    run_subtest "Correction learning tests pass" "$SCRIPT_DIR/core/test-correction-learning.sh" || true
 }
 
 # Test: Session metrics (functional tests)
@@ -680,32 +542,12 @@ test_session_metrics() {
     echo ""
     log_info "Testing session metrics (functional)"
 
-    local metrics_test="$SCRIPT_DIR/core/test-session-metrics.sh"
-
-    if [[ -f "$metrics_test" ]]; then
-        if bash "$metrics_test" > /dev/null 2>&1; then
-            log_pass "Session metrics tests pass"
-        else
-            log_fail "Session metrics tests failed - run tests/core/test-session-metrics.sh for details"
-        fi
-    else
-        log_skip "Session metrics tests (tests/core/test-session-metrics.sh not found)"
-    fi
+    run_subtest "Session metrics tests pass" "$SCRIPT_DIR/core/test-session-metrics.sh" || true
 
     echo ""
     log_info "Testing session state library (unit)"
 
-    local state_lib_test="$SCRIPT_DIR/core/test-session-state-lib.sh"
-
-    if [[ -f "$state_lib_test" ]]; then
-        if bash "$state_lib_test" > /dev/null 2>&1; then
-            log_pass "Session state library tests pass"
-        else
-            log_fail "Session state library tests failed - run tests/core/test-session-state-lib.sh for details"
-        fi
-    else
-        log_skip "Session state library tests (tests/core/test-session-state-lib.sh not found)"
-    fi
+    run_subtest "Session state library tests pass" "$SCRIPT_DIR/core/test-session-state-lib.sh" || true
 }
 
 # Test: Knowledge base integrity (files, stubs, em-dash, wiki-links)
@@ -713,17 +555,7 @@ test_knowledge_integrity() {
     echo ""
     log_info "Testing knowledge base integrity"
 
-    local knowledge_test="$SCRIPT_DIR/core/test-knowledge-integrity.sh"
-
-    if [[ -f "$knowledge_test" ]]; then
-        if bash "$knowledge_test" > /dev/null 2>&1; then
-            log_pass "Knowledge base integrity tests pass"
-        else
-            log_fail "Knowledge base integrity tests failed - run tests/core/test-knowledge-integrity.sh for details"
-        fi
-    else
-        log_skip "Knowledge base integrity tests (tests/core/test-knowledge-integrity.sh not found)"
-    fi
+    run_subtest "Knowledge base integrity tests pass" "$SCRIPT_DIR/core/test-knowledge-integrity.sh" || true
 }
 
 # Test: Workflow command (content validation)
@@ -731,17 +563,7 @@ test_workflow_command() {
     echo ""
     log_info "Testing workflow command (content)"
 
-    local workflow_test="$SCRIPT_DIR/core/test-workflow-command.sh"
-
-    if [[ -f "$workflow_test" ]]; then
-        if bash "$workflow_test" > /dev/null 2>&1; then
-            log_pass "Workflow command tests pass"
-        else
-            log_fail "Workflow command tests failed - run tests/core/test-workflow-command.sh for details"
-        fi
-    else
-        log_skip "Workflow command tests (tests/core/test-workflow-command.sh not found)"
-    fi
+    run_subtest "Workflow command tests pass" "$SCRIPT_DIR/core/test-workflow-command.sh" || true
 }
 
 # Test: Team templates reference agents that exist
@@ -749,17 +571,7 @@ test_team_templates() {
     echo ""
     log_info "Testing team templates (agent resolution)"
 
-    local team_test="$SCRIPT_DIR/core/test-team-templates.sh"
-
-    if [[ -f "$team_test" ]]; then
-        if bash "$team_test" > /dev/null 2>&1; then
-            log_pass "Team template tests pass"
-        else
-            log_fail "Team template tests failed - run tests/core/test-team-templates.sh for details"
-        fi
-    else
-        log_skip "Team template tests (tests/core/test-team-templates.sh not found)"
-    fi
+    run_subtest "Team template tests pass" "$SCRIPT_DIR/core/test-team-templates.sh" || true
 }
 
 # Test: Legacy command (content validation)
@@ -767,17 +579,7 @@ test_legacy_command() {
     echo ""
     log_info "Testing legacy command (content)"
 
-    local legacy_test="$SCRIPT_DIR/core/test-legacy-command.sh"
-
-    if [[ -f "$legacy_test" ]]; then
-        if bash "$legacy_test" > /dev/null 2>&1; then
-            log_pass "Legacy command tests pass"
-        else
-            log_fail "Legacy command tests failed - run tests/core/test-legacy-command.sh for details"
-        fi
-    else
-        log_skip "Legacy command tests (tests/core/test-legacy-command.sh not found)"
-    fi
+    run_subtest "Legacy command tests pass" "$SCRIPT_DIR/core/test-legacy-command.sh" || true
 }
 
 # Test: Hotspot analysis tool (functional)
@@ -785,17 +587,7 @@ test_hotspot_analysis() {
     echo ""
     log_info "Testing hotspot analysis tool (functional)"
 
-    local hotspot_test="$SCRIPT_DIR/core/test-hotspot-analysis.sh"
-
-    if [[ -f "$hotspot_test" ]]; then
-        if bash "$hotspot_test" > /dev/null 2>&1; then
-            log_pass "Hotspot analysis tests pass"
-        else
-            log_fail "Hotspot analysis tests failed - run tests/core/test-hotspot-analysis.sh for details"
-        fi
-    else
-        log_skip "Hotspot analysis tests (tests/core/test-hotspot-analysis.sh not found)"
-    fi
+    run_subtest "Hotspot analysis tests pass" "$SCRIPT_DIR/core/test-hotspot-analysis.sh" || true
 }
 
 # Test: Quick setup (content validation)
@@ -803,17 +595,7 @@ test_quick_setup() {
     echo ""
     log_info "Testing quick setup mode (content)"
 
-    local quick_test="$SCRIPT_DIR/core/test-quick-setup.sh"
-
-    if [[ -f "$quick_test" ]]; then
-        if bash "$quick_test" > /dev/null 2>&1; then
-            log_pass "Quick setup tests pass"
-        else
-            log_fail "Quick setup tests failed - run tests/core/test-quick-setup.sh for details"
-        fi
-    else
-        log_skip "Quick setup tests (tests/core/test-quick-setup.sh not found)"
-    fi
+    run_subtest "Quick setup tests pass" "$SCRIPT_DIR/core/test-quick-setup.sh" || true
 }
 
 # Test: Dog-fooding (plugin validates its own code)
@@ -821,17 +603,7 @@ test_dogfood() {
     echo ""
     log_info "Testing dog-fooding (self-validation)"
 
-    local dogfood_test="$SCRIPT_DIR/core/test-dogfood.sh"
-
-    if [[ -f "$dogfood_test" ]]; then
-        if bash "$dogfood_test" > /dev/null 2>&1; then
-            log_pass "Dog-fooding tests pass"
-        else
-            log_fail "Dog-fooding tests failed - run tests/core/test-dogfood.sh for details"
-        fi
-    else
-        log_skip "Dog-fooding tests (tests/core/test-dogfood.sh not found)"
-    fi
+    run_subtest "Dog-fooding tests pass" "$SCRIPT_DIR/core/test-dogfood.sh" || true
 }
 
 # Main test runner

@@ -268,18 +268,34 @@ _sync_pack_skills() {
     done
 }
 
+# Does this symlink point at something inside the packs directory?
+# The sweep below used to remove every symlink it found under agents/ and
+# skills/, which is more than this function owns: it runs on SessionStart
+# against the live checkout, so anything else a developer had symlinked there
+# was deleted and never put back. It now only removes what a pack put there.
+_pack_owns_symlink() {
+    local link="$1" packs_dir="$2"
+    [[ -L "$link" ]] || return 1
+    # A dangling link is a pack that went away: sweeping it is the point.
+    [[ -e "$link" ]] || return 0
+    local target
+    target=$(cd "$(dirname "$link")" 2>/dev/null && cd "$(dirname "$(readlink "$link")")" 2>/dev/null && pwd) || return 1
+    [[ "$target" == "$packs_dir"/* ]]
+}
+
 pack_sync_symlinks() {
     local root="${CLAUDE_PLUGIN_ROOT:-$(pwd)}"
     local packs_dir="${_PACKS_DIR:-$root/packs}"
+    packs_dir=$(cd "$packs_dir" 2>/dev/null && pwd) || return 0
 
     for f in "$root/agents/"*.md; do
-        [[ -L "$f" ]] && rm -- "$f"
+        _pack_owns_symlink "$f" "$packs_dir" && rm -- "$f"
     done
     for f in "$root/skills/"*/SKILL.md; do
-        [[ -L "$f" ]] && rm -- "$f"
-    done
-    for d in "$root/skills/"*/; do
-        rmdir "$d" 2>/dev/null || true
+        _pack_owns_symlink "$f" "$packs_dir" || continue
+        rm -- "$f"
+        # Only the directory this loop just emptied, never a core skill's.
+        rmdir "$(dirname "$f")" 2>/dev/null || true
     done
 
     local pack_name
