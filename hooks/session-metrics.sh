@@ -50,15 +50,25 @@ if [[ -f "$WRITES_FILE" ]]; then
     [[ "$WRITES_COUNT" =~ ^[0-9]+$ ]] || WRITES_COUNT=0
 fi
 
-# Count violations from this session (window = session duration)
-PROJECT_HASH=$(metrics_project_hash)
-DURATION_PARAM="-${SESSION_DURATION} seconds"
-BLOCKED=$(python3 "${SCRIPT_DIR}/lib/metrics-query.py" "$METRICS_DB" \
-    "SELECT COUNT(*) FROM violations WHERE project_hash=? AND blocked=1 AND timestamp > datetime('now', ?)" \
-    "$PROJECT_HASH" "$DURATION_PARAM" 2>/dev/null || echo 0)
-WARNED=$(python3 "${SCRIPT_DIR}/lib/metrics-query.py" "$METRICS_DB" \
-    "SELECT COUNT(*) FROM violations WHERE project_hash=? AND blocked=0 AND ignored=0 AND timestamp > datetime('now', ?)" \
-    "$PROJECT_HASH" "$DURATION_PARAM" 2>/dev/null || echo 0)
+# Violations OF this session, counted from the file post-write-check appends
+# to, exactly like session-writes above.
+#
+# This used to re-query the violations table over a window of the session's
+# own duration, which counts every other session's rows on the same project.
+# On 2026-07-27 that produced 16236 warnings across 236 sessions against 1353
+# violations actually recorded that day, and on a quiet day it under-counted
+# instead. Every trend built on sessions.violations_* was reading noise.
+VIOLATIONS_FILE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-violations"
+BLOCKED=0
+WARNED=0
+if [[ -f "$VIOLATIONS_FILE" ]]; then
+    # grep -c exits 1 when it matches nothing, which the ERR trap above
+    # turns into an aborted SessionEnd and a session never recorded at all.
+    BLOCKED=$(grep -c '^blocked$' "$VIOLATIONS_FILE" 2>/dev/null | tr -d ' ') || BLOCKED=0
+    WARNED=$(grep -c '^warned$' "$VIOLATIONS_FILE" 2>/dev/null | tr -d ' ') || WARNED=0
+fi
+[[ "$BLOCKED" =~ ^[0-9]+$ ]] || BLOCKED=0
+[[ "$WARNED" =~ ^[0-9]+$ ]] || WARNED=0
 
 # Extract agent usage count and team type from session state
 AGENT_COUNT=0
@@ -75,10 +85,15 @@ if [[ -f "$SESSION_STATE" ]]; then
     fi
 fi
 
-# Build agents_spawned JSON array for metrics record
+# Build agents_spawned JSON array for metrics record.
+#
+# The literal "agent_hook" was a placeholder that recorded nothing: 1053 of
+# 1054 rows held [] and the rest held fragments of a broken quote. There is no
+# source in this hook for an agent's name, so it records the count it does
+# know rather than a name it does not.
 AGENTS_JSON="[]"
 if [[ "${AGENT_COUNT:-0}" -gt 0 ]]; then
-    AGENTS_JSON="[\"agent_hook\"]"
+    AGENTS_JSON="[{\"count\":${AGENT_COUNT}}]"
 fi
 
 # Build skills_used JSON array (include team type if used)
@@ -110,6 +125,6 @@ if [[ ${#SUMMARY_PARTS[@]} -gt 0 ]]; then
 fi
 
 # Clear session state for correction learning + start-time marker + writes counter
-rm -f "$SESSION_STATE" "$START_TS_FILE" "$WRITES_FILE"
+rm -f "$SESSION_STATE" "$START_TS_FILE" "$WRITES_FILE" "$VIOLATIONS_FILE"
 
 exit 0

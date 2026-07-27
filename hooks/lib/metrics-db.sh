@@ -188,6 +188,20 @@ metrics_record_violation() {
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
         "INSERT INTO violations (project_hash, rule, file_pattern, severity, blocked, ignored, source) VALUES (?, ?, ?, ?, ?, ?, ?)" \
         "$project_hash" "$rule" "$file_pattern" "$severity" "$blocked" "$ignored" "$(metrics_source)"
+    _metrics_tally_session "$blocked" "$ignored"
+}
+
+# One line per finding for THIS session, read at SessionEnd. It used to derive
+# its counters by re-querying this table over a window of the session's own
+# duration, which counts every other session's rows on the same project: 236
+# sessions in one day reported 16236 warnings against 1353 actually recorded.
+# It lives here rather than in the caller because the pack validators record
+# straight through this function and would otherwise go uncounted.
+_metrics_tally_session() {
+    local blocked="$1" ignored="$2" kind="warned"
+    [[ "$blocked" == "1" ]] && kind="blocked"
+    [[ "$ignored" == "1" ]] && kind="ignored"
+    echo "$kind" >> "${METRICS_DB_DIR}/session-violations" 2>/dev/null || true
 }
 
 metrics_record_session() {
