@@ -36,8 +36,11 @@ d'architecture : rien dans la boucle ne vérifie.
 
 Craftsman met la vérification dans la boucle. Les mêmes règles tournent en
 hooks à chaque Write, en gate dans votre CI, et comme critères lus par les
-agents de revue. Une violation ne produit pas un rappel poli au paragraphe
-suivant. Elle renvoie exit 2 et l'écriture n'a pas lieu.
+agents de revue. Une violation n'est pas un rappel poli au paragraphe suivant :
+les violations de couche et l'absence de `strict_types` sont refusées avant que
+l'écriture n'aboutisse, le reste revient directement à Claude comme un constat
+dont il doit répondre, et la même règle fait échouer votre pipeline si elle
+atteint une pull request.
 
 Trois conséquences en découlent, et ce sont elles qui distinguent ce plugin
 d'un prompt bien écrit :
@@ -169,7 +172,7 @@ Les scaffolders proposent une variante de template avant de générer le code (e
 
 ## Agents spécialisés
 
-Agents core (d'autres se chargent automatiquement avec les packs) : `team-lead` (orchestrateur), `architect` (DDD/Clean Architecture, lecture seule), `doc-writer` (ADR, README, CHANGELOG), `security-pentester`, `legacy-surgeon`, `ui-ux-director` : plus des reviewers/craftsmen spécifiques pour Symfony, React et AI/ML. Liste complète et model tiering : [référence des agents](docs/reference/agents.md).
+Agents core (d'autres se chargent automatiquement avec les packs) : `team-lead` (orchestrateur), `architect` (DDD/Clean Architecture, sans Write/Edit), `doc-writer` (ADR, README, CHANGELOG), `security-pentester`, `legacy-surgeon`, `ui-ux-director` : plus des reviewers/craftsmen spécifiques pour Symfony, React et AI/ML. Liste complète et model tiering : [référence des agents](docs/reference/agents.md).
 
 ## Rules Engine
 
@@ -248,7 +251,9 @@ Pragmatisme plutôt que dogmatisme : 80 % de couverture sur les chemins critique
 
 ## Sécurité
 
-Les command hooks et agents reviewers sont en lecture seule, sauf pour la base de métriques locale et l'état de session. Les agent hooks (Haiku) ne modifient jamais de fichiers. Les violations bloquent (exit 2) ; la détection de biais avertit seulement (exit 0).
+Les command hooks n'écrivent que dans la base de métriques locale et l'état de session. Les agent hooks (Haiku) ne modifient jamais de fichiers. La détection de biais avertit seulement (exit 0). Les violations de couche et `strict_types` sont refusées avant l'écriture ; les autres règles remontent la violation à Claude après coup et font échouer la CI sur une pull request.
+
+Chaque agent déclare son propre périmètre d'outils dans `tools:`. La plupart des craftsmen détiennent `Write`/`Edit`/`Bash` parce que leur métier est de modifier du code ; `architect` et `team-lead` n'ont ni `Write` ni `Edit`. Lisez la frontmatter de l'agent plutôt que de déduire un périmètre de son nom.
 
 **Pas de télémétrie, pas d'analytics, pas de phone-home.** Avec `agent_hooks: false` et sans config Sentry, zéro activité réseau. Le contenu des fichiers édités n'atteint l'API Anthropic que si `agent_hooks: true` (défaut) ; Sentry n'est interrogé que si configuré ; les métriques ne quittent jamais votre machine. Détail complet : [SECURITY.md](SECURITY.md#data--network-transparency).
 

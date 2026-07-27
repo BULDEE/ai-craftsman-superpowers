@@ -173,6 +173,25 @@ _record_violation_output() {
     fi
 }
 
+# Record one violation to the metrics DB.
+#
+# `blocked` must mean blocked. It was $((1 - ignored)) - independent of
+# severity - so advisory rules recorded blocked=1 and the dashboard reported
+# 100% blocking for rules that never stop a write. `ignored` already carries
+# suppression; the two are separate facts.
+_record_violation_metric() {
+    local rule="$1" severity="$2" ignored="$3"
+
+    local metric_severity="critical"
+    [[ "$severity" == "warn" ]] && metric_severity="warning"
+
+    local metric_blocked=0
+    [[ "$severity" == "block" && "$ignored" -eq 0 ]] && metric_blocked=1
+
+    metrics_record_violation "$rule" "$FILE_PATTERN" "$metric_severity" \
+        "$metric_blocked" "$ignored" 2>/dev/null || true
+}
+
 add_violation() {
     local rule="$1"
     local message="$2"
@@ -194,9 +213,7 @@ add_violation() {
         _record_violation_output "$rule" "$message" "$severity"
     fi
 
-    local metric_severity="critical"
-    [[ "$severity" == "warn" ]] && metric_severity="warning"
-    metrics_record_violation "$rule" "$FILE_PATTERN" "$metric_severity" $((1 - ignored)) "$ignored" 2>/dev/null || true
+    _record_violation_metric "$rule" "$severity" "$ignored"
 }
 
 add_warning() {

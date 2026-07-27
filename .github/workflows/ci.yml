@@ -574,6 +574,22 @@ jobs:
                 echo "  ✗ missing 'name' field"
                 FAILED=1
               fi
+
+              # `allowedTools` is not a sub-agent frontmatter field. The
+              # documented pair is `tools` (allowlist) and `disallowedTools`
+              # (denylist), and an agent that declares neither "inherits every
+              # tool available to subagents". Every agent here shipped with
+              # `allowedTools` for months, so the restriction was inert and the
+              # reviewers silently held Write, Edit and Bash.
+              if grep -q "^allowedTools:" "$agent_file"; then
+                echo "  ✗ uses 'allowedTools' - not a real field, rename to 'tools'"
+                FAILED=1
+              elif grep -q "^tools:" "$agent_file"; then
+                echo "  ✓ declares 'tools'"
+              else
+                echo "  ✗ declares no 'tools' - would inherit the full tool pool"
+                FAILED=1
+              fi
             fi
           done
 

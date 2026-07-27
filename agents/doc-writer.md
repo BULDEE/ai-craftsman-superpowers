@@ -8,7 +8,7 @@ model: haiku
 effort: low
 memory: project
 maxTurns: 20
-allowedTools:
+tools:
   - Read
   - Glob
   - Grep

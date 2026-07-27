@@ -35,8 +35,10 @@ architecture problem: nothing in the loop is checking.
 
 Craftsman puts the check in the loop. The same rules run as hooks on every
 Write, as a gate in your CI, and as the criteria a reviewer agent reads. A
-violation does not produce a gentle reminder in the next paragraph. It returns
-exit 2 and the write does not happen.
+violation is not a gentle reminder in the next paragraph: layer violations and
+missing `strict_types` are refused before the write lands, everything else is
+handed straight back to Claude as a finding it has to answer for, and the same
+rule fails your pipeline if it reaches a pull request.
 
 Three things follow from that, and they are what make this plugin different
 from a well-written prompt:
@@ -167,7 +169,7 @@ Scaffolders offer a template variant before generating code (e.g. `bounded-conte
 
 ## Specialized Agents
 
-Core agents (more load automatically with packs): `team-lead` (orchestrator), `architect` (DDD/Clean Architecture, read-only), `doc-writer` (ADRs, README, CHANGELOG), `security-pentester`, `legacy-surgeon`, `ui-ux-director` - plus pack-specific reviewers/craftsmen for Symfony, React, and AI/ML. Full roster and model tiering: [Agents Reference](docs/reference/agents.md).
+Core agents (more load automatically with packs): `team-lead` (orchestrator), `architect` (DDD/Clean Architecture, no Write/Edit), `doc-writer` (ADRs, README, CHANGELOG), `security-pentester`, `legacy-surgeon`, `ui-ux-director` - plus pack-specific reviewers/craftsmen for Symfony, React, and AI/ML. Full roster and model tiering: [Agents Reference](docs/reference/agents.md).
 
 ## Rules Engine
 
@@ -246,7 +248,9 @@ Pragmatism over dogmatism: 80% coverage on critical paths beats 100% everywhere;
 
 ## Security
 
-Command hooks and reviewer agents are read-only except for the local metrics DB and session state. Agent hooks (Haiku) never modify files. Violations block (exit 2); bias detection only warns (exit 0).
+Command hooks write only to the local metrics DB and session state. Agent hooks (Haiku) never modify files. Bias detection only warns (exit 0). Layer and `strict_types` violations are refused before the write; the remaining rules report the violation to Claude after it and fail CI on a pull request.
+
+Agents declare their own tool grant in `tools:`. Most craftsmen hold `Write`/`Edit`/`Bash` because their job is to change code; `architect` and `team-lead` hold no `Write` or `Edit`. Read each agent's frontmatter for its actual grant rather than assuming a role name implies read-only.
 
 **No telemetry, no analytics, no phone-home.** With `agent_hooks: false` and no Sentry config, zero network activity. Edited file content only reaches the Anthropic API when `agent_hooks: true` (default); Sentry is only queried if configured; metrics never leave your machine. Full breakdown: [SECURITY.md](SECURITY.md#data--network-transparency).
 

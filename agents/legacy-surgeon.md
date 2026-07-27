@@ -10,7 +10,7 @@ effort: high
 memory: project
 isolation: worktree
 maxTurns: 25
-allowedTools:
+tools:
   - Read
   - Glob
   - Grep

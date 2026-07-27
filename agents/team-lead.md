@@ -8,7 +8,7 @@ model: sonnet
 effort: high
 memory: user
 maxTurns: 50
-allowedTools:
+tools:
   - Read
   - Glob
   - Grep
