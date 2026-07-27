@@ -5,6 +5,111 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2026-07-27
+
+### Security
+
+- **CI gate no longer fails open on a malformed report.** `adapter_compute_exit`
+  parsed the report with stderr discarded, so a report that was not valid JSON
+  produced an empty summary and exit 0. It now fails closed.
+- **Command injection through a channel number closed.** `cache_ttl` and the
+  three other values under `channels:` come from the repository's own
+  `.craft-config.yml` and landed in `$(( now + ttl ))`, where bash evaluates an
+  array subscript as a command: `cache_ttl: "a[$(touch${IFS}/tmp/pwned)]"`
+  executed on the first cached call. Reproduced end to end, now refused at the
+  config boundary and again inside `cache_set`, `cache_evict` and the circuit
+  breaker.
+- **Grep flag injection closed at three sites** (`rules-engine.sh`,
+  `post-write-check.sh`, `craftsman-ci.sh`): a pattern beginning with `-` was
+  read as an option.
+- **secrets-scan fails closed.** It reported "no secrets found" for every
+  condition that makes a scan produce nothing: a wrong repo root, a clone with
+  no history, a grep that failed. It now proves it can enumerate tracked files,
+  read their content and read history before any empty result means clean.
+- **Six credential shapes added to the scan**: `sk-proj-`, AWS `ASIA`
+  temporary keys, AWS secret access keys, Stripe live keys, Slack tokens, and
+  every `.env` suffix rather than only `.local` and `.production`. Fixtures
+  that must look real carry a per-line `secrets-scan: allow` marker instead of
+  exempting `tests/` wholesale.
+- **`hotspot_analysis.py` bounded.** Counting lines is lazy, but a file with no
+  newline is one line: a 400MB blob took 952MB of RSS. It now shares the
+  write-time gate's 2MB cap (17MB on the same input).
+
+### Changed
+
+- **`TS002`, `TS003` and `PHP003` default to advisory.** Each has legitimate
+  exceptions a regex cannot see, and blocking a write on those only teaches
+  suppression. Set them to `block` in `.craft-config.yml` where your codebase
+  has no such exception.
+- **`PHP002` skips a Doctrine entity.** A proxy extends the entity, so a final
+  entity breaks lazy loading: the rule was asking Symfony projects to break
+  their own persistence layer.
+- **`TS002` skips the files a framework resolves by their default export**:
+  `page`, `layout`, `route`, `middleware`, `loading`, `error`, `not-found`,
+  `template`, `default`, `instrumentation`, anything under `pages/`,
+  `*.stories.*`, `*.config.*` and `*.d.ts`. `TS002` and `TS003` now take a
+  line-level `craftsman-ignore`, and a suppressed line no longer covers the
+  rest of the file.
+- **The layer rules read the project's root namespace from `composer.json`.**
+  They matched `App\Domain` literally, and `App` is only the Symfony
+  skeleton's default, so every project that renamed its root namespace passed
+  all three layer rules by construction.
+
+### Fixed
+
+- **The CI quality gate no longer hangs.** Severity resolution walked from the
+  file's directory up to the project root, but both stop conditions are
+  absolute paths and CI is handed relative ones: `dirname` of `.` is `.` and
+  the walk never ended. Both walks in `rules-engine.sh` now stop as soon as
+  `dirname` stops moving.
+- **CI agrees with the hook on `ignore`.** It resolved a boolean and filed
+  everything that was not `block` under warnings, so a directory that had
+  switched a rule off still had every finding printed in the pipeline while the
+  hook stayed silent on the same file.
+- **CI resolves severity per file**, so a directory-level `.craft-rules.yml`
+  applies in the pipeline as it does in the hooks.
+- **`consolidate-metrics.sh` reports its failures.** It discarded sqlite's
+  stderr, so a locked or drifted source read as "0 rows to merge" and the run
+  reported a clean consolidation while dropping the whole source. Failures are
+  counted in a file (a shell counter is lost in a subshell), named, and the
+  script exits non-zero telling the operator not to delete any source.
+- **`pack_sync_symlinks` only removes what a pack put there.** It removed every
+  symlink under `agents/` and every `skills/*/SKILL.md` in the live checkout
+  and rebuilt only the loaded packs' entries, so anything else there was
+  deleted and never restored.
+
+### Testing
+
+- **Twenty test suites the runner never called are now wired in**, including
+  the entire hostile-repository security suite. The suite reported 213/0 while
+  a third of the files on disk sat unexecuted. `test-runner-integrity.sh` fails
+  when a test function is defined and not called, or a file is not named in the
+  runner.
+- **A failing subtest now says why.** All 26 wrappers discarded their output and
+  told you to re-run the script yourself, which cannot work for a failure that
+  only happens in the suite. They keep the output and print the failing
+  assertions. Each subtest runs under a 300s timeout, so a hang is a named
+  failure rather than a run that reports nothing.
+- **Guard tests can no longer pass against deleted code.** Every absence
+  assertion in the hostile-repository suite is gated on a positive control only
+  a live tool can satisfy. With five analysis modules stubbed to `sys.exit(1)`:
+  11 pass, 11 fail, where 19 used to stay green.
+- **Two races removed from the circuit-breaker suite** that made it green four
+  runs out of five, both on second boundaries.
+
+### Documentation
+
+- The model-tiering guide showed `/craftsman:metrics` printing a per-model cost
+  breakdown that does not exist: the metrics database has no model, token or
+  cost column. Replaced with published per-Mtok prices and a pointer to Claude
+  Code's `/usage`.
+- `SECURITY.md` described a plugin from two majors ago: 7 hook scripts against
+  19, 8 events against 13, a RAG knowledge base and an MCP server removed in
+  ADR-0024, and two audit commands that did not work.
+- Three team templates spawned `architecture-reviewer`, an agent this
+  repository has never shipped. They now name `architect`, and
+  `test-team-templates.sh` fails on an unknown name.
+
 ## [4.0.1] - 2026-07-27
 
 Corrects two settings that did not do what the repository believed, and removes
