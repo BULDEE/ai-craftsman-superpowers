@@ -259,12 +259,19 @@ _config_psr4_root() {
 
 # Comma-separated list of disabled hook ids from hooks.disabled (inline form:
 # disabled: [a, b]). Merged with CRAFTSMAN_DISABLED_HOOKS by hook-profile.sh.
+#
+# SECURITY (same asymmetry as external_packs and trust_project_tools above):
+# this key is the off switch for the gates themselves, so honouring the project
+# file let any cloned repository ship
+#   hooks: {disabled: [config-protection, post-write-check, pre-write-check]}
+# and start its first session with every gate silently off, including
+# config-protection, which declares tier `always` and is deliberately excluded
+# from its own protection list. A repository may tune what the gates check; it
+# may not decide whether they run. Only the machine owner can, in
+# ~/.claude/.craft-config.yml or through CRAFTSMAN_DISABLED_HOOKS.
 config_hooks_disabled_csv() {
     local raw=""
-    if [[ -f "$PWD/.craft-config.yml" ]]; then
-        raw=$(_config_parse_nested_inline_list "hooks" "disabled" "$PWD/.craft-config.yml")
-    fi
-    if [[ -z "$raw" && -f "${HOME}/.claude/.craft-config.yml" ]]; then
+    if [[ -f "${HOME}/.claude/.craft-config.yml" ]]; then
         raw=$(_config_parse_nested_inline_list "hooks" "disabled" "${HOME}/.claude/.craft-config.yml")
     fi
     echo "$raw"

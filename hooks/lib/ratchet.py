@@ -20,8 +20,10 @@ Zero dependency, single pass, no AST: this runs on every Write/Edit in the AI
 loop and in CI from the same code path (zero drift).
 """
 import json
+import os
 import re
 import sys
+import tempfile
 from pathlib import Path
 
 SUPPORTED_EXTS = {".php", ".ts", ".tsx", ".py", ".sh"}
@@ -29,6 +31,8 @@ SUPPORTED_EXTS = {".php", ".ts", ".tsx", ".py", ".sh"}
 # lines. A hostile repository can ship a 1 GB "source" file, and this runs on
 # every write: anything past this size is not code worth measuring.
 MAX_SOURCE_BYTES = 2 * 1024 * 1024
+# The baseline is repo-supplied too, and it is parsed on every write.
+MAX_BASELINE_BYTES = 8 * 1024 * 1024
 BASELINE_NAME = ".craftsman-baseline.json"
 RATCHETED_METRICS = ["complexity", "file_lines", "max_fn_lines", "fan_out", "ignores"]
 
@@ -85,23 +89,70 @@ def _baseline_path(args) -> Path:
     return Path(BASELINE_NAME)
 
 
+def _is_measurement(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _is_usable(entry) -> bool:
+    """A poisoned metric must never reach the comparison in `check`: a string
+    there raises TypeError, the caller reads the resulting exit 1 as a
+    regression, and because stdout is empty it prints nothing and skips the
+    update branch. The ratchet then no-ops forever on that path, silently.
+
+    A missing metric stays legitimate: older baselines predate later metrics
+    and `check` already defaults them to the current value.
+    """
+    if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
+        return False
+    return all(_is_measurement(entry[name]) for name in RATCHETED_METRICS if name in entry)
+
+
 def load_baseline(path: Path) -> dict:
-    if not path.is_file():
+    """Entries keyed by project-relative path, malformed ones dropped one by one.
+
+    Dropping the whole file on a single bad entry is what makes this dangerous
+    rather than merely wrong: every touched file then looks new, and the next
+    save rewrites the baseline with that one entry, erasing every other
+    high-water mark in the repository.
+
+    A symlinked baseline is refused outright, see save_baseline.
+    """
+    if path.is_symlink() or not path.is_file():
         return {}
     try:
+        if path.stat().st_size > MAX_BASELINE_BYTES:
+            return {}
         entries = json.loads(path.read_text())
-        return {entry["path"]: entry for entry in entries}
-    except (json.JSONDecodeError, KeyError, TypeError, OSError):
+    except (json.JSONDecodeError, OSError):
         return {}
+    if not isinstance(entries, list):
+        return {}
+    return {entry["path"]: entry for entry in entries if _is_usable(entry)}
 
 
 def save_baseline(path: Path, entries: dict) -> None:
-    """One JSON object per line, sorted by path: diffs stay readable."""
+    """One JSON object per line, sorted by path: diffs stay readable.
+
+    Written to a sibling temp file and renamed over the target. A cloned
+    repository can ship the baseline as a symlink, and `write_text` would
+    follow it and overwrite whatever it points at (~/.claude/settings.json,
+    .git/hooks/*, any file the developer can write) on the first edit after
+    cloning. os.replace acts on the link itself, never on its target.
+    """
     rendered = [
         json.dumps(entries[key], separators=(",", ":"), sort_keys=True)
         for key in sorted(entries)
     ]
-    path.write_text("[\n" + ",\n".join(rendered) + "\n]\n")
+    if path.is_symlink():
+        print(f"ratchet: {path} is a symlink, replacing it with a regular file", file=sys.stderr)
+    handle, temp_name = tempfile.mkstemp(dir=str(path.parent or Path(".")), prefix=".ratchet-")
+    try:
+        with os.fdopen(handle, "w") as stream:
+            stream.write("[\n" + ",\n".join(rendered) + "\n]\n")
+        os.replace(temp_name, path)
+    except OSError:
+        Path(temp_name).unlink(missing_ok=True)
+        raise
 
 
 def _relative(path: Path):

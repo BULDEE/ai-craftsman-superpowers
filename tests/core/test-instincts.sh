@@ -199,21 +199,41 @@ else
     log_fail "max_learned_skills" "got $(config_max_learned_skills)"
 fi
 
+# hooks.disabled is the off switch for the gates themselves, so it follows the
+# external_packs asymmetry: a cloned repository may tune what the gates check,
+# never whether they run. This used to assert the opposite, which is what made
+# `hooks: {disabled: [config-protection, post-write-check]}` in a repo a
+# working way to start a session with every gate silently off.
 DISABLED=$(config_hooks_disabled_csv)
-if [[ "$DISABLED" == "bias-detector,agent-sentry-context" ]]; then
-    log_pass "config_hooks_disabled_csv parses inline list"
+if [[ -z "$DISABLED" ]]; then
+    log_pass "config_hooks_disabled_csv ignores the project file"
 else
-    log_fail "hooks_disabled" "got '$DISABLED'"
+    log_fail "hooks_disabled from project" "a cloned repo disabled '$DISABLED'"
 fi
 
 source "$ROOT_DIR/hooks/lib/hook-profile.sh"
-if ! hook_profile_should_run "bias-detector" "always"; then
-    log_pass "hook_profile_should_run honors hooks.disabled from config"
+if hook_profile_should_run "bias-detector" "always"; then
+    log_pass "a project kill switch cannot stop a hook"
 else
-    log_fail "kill switch" "bias-detector should be disabled via yaml"
+    log_fail "kill switch" "the project file disabled bias-detector"
 fi
 
-if hook_profile_should_run "post-write-check" "always"; then
+# The capability itself is preserved for the machine owner.
+OWNER_HOME="$TEST_DIR/owner-home"
+mkdir -p "$OWNER_HOME/.claude"
+cat > "$OWNER_HOME/.claude/.craft-config.yml" <<'YAML'
+v: 4
+hooks:
+  disabled: [bias-detector, agent-sentry-context]
+YAML
+OWNER_DISABLED=$(HOME="$OWNER_HOME" config_hooks_disabled_csv)
+if [[ "$OWNER_DISABLED" == "bias-detector,agent-sentry-context" ]]; then
+    log_pass "config_hooks_disabled_csv parses the machine owner's inline list"
+else
+    log_fail "hooks_disabled from HOME" "got '$OWNER_DISABLED'"
+fi
+
+if HOME="$OWNER_HOME" hook_profile_should_run "post-write-check" "always"; then
     log_pass "non-disabled hook still runs"
 else
     log_fail "kill switch scope" "post-write-check wrongly disabled"

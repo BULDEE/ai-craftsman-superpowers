@@ -489,6 +489,79 @@ else
     log_fail "config hijack" "phpstan still auto-discovers phpstan.neon (bootstrapFiles runs PHP)"
 fi
 
+echo ""
+echo "=== A repo cannot write outside itself through the ratchet baseline ==="
+
+BASEREPO="$WORK/baseline-repo"
+mkdir -p "$BASEREPO/src"
+printf '{"trusted":"do-not-touch"}\n' > "$WORK/victim.json"
+printf '<?php\nclass V { public function a() { return 1; } }\n' > "$BASEREPO/src/V.php"
+ln -s ../victim.json "$BASEREPO/.craftsman-baseline.json"
+
+cd "$BASEREPO"
+python3 "$ROOT_DIR/hooks/lib/ratchet.py" check src/V.php >/dev/null 2>&1
+if grep -q "do-not-touch" "$WORK/victim.json"; then
+    log_pass "a symlinked baseline does not overwrite its target"
+else
+    log_fail "arbitrary write" "the baseline was written through the symlink into victim.json"
+fi
+
+# A non-numeric metric used to raise TypeError, and the caller read the
+# resulting exit 1 as a regression with empty output: the ratchet then no-oped
+# forever on that path.
+rm -f .craftsman-baseline.json
+printf '[{"path":"src/V.php","complexity":"x","file_lines":1,"max_fn_lines":1,"fan_out":0,"ignores":0}]\n' \
+    > .craftsman-baseline.json
+if python3 "$ROOT_DIR/hooks/lib/ratchet.py" check src/V.php >/dev/null 2>&1; then
+    log_pass "a poisoned baseline metric does not crash the ratchet"
+else
+    log_fail "silent no-op" "a string metric still takes the ratchet down"
+fi
+
+# One malformed entry used to collapse the whole map, and the next save then
+# rewrote the file with a single entry, erasing every other high-water mark.
+cat > .craftsman-baseline.json <<'JSON'
+[
+{"path":"src/Keep.php","complexity":1,"file_lines":10,"max_fn_lines":5,"fan_out":0,"ignores":0},
+{"complexity":2}
+]
+JSON
+python3 "$ROOT_DIR/hooks/lib/ratchet.py" check src/V.php >/dev/null 2>&1
+if grep -q "src/Keep.php" .craftsman-baseline.json; then
+    log_pass "a malformed entry does not erase the rest of the baseline"
+else
+    log_fail "data loss" "src/Keep.php was dropped from the baseline"
+fi
+
+echo ""
+echo "=== A repo cannot disarm the rules that judge it ==="
+
+NSREPO="$WORK/ns-repo"
+mkdir -p "$NSREPO/src"
+printf '{"autoload":{"psr-4":{"A(pp\\\\":"src/"}}}\n' > "$NSREPO/composer.json"
+printf '<?php\nnamespace A(pp\\Domain;\nuse A(pp\\Infrastructure\\Db;\n' > "$NSREPO/src/Entity.php"
+
+cd "$NSREPO"
+HOSTILE_NS=$(bash -c "source '$ROOT_DIR/hooks/lib/config.sh'; \
+    source '$ROOT_DIR/packs/symfony/hooks/layer-validator.sh'; \
+    _layer_ns_regex './src/Entity.php'")
+if grep -qE "use\s+${HOSTILE_NS}\\\\Infrastructure" src/Entity.php 2>/dev/null; then
+    log_pass "an ERE metacharacter in a psr-4 key does not disable the LAYER rules"
+else
+    log_fail "rules disarmed" "grep failed on namespace root '$HOSTILE_NS', LAYER001-003 never fire"
+fi
+
+SWITCHREPO="$WORK/switch-repo"
+mkdir -p "$SWITCHREPO"
+printf 'hooks:\n  disabled: [config-protection, post-write-check]\n' > "$SWITCHREPO/.craft-config.yml"
+cd "$SWITCHREPO"
+REPO_KILLED=$(bash -c "source '$ROOT_DIR/hooks/lib/config.sh'; config_hooks_disabled_csv")
+if [[ -z "$REPO_KILLED" ]]; then
+    log_pass "a repo cannot switch off the gates through hooks.disabled"
+else
+    log_fail "gates disabled" "the project config disabled '$REPO_KILLED'"
+fi
+
 cd "$PREV_PWD"
 rm -rf "$WORK"
 

@@ -19,8 +19,13 @@ _layer_ns_regex() {
         root=$(config_php_namespace_root "$(dirname "$file")")
     fi
     [[ -n "${root:-}" ]] || root="App"
-    # A backslash in the root has to survive into the ERE as a literal.
-    printf '%s' "${root//\\/\\\\}"
+    # The root is repository-supplied (a composer.json psr-4 key), so it is
+    # data being spliced into a pattern. Escaping backslashes alone left every
+    # other ERE metacharacter live: a key like "A(pp\\" makes each grep below
+    # exit 2, which _layer_is reads as "not this layer", and LAYER001/002/003
+    # then silently stop firing for the entire repository, in the hook and in
+    # CI alike. Quote the whole metacharacter class, not one member of it.
+    printf '%s' "$root" | sed 's/[][\\^$.*+?(){}|]/\\&/g'
 }
 
 # In this layer, is the file part of $layer? Path or declared namespace.
