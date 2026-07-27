@@ -110,8 +110,17 @@ pack_loader_init
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 
-# Validate file path contains only safe characters
-[[ "$FILE_PATH" =~ ^[a-zA-Z0-9_./@:\ -]+$ ]] || exit 0
+# Refuse the characters that are dangerous where the path is interpolated,
+# rather than allow-listing an alphabet. The allowlist excluded [ ] ( ) + , and
+# everything non-ASCII, and a path it rejected skipped validation in silence:
+# every Next.js App Router dynamic route (app/[slug]/page.tsx) and route group
+# (app/(marketing)/page.tsx) was unvalidated, as was any path with an accent.
+# Verified beforehand that every downstream use of FILE_PATH is quoted, which
+# is what makes the narrower set sufficient.
+if [[ "$FILE_PATH" == *[\$\`\;\|\&\<\>\\\"\']* || "$FILE_PATH" == *$'\n'* ]]; then
+    echo "craftsman: not validating ${FILE_PATH}, the path contains a shell metacharacter" >&2
+    exit 0
+fi
 
 # Exit silently if no file path or file doesn't exist
 [[ -z "$FILE_PATH" || ! -f "$FILE_PATH" ]] && exit 0

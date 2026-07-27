@@ -37,44 +37,58 @@ _pack_sa_eslint_map_error() {
 pack_sa_typescript() {
     local file="$1"
     local errors=""
+    errors="$(_pack_sa_eslint_run "$file")$(_pack_sa_depcruise_run "$file")"
+    [[ -n "$errors" ]] && echo -e "$errors"
+}
 
-    # ESLint analysis
+# Deliberately NOT pinned to a safe config, unlike phpstan next door.
+# phpstan is pinned because its bootstrapFiles key runs PHP while the
+# config is merely being read, before any analysis is asked for. An eslint
+# flat config is executable JavaScript by design, and running the
+# project's rules IS what level 2 is for here: pinning a neutral config
+# would leave eslint enforcing nothing. The consent gate is
+# config_trust_project_tools, machine-owner only and off by default, and
+# the plugin's own TS rules run at level 1 regardless.
+_pack_sa_eslint_run() {
+    local file="$1"
+    local errors=""
+
     local eslint=""
     if [[ -f "node_modules/.bin/eslint" ]]; then
         eslint="node_modules/.bin/eslint"
     elif command -v npx &>/dev/null && [[ -f "node_modules/eslint/package.json" ]]; then
         eslint="npx eslint"
     fi
+    [[ -n "$eslint" ]] || return 0
 
-    if [[ -n "$eslint" ]]; then
-        local output
-        output=$(sa_timeout "$SA_BUDGET_FILE_SECONDS" $eslint "$file" --format=compact --no-color 2>/dev/null) || true
-        if [[ -n "$output" ]]; then
-            while IFS= read -r line; do
-                [[ -z "$line" ]] && continue
-                echo "$line" | grep -qi "error" || continue
-                # ESLint compact: "file: line X, col Y, Error - msg (rule)"
-                local lineno msg
-                lineno=$(echo "$line" | grep -oE 'line [0-9]+' | grep -oE '[0-9]+' | head -1)
-                msg=$(echo "$line" | sed -E 's/^.*Error - //')
-                local code
-                code=$(_pack_sa_eslint_map_error "$line")
-                errors="${errors}${code}:${lineno:-0}:${msg}\n"
-            done <<< "$output"
-        fi
-    fi
+    local output
+    output=$(sa_timeout "$SA_BUDGET_FILE_SECONDS" $eslint "$file" --format=compact --no-color 2>/dev/null) || true
+    [[ -n "$output" ]] || return 0
 
-    # Dependency-Cruiser analysis
-    if command -v npx &>/dev/null && [[ -f "node_modules/dependency-cruiser/package.json" ]]; then
-        local output
-        output=$(sa_timeout "$SA_BUDGET_PROJECT_SECONDS" npx depcruise "$file" --output-type err 2>/dev/null) || true
-        if [[ -n "$output" ]]; then
-            while IFS= read -r line; do
-                [[ -z "$line" ]] && continue
-                errors="${errors}ESLINT003:0:${line}\n"
-            done <<< "$output"
-        fi
-    fi
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        echo "$line" | grep -qi "error" || continue
+        local lineno msg code
+        lineno=$(echo "$line" | grep -oE 'line [0-9]+' | grep -oE '[0-9]+' | head -1)
+        msg=$(echo "$line" | sed -E 's/^.*Error - //')
+        code=$(_pack_sa_eslint_map_error "$line")
+        errors="${errors}${code}:${lineno:-0}:${msg}\n"
+    done <<< "$output"
+    printf '%s' "$errors"
+}
 
-    [[ -n "$errors" ]] && echo -e "$errors"
+_pack_sa_depcruise_run() {
+    local file="$1"
+    local errors=""
+    command -v npx &>/dev/null && [[ -f "node_modules/dependency-cruiser/package.json" ]] || return 0
+
+    local output
+    output=$(sa_timeout "$SA_BUDGET_PROJECT_SECONDS" npx depcruise "$file" --output-type err 2>/dev/null) || true
+    [[ -n "$output" ]] || return 0
+
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        errors="${errors}ESLINT003:0:${line}\n"
+    done <<< "$output"
+    printf '%s' "$errors"
 }

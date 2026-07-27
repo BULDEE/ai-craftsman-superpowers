@@ -171,7 +171,15 @@ _rules_parse_config() {
     local parser_path
     parser_path="$(_rules_yaml_parser_path)"
     local json_output
-    json_output=$(python3 "$parser_path" "$file" "config") || json_output="{}"
+    # A parser failure is not an empty config. Built-in rules fall back to
+    # strict, but every custom rule declared in .craft-config.yml simply
+    # ceased to exist, silently, and CI suppressed the stderr that would have
+    # said so. Announce it: a rule the team wrote and that never fires is
+    # worse than no rule, because they believe it is running.
+    json_output=$(python3 "$parser_path" "$file" "config") || {
+        echo "craftsman: could not parse $file, its custom rules will not be enforced" >&2
+        json_output="{}"
+    }
 
     if [[ -z "$json_output" ]] || [[ "$json_output" == "{}" ]]; then
         return 0
@@ -220,7 +228,10 @@ _rules_parse_dir_config() {
     local parser_path
     parser_path="$(_rules_yaml_parser_path)"
     local json_output
-    json_output=$(python3 "$parser_path" "$file" "rules") || json_output="{}"
+    json_output=$(python3 "$parser_path" "$file" "rules") || {
+        echo "craftsman: could not parse rules from $file, they will not be enforced" >&2
+        json_output="{}"
+    }
 
     if [[ -z "$json_output" ]] || [[ "$json_output" == "{}" ]]; then
         return 0

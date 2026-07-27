@@ -39,8 +39,14 @@ VERIFIED=$(python3 "${SCRIPT_DIR}/lib/session_state.py" check-flag "$SESSION_STA
 [[ "$VERIFIED" == "true" ]] && exit 0
 
 # No files written this session? Nothing to verify.
-WRITES=$(python3 "${SCRIPT_DIR}/lib/session_state.py" read "$SESSION_STATE" writes_count 0 2>/dev/null || echo 0)
-[[ "$WRITES" == "0" || -z "$WRITES" ]] && exit 0
+#
+# A failed read is not zero writes. Defaulting it to 0 meant a missing python3
+# or a corrupt session state let a task be marked complete with no evidence at
+# all, which is the one thing this hook exists to prevent. An unreadable count
+# is treated as "there were writes" and the task still has to show evidence.
+WRITES=$(python3 "${SCRIPT_DIR}/lib/session_state.py" read "$SESSION_STATE" writes_count 0 2>/dev/null) || WRITES="unknown"
+[[ "$WRITES" =~ ^[0-9]+$ ]] || WRITES="unknown"
+[[ "$WRITES" == "0" ]] && exit 0
 
 REASON="Task '${TASK_SUBJECT:-unknown}' marked complete without verification evidence. Run the test suite or /craftsman:verify first (evidence-before-completion, ADR-0023)."
 
