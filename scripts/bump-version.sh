@@ -62,7 +62,10 @@ bump_file() {
     fi
 
     if grep -q "$pattern" "$file" 2>/dev/null; then
-        sed -i '' "s|${pattern}|${replacement}|g" "$file"
+        # Not `sed -i ''`: BSD wants an empty suffix argument, GNU reads it as
+        # the script. A temp file is the one form both accept.
+        sed "s|${pattern}|${replacement}|g" "$file" > "${file}.bump.tmp" \
+            && mv "${file}.bump.tmp" "$file"
         local count
         count=$(grep -c "$replacement" "$file" 2>/dev/null || echo "0")
         echo "  ✓  $label (${count} occurrence(s))"

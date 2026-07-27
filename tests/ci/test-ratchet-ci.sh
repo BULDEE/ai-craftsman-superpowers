@@ -87,13 +87,13 @@ echo "=== The pipeline agrees with the hook on ignore, warn and block ==="
 hook_reports_ratchet() {
     local out
     out=$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$WORK/src/Ok.php" \
-        | CLAUDE_PLUGIN_ROOT="$ROOT_DIR" timeout 30 bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1)
+        | CLAUDE_PLUGIN_ROOT="$ROOT_DIR" run_with_timeout 30 bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1)
     printf '%s' "$out" | grep -c "RATCHET001" || true
 }
 
 ci_run() {
     local out code=0
-    out=$(timeout 60 bash "$ROOT_DIR/ci/craftsman-ci.sh" src/ 2>&1) || code=$?
+    out=$(run_with_timeout 60 bash "$ROOT_DIR/ci/craftsman-ci.sh" src/ 2>&1) || code=$?
     printf '%s|%s' "$code" "$(printf '%s' "$out" | grep -c 'RATCHET001' || true)"
 }
 
@@ -176,7 +176,7 @@ PHP
 # by a run that never performed the ratchet check at all, which is what happens
 # when the baseline is not where CI looks for it.
 BASE_CODE=0
-BASE_OUT=$(cd "$SUB" && timeout 60 bash "$ROOT_DIR/ci/craftsman-ci.sh" deep/Deep.php 2>&1) || BASE_CODE=$?
+BASE_OUT=$(cd "$SUB" && run_with_timeout 60 bash "$ROOT_DIR/ci/craftsman-ci.sh" deep/Deep.php 2>&1) || BASE_CODE=$?
 if [[ "$BASE_CODE" == "124" ]]; then
     log_fail "CI hangs when invoked from a subdirectory" "the gate never returned"
 elif printf '%s' "$BASE_OUT" | grep -q "RATCHET001"; then
@@ -184,7 +184,7 @@ elif printf '%s' "$BASE_OUT" | grep -q "RATCHET001"; then
 
     printf 'rules:\n  RATCHET001: ignore\n' > "$SUB/deep/.craft-rules.yml"
     OVER_CODE=0
-    OVER_OUT=$(cd "$SUB" && timeout 60 bash "$ROOT_DIR/ci/craftsman-ci.sh" deep/Deep.php 2>&1) || OVER_CODE=$?
+    OVER_OUT=$(cd "$SUB" && run_with_timeout 60 bash "$ROOT_DIR/ci/craftsman-ci.sh" deep/Deep.php 2>&1) || OVER_CODE=$?
     if [[ "$OVER_CODE" == "124" ]]; then
         log_fail "CI hangs with a directory override" "the gate never returned"
     elif ! printf '%s' "$OVER_OUT" | grep -q "RATCHET001"; then

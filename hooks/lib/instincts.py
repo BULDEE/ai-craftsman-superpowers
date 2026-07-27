@@ -14,6 +14,12 @@ Promotion is never automatic: `candidates` only records what a human may
 approve. Generated skills carry provenance and are plain files the user
 can edit or delete.
 """
+# `str | None` in an annotation is PEP 604, evaluated at runtime from Python
+# 3.10. /usr/bin/python3 on a Mac without homebrew is 3.9, where importing this
+# module raised TypeError and the whole instinct pipeline was dead. Deferring
+# annotation evaluation keeps the modern syntax and runs on 3.9.
+from __future__ import annotations
+
 import sqlite3
 import sys
 from datetime import datetime, timezone

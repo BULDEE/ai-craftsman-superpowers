@@ -263,7 +263,7 @@ import sys
 open(sys.argv[1], 'w').write(sys.argv[2] + ('// pad\n' * 400000))
 " "$HUGE_DIR/huge-violation.php" "$(printf "$VIOLATION")"
 
-SMALL_FINDINGS=$(timeout 10 python3 "$ROOT_DIR/hooks/lib/structural_metrics.py" \
+SMALL_FINDINGS=$(run_with_timeout 10 python3 "$ROOT_DIR/hooks/lib/structural_metrics.py" \
     "$HUGE_DIR/small-violation.php" php 2>/dev/null)
 if printf '%s' "$SMALL_FINDINGS" | grep -q "^PARAM001|"; then
     log_pass "structural analysis reports the violation in a normal-sized file"
@@ -271,7 +271,7 @@ else
     log_fail "structural analysis" "positive control produced no finding: $SMALL_FINDINGS"
 fi
 
-HUGE_FINDINGS=$(timeout 10 python3 "$ROOT_DIR/hooks/lib/structural_metrics.py" \
+HUGE_FINDINGS=$(run_with_timeout 10 python3 "$ROOT_DIR/hooks/lib/structural_metrics.py" \
     "$HUGE_DIR/huge-violation.php" php 2>/dev/null)
 HUGE_CODE=$?
 if printf '%s' "$SMALL_FINDINGS" | grep -q "^PARAM001|"; then
@@ -320,7 +320,7 @@ DEVDIR="$WORK/devrepo"
 mkdir -p "$DEVDIR"
 ln -s /dev/zero "$DEVDIR/evil.php"
 cd "$DEVDIR"
-MEASURED=$(timeout 10 python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure evil.php 2>/dev/null)
+MEASURED=$(run_with_timeout 10 python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure evil.php 2>/dev/null)
 MEASURE_CODE=$?
 if [[ "${RATCHET_ALIVE:-0}" -eq 1 ]]; then
     if [[ $MEASURE_CODE -ne 124 && -z "$MEASURED" ]]; then

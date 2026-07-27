@@ -353,7 +353,7 @@ assert_eq "Walk-up: PHP002 outside Infrastructure is block" "block" \
 # rather than a plain call because the failure mode is a hang, and a hung
 # assertion reports nothing at all.
 cd "$PROJECT_DIR"
-RELATIVE_SEVERITY=$(timeout 10 bash -c "
+RELATIVE_SEVERITY=$(run_with_timeout 10 bash -c "
     source '$ROOT_DIR/hooks/lib/rules-engine.sh'
     rules_init '$PROJECT_DIR' >/dev/null 2>&1
     rules_severity_for_file 'src/Domain/User.php' 'PHP002'
@@ -371,7 +371,7 @@ else
 fi
 
 # Same for the sibling walk that reports which directory supplied the override.
-DEEP_DIR=$(timeout 10 bash -c "
+DEEP_DIR=$(run_with_timeout 10 bash -c "
     source '$ROOT_DIR/hooks/lib/rules-engine.sh'
     rules_init '$PROJECT_DIR' >/dev/null 2>&1
     _rules_find_override_directory 'nowhere/at/all/File.php' || true

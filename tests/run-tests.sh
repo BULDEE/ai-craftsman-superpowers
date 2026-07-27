@@ -81,6 +81,38 @@ log_skip() {
     TESTS_SKIPPED=$((TESTS_SKIPPED + 1))
 }
 
+# `timeout` is GNU coreutils and is absent on a stock macOS, where the previous
+# form silently dropped the budget and a hanging subtest could run forever.
+run_with_timeout() {
+    local seconds="$1"; shift
+
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "$seconds" "$@"
+        return $?
+    fi
+    if command -v gtimeout >/dev/null 2>&1; then
+        gtimeout "$seconds" "$@"
+        return $?
+    fi
+
+    # <&0 matters: bash redirects a background job's stdin from /dev/null unless
+    # it is explicitly redirected, and every hook in this repository is fed its
+    # payload on stdin. Without it the command reads nothing and returns as if
+    # there were no input.
+    "$@" <&0 &
+    local pid=$! waited=0
+    while kill -0 "$pid" 2>/dev/null; do
+        if [[ $waited -ge $seconds ]]; then
+            kill -9 "$pid" 2>/dev/null
+            wait "$pid" 2>/dev/null
+            return 124
+        fi
+        sleep 1
+        waited=$((waited + 1))
+    done
+    wait "$pid"
+}
+
 # run_subtest "<label>" "<path to test script>"
 #
 # Every wrapper used to run its subtest with output discarded and, on failure,
@@ -102,11 +134,7 @@ run_subtest() {
     # it gets killed and the run reports nothing at all. tests/ci/test-ratchet-ci.sh
     # was observed spawning craftsman-ci.sh recursively and never returning.
     # 300s is well past the slowest honest subtest (craftsman-ci, ~75s).
-    if command -v timeout >/dev/null 2>&1; then
-        timeout "${SUBTEST_TIMEOUT:-300}" bash "$script" > "$out" 2>&1 || status=$?
-    else
-        bash "$script" > "$out" 2>&1 || status=$?
-    fi
+    run_with_timeout "${SUBTEST_TIMEOUT:-300}" bash "$script" > "$out" 2>&1 || status=$?
 
     if [[ $status -eq 0 ]]; then
         log_pass "$label"

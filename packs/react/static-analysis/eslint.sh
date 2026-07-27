@@ -48,7 +48,7 @@ pack_sa_typescript() {
 
     if [[ -n "$eslint" ]]; then
         local output
-        output=$(timeout 2 $eslint "$file" --format=compact --no-color 2>/dev/null) || true
+        output=$(sa_timeout 2 $eslint "$file" --format=compact --no-color 2>/dev/null) || true
         if [[ -n "$output" ]]; then
             while IFS= read -r line; do
                 [[ -z "$line" ]] && continue
@@ -67,7 +67,7 @@ pack_sa_typescript() {
     # Dependency-Cruiser analysis
     if command -v npx &>/dev/null && [[ -f "node_modules/dependency-cruiser/package.json" ]]; then
         local output
-        output=$(timeout 2 npx depcruise "$file" --output-type err 2>/dev/null) || true
+        output=$(sa_timeout 2 npx depcruise "$file" --output-type err 2>/dev/null) || true
         if [[ -n "$output" ]]; then
             while IFS= read -r line; do
                 [[ -z "$line" ]] && continue

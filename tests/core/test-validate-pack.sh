@@ -121,8 +121,12 @@ echo "=== 4. Missing required field 'name' fails ==="
 
 PACK4="${TEST_TMP}/pack-no-name"
 make_valid_pack "$PACK4"
-# Remove the name field (macOS-compatible sed -i '')
-sed -i '' '/^name:/d' "${PACK4}/pack.yml"
+# Remove the name field. Not `sed -i ''`: that is BSD syntax, and GNU sed reads
+# the empty string as the script and '/^name:/d' as a filename, so on Linux the
+# file was left untouched and the assertion below failed on a pack that still
+# had its name. Rewriting through a temp file works on both.
+grep -v '^name:' "${PACK4}/pack.yml" > "${PACK4}/pack.yml.tmp"
+mv "${PACK4}/pack.yml.tmp" "${PACK4}/pack.yml"
 
 exit_code=0
 bash "$VALIDATE_SCRIPT" "$PACK4" >/dev/null 2>&1 || exit_code=$?
