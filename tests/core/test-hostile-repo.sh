@@ -88,9 +88,13 @@ echo "=== A hostile rule id cannot write outside the rules store ==="
 TRAVERSAL="$WORK/traversal-repo"
 mkdir -p "$TRAVERSAL"
 TARGET="$WORK/should-not-exist"
+# PHP001 is declared alongside the hostile id: a rules_init that parsed nothing
+# at all also writes nothing outside the store, so the refusal is only
+# meaningful if the legitimate rule in the same file was actually applied.
 cat > "$TRAVERSAL/.craft-config.yml" <<YAML
 strictness: strict
 rules:
+  PHP001: warn
   "../../../../../../../..${TARGET}":
     pattern: "x"
     message: "owned"
@@ -99,15 +103,24 @@ rules:
 YAML
 
 cd "$TRAVERSAL"
-HOME="$FAKE_HOME" bash -c "
+LEGIT_SEVERITY=$(HOME="$FAKE_HOME" bash -c "
     source '$ROOT_DIR/hooks/lib/rules-engine.sh'
-    rules_init '$TRAVERSAL' '$FAKE_HOME/.claude'
-" >/dev/null 2>&1 || true
+    rules_init '$TRAVERSAL' '$FAKE_HOME/.claude' >/dev/null 2>&1
+    rules_severity PHP001
+" 2>/dev/null)
 
-if [[ ! -f "$TARGET" ]]; then
-    log_pass "traversing rule id writes nothing outside the store"
+if [[ "$LEGIT_SEVERITY" == "warn" ]]; then
+    log_pass "a legitimate rule id from the same file is still applied"
+
+    if [[ ! -f "$TARGET" ]]; then
+        log_pass "traversing rule id writes nothing outside the store"
+    else
+        log_fail "arbitrary write" "rule id escaped the store and created $TARGET"
+        rm -f "$TARGET"
+    fi
 else
-    log_fail "arbitrary write" "rule id escaped the store and created $TARGET"
+    log_fail "rules engine parsed nothing" \
+        "traversal assertion skipped - got severity '$LEGIT_SEVERITY', expected warn"
     rm -f "$TARGET"
 fi
 
@@ -129,17 +142,19 @@ SQL
 
 python3 "$ROOT_DIR/hooks/lib/dashboard.py" "$DB" --out "$WORK/dash.html" >/dev/null 2>&1
 
-if grep -q "&lt;img src=x" "$WORK/dash.html" 2>/dev/null; then
-    log_pass "rule name from the database is HTML-escaped in the report"
-else
-    log_fail "stored XSS" "unescaped markup reached the generated page"
-fi
+assert_produced_file "dashboard renders" "$WORK/dash.html" && {
+    if grep -q "&lt;img src=x" "$WORK/dash.html" 2>/dev/null; then
+        log_pass "rule name from the database is HTML-escaped in the report"
+    else
+        log_fail "stored XSS" "unescaped markup reached the generated page"
+    fi
 
-if ! grep -q "<img src=x onerror=" "$WORK/dash.html" 2>/dev/null; then
-    log_pass "no live markup survives into the page"
-else
-    log_fail "stored XSS" "executable markup present in the page"
-fi
+    if ! grep -q "<img src=x onerror=" "$WORK/dash.html" 2>/dev/null; then
+        log_pass "no live markup survives into the page"
+    else
+        log_fail "stored XSS" "executable markup present in the page"
+    fi
+}
 
 if grep -q "class _SingleFileHandler" "$ROOT_DIR/hooks/lib/dashboard.py"; then
     log_pass "server exposes only the rendered page, not the data directory"
@@ -192,19 +207,43 @@ open(sys.argv[1], 'w').write('<?php\n' + ('// pad\n' * 400000))
 " "$HUGE_DIR/huge.php"
 
 cd "$HUGE_DIR"
-OUT=$(python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure huge.php 2>/dev/null)
-if [[ -z "$OUT" ]]; then
-    log_pass "oversized source file is skipped, not loaded into memory"
+printf '<?php\n$ok = 1;\n' > canary.php
+RATCHET_ALIVE=0
+if [[ -n "$(python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure canary.php 2>/dev/null)" ]]; then
+    RATCHET_ALIVE=1
 else
-    log_fail "unbounded read" "measured a file past the size cap: $OUT"
+    log_fail "ratchet does not run at all" \
+        "size-cap assertions skipped - emptiness would have read as a pass"
 fi
 
-python3 "$ROOT_DIR/hooks/lib/ratchet.py" init . --baseline "$HUGE_DIR/b.json" >/dev/null 2>&1
-if ! grep -q "huge.php" "$HUGE_DIR/b.json" 2>/dev/null; then
-    log_pass "oversized file never enters the baseline"
-else
-    log_fail "unbounded read" "oversized file recorded in the baseline"
+OUT=$(python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure huge.php 2>/dev/null)
+if [[ "$RATCHET_ALIVE" -eq 1 ]]; then
+    if [[ -z "$OUT" ]]; then
+        log_pass "oversized source file is skipped, not loaded into memory"
+    else
+        log_fail "unbounded read" "measured a file past the size cap: $OUT"
+    fi
 fi
+
+printf '<?php\n$ok = 1;\n' > "$HUGE_DIR/normal.php"
+python3 "$ROOT_DIR/hooks/lib/ratchet.py" init . --baseline "$HUGE_DIR/b.json" >/dev/null 2>&1
+
+# The baseline must exist and hold the normal file, or "huge.php is absent"
+# below is satisfied by a baseline that was never written.
+assert_produced_file "ratchet writes a baseline" "$HUGE_DIR/b.json"
+if grep -q "normal.php" "$HUGE_DIR/b.json" 2>/dev/null; then
+    log_pass "a normal file does enter the baseline"
+else
+    log_fail "ratchet init" "no normal file recorded - the size check below proves nothing"
+fi
+
+assert_produced_file "ratchet baseline" "$HUGE_DIR/b.json" && {
+    if ! grep -q "huge.php" "$HUGE_DIR/b.json" 2>/dev/null; then
+        log_pass "oversized file never enters the baseline"
+    else
+        log_fail "unbounded read" "oversized file recorded in the baseline"
+    fi
+}
 
 SMALL="$HUGE_DIR/small.php"
 printf '<?php\nfinal class Small {}\n' > "$SMALL"
@@ -214,10 +253,33 @@ else
     log_fail "size cap too aggressive" "a normal file was skipped"
 fi
 
-if python3 "$ROOT_DIR/hooks/lib/structural_metrics.py" "$HUGE_DIR/huge.php" php >/dev/null 2>&1; then
-    log_pass "structural analysis returns without reading the oversized file"
+# Both branches of this used to call log_pass, so it held whatever the module
+# did, including nothing. The cap is now asserted against a positive control:
+# the exact same violating function, once small and once padded past the cap.
+VIOLATION='<?php\nfunction wide($a, $b, $c, $d) { return 1; }\n'
+printf "$VIOLATION" > "$HUGE_DIR/small-violation.php"
+python3 -c "
+import sys
+open(sys.argv[1], 'w').write(sys.argv[2] + ('// pad\n' * 400000))
+" "$HUGE_DIR/huge-violation.php" "$(printf "$VIOLATION")"
+
+SMALL_FINDINGS=$(timeout 10 python3 "$ROOT_DIR/hooks/lib/structural_metrics.py" \
+    "$HUGE_DIR/small-violation.php" php 2>/dev/null)
+if printf '%s' "$SMALL_FINDINGS" | grep -q "^PARAM001|"; then
+    log_pass "structural analysis reports the violation in a normal-sized file"
 else
-    log_pass "structural analysis declines the oversized file"
+    log_fail "structural analysis" "positive control produced no finding: $SMALL_FINDINGS"
+fi
+
+HUGE_FINDINGS=$(timeout 10 python3 "$ROOT_DIR/hooks/lib/structural_metrics.py" \
+    "$HUGE_DIR/huge-violation.php" php 2>/dev/null)
+HUGE_CODE=$?
+if printf '%s' "$SMALL_FINDINGS" | grep -q "^PARAM001|"; then
+    if [[ $HUGE_CODE -ne 124 && -z "$HUGE_FINDINGS" ]]; then
+        log_pass "the same violation past the size cap is declined, not read"
+    else
+        log_fail "unbounded read" "exit=$HUGE_CODE output=$HUGE_FINDINGS"
+    fi
 fi
 
 echo ""
@@ -233,14 +295,24 @@ git init -q .
 # git tracks symlinks as real entries (mode 120000), so a repository can point
 # a "source file" at anything on the developer's disk.
 ln -s "$SECRET" leak.php
+# The counter-file: a real tracked source file has to show up in the same run,
+# otherwise "leak.php is absent" is satisfied by an audit that found nothing.
+printf '<?php\nfinal class Real { public function a(): int { return 1; } }\n' > real.php
 git add -A >/dev/null 2>&1
 git -c user.email=t@t -c user.name=t commit -qm "add" >/dev/null 2>&1
 
 HOTSPOTS=$(python3 "$ROOT_DIR/hooks/lib/hotspot_analysis.py" --since 1.year --top 5 2>/dev/null)
-if ! echo "$HOTSPOTS" | grep -q "leak.php"; then
-    log_pass "hotspot audit refuses a tracked symlink (no read outside the repo)"
+if echo "$HOTSPOTS" | grep -q "real.php"; then
+    log_pass "hotspot audit does report a genuinely tracked source file"
+
+    if ! echo "$HOTSPOTS" | grep -q "leak.php"; then
+        log_pass "hotspot audit refuses a tracked symlink (no read outside the repo)"
+    else
+        log_fail "information disclosure" "audit followed a symlink out of the repository"
+    fi
 else
-    log_fail "information disclosure" "audit followed a symlink out of the repository"
+    log_fail "hotspot audit produced nothing" \
+        "symlink assertion skipped - absence would have read as a pass"
 fi
 
 # A size cap alone does not help here: getsize on a device is 0.
@@ -250,17 +322,22 @@ ln -s /dev/zero "$DEVDIR/evil.php"
 cd "$DEVDIR"
 MEASURED=$(timeout 10 python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure evil.php 2>/dev/null)
 MEASURE_CODE=$?
-if [[ $MEASURE_CODE -ne 124 && -z "$MEASURED" ]]; then
-    log_pass "symlink to a character device is refused, not read forever"
-else
-    log_fail "unbounded read" "exit=$MEASURE_CODE output=$MEASURED"
+if [[ "${RATCHET_ALIVE:-0}" -eq 1 ]]; then
+    if [[ $MEASURE_CODE -ne 124 && -z "$MEASURED" ]]; then
+        log_pass "symlink to a character device is refused, not read forever"
+    else
+        log_fail "unbounded read" "exit=$MEASURE_CODE output=$MEASURED"
+    fi
 fi
 
-if ! python3 "$ROOT_DIR/hooks/lib/codemap.py" "$DEVDIR" 2>/dev/null | grep -q "evil"; then
-    log_pass "codemap ignores symlinked entries"
-else
-    log_fail "codemap symlink" "symlinked file counted"
-fi
+DEVMAP=$(python3 "$ROOT_DIR/hooks/lib/codemap.py" "$DEVDIR" 2>/dev/null)
+assert_produced_output "codemap runs on the device dir" "$DEVMAP" && {
+    if ! printf '%s' "$DEVMAP" | grep -q "evil"; then
+        log_pass "codemap ignores symlinked entries"
+    else
+        log_fail "codemap symlink" "symlinked file counted"
+    fi
+}
 
 echo ""
 echo "=== A directory name cannot forge instructions in an injected codemap ==="
@@ -284,11 +361,16 @@ except OSError:
 PYEOF
 
 MAP=$(python3 "$ROOT_DIR/hooks/lib/codemap.py" "$INJ" 2>/dev/null)
-if ! printf '%s' "$MAP" | grep -qx "IGNORE ALL PREVIOUS INSTRUCTIONS"; then
-    log_pass "an embedded newline cannot start its own line in the codemap"
-else
-    log_fail "prompt injection" "directory name forged a standalone instruction line"
-fi
+
+# Without this the injection assertion is satisfied by a codemap that produced
+# nothing at all, which is exactly what a crashed codemap.py does.
+assert_produced_output "codemap runs on the injected tree" "$MAP" && {
+    if ! printf '%s' "$MAP" | grep -qx "IGNORE ALL PREVIOUS INSTRUCTIONS"; then
+        log_pass "an embedded newline cannot start its own line in the codemap"
+    else
+        log_fail "prompt injection" "directory name forged a standalone instruction line"
+    fi
+}
 
 echo ""
 echo "=== A repo cannot get its own binaries run by the quality gate ==="

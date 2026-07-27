@@ -144,6 +144,58 @@ cleanup_test_env() {
     [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]] && rm -rf "$CLAUDE_PLUGIN_DATA"
 }
 
+# --- Liveness preconditions for guard tests ---
+#
+# A security guard is usually asserted by the absence of something bad: no raw
+# markup in the page, no oversized file in the baseline, no attacker string in
+# the map. A dead program also produces absence, so those assertions cannot
+# tell a working guard from deleted code. Stubbing dashboard.py, codemap.py and
+# ratchet.py to `sys.exit(1)` left 19 of the 22 hostile-repo assertions green.
+#
+# Every absence assertion is therefore preceded by one of these, which fail
+# loudly when the tool under test produced nothing at all.
+
+# Gate the dependent assertion on these rather than merely reporting alongside
+# it. A guard whose tool never ran is not verified, it is undetermined, and
+# printing a green tick for it is the whole defect these helpers exist to close:
+#
+#   assert_produced_file "dashboard" "$OUT" && { ...absence assertion... }
+#
+# assert_produced_file <label> <path> - the tool wrote a non-empty artifact
+assert_produced_file() {
+    local label="$1" path="$2"
+    if [[ -s "$path" ]]; then
+        return 0
+    fi
+    log_fail "$label: tool produced no output" \
+        "guard assertions skipped - they would have passed against deleted code"
+    return 1
+}
+
+# assert_produced_output <label> <text> - the tool wrote something to stdout
+assert_produced_output() {
+    local label="$1" text="$2"
+    if [[ -n "$text" ]]; then
+        return 0
+    fi
+    log_fail "$label: tool produced no output" \
+        "guard assertions skipped - they would have passed against deleted code"
+    return 1
+}
+
+# tool_alive <label> <command...> - does this tool still work on benign input?
+# For guards asserted by an empty result (a size cap, a refusal), emptiness is
+# the pass condition, so liveness has to come from a separate benign run.
+tool_alive() {
+    local label="$1"; shift
+    if "$@" >/dev/null 2>&1; then
+        return 0
+    fi
+    log_fail "$label: tool does not run at all" \
+        "guard assertions skipped - emptiness would have read as a pass"
+    return 1
+}
+
 # Bridge files live in the real ~/.claude so skills can find them without
 # CLAUDE_PLUGIN_ROOT, which means any suite invoking session-start.sh rewrites
 # the developer's own bridges to throwaway test paths. Back them up as a set:
