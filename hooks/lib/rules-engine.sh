@@ -257,7 +257,11 @@ _rules_validate_pattern() {
         return 1
     fi
     local grep_ret=0
-    echo "test" | grep -E "$pattern" >/dev/null 2>&1 || grep_ret=$?
+    # -e is required: the pattern comes from the audited repository's own
+    # .craft-config.yml, and without it a leading dash is parsed as an option.
+    # `--file=/dev/zero` hangs the hook on every Write/Edit; `--file=/etc/passwd`
+    # makes grep read an arbitrary local file as its pattern source.
+    echo "test" | grep -E -e "$pattern" >/dev/null 2>&1 || grep_ret=$?
     if [[ $grep_ret -eq 2 ]]; then
         echo "[rules-engine] WARNING: Rule $rule_id has invalid regex pattern '$pattern', setting to ignore" >&2
         return 1

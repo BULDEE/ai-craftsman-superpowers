@@ -93,7 +93,7 @@ Tout le reste continue de fonctionner sur un dépôt non fiable : rules engine, 
 /plugin marketplace add BULDEE/ai-craftsman-superpowers
 
 # 2. Install the plugin
-/plugin install craftsman@BULDEE-ai-craftsman-superpowers
+/plugin install craftsman@ai-craftsman-superpowers
 
 # 3. Restart Claude Code
 exit

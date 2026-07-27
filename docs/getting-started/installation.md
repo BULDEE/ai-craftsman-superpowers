@@ -2,7 +2,9 @@
 
 ## Prerequisites
 
-- [Claude Code CLI](https://claude.ai/code) v1.0.33 or later
+- [Claude Code CLI](https://claude.ai/code) v2.1.218 or later. v4 is a clean
+  break ([ADR-0016](../adr/0016-v4-clean-break-native-first.md)) and does not
+  run on older releases; install the frozen 3.9.x line for those.
 - Run `claude --version` to verify
 
 ## Quick Install (Recommended)
@@ -12,7 +14,7 @@
 /plugin marketplace add BULDEE/ai-craftsman-superpowers
 
 # 2. Install the plugin
-/plugin install craftsman@BULDEE-ai-craftsman-superpowers
+/plugin install craftsman@ai-craftsman-superpowers
 
 # 3. Restart Claude Code
 exit
@@ -55,8 +57,8 @@ exit
 claude
 
 # Reinstall
-/plugin uninstall craftsman@BULDEE-ai-craftsman-superpowers
-/plugin install craftsman@BULDEE-ai-craftsman-superpowers
+/plugin uninstall craftsman@ai-craftsman-superpowers
+/plugin install craftsman@ai-craftsman-superpowers
 ```
 
 ## Next Steps

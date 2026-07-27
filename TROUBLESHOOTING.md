@@ -44,8 +44,8 @@ exit
 claude
 
 # Reinstall plugin
-/plugin uninstall craftsman@BULDEE-ai-craftsman-superpowers
-/plugin install craftsman@BULDEE-ai-craftsman-superpowers
+/plugin uninstall craftsman@ai-craftsman-superpowers
+/plugin install craftsman@ai-craftsman-superpowers
 ```
 
 ## Check for errors

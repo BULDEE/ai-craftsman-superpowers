@@ -242,7 +242,13 @@ _resolve_config() {
         local project_dir="$PWD"
         local global_dir="${HOME:-}"
 
-        rules_init "$project_dir" "$global_dir"
+        # stderr is suppressed here for the same reason it is on pack_loader_init
+        # and sa_analyze_file: the adapters redirect this command's stderr into
+        # the JSON report file, so a single warning makes the report unparseable.
+        # rules-engine warns on any malformed custom rule, and .craft-config.yml
+        # is supplied by the repository under audit - so leaving stderr on let a
+        # pull request corrupt its own report and take the gate green with it.
+        rules_init "$project_dir" "$global_dir" 2>/dev/null
 
         # If --config was passed explicitly, feed it to the rules engine
         # (rules_init only looks for .craft-config.yml by convention name)
@@ -493,7 +499,8 @@ scan_file() {
                 [[ -z "$pattern" ]] && continue
                 while IFS= read -r fline; do
                     ln_num=$((ln_num + 1))
-                    if echo "$fline" | grep -qE "$pattern" 2>/dev/null; then
+                    # -e: repo-supplied pattern, see rules-engine.sh for the note
+                    if echo "$fline" | grep -qE -e "$pattern" 2>/dev/null; then
                         _add_violation "$file" "$ln_num" "$rule_id" "$msg"
                         break
                     fi

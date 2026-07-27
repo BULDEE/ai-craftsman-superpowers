@@ -288,7 +288,8 @@ _validate_custom_rules() {
         pattern=$(rules_pattern "$rule_id")
         msg=$(rules_message "$rule_id")
         [[ -z "$pattern" ]] && continue
-        if grep -qE "$pattern" "$file" 2>/dev/null; then
+        # -e: repo-supplied pattern, see rules-engine.sh for the flag-injection note
+        if grep -qE -e "$pattern" "$file" 2>/dev/null; then
             add_violation "$rule_id" "$msg" "$file"
         fi
     done <<< "$custom_rules"

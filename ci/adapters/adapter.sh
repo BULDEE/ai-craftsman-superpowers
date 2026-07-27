@@ -127,9 +127,24 @@ for v in report['violations']:
 adapter_compute_exit() {
     local report_file="$1"
 
-    local violations warnings
-    violations=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['violations'])" < "$report_file" 2>/dev/null || echo "0")
-    warnings=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['warnings'])" < "$report_file" 2>/dev/null || echo "0")
+    # Read both counts in one parse so an unreadable report is distinguishable
+    # from a clean one. Defaulting a parse failure to zero was a fail-open: the
+    # adapters merge the scanner's stderr into this file, so anything that
+    # writes a warning - including a malformed rule in the audited repository's
+    # own .craft-config.yml - produced "0 violations" and a green gate.
+    local summary
+    if ! summary=$(python3 -c "
+import json, sys
+d = json.load(sys.stdin)['summary']
+print(d['violations'], d['warnings'])
+" < "$report_file" 2>/dev/null); then
+        echo "craftsman-ci: report is not valid JSON, failing closed: $report_file" >&2
+        echo "craftsman-ci: first line was: $(head -1 "$report_file" 2>/dev/null)" >&2
+        return 2
+    fi
+
+    local violations="${summary%% *}"
+    local warnings="${summary##* }"
 
     if [[ "$violations" -gt 0 ]]; then
         return 2
