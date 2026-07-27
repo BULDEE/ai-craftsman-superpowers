@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 ## Outcome Contract
 
-- **Outcome**: a CI pipeline that enforces the same rules as the local hooks, with zero drift between them.
+- **Outcome**: a CI pipeline that enforces the same rules as the local hooks, from the same validators, the same rules engine and the same per-file severity resolution.
 - **Done when**: the generated pipeline file exists for the target provider, references the same pack validators as the hooks, and a dry run reports the same violations locally and in CI.
 - **Evidence**: craftsman-ci.sh output, the generated template, and the provider adapter used.
 

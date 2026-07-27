@@ -64,7 +64,7 @@ Ce qui rend ce plugin réellement unique dans l'écosystème Claude Code :
 2. **Rules Engine avec héritage à 3 niveaux** : surcharges Global → Projet → Répertoire. Forme courte (`PHP001: warn`) ou forme longue (règles regex custom). Le code legacy coexiste avec du code neuf strict via la relaxation par répertoire.
 3. **Détecteur de biais cognitifs** : détection en temps réel du biais d'accélération, du scope creep et de la sur-optimisation dans vos prompts, bilingue FR/EN, contextuel pour réduire les faux positifs.
 4. **Quality Gate temps réel** : validation progressive sur chaque Write/Edit : regex (<50ms, toujours actif) → sémantique LSP (en direct, si votre serveur de langage est installé) → analyse statique et architecture (PHPStan/ESLint/deptrac, activation explicite par machine car exécuter les analyseurs d'un projet revient à exécuter son code, voir [SECURITY.md](SECURITY.md)). Dégradation gracieuse sans aucun outil installé.
-5. **Pipeline CI multi-provider** : le même rules engine tourne dans les hooks (temps réel) et en CI (pipeline) avec zéro dérive, sur GitHub Actions, GitLab CI, Bitbucket Pipelines et Jenkins.
+5. **Pipeline CI multi-provider** : la CI charge les mêmes validateurs de pack et le même rules engine que les hooks, et résout la sévérité fichier par fichier, donc un `.craft-rules.yml` de répertoire s'applique des deux côtés. GitHub Actions, GitLab CI et Bitbucket Pipelines ont des annotations natives ; Jenkins passe par l'adaptateur générique.
 6. **Métriques & analyse de tendances** : suivi SQLite des violations, corrections et sessions, avec vues de tendances à 7 et 30 jours pour identifier vos règles les plus violées.
 7. **Cliquet structurel** : un baseline committé enregistre le high-water mark structurel de chaque fichier (complexité, taille, plus longue fonction, fan-out d'imports, nombre de suppressions). Un fichier que vous touchez peut s'améliorer ou rester égal, jamais régresser : la marque se resserre automatiquement au passage vert et ne se desserre que par une suppression documentée et comptée. Appliqué à l'identique dans les hooks et en CI ; le legacy non touché n'est jamais puni pour une dette qu'il avait déjà.
 8. **Panel de contradiction au design** : trois contradicteurs (YAGNI, invariants et frontières, faisabilité) attaquent le design pendant `/craftsman:design`, avant qu'une ligne existe. Chaque objection atterrit dans une table retenue ou écartée : le silence n'est pas une option. Contredire un design coûte bien moins cher que contredire le code bâti dessus.
@@ -188,14 +188,16 @@ Forme courte : `PHP001: warn` / `TS001: ignore`. Forme longue : règles custom a
 
 ## Intégration CI/CD
 
-Même rules engine, zéro dérive entre hooks locaux et CI, 4 providers :
+La CI charge les mêmes validateurs de pack et le même rules engine que les
+hooks : une règle ne peut pas vouloir dire une chose sur votre machine et une
+autre dans le pipeline.
 
-| Provider | Template |
-|----------|----------|
-| GitHub Actions | `craftsman-quality-gate.yml` |
-| GitLab CI | `.gitlab-ci.craftsman.yml` |
-| Bitbucket Pipelines | `bitbucket-pipelines.craftsman.yml` |
-| Jenkins | `Jenkinsfile.craftsman` |
+| Provider | Template | Adaptateur |
+|----------|----------|------------|
+| GitHub Actions | `craftsman-quality-gate.yml` | Natif : annotations inline et commentaire de PR |
+| GitLab CI | `.gitlab-ci.craftsman.yml` | Natif : rapport code-quality et note de MR |
+| Bitbucket Pipelines | `bitbucket-pipelines.craftsman.yml` | Natif : rapport de build |
+| Jenkins | `Jenkinsfile.craftsman` | Générique : sortie de log et fichier markdown, sans annotations natives |
 
 Utilisez `/craftsman:ci export` ou `craftsman-ci.sh init --provider` en CLI.
 

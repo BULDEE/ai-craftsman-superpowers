@@ -19,9 +19,9 @@ Result: Better quality where it matters, lower cost where it doesn't.
 
 Haiku is a lightweight model optimized for speed and cost.
 
-**Costs:** ~5x cheaper than Sonnet
-**Speed:** ~3x faster than Sonnet
-**Latency:** <1 second typically
+**Costs:** 3x cheaper than Sonnet at list price ($1/$5 per Mtok against $3/$15)
+**Speed:** noticeably faster, which is what keeps a write-time hook out of
+your way. The exact factor depends on prompt size, so no number is quoted here
 
 **Best for:**
 - Validation tasks (checking syntax, rules)
@@ -237,86 +237,31 @@ $ /craftsman:challenge
 
 ## Cost Impact
 
-### Feature: "Add User Registration" (Sequential Workflow)
+The numbers that follow are list prices per million tokens, published by
+Anthropic. What a given step costs depends on how much context it carries,
+which nobody can state for your codebase, so this section gives ratios rather
+than invented totals.
 
-```
-Step 1: /craftsman:design (Sonnet)
-  - Input: Feature description
-  - Output: Domain model
-  - Cost: ~$0.008
-  - Time: 3 min
+| Tier | Input | Output | Relative to Sonnet |
+|------|-------|--------|--------------------|
+| Haiku 4.5 | $1.00 | $5.00 | 3x cheaper |
+| Sonnet 5 | $3.00 | $15.00 | baseline |
+| Opus 5 | $5.00 | $25.00 | 1.7x more |
 
-Step 2: /craftsman:spec (Sonnet)
-  - Input: Design
-  - Output: Test specifications
-  - Cost: ~$0.006
-  - Time: 2 min
+Read the tiering decision off that table. A verification pass that re-reads the
+files it just checked is the step whose token count grows fastest, and it is
+the step whose judgement matters least: that is why every hook runs on Haiku.
+An architecture critique carries a fraction of those tokens and is the step
+where a worse answer costs the most rework: that is why `/craftsman:challenge`
+runs on Opus.
 
-Step 3: /craftsman:scaffold (Sonnet)
-  - Input: Design + spec
-  - Output: Code skeletons
-  - Cost: ~$0.008
-  - Time: 4 min
+Putting the whole pipeline on Opus multiplies the cheap high-volume steps by
+five while changing nothing about the expensive low-volume ones. Putting it all
+on Haiku saves little (the high-volume steps are already there) and gives up
+the judgement on the steps that needed it.
 
-Step 4: /craftsman:test (Sonnet)
-  - Input: Scaffolded code
-  - Output: Test implementations
-  - Cost: ~$0.008
-  - Time: 3 min
-
-Step 5: /craftsman:challenge (Opus)
-  - Input: All code
-  - Output: Architecture critique
-  - Cost: ~$0.020 (2x more expensive, but worth it)
-  - Time: 5 min
-
-Step 6: /craftsman:verify (Haiku)
-  - Input: All code
-  - Output: Quality report
-  - Cost: ~$0.001 (ultra-cheap)
-  - Time: 1 min
-
-Step 7: /craftsman:git (Haiku)
-  - Input: Modified files
-  - Output: Git commit
-  - Cost: ~$0.001
-  - Time: <1 min
-
-TOTAL COST: ~$0.052
-TOTAL TIME: ~20 min
-```
-
-### Comparison: If All Commands Used Sonnet
-
-```
-Same workflow, all Sonnet:
-Step 1-4: Sonnet (same cost, same quality) ✅
-Step 5: Challenge as Sonnet
-  - Cost: ~$0.010 (cheaper)
-  - Quality: Lower (less judgment)
-  - Issues: Might miss subtle architecture problems ❌
-Step 6-7: Sonnet (overkill)
-  - Cost: ~$0.008 total (much more expensive)
-  - Quality: Wasted capability (doesn't need reasoning)
-  - Issues: Slow feedback on simple validation ❌
-
-TOTAL COST: ~$0.052 (SAME!)
-TOTAL TIME: ~25 min (SLOWER!)
-QUALITY: Mixed (worse on critical path)
-```
-
-### Comparison: If All Commands Used Opus
-
-```
-Same workflow, all Opus:
-Every step: Opus
-  - Cost: ~$0.140 (2.7x more expensive!)
-  - Quality: Overkill on scaffolding
-  - Issues: Slow feedback loop, expensive verification ❌
-
-TOTAL COST: ~$0.140 (268% more!)
-TOTAL TIME: ~35 min (75% slower!)
-```
+For what a session actually cost, use Claude Code's `/usage`. This plugin
+records no token or cost data.
 
 ## The Sweet Spot
 
@@ -440,28 +385,19 @@ plugin setting.
 
 ## Monitoring Costs
 
-Check your API usage:
+This plugin does not track spend. Its metrics database records violations,
+corrections and sessions; it holds no model, token or cost column, and
+`/craftsman:metrics` reports on code quality, not on your bill.
 
-```bash
-/craftsman:metrics
-```
+Claude Code's own `/usage` is where model spend lives. Its Session block gives
+token counts and a locally computed dollar figure per model, and on a Pro,
+Max, Team or Enterprise plan it also attributes recent usage to skills,
+subagents and individual plugins, so you can see this plugin's own share.
+Press `d` or `w` to switch between the last 24 hours and the last 7 days.
 
-Output shows:
-```
-Model usage this week:
-- Haiku:  156 calls × $0.0008 = $0.125
-- Sonnet: 42 calls × $0.003  = $0.126
-- Opus:   8 calls × $0.015   = $0.120
-
-Total: $0.371
-
-Breakdown:
-- Verification (Haiku): $0.125 (34%)
-- Development (Sonnet): $0.126 (34%)
-- Architecture (Opus):  $0.120 (32%)
-
-Most expensive: /craftsman:challenge (35 calls, $0.105)
-```
+The figures are computed from local session history at list prices, so they
+exclude other machines and any contracted discount. For authoritative billing,
+use the usage page in the Claude Console.
 
 ---
 
@@ -508,7 +444,7 @@ Priority for disabling (least impact):
    - Loss: Slower debugging
    - When: Simple bugs only
 
-Full pricing breakdown in [ADR-001: Model Tiering Strategy](../adr/001-model-tiering.md)
+Full pricing breakdown in [ADR-0010: Model Tiering Strategy](../adr/0010-model-tiering.md)
 
 ---
 

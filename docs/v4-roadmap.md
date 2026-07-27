@@ -24,7 +24,7 @@ v3 made Claude a disciplined craftsman: rules enforced in real time, zero CI dri
 
 ## What stays
 
-- The rules engine, 3-level inheritance, and CI adapters: deterministic checks remain bash, tested, and identical between hooks and CI (zero drift).
+- The rules engine, 3-level inheritance, and CI adapters: deterministic checks remain bash, tested, and run from the same code in hooks and CI.
 - SQLite metrics as the system of record.
 - The pack system (symfony, react, python, bash, ai-ml) and its validator interface.
 - The `/craftsman:*` namespace: user-facing invocations do not change.

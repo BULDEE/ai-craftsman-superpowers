@@ -482,7 +482,7 @@ workflows:
         prompt: "Design based on specification"
       - skill: /test
         prompt: "Write tests for the design"
-      - agent: architecture-reviewer
+      - agent: architect
         prompt: "Review the design"
 
   bug-fix:

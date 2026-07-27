@@ -744,6 +744,24 @@ test_workflow_command() {
     fi
 }
 
+# Test: Team templates reference agents that exist
+test_team_templates() {
+    echo ""
+    log_info "Testing team templates (agent resolution)"
+
+    local team_test="$SCRIPT_DIR/core/test-team-templates.sh"
+
+    if [[ -f "$team_test" ]]; then
+        if bash "$team_test" > /dev/null 2>&1; then
+            log_pass "Team template tests pass"
+        else
+            log_fail "Team template tests failed - run tests/core/test-team-templates.sh for details"
+        fi
+    else
+        log_skip "Team template tests (tests/core/test-team-templates.sh not found)"
+    fi
+}
+
 # Test: Legacy command (content validation)
 test_legacy_command() {
     echo ""
@@ -904,6 +922,7 @@ main() {
         test_craftsman_ci
         test_workflow_command
         test_legacy_command
+        test_team_templates
         test_hotspot_analysis
         test_quick_setup
         test_dogfood

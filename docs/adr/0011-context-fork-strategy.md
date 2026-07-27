@@ -64,4 +64,4 @@ When using `context: fork`, select appropriate agent:
 ## References
 
 - [Claude Code Subagents](https://code.claude.com/docs/en/sub-agents)
-- [ADR-001: Model Tiering](./001-model-tiering.md)
+- [ADR-0010: Model Tiering](./0010-model-tiering.md)

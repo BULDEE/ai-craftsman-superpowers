@@ -11,7 +11,7 @@ agents:
     role: lead
     focus: "OWASP top 10, authentication, authorization, data exposure"
 
-  - agent: architecture-reviewer
+  - agent: architect
     role: member
     focus: "Multi-tenancy isolation, data flow, trust boundaries"
 
@@ -24,5 +24,5 @@ workflow:
   type: sequential
   steps:
     - security-pentester      # Full scan first
-    - architecture-reviewer   # Architecture-level security
+    - architect   # Architecture-level security
     - ai-engineer             # AI-specific (conditional - skip if no AI/ML code)

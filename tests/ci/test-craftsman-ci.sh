@@ -567,6 +567,38 @@ else
 fi
 
 # =============================================================================
+# The pipeline must not disagree with the hooks
+# =============================================================================
+echo ""
+echo "=== No drift between the hooks and the pipeline ==="
+
+# The CI fallback carries its own copy of the advisory list, because it exists
+# for the case where the rules engine could not be sourced and nothing can be
+# shared. A copy drifts unless something compares it.
+ENGINE_ADVISORY=$(awk '/^_rules_is_advisory\(\)/,/^}/' "$ROOT_DIR/hooks/lib/rules-engine.sh" \
+    | grep -oE "^[[:space:]]+[A-Z0-9*|]+\)" | tr -d ' )' | tr '|' '\n' | sort -u)
+CI_ADVISORY=$(awk '/^_should_block\(\)/,/^}/' "$ROOT_DIR/ci/craftsman-ci.sh" \
+    | grep -E "return 1 ;;" | grep -oE "^[[:space:]]+[A-Z0-9*|]+\)" | tr -d ' )' | tr '|' '\n' | sort -u)
+
+if [[ -z "$ENGINE_ADVISORY" || -z "$CI_ADVISORY" ]]; then
+    log_fail "advisory lists unreadable" \
+        "engine='${ENGINE_ADVISORY//$'\n'/,}' ci='${CI_ADVISORY//$'\n'/,}' - the comparison would pass vacuously"
+elif [[ "$ENGINE_ADVISORY" == "$CI_ADVISORY" ]]; then
+    log_pass "the CI fallback lists exactly the rules the engine calls advisory"
+else
+    log_fail "advisory drift" \
+        "engine: $(echo "$ENGINE_ADVISORY" | tr '\n' ' ') | ci: $(echo "$CI_ADVISORY" | tr '\n' ' ')"
+fi
+
+# A directory-level relaxation the hooks honour must be honoured here too.
+if grep -q "rules_severity_for_file" "$ROOT_DIR/ci/craftsman-ci.sh"; then
+    log_pass "CI resolves severity per file, so .craft-rules.yml applies in the pipeline"
+else
+    log_fail "directory overrides ignored in CI" \
+        "craftsman-ci.sh calls rules_severity without the file, unlike the hooks"
+fi
+
+# =============================================================================
 # Summary
 # =============================================================================
 test_summary

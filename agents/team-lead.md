@@ -54,7 +54,7 @@ Coordinate, delegate, challenge, and consolidate. You never implement directly -
 | Task requires UX/design decisions | Delegate to ui-ux-director |
 | Task requires documentation | Delegate to doc-writer |
 | Task requires security audit | Delegate to security-pentester |
-| Task requires code review | Delegate to architecture-reviewer + stack reviewer |
+| Task requires code review | Delegate to architect + stack reviewer |
 
 ## Quality Gates
 

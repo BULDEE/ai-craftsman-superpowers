@@ -316,15 +316,27 @@ _ts_enabled() {
 }
 
 _should_block() {
-    local rule="$1"
+    local rule="$1" file="${2:-}"
     if [[ "$RULES_ENGINE_AVAILABLE" == true ]]; then
         local sev
-        sev=$(rules_severity "$rule")
+        # rules_severity_for_file, not rules_severity: the hooks honour a
+        # directory-level .craft-rules.yml and CI did not, so a directory a
+        # team had deliberately relaxed still failed the pipeline. That is the
+        # drift this pipeline exists to not have.
+        if [[ -n "$file" ]]; then
+            sev=$(rules_severity_for_file "$file" "$rule")
+        else
+            sev=$(rules_severity "$rule")
+        fi
         [[ "$sev" == "block" ]]
     else
-        # Standalone fallback logic
+        # Standalone fallback, used only when the rules engine could not be
+        # sourced. This list must match _rules_is_advisory in
+        # hooks/lib/rules-engine.sh; tests/ci/test-craftsman-ci.sh fails when
+        # the two diverge.
         case "$rule" in
-            WARN*|PHP005) return 1 ;;
+            WARN*|PHP005|NEST001|LOC001|GOD001|PARAM001|CTRL001|RATCHET001) return 1 ;;
+            TS002|TS003|PHP003) return 1 ;;
         esac
         case "$STRICTNESS" in
             strict)   return 0 ;;
@@ -359,7 +371,7 @@ _add_violation() {
     local rule="$3"
     local message="$4"
 
-    if _should_block "$rule"; then
+    if _should_block "$rule" "$file"; then
         V_FILES+=("$file")
         V_LINES+=("$line")
         V_RULES+=("$rule")

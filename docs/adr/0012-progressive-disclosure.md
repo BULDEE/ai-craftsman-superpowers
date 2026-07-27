@@ -36,8 +36,8 @@ skill-name/
 ```markdown
 ## Additional Resources
 
-For detailed patterns, see [reference.md](reference.md).
-For examples, see [examples.md](examples.md).
+For detailed patterns, see `reference.md`.
+For examples, see `examples.md`.
 ```
 
 ### Current Implementation

@@ -15,7 +15,7 @@ agents:
     role: member
     focus: "Components, hooks, API integration"
 
-  - agent: architecture-reviewer
+  - agent: architect
     role: reviewer
     focus: "Post-implementation architecture validation"
 
@@ -23,4 +23,4 @@ workflow:
   type: parallel-then-review
   steps:
     - parallel: [backend-craftsman, frontend-craftsman]
-    - sequential: [architecture-reviewer]
+    - sequential: [architect]

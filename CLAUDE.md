@@ -36,7 +36,7 @@ bash tests/templates/test-templates.sh
 These are the 6 genuine features that differentiate AI Craftsman Superpowers:
 
 ### 1. Correction Learning System
-Records every violation fix users make, injects correction trends at next session start, and promotes recurring fixes into human-reviewed learned skills. SQLite-backed feedback loop that progressively teaches Claude the exact patterns your codebase rejects. Cross-file pattern detection suggests project-wide fixes when 3+ files share the same violation. Differentiator: the only learning loop coupled to a verified rules engine - what is learned comes from violations the same engine enforces in hooks and CI with zero drift.
+Records every violation fix users make, injects correction trends at next session start, and promotes recurring fixes into human-reviewed learned skills. SQLite-backed feedback loop that progressively teaches Claude the exact patterns your codebase rejects. Cross-file pattern detection suggests project-wide fixes when 3+ files share the same violation. Differentiator: the learning loop is coupled to the rules engine, so what is learned comes from violations that same engine enforces in hooks and in CI, not from a separate model of what good code looks like.
 
 ### 2. Rules Engine with 3-Level Inheritance
 Enterprise-ready rule customization: Global → Project → Directory overrides. Short form (`PHP001: warn`) and long form (custom rules with regex, message, severity, languages, paths). Legacy code coexists with strict new code via directory-level relaxation. Python-backed YAML parser with bash 3.2 shell compatibility.
@@ -52,7 +52,7 @@ Real-time detection of acceleration bias, scope creep, and over-optimization in 
 Graceful degradation: works with zero tools installed (Level 1 only).
 
 ### 5. Multi-Provider CI Pipeline
-Same rules engine runs in hooks (real-time) AND CI (pipeline) with zero drift - CI sources the same pack validators as hooks. 4 providers: GitHub Actions, GitLab CI, Bitbucket Pipelines, Jenkins. Adapter pattern: detect → run → annotate → comment → exit.
+CI sources the same pack validators and the same rules engine as the hooks, and resolves severity per file so directory-level `.craft-rules.yml` applies in both. tests/ci/test-craftsman-ci.sh fails when the two disagree. 4 provider templates: GitHub Actions, GitLab CI, Bitbucket Pipelines, Jenkins; the first three get native annotations, Jenkins runs through the generic adapter. Adapter pattern: detect → run → annotate → comment → exit.
 
 ### 6. Metrics & Trend Analysis
 SQLite-backed tracking of violations, corrections, and sessions. 7-day and 30-day trend views. Data-driven quality improvement: identify most-violated rules and adjust strictness. Currently per-machine - team metrics sync planned for v3.

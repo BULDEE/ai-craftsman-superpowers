@@ -305,10 +305,12 @@ Identify independent tasks:
 All tasks are read-only → Safe to parallelize
 
 Agents run concurrently, results aggregated
-Estimated speedup: 3-4x faster than sequential review
+Wall-clock is the slowest single review, not the sum of all four
 ```
 
-**Rationale:** All tasks are independent read operations on different files. No conflicts. Much faster than reviewing sequentially.
+**Rationale:** All tasks are independent read operations on different files. No
+conflicts, so they overlap. The gain is bounded by the slowest reviewer and by
+the concurrency cap, not by the number of agents.
 
 ---
 

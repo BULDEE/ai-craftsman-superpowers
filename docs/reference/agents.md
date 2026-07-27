@@ -9,7 +9,7 @@ The plugin provides **11 agents** organized in two categories:
 **Reviewers** are invoked for code review:
 
 ```
-> Review this PR with the architecture-reviewer agent
+> Review this PR with the architect agent
 
 > Run ai-engineer on the ML pipeline code
 ```
@@ -161,9 +161,10 @@ The plugin provides **11 agents** organized in two categories:
 
 ### Core Pack
 
-### architecture-reviewer
+### Architecture review
 
-**Mission**: Review code against Clean Architecture principles.
+There is no `architecture-reviewer` agent. Architecture review is what
+[`architect`](#architect) does, read-only, and that is the name to spawn.
 
 **Checks**:
 - Dependencies point inward (domain has no external imports)
@@ -181,6 +182,7 @@ The plugin provides **11 agents** organized in two categories:
 | IMPROVE | Missing value objects, unclear naming |
 
 **Report Format**:
+
 ```markdown
 ## Architecture Review
 

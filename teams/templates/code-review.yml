@@ -7,7 +7,7 @@ description: Comprehensive code review team - architecture + security + domain q
 trigger: "Use when reviewing PRs, auditing code quality, or before major releases"
 
 agents:
-  - agent: architecture-reviewer
+  - agent: architect
     role: lead
     focus: "Layer violations, aggregate boundaries, dependency direction"
 
@@ -24,4 +24,4 @@ workflow:
   type: parallel
   consolidation: "Lead aggregates findings into single review report"
   steps:
-    - parallel: [architecture-reviewer, security-pentester, symfony-reviewer]
+    - parallel: [architect, security-pentester, symfony-reviewer]

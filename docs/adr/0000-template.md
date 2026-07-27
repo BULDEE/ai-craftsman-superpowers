@@ -44,5 +44,5 @@ Description and why rejected.
 
 ## References
 
-- [Link 1](url)
-- [Link 2](url)
+- [Related ADR](./0000-template.md)
+- [External reference](https://example.com/)

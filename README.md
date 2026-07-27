@@ -61,7 +61,7 @@ What makes this plugin genuinely unique in the Claude Code ecosystem:
 2. **Rules Engine with 3-Level Inheritance** - Global → Project → Directory overrides. Short form (`PHP001: warn`) or long form (custom regex rules). Legacy code coexists with strict new code via directory-level relaxation.
 3. **Cognitive Bias Detector** - real-time detection of acceleration bias, scope creep, and over-optimization in your prompts, bilingual FR/EN, context-aware to reduce false positives.
 4. **Real-Time Quality Gate** - progressive validation on every Write/Edit: regex (<50ms, always on) → LSP semantics (live, when your language server is installed) → static analysis and architecture (PHPStan/ESLint/deptrac, opt-in per machine because running a project's analysers runs its code, see [SECURITY.md](SECURITY.md)). Degrades gracefully with zero tools installed.
-5. **Multi-Provider CI Pipeline** - the same rules engine runs in hooks (real-time) and CI (pipeline) with zero drift, across GitHub Actions, GitLab CI, Bitbucket Pipelines, and Jenkins.
+5. **Multi-Provider CI Pipeline** - CI sources the same pack validators and rules engine as the hooks, so a rule means the same thing locally and in the pipeline. GitHub Actions, GitLab CI and Bitbucket Pipelines get native annotations; Jenkins runs through the generic adapter.
 6. **Metrics & Trend Analysis** - SQLite-backed tracking of violations, corrections, and sessions, with 7-day/30-day trend views to identify your most-violated rules.
 7. **Structural Ratchet** - a committed baseline records each file's structural high-water mark (complexity, size, longest function, import fan-out, suppression count). A file you touch may improve or stay equal, never regress: the mark tightens automatically on a green pass and only loosens through a documented, counted suppression. Enforced identically in hooks and CI; untouched legacy is never punished for debt it already had.
 8. **Adversarial Design Panel** - three contradictors (YAGNI, invariants and boundaries, feasibility) attack a design during `/craftsman:design`, before any code exists. Every objection lands in a retained or dismissed table: silence is not an option. Contradicting a design costs far less than contradicting the code built on it.
@@ -185,14 +185,15 @@ Short form: `PHP001: warn` / `TS001: ignore`. Long form: custom rules with regex
 
 ## CI/CD Integration
 
-Same rules engine, zero drift between local hooks and CI, 4 providers:
+CI sources the same pack validators and the same rules engine as the hooks, so
+a rule cannot mean one thing on your machine and another in the pipeline.
 
-| Provider | Template |
-|----------|----------|
-| GitHub Actions | `craftsman-quality-gate.yml` |
-| GitLab CI | `.gitlab-ci.craftsman.yml` |
-| Bitbucket Pipelines | `bitbucket-pipelines.craftsman.yml` |
-| Jenkins | `Jenkinsfile.craftsman` |
+| Provider | Template | Adapter |
+|----------|----------|---------|
+| GitHub Actions | `craftsman-quality-gate.yml` | Native: inline annotations and a PR comment |
+| GitLab CI | `.gitlab-ci.craftsman.yml` | Native: code-quality report and an MR note |
+| Bitbucket Pipelines | `bitbucket-pipelines.craftsman.yml` | Native: build report |
+| Jenkins | `Jenkinsfile.craftsman` | Generic: plain log output and a markdown file, no native annotations |
 
 Use `/craftsman:ci export` or `craftsman-ci.sh init --provider` from the CLI.
 
