@@ -508,6 +508,30 @@ _rules_find_override_directory() {
     return 1
 }
 
+# Paths where the structural premise does not hold. A long setup method, a
+# fixture builder taking six arguments, a deeply nested data literal: those are
+# the normal shape of a test, not decay. A credential in a fixture is a
+# fixture, not a leak. Blocking on them is what teaches a developer to reach
+# for craftsman-ignore, and that habit then covers the real findings too.
+#
+# Degraded to warn, never dropped: the finding stays visible, it just stops
+# standing between the developer and their own test file. An explicit
+# directory override in .craft-rules.yml still wins over this, since a project
+# that means it should be able to say so.
+_RULES_TEST_PATH_RE='(^|/)(tests?|spec|__tests__|__mocks__|fixtures?|factories)(/|$)'
+_RULES_TEST_RELAXED='LOC001 NEST001 PARAM001 GOD001 CTRL001 SEC001 SEC002'
+
+_rules_is_test_path() {
+    [[ "$1" =~ $_RULES_TEST_PATH_RE ]]
+}
+
+_rules_relaxed_in_tests() {
+    case " $_RULES_TEST_RELAXED " in
+        *" $1 "*) return 0 ;;
+    esac
+    return 1
+}
+
 rules_severity_for_file() {
     local file_path="$1"
     local rule_id="$2"
@@ -518,7 +542,15 @@ rules_severity_for_file() {
         return 0
     }
 
-    rules_severity "$rule_id"
+    local severity
+    severity=$(rules_severity "$rule_id")
+    if [[ "$severity" == "block" ]] \
+        && _rules_is_test_path "$file_path" \
+        && _rules_relaxed_in_tests "$rule_id"; then
+        echo "warn"
+        return 0
+    fi
+    echo "$severity"
 }
 
 # ---------------------------------------------------------------------------

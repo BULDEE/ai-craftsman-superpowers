@@ -122,6 +122,20 @@ assert_eq "PHP001 still block in Infrastructure dir" "block" \
 assert_eq "PHP002 is block outside Infrastructure" "block" \
     "$(rules_severity_for_file "$PROJECT_DIR/src/Domain/Entity.php" "PHP002")"
 
+# A long setup, a six-argument fixture builder and a nested data literal are
+# the normal shape of a test, and a credential in a fixture is a fixture. Those
+# rules degrade to warn there, and only there.
+assert_eq "SEC001 still blocks in production code" "block" \
+    "$(rules_severity_for_file "$PROJECT_DIR/src/Infrastructure/Client.php" "SEC001")"
+assert_eq "SEC001 degrades to warn in a test path" "warn" \
+    "$(rules_severity_for_file "$PROJECT_DIR/tests/Unit/ClientTest.php" "SEC001")"
+assert_eq "PARAM001 degrades to warn under __mocks__" "warn" \
+    "$(rules_severity_for_file "$PROJECT_DIR/src/__mocks__/api.ts" "PARAM001")"
+
+# The relaxation is a list, not a blanket: a test class is still a class.
+assert_eq "PHP001 still blocks in a test path" "block" \
+    "$(rules_severity_for_file "$PROJECT_DIR/tests/Unit/ClientTest.php" "PHP001")"
+
 # =============================================================================
 # 4. Custom rules (pattern, message, severity, languages)
 # =============================================================================

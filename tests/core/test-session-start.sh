@@ -59,8 +59,19 @@ fi
 # Skills query through the Bash tool, where CLAUDE_PLUGIN_DATA does not exist:
 # without this bridge they read a database no hook has written to since the
 # plugin slug changed, and report a silent instrumentation outage.
-if [[ -f "$_DB_BRIDGE" ]]; then
-    bridged_db=$(cat "$_DB_BRIDGE")
+#
+# Run under a private HOME. ~/.claude/craftsman-metrics-db-path is one file for
+# the whole machine, so reading the real one asserted a property of whatever
+# session wrote it last: a live editor session overwriting it between this
+# hook call and this read failed the suite for a reason that had nothing to do
+# with the code, and it reproduced only under concurrency.
+BRIDGE_HOME=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-bridge.XXXXXX")
+mkdir -p "$BRIDGE_HOME/.claude"
+echo '{}' | HOME="$BRIDGE_HOME" bash "$ROOT_DIR/hooks/session-start.sh" >/dev/null 2>&1
+_OWN_BRIDGE="${BRIDGE_HOME}/.claude/craftsman-metrics-db-path"
+
+if [[ -f "$_OWN_BRIDGE" ]]; then
+    bridged_db=$(cat "$_OWN_BRIDGE")
     if [[ "$bridged_db" == "${CLAUDE_PLUGIN_DATA}/metrics.db" ]]; then
         log_pass "Metrics DB bridge resolves CLAUDE_PLUGIN_DATA"
     else
@@ -69,6 +80,7 @@ if [[ -f "$_DB_BRIDGE" ]]; then
 else
     log_fail "Session start should write ~/.claude/craftsman-metrics-db-path" "file missing"
 fi
+rm -rf "$BRIDGE_HOME"
 
 # Test: the reporting skills read the bridge instead of hardcoding the fallback.
 # The fallback path may still appear, but only as the `|| echo` arm of a bridge
