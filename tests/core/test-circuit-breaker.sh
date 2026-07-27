@@ -120,14 +120,24 @@ assert_eq "Failures reset to 0 after success" "0" "$result"
 echo ""
 echo "=== 5. Half-Open After Cooldown ==="
 
-cb_init "fast-channel" 2 1
+# Same reason as section 7 below: a 1 second cooldown makes "is it open?"
+# depend on which side of a second boundary the read lands.
+cb_age_open() {
+    local channel="$1" seconds="$2"
+    local file aged
+    file=$(_cb_state_file "$channel")
+    aged=$(jq --argjson back "$seconds" '.opened_at = (.opened_at - $back)' "$file")
+    printf '%s' "$aged" > "$file"
+}
+
+cb_init "fast-channel" 2 300
 cb_record_failure "fast-channel"
 cb_record_failure "fast-channel"
 
 result=$(cb_state "fast-channel")
 assert_eq "Circuit opens at threshold" "open" "$result"
 
-sleep 2
+cb_age_open "fast-channel" 301
 
 result=$(cb_state "fast-channel")
 assert_eq "Circuit half-open after cooldown expires" "half-open" "$result"
@@ -151,13 +161,18 @@ assert_eq "Failures reset after half-open success" "0" "$result"
 echo ""
 echo "=== 7. Half-Open + Failure -> Open ==="
 
-cb_init "retry-channel" 1 1
+# The cooldown is long here and the clock is moved by hand. With cooldown=1 and
+# a sleep, "is it open?" was a coin flip on second boundaries: cb_state returns
+# half-open as soon as elapsed >= cooldown, and elapsed is already 0 or 1 the
+# moment the circuit opens. Rewinding opened_at makes each transition exact and
+# drops two seconds of sleeping. cb_age_open is defined in section 5.
+cb_init "retry-channel" 1 300
 cb_record_failure "retry-channel"
 
 result=$(cb_state "retry-channel")
 assert_eq "Opens after 1 failure (threshold=1)" "open" "$result"
 
-sleep 2
+cb_age_open "retry-channel" 301
 
 result=$(cb_state "retry-channel")
 assert_eq "Half-open after cooldown" "half-open" "$result"
@@ -232,11 +247,17 @@ assert_empty "Cache miss returns empty" "$result"
 echo ""
 echo "=== 12. TTL Expiry ==="
 
+# Two entries, not one. cache_set stores expires_at = now + ttl and cache_get
+# misses on now >= expires_at, so reading a ttl=1 entry back immediately misses
+# whenever the clock ticks between the two calls: the "hit" assertion was a
+# coin flip on second boundaries. The hit is checked on an entry that cannot
+# expire during the test; the expiry is checked on its own short-lived entry.
+cache_set "sentry" "live:data" "still-fresh" 3600
+
+result=$(cache_get "sentry" "live:data")
+assert_eq "Cache hit before TTL" "still-fresh" "$result"
+
 cache_set "sentry" "temp:data" "short-lived" 1
-
-result=$(cache_get "sentry" "temp:data")
-assert_eq "Cache hit before TTL" "short-lived" "$result"
-
 sleep 2
 
 result=$(cache_get "sentry" "temp:data")

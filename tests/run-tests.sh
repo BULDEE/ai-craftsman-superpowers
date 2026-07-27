@@ -96,12 +96,30 @@ run_subtest() {
         return 0
     fi
 
-    local out
+    local out status=0
     out=$(mktemp)
-    if bash "$script" > "$out" 2>&1; then
+    # A suite that hangs is worse than one that fails: nobody waits it out, so
+    # it gets killed and the run reports nothing at all. tests/ci/test-ratchet-ci.sh
+    # was observed spawning craftsman-ci.sh recursively and never returning.
+    # 300s is well past the slowest honest subtest (craftsman-ci, ~75s).
+    if command -v timeout >/dev/null 2>&1; then
+        timeout "${SUBTEST_TIMEOUT:-300}" bash "$script" > "$out" 2>&1 || status=$?
+    else
+        bash "$script" > "$out" 2>&1 || status=$?
+    fi
+
+    if [[ $status -eq 0 ]]; then
         log_pass "$label"
         rm -f "$out"
         return 0
+    fi
+
+    if [[ $status -eq 124 ]]; then
+        log_fail "$label - ${script#$ROOT_DIR/} TIMED OUT after ${SUBTEST_TIMEOUT:-300}s"
+        echo "    --- last 15 lines before the timeout ---"
+        tail -15 "$out" | sed 's/^/    /'
+        echo "    --- full output kept at: $out ---"
+        return 1
     fi
 
     log_fail "$label - ${script#$ROOT_DIR/}"
@@ -543,6 +561,21 @@ test_session_metrics() {
     log_info "Testing session metrics (functional)"
 
     run_subtest "Session metrics tests pass" "$SCRIPT_DIR/core/test-session-metrics.sh" || true
+    run_subtest "Metrics consolidation tests pass" "$SCRIPT_DIR/core/test-consolidate-metrics.sh" || true
+    run_subtest "Runner integrity tests pass" "$SCRIPT_DIR/core/test-runner-integrity.sh" || true
+    run_subtest "Circuit breaker and cache tests pass" "$SCRIPT_DIR/core/test-circuit-breaker.sh" || true
+    run_subtest "External pack gating tests pass" "$SCRIPT_DIR/core/test-external-packs.sh" || true
+    run_subtest "Healthcheck tests pass" "$SCRIPT_DIR/core/test-healthcheck.sh" || true
+    run_subtest "Pack loader tests pass" "$SCRIPT_DIR/core/test-pack-loader.sh" || true
+    run_subtest "Routing table tests pass" "$SCRIPT_DIR/core/test-routing-table.sh" || true
+    run_subtest "Rules engine tests pass" "$SCRIPT_DIR/core/test-rules-engine.sh" || true
+    run_subtest "Session start tests pass" "$SCRIPT_DIR/core/test-session-start.sh" || true
+    run_subtest "Pack validation tests pass" "$SCRIPT_DIR/core/test-validate-pack.sh" || true
+    run_subtest "CI adapter tests pass" "$SCRIPT_DIR/ci/test-adapters.sh" || true
+    run_subtest "Doctrine export tests pass" "$SCRIPT_DIR/ci/test-doctrine-export.sh" || true
+    run_subtest "Ratchet CI parity tests pass" "$SCRIPT_DIR/ci/test-ratchet-ci.sh" || true
+
+    run_subtest "Suite isolation audit" "$SCRIPT_DIR/core/test-suite-isolation.sh" || true
 
     echo ""
     log_info "Testing session state library (unit)"
@@ -683,6 +716,15 @@ main() {
 
         test_hook_behavior
         test_agent_hooks
+        test_hostile_repo
+        test_ratchet
+        test_design_panel
+        test_okf_knowledge
+        test_dashboard
+        test_tooling_detect
+        test_verify_loop
+        test_observation
+        test_instincts
         test_config_protection
         test_security_invariants
         test_config_resolution

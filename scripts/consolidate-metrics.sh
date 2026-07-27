@@ -68,7 +68,18 @@ sql_quote() {
 # With stderr discarded, the empty result read as "0 rows to merge" and the
 # script went on to report a clean consolidation while silently dropping the
 # whole source. Failures are now counted and surfaced.
-MERGE_ERRORS=0
+# The count is kept in a file, not a variable. A shell counter is silently lost
+# the moment its function runs inside $( ), a pipeline, or a `while ... | read`
+# loop, and the caller cannot tell the difference between "no failures" and
+# "the increment happened in a subshell". A file survives all three, and it
+# also records which table failed and why for the summary below.
+MERGE_ERROR_LOG=$(mktemp)
+trap 'rm -f "$MERGE_ERROR_LOG"' EXIT
+
+merge_error_count() {
+    [[ -s "$MERGE_ERROR_LOG" ]] || { printf '0'; return 0; }
+    wc -l < "$MERGE_ERROR_LOG" | tr -d ' '
+}
 
 run_sql() {
     local label="$1" sql="$2"
@@ -87,7 +98,7 @@ run_sql() {
 merge_failed() {
     local table="$1" reason="$2"
     echo "  ${table}: NOT MERGED, ${reason}" >&2
-    MERGE_ERRORS=$((MERGE_ERRORS + 1))
+    printf '%s\t%s\n' "$table" "$reason" >> "$MERGE_ERROR_LOG"
 }
 
 count_pending() {
@@ -174,9 +185,13 @@ else
     echo "Dry run complete."
 fi
 
-if [[ "$MERGE_ERRORS" -gt 0 ]]; then
+ERRORS=$(merge_error_count)
+if [[ "$ERRORS" -gt 0 ]]; then
     echo ""
-    echo "${MERGE_ERRORS} merge step(s) failed: this consolidation is INCOMPLETE." >&2
+    echo "${ERRORS} merge step(s) failed: this consolidation is INCOMPLETE." >&2
+    while IFS=$'\t' read -r failed_table failed_reason; do
+        echo "  - ${failed_table}: ${failed_reason}" >&2
+    done < "$MERGE_ERROR_LOG"
     echo "Do not delete any source database." >&2
     exit 1
 fi
