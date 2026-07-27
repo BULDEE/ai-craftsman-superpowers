@@ -16,13 +16,8 @@ mkdir -p "$CLAUDE_PLUGIN_DATA"
 source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
 # Backup bridge files - session-start.sh overwrites them with test paths
-_BRIDGE="${HOME}/.claude/craftsman-session-state-path"
-_BRIDGE_BAK="${_BRIDGE}.test-backup"
-[[ -f "$_BRIDGE" ]] && cp "$_BRIDGE" "$_BRIDGE_BAK"
-
 _DB_BRIDGE="${HOME}/.claude/craftsman-metrics-db-path"
-_DB_BRIDGE_BAK="${_DB_BRIDGE}.test-backup"
-[[ -f "$_DB_BRIDGE" ]] && cp "$_DB_BRIDGE" "$_DB_BRIDGE_BAK"
+backup_home_bridges
 
 echo ""
 echo "=== Session Start Hook Tests ==="
@@ -89,6 +84,33 @@ else
     log_fail "Skills must not query the bare fallback DB" "hardcoded at: $hardcoded"
 fi
 
+# Test: every SQL the reporting skills run is valid against the real schema.
+# Step 7 selected agent_invocations and team_type, columns the sessions table
+# never had: the query failed on every run and its `|| echo` arm announced an
+# absence of activity, turning a schema error into a plausible-looking report.
+SCHEMA_DB="${CLAUDE_PLUGIN_DATA}/schema-probe.db"
+rm -f "$SCHEMA_DB"
+(
+    export METRICS_DB_DIR="$CLAUDE_PLUGIN_DATA"
+    export METRICS_DB="$SCHEMA_DB"
+    source "$ROOT_DIR/hooks/lib/metrics-db.sh"
+    METRICS_DB="$SCHEMA_DB"
+    metrics_init
+) >/dev/null 2>&1
+
+sql_errors=""
+while IFS= read -r query; do
+    err=$(sqlite3 "$SCHEMA_DB" "$query" 2>&1 >/dev/null)
+    [[ -n "$err" ]] && sql_errors+="${err}; "
+done < <(grep -ho '"SELECT [^"]*"' "$ROOT_DIR/skills/metrics/SKILL.md" "$ROOT_DIR/skills/debug/SKILL.md" 2>/dev/null | tr -d '"')
+
+if [[ -z "$sql_errors" ]]; then
+    log_pass "Skill queries are valid against the metrics schema"
+else
+    log_fail "Skill queries must match the schema" "$sql_errors"
+fi
+rm -f "$SCHEMA_DB"
+
 # Test: Auto-setup gate warns when no config
 ORIGINAL_HOME="$HOME"
 export HOME="/tmp/craftsman-fake-home-$$"
@@ -103,8 +125,7 @@ fi
 export HOME="$ORIGINAL_HOME"
 
 # Restore bridge files
-[[ -f "$_BRIDGE_BAK" ]] && mv "$_BRIDGE_BAK" "$_BRIDGE"
-[[ -f "$_DB_BRIDGE_BAK" ]] && mv "$_DB_BRIDGE_BAK" "$_DB_BRIDGE"
+restore_home_bridges
 
 # Cleanup
 rm -rf "$CLAUDE_PLUGIN_DATA" "/tmp/craftsman-fake-home-$$"

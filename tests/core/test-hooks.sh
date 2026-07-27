@@ -281,10 +281,9 @@ fi
 echo ""
 echo "=== SessionStart Hook Tests ==="
 
-# Backup bridge file - session-start.sh overwrites it with test paths
+# Backup bridge files - session-start.sh overwrites them with test paths
 _BRIDGE="${HOME}/.claude/craftsman-session-state-path"
-_BRIDGE_BAK="${_BRIDGE}.test-backup"
-[[ -f "$_BRIDGE" ]] && cp "$_BRIDGE" "$_BRIDGE_BAK"
+backup_home_bridges
 
 run_session_start() {
     local output
@@ -380,8 +379,8 @@ else
     log_fail "SessionStart should always exit 0" "got exit $exit_code"
 fi
 
-# Restore bridge file after session-start tests
-[[ -f "$_BRIDGE_BAK" ]] && mv "$_BRIDGE_BAK" "$_BRIDGE"
+# Restore bridge files after session-start tests
+restore_home_bridges
 
 cd "$ORIGINAL_PWD"
 rm -rf "$SESSION_TEST_DIR"

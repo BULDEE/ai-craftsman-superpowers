@@ -144,6 +144,32 @@ cleanup_test_env() {
     [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]] && rm -rf "$CLAUDE_PLUGIN_DATA"
 }
 
+# Bridge files live in the real ~/.claude so skills can find them without
+# CLAUDE_PLUGIN_ROOT, which means any suite invoking session-start.sh rewrites
+# the developer's own bridges to throwaway test paths. Back them up as a set:
+# guarding them one by one is how the metrics bridge got clobbered by
+# test-hooks.sh the day it was introduced.
+_CRAFTSMAN_BRIDGES=(
+    "${HOME}/.claude/craftsman-session-state-path"
+    "${HOME}/.claude/craftsman-metrics-db-path"
+)
+
+backup_home_bridges() {
+    local bridge
+    for bridge in "${_CRAFTSMAN_BRIDGES[@]}"; do
+        [[ -f "$bridge" ]] && cp "$bridge" "${bridge}.test-backup"
+    done
+    return 0
+}
+
+restore_home_bridges() {
+    local bridge
+    for bridge in "${_CRAFTSMAN_BRIDGES[@]}"; do
+        [[ -f "${bridge}.test-backup" ]] && mv "${bridge}.test-backup" "$bridge"
+    done
+    return 0
+}
+
 # --- Summary ---
 
 # test_summary - print results and exit with correct code

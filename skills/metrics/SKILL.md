@@ -101,19 +101,24 @@ To calculate trend, compare current 7-day score against the prior 7-day window (
 
 Use the Bash tool to query agent/team stats:
 ```bash
-sqlite3 -header -column "$(cat ~/.claude/craftsman-metrics-db-path 2>/dev/null || echo ~/.claude/plugins/data/craftsman/metrics.db)" "SELECT date(timestamp) as day, agent_invocations, team_type FROM sessions WHERE timestamp > datetime('now','-14 days') AND (agent_invocations > 0 OR team_type IS NOT NULL) ORDER BY day DESC;" 2>/dev/null || echo "No agent/team data yet."
+sqlite3 -header -column "$(cat ~/.claude/craftsman-metrics-db-path 2>/dev/null || echo ~/.claude/plugins/data/craftsman/metrics.db)" "SELECT date(timestamp) as day, agents_spawned, skills_used FROM sessions WHERE timestamp > datetime('now','-14 days') AND (COALESCE(agents_spawned,'[]') != '[]' OR COALESCE(skills_used,'[]') != '[]') ORDER BY day DESC;" || echo "No agent/team data yet."
 ```
 
 Add to the report:
 
 ```
 ### Agent & Team Usage (14 days)
-| Day | Agent Invocations | Team Type |
-|-----|------------------|-----------|
-| ... | ...              | ...       |
+| Day | Agents Spawned | Skills Used |
+|-----|----------------|-------------|
+| ... | ...            | ...         |
 ```
 
 If no agent/team data, display: "No agent or team sessions recorded in the last 14 days."
+
+Do not silence this query's stderr. It used to select `agent_invocations` and
+`team_type`, columns the sessions table never had, so it always failed and the
+`||` arm reported an absence of activity instead of a broken query. An empty
+result must mean empty data, never a schema error swallowed on the way out.
 
 ### Step 8: Hotspots (churn x complexity)
 
