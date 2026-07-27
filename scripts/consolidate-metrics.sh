@@ -53,14 +53,26 @@ if [[ ${#SOURCES[@]} -eq 0 ]]; then
     exit 0
 fi
 
+# Escape a single quote for embedding into a single-quoted SQLite string
+# literal, by doubling it. SOURCES comes from `find` under the user's own
+# ~/.claude, not attacker-controlled input, but ATTACH takes a string literal
+# rather than a bound parameter, so an unescaped quote in a path would still
+# terminate the literal early and let the rest of the path run as SQL.
+sql_quote() {
+    local q="'"
+    printf '%s' "${1//$q/$q$q}"
+}
+
 # Per table, the columns that identify a row well enough to detect a re-run.
 # `id` is excluded everywhere: it is reassigned on insert.
 merge_table() {
     local src_db="$1" table="$2" cols="$3" key="$4"
+    local src_db_sql
+    src_db_sql=$(sql_quote "$src_db")
 
     local pending
     pending=$(sqlite3 "$TARGET_DB" \
-        "ATTACH '${src_db}' AS src;
+        "ATTACH '${src_db_sql}' AS src;
          SELECT COUNT(*) FROM src.${table} s
          WHERE NOT EXISTS (
              SELECT 1 FROM main.${table} m WHERE ${key}
@@ -72,7 +84,7 @@ merge_table() {
     [[ "$EXECUTE" -eq 0 || "$pending" -eq 0 ]] && return 0
 
     sqlite3 "$TARGET_DB" \
-        "ATTACH '${src_db}' AS src;
+        "ATTACH '${src_db_sql}' AS src;
          INSERT INTO main.${table} (${cols})
          SELECT ${cols} FROM src.${table} s
          WHERE NOT EXISTS (
