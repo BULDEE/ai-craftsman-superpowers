@@ -132,6 +132,18 @@ assert_eq "SEC001 degrades to warn in a test path" "warn" \
 assert_eq "PARAM001 degrades to warn under __mocks__" "warn" \
     "$(rules_severity_for_file "$PROJECT_DIR/src/__mocks__/api.ts" "PARAM001")"
 
+# The case of a directory name is not semantic. `Tests/` is the PSR-4
+# convention, and a case-sensitive match resolved it to block while `tests/`
+# resolved to warn, so the relaxation missed the most common PHP layout.
+assert_eq "SEC001 degrades under a capitalised Tests/" "warn" \
+    "$(rules_severity_for_file "$PROJECT_DIR/Tests/Unit/ClientTest.php" "SEC001")"
+assert_eq "SEC001 degrades under Fixtures/" "warn" \
+    "$(rules_severity_for_file "$PROJECT_DIR/Fixtures/Client.php" "SEC001")"
+
+# The anchors keep it from over-matching a word that merely contains one.
+assert_eq "SEC001 still blocks in src/Contest/" "block" \
+    "$(rules_severity_for_file "$PROJECT_DIR/src/Contest/Client.php" "SEC001")"
+
 # The relaxation is a list, not a blanket: a test class is still a class.
 assert_eq "PHP001 still blocks in a test path" "block" \
     "$(rules_severity_for_file "$PROJECT_DIR/tests/Unit/ClientTest.php" "PHP001")"

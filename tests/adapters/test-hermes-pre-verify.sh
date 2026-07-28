@@ -205,6 +205,29 @@ else
     log_fail "silent credential failure" "rc=$RC"
 fi
 
+echo ""
+echo "=== the adapter costs a Claude Code user nothing ==="
+
+# Hermes support is opt-in for the people who run Hermes. Everyone else carries
+# the files and loads none of them, and that has to be structural rather than
+# remembered: the moment a hook or the manifest reaches into adapters/, every
+# Claude Code session pays for a runtime it does not use.
+LOADERS=$(grep -rl "adapters/" "$ROOT_DIR/hooks" "$ROOT_DIR/.claude-plugin" 2>/dev/null \
+    | xargs grep -l "adapters/hermes" 2>/dev/null || true)
+if [[ -z "$LOADERS" ]]; then
+    log_pass "no hook and no plugin manifest reaches into adapters/"
+else
+    log_fail "adapter leaked into the load path" "$LOADERS"
+fi
+
+# The reverse direction is fine and intended: the adapter calls the shared gate
+# rather than reimplementing severity resolution.
+if grep -q "ci/craftsman-ci.sh" "$HOOK"; then
+    log_pass "the adapter consumes the shared gate instead of duplicating it"
+else
+    log_fail "duplicated gate" "the adapter should call ci/craftsman-ci.sh"
+fi
+
 cd "$PREV_PWD"
 rm -rf "$WORK"
 

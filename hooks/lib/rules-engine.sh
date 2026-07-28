@@ -532,8 +532,27 @@ _rules_find_override_directory() {
 _RULES_TEST_PATH_RE='(^|/)(tests?|spec|__tests__|__mocks__|fixtures?|factories)(/|$)'
 _RULES_TEST_RELAXED='LOC001 NEST001 PARAM001 GOD001 CTRL001 SEC001 SEC002'
 
+# Case-insensitive: the case of a directory name is not semantic, and the
+# regex missed the PSR-4 convention this plugin's own primary stack uses.
+# `Tests/Unit/FooTest.php` resolved SEC001 to block while `tests/` resolved it
+# to warn, so the relaxation written to stop blocking on fixture credentials
+# missed the most common PHP layout. nocasematch is saved and restored rather
+# than set globally: it is shell-wide state and the hook shares its shell with
+# every other validator.
 _rules_is_test_path() {
+    # Restored by branching rather than by eval'ing `shopt -p`: the idiomatic
+    # save/restore is data-as-code, and SH004 is right to refuse it even when
+    # the string comes from the shell itself.
+    if shopt -q nocasematch; then
+        [[ "$1" =~ $_RULES_TEST_PATH_RE ]]
+        return $?
+    fi
+    local matched
+    shopt -s nocasematch
     [[ "$1" =~ $_RULES_TEST_PATH_RE ]]
+    matched=$?
+    shopt -u nocasematch
+    return $matched
 }
 
 _rules_relaxed_in_tests() {
