@@ -1,0 +1,17 @@
+# A Docker build context is not a git checkout: COPY . ships whatever is on
+# disk, including everything .gitignore keeps out of the repository. Without
+# this file, plans, specs, agent memory and the full git history would end up
+# inside a published image.
+.git
+.github
+.claude
+.craftsman-baseline.json
+graphify-out
+.playwright-mcp
+.ruff_cache
+.pytest_cache
+__pycache__
+node_modules
+dist
+*.log
+*.db

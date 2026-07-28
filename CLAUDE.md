@@ -73,8 +73,16 @@ packs/              → Loadable language packs (5 packs)
   python/           → Python pack (validators, knowledge, anti-patterns)
   bash/             → Bash/Shell pack (validators, knowledge, anti-patterns)
   ai-ml/            → AI/ML pack (agents, knowledge, commands)
-ci/                 → CI pipeline integration (adapter pattern)
+ci/                 → CI pipeline integration; ci/adapters/ = CI providers
+adapters/           → host agent runtimes (a different axis from ci/adapters/)
+  hermes/           → Nous Research Hermes: pre_verify hook, Claude Code wrapper
 ```
+
+Three front-ends over one core: `hooks/` for Claude Code, `ci/craftsman-ci.sh`
+for pipelines, `adapters/<host>/` for other agent runtimes. The rules engine,
+the packs and `knowledge/` are shared, and the parity tests fail when two
+front-ends disagree on a severity. A fourth front-end is an adapter, never a
+fork.
 
 ## Version Sync Checklist
 

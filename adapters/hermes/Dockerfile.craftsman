@@ -1,0 +1,81 @@
+# =============================================================================
+# Craftsman layer for nousresearch/hermes-agent.
+#
+# Built FROM THE CRAFTSMAN REPOSITORY ROOT, not appended to another repo's
+# Dockerfile:
+#
+#   docker build -f adapters/hermes/Dockerfile.craftsman -t hermes-craftsman .
+#
+# The COPY below takes the build context, so running it from elsewhere puts the
+# wrong tree at /opt/craftsman and every path in README.md silently does not
+# exist. .dockerignore at the repository root keeps the context free of .git,
+# .claude and the rest of what .gitignore excludes.
+#
+# Three things the stock image lack, each measured on the running container
+# rather than assumed:
+#
+#   sqlite3   absent  -> metrics_init returns non-zero and says so, but the
+#                        correction-learning loop and every trend are dead
+#                        without it
+#   jq        absent  -> every craftsman hook parses its stdin with jq, so the
+#                        gate would be a silent no-op
+#   claude    absent  -> skills/autonomous-ai-agents/claude-code/SKILL.md tells
+#                        the agent to run it, and it is not there
+#
+# The plugin is baked into the image rather than dropped on the /opt/data
+# volume on purpose: /opt/data is not under version control, so a gate living
+# there could be edited with no diff, no review and no history. What enforces
+# the rules ships with the image; only session state belongs on the volume.
+# =============================================================================
+
+# Pinned, because this file's own argument for baking the plugin into the
+# image is "no change with no diff, no review and no history", and :latest is
+# exactly that. Replace with the digest you validated.
+ARG HERMES_IMAGE=nousresearch/hermes-agent:latest
+FROM ${HERMES_IMAGE}
+
+# Already uid 0 on the stock image; no USER switch to undo.
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends sqlite3 jq \
+ && rm -rf /var/lib/apt/lists/*
+
+ARG CLAUDE_CODE_VERSION=latest
+RUN npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+
+COPY . /opt/craftsman
+RUN chmod a+rx /opt/craftsman/adapters/hermes/pre-verify.sh \
+               /opt/craftsman/adapters/hermes/claude-craftsman.sh \
+               /opt/craftsman/ci/craftsman-ci.sh
+
+# NOT protected by file permissions, and saying otherwise would be worse than
+# saying nothing. The stock image runs as uid 0 (verified on the running
+# container), and root ignores the permission bits, so `chmod a-w` here would
+# contain exactly nobody.
+#
+# It matters because the gated party configures the gate: a .craft-rules.yml
+# next to a violating file switches its rule to `ignore` and the gate goes
+# silent, and trust_project_tools turns a config toggle into execution of a
+# cloned repository's own binaries. Reproduced, both.
+#
+# Containing it needs one of these, none of which is a Dockerfile line:
+#   - run the agent as a non-root uid that does not own /opt/craftsman
+#   - mount /opt/craftsman read-only at the container level
+#   - have the adapter refuse a turn whose diff touches the gate's own config
+# The third is the only one that lives in this repository; the first two are
+# infrastructure decisions and are documented in README.md.
+
+# Level 2 and 3 run the analysed project's own binaries (vendor/bin/phpstan,
+# node_modules/.bin/eslint) and an eslint flat config is executable JavaScript.
+# In a container that clones untrusted repositories the "machine owner" this
+# opt-in was written for is the agent itself, so it stays off.
+#
+# Written to the file config_trust_project_tools actually reads. An env var
+# would have been decorative: nothing in the plugin consults one, so the line
+# would have described a control it did not exercise.
+RUN mkdir -p /root/.claude \
+ && printf 'trust_project_tools: false\n' > /root/.claude/.craft-config.yml
+
+# Where the metrics database lives. Not /opt/data root: the legacy-adoption
+# path would otherwise pull whatever a previous run left there.
+ENV CLAUDE_PLUGIN_DATA=/opt/data/craftsman

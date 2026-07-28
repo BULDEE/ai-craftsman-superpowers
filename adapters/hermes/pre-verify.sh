@@ -36,8 +36,20 @@ set -uo pipefail
 # only ever mean "the gate ran and found nothing".
 trap '_bail "aborted at line $LINENO"' ERR
 
+# A gate that could not run is not a clean file. stderr goes to a container log
+# nobody reads in an autonomous loop, so a failure that only writes there
+# removes the gate without removing the appearance of one. The turn is blocked
+# instead, which traps nothing: Hermes bounds the retries with
+# agent.max_verify_nudges, the same argument that put this hook on pre_verify.
 _bail() {
     echo "craftsman/hermes: $1" >&2
+    python3 -c '
+import json, sys
+print(json.dumps({"decision": "block",
+                  "reason": "The craftsman gate could not run (" + sys.argv[1]
+                            + "). Do not conclude until it does."},
+                 ensure_ascii=False))
+' "$1" 2>/dev/null
     exit 0
 }
 
@@ -98,10 +110,26 @@ cd "$CWD" || _bail "cannot enter ${CWD}, gate not run"
 # reaches the list, so a gate that trusted it would miss every file written
 # that way. Scope comes from git, with the payload merged in for a workspace
 # that is not a repository.
+# The worktree is not the whole turn. An autonomous agent commits, and a
+# committed violation left the worktree clean and the gate silent: everything
+# it had just written escaped the scan. The branch point is included so the
+# turn is judged on what it produced, not on what it has not tidied away yet.
+_diff_base() {
+    local base
+    for base in "${CRAFTSMAN_DIFF_BASE:-}" "@{u}" "origin/HEAD" "origin/main" "origin/master"; do
+        [[ -n "$base" ]] || continue
+        git merge-base "$base" HEAD 2>/dev/null && return 0
+    done
+    return 1
+}
+
 _git_scope() {
     git rev-parse --show-toplevel >/dev/null 2>&1 || return 0
     git diff --name-only HEAD 2>/dev/null
     git ls-files --others --exclude-standard 2>/dev/null
+    local base
+    base=$(_diff_base) && git diff --name-only "$base"..HEAD 2>/dev/null
+    return 0
 }
 
 # Contained to the workspace: an absolute or traversing path in the payload

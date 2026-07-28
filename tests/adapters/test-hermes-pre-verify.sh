@@ -105,6 +105,34 @@ else
     log_fail "spurious verdict" "$OUT"
 fi
 
+# An autonomous agent commits. Scope taken from the worktree alone left a
+# committed violation invisible: clean worktree, silent gate, everything the
+# turn produced unscanned.
+git add -A >/dev/null 2>&1
+printf 'const committed: any = 1;\n' > src/Committed.ts
+git add -A >/dev/null 2>&1
+git -c user.email=t@t -c user.name=t commit -qm "agent work" >/dev/null 2>&1
+BASE=$(git rev-parse HEAD~1)
+OUT=$(CRAFTSMAN_DIFF_BASE="$BASE" bash "$HOOK" < <(_payload "" 1) 2>/dev/null)
+if printf '%s' "$OUT" | grep -q "Committed.ts"; then
+    log_pass "work the agent already committed is still gated"
+else
+    log_fail "gate bypass" "a committed violation left the worktree clean and the gate silent"
+fi
+git reset -q --hard HEAD~1 >/dev/null 2>&1
+
+# stderr goes to a container log nobody reads in an autonomous loop, so a gate
+# that could not run must block rather than let the turn conclude.
+sed "s#\${PLUGIN_ROOT}/ci/craftsman-ci.sh#/nonexistent-gate.sh#" "$HOOK" > "$WORK/broken-hook.sh"
+printf 'const x: any = 1;\n' > src/Dirty.ts
+OUT=$(bash "$WORK/broken-hook.sh" < <(_payload "" 1) 2>/dev/null)
+if printf '%s' "$OUT" | grep -q "could not run"; then
+    log_pass "a gate that cannot run blocks instead of passing silently"
+else
+    log_fail "fails open" "missing gate produced no directive: ${OUT:-<empty>}"
+fi
+rm -f src/Dirty.ts
+
 OUT=$(echo 'not json at all' | bash "$HOOK" 2>/dev/null)
 RC=$?
 if [[ -z "$OUT" && "$RC" -eq 0 ]]; then
@@ -119,6 +147,62 @@ if ! sed 's/#.*//' "$HOOK" | grep -qE '(^|[^a-z_.-])jq[[:space:]]'; then
     log_pass "adapter does not depend on jq, which the Hermes image lacks"
 else
     log_fail "jq dependency" "the Hermes image has no jq"
+fi
+
+echo ""
+echo "=== claude-craftsman wrapper ==="
+
+WRAPPER="$ROOT_DIR/adapters/hermes/claude-craftsman.sh"
+
+# --bare skips auto-discovery of hooks, skills and plugins AND does not read
+# CLAUDE_CODE_OAUTH_TOKEN (docs/en/headless, docs/en/authentication). It loses
+# the gate and the supplied credential in one flag, and the docs say it becomes
+# the default for -p in a future release, so refusing it explicitly is the
+# point of the wrapper existing at all.
+mkdir -p "$WORK/fakebin"
+printf '#!/bin/sh\nfor a in "$@"; do echo "ARG:$a"; done\necho "KEY:${ANTHROPIC_API_KEY:-unset}"\n' > "$WORK/fakebin/claude"
+chmod +x "$WORK/fakebin/claude"
+
+RC=0
+OUT=$(PATH="$WORK/fakebin:$PATH" CLAUDE_CODE_OAUTH_TOKEN=tok bash "$WRAPPER" --bare "x" 2>&1) || RC=$?
+if [[ "$RC" -eq 64 ]]; then
+    log_pass "the wrapper refuses --bare instead of running ungated"
+else
+    log_fail "bare accepted" "rc=$RC out=$OUT"
+fi
+
+# ANTHROPIC_API_KEY outranks CLAUDE_CODE_OAUTH_TOKEN in Claude Code's
+# precedence order, and the Hermes image already carries one: leaving it set
+# means the credential the caller supplied is silently not the one in use.
+OUT=$(PATH="$WORK/fakebin:$PATH" CLAUDE_CODE_OAUTH_TOKEN=tok ANTHROPIC_API_KEY=sk-live \
+      bash "$WRAPPER" "task" 2>/dev/null)
+if printf '%s' "$OUT" | grep -q "KEY:unset"; then
+    log_pass "an API key does not outrank the supplied OAuth token"
+else
+    log_fail "credential precedence" "ANTHROPIC_API_KEY survived: $OUT"
+fi
+
+if printf '%s' "$OUT" | grep -q -- "--plugin-dir"; then
+    log_pass "the plugin is loaded explicitly rather than by discovery"
+else
+    log_fail "plugin not loaded" "$OUT"
+fi
+
+# Observed on the arguments claude actually receives, not grepped from the
+# source: the wrapper's own refusal branch mentions the flag it forbids.
+if ! printf '%s' "$OUT" | grep -q "^ARG:--bare$"; then
+    log_pass "the wrapper never passes --bare itself"
+else
+    log_fail "bare passed" "the wrapper would disable the plugin it exists to load"
+fi
+
+RC=0
+PATH="$WORK/fakebin:$PATH" env -u CLAUDE_CODE_OAUTH_TOKEN -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \
+    bash "$WRAPPER" "task" >/dev/null 2>&1 || RC=$?
+if [[ "$RC" -eq 78 ]]; then
+    log_pass "no credential fails loudly instead of half-running"
+else
+    log_fail "silent credential failure" "rc=$RC"
 fi
 
 cd "$PREV_PWD"
