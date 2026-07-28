@@ -589,6 +589,7 @@ test_session_metrics() {
     run_subtest "Session start tests pass" "$SCRIPT_DIR/core/test-session-start.sh" || true
     run_subtest "Pack validation tests pass" "$SCRIPT_DIR/core/test-validate-pack.sh" || true
     run_subtest "CI adapter tests pass" "$SCRIPT_DIR/ci/test-adapters.sh" || true
+    run_subtest "Hermes pre_verify adapter tests pass" "$SCRIPT_DIR/adapters/test-hermes-pre-verify.sh" || true
     run_subtest "Doctrine export tests pass" "$SCRIPT_DIR/ci/test-doctrine-export.sh" || true
     run_subtest "Ratchet CI parity tests pass" "$SCRIPT_DIR/ci/test-ratchet-ci.sh" || true
 

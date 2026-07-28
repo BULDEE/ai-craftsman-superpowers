@@ -36,7 +36,12 @@ _sh_check_safety_options() {
     local has_set_e=false
     local has_set_u=false
     local head_content
-    head_content=$(head -20 "$file" 2>/dev/null)
+    # The whole file, not the first 20 lines. A script whose header explains
+    # why it exists pushes its `set -u` past line 20 and was then reported as
+    # missing something it declares: the rule taxed the documentation the
+    # doctrine asks for. Where the option sits does not change whether it is
+    # set, so scanning everything cannot false-positive.
+    head_content=$(cat "$file" 2>/dev/null)
 
     if echo "$head_content" | grep -qE '(set\s+-[a-z]*e|set\s+-o\s+errexit)' 2>/dev/null; then
         has_set_e=true
