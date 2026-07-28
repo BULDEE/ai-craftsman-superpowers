@@ -61,7 +61,16 @@ printf '%s' "$METRICS_DB_PATH" > "${HOME}/.claude/craftsman-metrics-db-path" 2>/
 # Record session start epoch. SessionEnd input has no duration field
 # (only session_id/transcript_path/cwd/reason), so session-metrics.sh
 # derives duration and its violation-count window from this marker.
-printf '%s' "$(date +%s)" > "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-start-ts" 2>/dev/null || true
+_CRAFTSMAN_DATA_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
+printf '%s' "$(date +%s)" > "${_CRAFTSMAN_DATA_DIR}/session-start-ts" 2>/dev/null || true
+
+# The per-session tallies restart with the session, like the timestamp above.
+# SessionEnd removes them, but a crash between the two left them in place and
+# the next session counted this one's violations as its own: two writes then
+# one produced three. The duration is already measured from this line, so
+# counting over any other window was incoherent regardless of the crash.
+rm -f "${_CRAFTSMAN_DATA_DIR}/session-violations" \
+      "${_CRAFTSMAN_DATA_DIR}/session-writes" 2>/dev/null || true
 
 # Generate a self-contained verify wrapper at a well-known path.
 # Skills run via the Bash tool without CLAUDE_PLUGIN_ROOT, so they cannot

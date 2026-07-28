@@ -222,4 +222,64 @@ else
     log_fail "session-writes should be removed" "still exists"
 fi
 
+echo ""
+echo "=== A crashed SessionEnd does not bill the next session ==="
+
+# SessionEnd removes the per-session tallies, but nothing else did, so a crash
+# between the two left them in place and the next session counted this one's
+# violations as its own: two writes then one produced three. The duration is
+# already measured from SessionStart, so counting over any other window was
+# incoherent even without a crash.
+CARRY_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-carry.XXXXXX")
+printf 'blocked\nblocked\n' > "$CARRY_DIR/session-violations"
+printf '1\n1\n' > "$CARRY_DIR/session-writes"
+
+echo '{}' | CLAUDE_PLUGIN_DATA="$CARRY_DIR" CLAUDE_PLUGIN_ROOT="$ROOT_DIR" \
+    bash "$ROOT_DIR/hooks/session-start.sh" >/dev/null 2>&1
+
+LEFTOVER=$(( $(wc -l < "$CARRY_DIR/session-violations" 2>/dev/null || echo 0) \
+          + $(wc -l < "$CARRY_DIR/session-writes" 2>/dev/null || echo 0) ))
+if [[ "$LEFTOVER" -eq 0 ]]; then
+    log_pass "SessionStart clears the tallies a crashed SessionEnd left behind"
+else
+    log_fail "counter carryover" "$LEFTOVER stale line(s) survived into the new session"
+fi
+rm -rf "$CARRY_DIR"
+
+echo ""
+echo "=== A failed adoption retries instead of losing the history ==="
+
+# The marker was written whether or not the copy succeeded, so a full disk or a
+# refused permission discarded the previous database for good, in silence, and
+# the adoption never retried.
+MIG_HOME=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-mig.XXXXXX")
+mkdir -p "$MIG_HOME/.claude/plugins/data/craftsman" "$MIG_HOME/new"
+sqlite3 "$MIG_HOME/.claude/plugins/data/craftsman/metrics.db" \
+    "CREATE TABLE violations(id INTEGER PRIMARY KEY, rule TEXT); INSERT INTO violations(rule) VALUES ('PHP001');" 2>/dev/null
+
+HOME="$MIG_HOME" CLAUDE_PLUGIN_DATA="$MIG_HOME/new" bash -c "
+    cp() { return 1; }
+    source '$ROOT_DIR/hooks/lib/metrics-db.sh'
+    _metrics_migrate_legacy_location
+" >/dev/null 2>&1
+
+if [[ ! -f "$MIG_HOME/new/.legacy-adopted" ]]; then
+    log_pass "a failed adoption leaves no marker, so it runs again"
+else
+    log_fail "history lost" "the marker claims an adoption that never happened"
+fi
+
+HOME="$MIG_HOME" CLAUDE_PLUGIN_DATA="$MIG_HOME/new" bash -c "
+    source '$ROOT_DIR/hooks/lib/metrics-db.sh'
+    _metrics_migrate_legacy_location
+" >/dev/null 2>&1
+
+RECOVERED=$(sqlite3 "$MIG_HOME/new/metrics.db" "SELECT COUNT(*) FROM violations;" 2>/dev/null || echo 0)
+if [[ "$RECOVERED" -eq 1 ]]; then
+    log_pass "the retry recovers the history the first attempt could not copy"
+else
+    log_fail "history not recovered" "expected 1 row, got ${RECOVERED}"
+fi
+rm -rf "$MIG_HOME"
+
 test_summary

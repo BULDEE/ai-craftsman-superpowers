@@ -114,10 +114,22 @@ _metrics_migrate_legacy_location() {
     local marker="${METRICS_DB_DIR}/.legacy-adopted"
     [[ "$METRICS_DB" == "$legacy_db" ]] && return 0
     [[ -f "$marker" ]] && return 0
-    if [[ ! -f "$METRICS_DB" && -f "$legacy_db" ]]; then
-        cp "$legacy_db" "$METRICS_DB" 2>/dev/null || true
+
+    # Nothing to adopt is a settled answer, so it is recorded once.
+    if [[ -f "$METRICS_DB" || ! -f "$legacy_db" ]]; then
+        : > "$marker" 2>/dev/null || true
+        return 0
     fi
-    : > "$marker" 2>/dev/null || true
+
+    # A failed copy is not a settled answer. Writing the marker anyway meant a
+    # full disk or a refused permission discarded the history for good, in
+    # silence, and the adoption never retried.
+    if cp "$legacy_db" "$METRICS_DB" 2>/dev/null; then
+        : > "$marker" 2>/dev/null || true
+        return 0
+    fi
+    echo "craftsman: could not adopt the previous metrics database, retrying next session" >&2
+    return 0
 }
 
 # Where a row came from. Four months of test fixtures were indistinguishable
