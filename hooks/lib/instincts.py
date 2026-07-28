@@ -20,6 +20,7 @@ can edit or delete.
 # annotation evaluation keeps the modern syntax and runs on 3.9.
 from __future__ import annotations
 
+import re
 import sqlite3
 import sys
 from datetime import datetime, timezone
@@ -126,6 +127,57 @@ def _slugify(rule: str) -> str:
     return "".join(char.lower() if char.isalnum() else "-" for char in rule).strip("-")
 
 
+# A generated skill is loaded into the model's context as background knowledge,
+# so every field interpolated into it is an instruction channel. Two of them are
+# not plugin-controlled: pattern_summary comes from a correction's context, and
+# the evidence lines carry file_pattern, which is a path out of the audited
+# repository. A newline in either one closes the markdown body and lets the rest
+# of the string read as fresh instructions - or, at the top of the file, as more
+# YAML frontmatter. Collapse to a single line, drop the characters that would
+# terminate the inline-code fence, and cap the length.
+_UNTRUSTED_MAX = 200
+
+
+def _untrusted(text: str, limit: int = _UNTRUSTED_MAX) -> str:
+    collapsed = " ".join(str(text or "").split())
+    stripped = "".join(char for char in collapsed if char.isprintable() and char != "`")
+    if len(stripped) > limit:
+        stripped = stripped[:limit] + "..."
+    return stripped
+
+
+# metrics-db.sh validates a rule id before it writes one, but this module is a
+# second front door: it reads rows a previous version wrote, and rows written by
+# anything else pointed at the same database. Validating here keeps the
+# guarantee local instead of borrowing it from a caller three files away.
+_RULE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{1,39}$")
+
+
+def _safe_rule(rule: str) -> str:
+    if not _RULE_RE.match(str(rule or "")):
+        print(f"error: refusing to generate a skill for malformed rule id: {rule!r}",
+              file=sys.stderr)
+        sys.exit(1)
+    return rule
+
+
+# skills_dir is raw argv. _slugify already prevents the rule from walking out of
+# it, but nothing stopped the directory itself from pointing anywhere writable.
+# A generated skill only means something inside the project or the user's own
+# Claude configuration; anywhere else is a write primitive, not a feature.
+def _resolve_skills_dir(skills_dir: str) -> Path:
+    target = Path(skills_dir).expanduser().resolve()
+    allowed = [Path.cwd().resolve()]
+    home = Path.home().resolve()
+    allowed.append(home / ".claude")
+    for root in allowed:
+        if target == root or root in target.parents:
+            return target
+    print(f"error: refusing to write skills outside the project or ~/.claude: {target}",
+          file=sys.stderr)
+    sys.exit(1)
+
+
 SKILL_TEMPLATE = """---
 description: Learned instinct for rule {rule}. This project corrected {rule} {occurrences} times across {distinct_files} files; apply the fix pattern proactively when writing matching code.
 user-invocable: false
@@ -153,15 +205,18 @@ This project repeatedly corrects **{rule}**. Apply the correction proactively in
 
 def _render_skill(rule: str, summary: str, occurrences: int, distinct_files: int,
                   confidence: float, contexts: list[tuple]) -> str:
+    rule = _safe_rule(rule)
     evidence = "\n".join(
-        f"- `{fp}`: {ctx[:120]}" if ctx else f"- `{fp}`" for ctx, fp in contexts
+        f"- `{_untrusted(fp, 120)}`: {_untrusted(ctx, 120)}" if ctx
+        else f"- `{_untrusted(fp, 120)}`"
+        for ctx, fp in contexts
     ) or "- (contexts not recorded)"
     return SKILL_TEMPLATE.format(
         rule=rule,
         occurrences=occurrences,
         distinct_files=distinct_files,
         confidence=confidence,
-        pattern=summary or f"See the {rule} rule definition in the active pack validators.",
+        pattern=_untrusted(summary) or f"See the {rule} rule definition in the active pack validators.",
         evidence=evidence,
         today=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
     )
@@ -193,7 +248,7 @@ def approve(conn: sqlite3.Connection, instinct_id: int, skills_dir: str) -> None
         conn, instinct_id
     )
     contexts = _evidence_contexts(conn, project_hash, rule)
-    skill_dir = Path(skills_dir) / f"learned-{_slugify(rule)}"
+    skill_dir = _resolve_skills_dir(skills_dir) / f"learned-{_slugify(rule)}"
     skill_dir.mkdir(parents=True, exist_ok=True)
     content = _render_skill(rule, summary, occurrences, distinct_files, confidence, contexts)
     (skill_dir / "SKILL.md").write_text(content)
@@ -266,13 +321,14 @@ def _cmd_promote(conn: sqlite3.Connection, args: list[str]) -> None:
         print(f"error: {rule} is not approved in 2+ projects", file=sys.stderr)
         sys.exit(1)
     _rule, projects, occurrences, summary = match[0]
-    skill_dir = Path(skills_dir) / f"learned-global-{_slugify(rule)}"
+    rule = _safe_rule(rule)
+    skill_dir = _resolve_skills_dir(skills_dir) / f"learned-global-{_slugify(rule)}"
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / "SKILL.md").write_text(GLOBAL_TEMPLATE.format(
         rule=rule,
         project_count=projects,
         occurrences=occurrences,
-        pattern=summary or f"See the {rule} rule definition in the active pack validators.",
+        pattern=_untrusted(summary) or f"See the {rule} rule definition in the active pack validators.",
         today=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
     ))
     print(f"promoted: {skill_dir / 'SKILL.md'}")
