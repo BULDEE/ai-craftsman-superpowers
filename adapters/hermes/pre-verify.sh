@@ -31,15 +31,23 @@
 # =============================================================================
 set -uo pipefail
 
-# A hook that dies must not stop the agent, and must not look like a verdict.
-trap 'exit 0' ERR
+# A hook that dies must not stop the agent, and must not look like a clean
+# file. Every exit below says why on stderr, which Hermes logs: silence must
+# only ever mean "the gate ran and found nothing".
+trap '_bail "aborted at line $LINENO"' ERR
+
+_bail() {
+    echo "craftsman/hermes: $1" >&2
+    exit 0
+}
 
 ADAPTER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_ROOT="$(cd "$ADAPTER_DIR/../.." && pwd)"
 CRAFTSMAN_CI="${PLUGIN_ROOT}/ci/craftsman-ci.sh"
 
-command -v python3 >/dev/null 2>&1 || exit 0
-[[ -x "$CRAFTSMAN_CI" || -f "$CRAFTSMAN_CI" ]] || exit 0
+command -v python3 >/dev/null 2>&1 || _bail "python3 not found, gate not run"
+[[ -f "$CRAFTSMAN_CI" ]] || _bail "craftsman-ci not found at ${CRAFTSMAN_CI}, gate not run"
+source "${PLUGIN_ROOT}/hooks/lib/portable-timeout.sh" 2>/dev/null || true
 
 INPUT=$(cat)
 
@@ -71,26 +79,60 @@ elif value is not None:
 ' "$1" 2>/dev/null
 }
 
-COMPILED_PATHS=$(_field changed_paths)
+HINTED_PATHS=$(_field changed_paths)
 CODING=$(_field coding)
 CWD=$(_field cwd)
 
 # Scope like a pre_tool_call hook scopes on tool_name: a non-coding session has
 # nothing for this gate to say.
 [[ "$CODING" == "True" || "$CODING" == "true" ]] || exit 0
-[[ -n "$COMPILED_PATHS" ]] || exit 0
+[[ -n "$CWD" && -d "$CWD" ]] || _bail "no usable cwd in the payload, gate not run"
+cd "$CWD" || _bail "cannot enter ${CWD}, gate not run"
 
-[[ -n "$CWD" && -d "$CWD" ]] && cd "$CWD"
+# The payload is a hint, never the truth.
+#
+# Hermes collects changed_paths from the tool name, not from the filesystem:
+# agent/tool_dispatch_helpers.py returns [] for anything outside
+# FILE_MUTATING_TOOL_NAMES, and only write_file and patch are in it. A write
+# through `terminal` (sed -i, python -c, tee, a redirect, git apply) never
+# reaches the list, so a gate that trusted it would miss every file written
+# that way. Scope comes from git, with the payload merged in for a workspace
+# that is not a repository.
+_git_scope() {
+    git rev-parse --show-toplevel >/dev/null 2>&1 || return 0
+    git diff --name-only HEAD 2>/dev/null
+    git ls-files --others --exclude-standard 2>/dev/null
+}
 
-# Only the files this turn touched, and only those still on disk.
+# Contained to the workspace: an absolute or traversing path in the payload
+# would drag host files into the report.
 SCAN_PATHS=()
 while IFS= read -r path; do
-    [[ -n "$path" && -f "$path" ]] && SCAN_PATHS+=("$path")
-done <<< "$COMPILED_PATHS"
+    [[ -n "$path" ]] || continue
+    # Relative on the way out as well as contained on the way in: an absolute
+    # path in the directive would put the host's directory structure into the
+    # model's context for no benefit.
+    resolved=$(python3 -c '
+import os, sys
+root = os.path.realpath(sys.argv[1])
+target = os.path.realpath(os.path.join(root, sys.argv[2]))
+inside = target == root or target.startswith(root + os.sep)
+print(os.path.relpath(target, root) if inside else "")
+' "$CWD" "$path" 2>/dev/null)
+    [[ -n "$resolved" && -f "$resolved" ]] || continue
+    case " ${SCAN_PATHS[*]:-} " in *" $resolved "*) continue ;; esac
+    SCAN_PATHS+=("$resolved")
+done <<< "$(printf '%s\n%s\n' "$(_git_scope)" "$HINTED_PATHS")"
+
 [[ ${#SCAN_PATHS[@]} -gt 0 ]] || exit 0
 
-REPORT=$(bash "$CRAFTSMAN_CI" --format json "${SCAN_PATHS[@]}" 2>/dev/null) || true
-[[ -n "$REPORT" ]] || exit 0
+# Hermes kills the hook at its configured timeout, and a kill is
+# indistinguishable from a pass. Bound it here so the adapter can say so.
+GATE_STATUS=0
+REPORT=$(portable_timeout "${CRAFTSMAN_GATE_SECONDS:-45}" \
+    bash "$CRAFTSMAN_CI" --format json "${SCAN_PATHS[@]}" 2>/dev/null) || GATE_STATUS=$?
+[[ "$GATE_STATUS" -eq 124 ]] && _bail "gate exceeded ${CRAFTSMAN_GATE_SECONDS:-45}s on ${#SCAN_PATHS[@]} file(s), verdict unknown"
+[[ -n "$REPORT" ]] || _bail "gate produced no report (exit ${GATE_STATUS}), verdict unknown"
 
 SUMMARY=$(printf '%s' "$REPORT" | python3 -c '
 import json, sys
