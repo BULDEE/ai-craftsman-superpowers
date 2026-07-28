@@ -654,4 +654,23 @@ else
     log_fail "dangerous trigger" "pull_request_target exposes secrets to forks"
 fi
 
+echo ""
+echo "=== Bitbucket reports a failure the API can accept ==="
+
+# An unreadable report must still reach the commit as FAILED. A negative
+# sentinel read well to a human, but the Reports API is not documented to
+# accept one in a NUMBER field, and a rejected report is a verdict that never
+# arrives: worse than the green gate this path exists to prevent.
+if ! grep -qE '(violations|warnings|files_scanned)=-1' "$ROOT_DIR/ci/adapters/bitbucket.sh"; then
+    log_pass "no negative value is sent to a Bitbucket NUMBER field"
+else
+    log_fail "unaccepted payload" "a negative sentinel risks the report being rejected"
+fi
+
+if grep -q 'details="Craftsman gate FAILED' "$ROOT_DIR/ci/adapters/bitbucket.sh"; then
+    log_pass "the unreadable case carries its reason in the free-form details field"
+else
+    log_fail "silent failure" "FAILED is reported with no reason a human can read"
+fi
+
 test_summary

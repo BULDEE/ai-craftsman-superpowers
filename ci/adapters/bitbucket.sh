@@ -46,16 +46,21 @@ adapter_annotate() {
     # parse failure and the gate below then published a green PASSED against
     # the commit: adapter_compute_exit was hardened for exactly this and the
     # annotation path was left behind.
-    local violations warnings files_scanned result
+    local violations warnings files_scanned result details=""
     violations=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['violations'])" < "$report_file" 2>/dev/null) || violations=""
     warnings=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['warnings'])" < "$report_file" 2>/dev/null) || warnings=""
     files_scanned=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['files_scanned'])" < "$report_file" 2>/dev/null) || files_scanned=""
 
     if [[ ! "$violations" =~ ^[0-9]+$ || ! "$files_scanned" =~ ^[0-9]+$ ]]; then
         echo "Bitbucket adapter: ${report_file} is unreadable, reporting FAILED rather than a green gate" >&2
-        # -1 rather than a placeholder string: these land in JSON NUMBER
-        # fields, and it reads as the sentinel it is.
-        violations=-1 ; warnings=-1 ; files_scanned=-1
+        # Zero in the NUMBER fields, and the truth in the free-form details
+        # line. A negative sentinel read well to a human but the Bitbucket
+        # Reports API is not documented to accept one, and a rejected report is
+        # a FAILED verdict that never reaches the commit: worse than the green
+        # gate this branch exists to prevent. The result field carries the
+        # verdict; the counters only decorate it.
+        violations=0 ; warnings=0 ; files_scanned=0
+        details="Craftsman gate FAILED: the report could not be read, so no file is known to have passed."
         result="FAILED"
     elif [[ "$violations" -gt 0 || "$files_scanned" -eq 0 ]]; then
         result="FAILED"
@@ -63,19 +68,20 @@ adapter_annotate() {
         result="PASSED"
     fi
 
-    _bb_put_summary "$result" "$files_scanned" "$violations" "$warnings"
+    [[ -n "$details" ]] || details="Scanned ${files_scanned} files: ${violations} violations, ${warnings} warnings"
+    _bb_put_summary "$result" "$files_scanned" "$violations" "$warnings" "$details"
     _bb_put_annotations "$report_file"
 }
 
 _bb_put_summary() {
-    local result="$1" files_scanned="$2" violations="$3" warnings="$4"
+    local result="$1" files_scanned="$2" violations="$3" warnings="$4" details="$5"
     curl -sf \
         -X PUT \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/json" \
         --data "{
             \"title\": \"Craftsman Quality Gate\",
-            \"details\": \"Scanned ${files_scanned} files: ${violations} violations, ${warnings} warnings\",
+            \"details\": \"${details}\",
             \"report_type\": \"BUG\",
             \"result\": \"${result}\",
             \"data\": [

@@ -12,6 +12,21 @@
 # craftsman-ignore: SH001
 # =============================================================================
 
+# A rule that cannot run is not a rule that passed. Every check below that
+# needs python3 returned silently without it, so on a machine that has none the
+# pack reported every file clean and nothing said otherwise. Same shape as the
+# sqlite3 guard in metrics-db.sh. Announced once per process rather than once
+# per rule, because the point is to be noticed, not to be noisy.
+_PY_PACK_PY3_WARNED=""
+_py_pack_has_python3() {
+    command -v python3 >/dev/null 2>&1 && return 0
+    if [[ -z "${_PY_PACK_PY3_WARNED}" ]]; then
+        _PY_PACK_PY3_WARNED=1
+        echo "craftsman: python3 not found, PY001, PY002, GOD001 and NEST001 were not run" >&2
+    fi
+    return 1
+}
+
 _PY_PACK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 _check_py001() {
@@ -19,7 +34,7 @@ _check_py001() {
     # Tokenised, not grepped: the regex read raw lines, so a docstring line
     # starting with an English article looked like a two-letter variable and
     # the rule blocked writes on prose.
-    command -v python3 >/dev/null 2>&1 || return 0
+    _py_pack_has_python3 || return 0
     local line_number
     while IFS= read -r line_number; do
         [[ -z "$line_number" ]] && continue
@@ -30,7 +45,7 @@ _check_py001() {
 
 _check_py002() {
     local file="$1"
-    command -v python3 >/dev/null 2>&1 || return 0
+    _py_pack_has_python3 || return 0
     local warning_message
     while IFS= read -r warning_message; do
         [[ -z "$warning_message" ]] && continue
@@ -91,7 +106,7 @@ _check_warn_py001() {
 
 _check_god001() {
     local file="$1"
-    command -v python3 >/dev/null 2>&1 || return 0
+    _py_pack_has_python3 || return 0
     local message
     while IFS= read -r message; do
         [[ -z "$message" ]] && continue
@@ -112,7 +127,7 @@ for node in ast.walk(tree):
 
 _check_nest001() {
     local file="$1"
-    command -v python3 >/dev/null 2>&1 || return 0
+    _py_pack_has_python3 || return 0
     local message
     while IFS= read -r message; do
         [[ -z "$message" ]] && continue

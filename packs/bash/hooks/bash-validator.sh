@@ -12,9 +12,24 @@
 # craftsman-ignore: SH001
 # =============================================================================
 
-# Conventional short variable names allowed in shell scripts
+# A rule that cannot run is not a rule that passed. Every check below that
+# needs python3 returned silently without it, so on a machine that has none the
+# pack reported every file clean and nothing said otherwise. Same shape as the
+# sqlite3 guard in metrics-db.sh. Announced once per process rather than once
+# per rule, because the point is to be noticed, not to be noisy.
+_SH_PACK_PY3_WARNED=""
+_sh_pack_has_python3() {
+    command -v python3 >/dev/null 2>&1 && return 0
+    if [[ -z "${_SH_PACK_PY3_WARNED}" ]]; then
+        _SH_PACK_PY3_WARNED=1
+        echo "craftsman: python3 not found, SH002 and WARN-SH001 were not run" >&2
+    fi
+    return 1
+}
+
 _SH_PACK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Conventional short variable names allowed in shell scripts
 _SH_ALLOWED_SHORT_VARS='(i|j|k|n|f|s|v|fd|IFS|FS|NR|NF|RS|OFS|ORS|OPTARG|OPTIND)'
 
 # One function per rule. The dispatcher below was a single 138 line body,
@@ -64,7 +79,7 @@ _sh_check_function_length() {
     # brace from a brace inside an embedded python or awk snippet, and that
     # logic cannot survive being escaped through a double-quoted bash string,
     # which is how it came to report lengths no function had.
-    command -v python3 >/dev/null 2>&1 || return 0
+    _sh_pack_has_python3 || return 0
     local function_warning
     while IFS= read -r function_warning; do
         [[ -z "$function_warning" ]] && continue
@@ -113,7 +128,7 @@ _sh_check_missing_local() {
     local file="$1"
     # WARN-SH001, through the same scanner as SH002: it carried its own copy of
     # the brace counting and therefore the same miscount.
-    command -v python3 >/dev/null 2>&1 || return 0
+    _sh_pack_has_python3 || return 0
     local no_local_warning
     while IFS= read -r no_local_warning; do
         [[ -z "$no_local_warning" ]] && continue

@@ -152,4 +152,40 @@ else
 fi
 
 rm -f "$tmpfile"
+echo ""
+echo "=== A rule that cannot run says so ==="
+
+# PY001, PY002, GOD001 and NEST001 all shell out to python3, and each returned
+# silently without it. On a machine with no python3 the pack reported every
+# file clean and nothing said otherwise, which is the failure the sqlite3 guard
+# in metrics-db.sh closed for the metrics layer.
+PY_NOPY=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-nopy.XXXXXX")
+for _bin in bash sh grep sed awk cat head tail wc tr cut sort ls rm mkdir dirname basename; do
+    ln -sf "$(command -v "$_bin")" "$PY_NOPY/$_bin" 2>/dev/null
+done
+printf 'def f():\n    ab = 1\n    return ab\n' > "$PY_NOPY/sample.py"
+
+NOPY_ERR=$(PATH="$PY_NOPY" "$PY_NOPY/bash" -c "
+    cd '$ROOT_DIR'
+    source packs/python/hooks/python-validator.sh
+    add_violation() { :; }; add_warning() { :; }
+    pack_validate_python '$PY_NOPY/sample.py'
+    pack_validate_python '$PY_NOPY/sample.py'
+" 2>&1 >/dev/null)
+
+if printf '%s' "$NOPY_ERR" | grep -q "python3 not found"; then
+    log_pass "a missing python3 is announced instead of silently skipping the rules"
+else
+    log_fail "silent fail-open" "the pack reported clean with no python3 and said nothing"
+fi
+
+# Announced once per process: the point is to be noticed, not to be noisy.
+NOPY_COUNT=$(printf '%s' "$NOPY_ERR" | grep -c "python3 not found")
+if [[ "$NOPY_COUNT" -eq 1 ]]; then
+    log_pass "the warning fires once per process, not once per rule per file"
+else
+    log_fail "noisy warning" "$NOPY_COUNT announcements for two files"
+fi
+rm -rf "$PY_NOPY"
+
 echo "=== Python Pack Tests Complete ==="
