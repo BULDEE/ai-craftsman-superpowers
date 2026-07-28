@@ -74,6 +74,57 @@ else
 fi
 
 echo ""
+echo "=== The doctrine describes every rule the engine can emit ==="
+
+# Four hardcoded lists used to cover 15 of the 38 rules the validators emit, and
+# three of those 15 named the wrong rule: PHP003 was documented as "private
+# constructor plus factory" while it enforces "no public setter", PHP004 as "no
+# setters" while it enforces "no new DateTime()", TS002 as "readonly by default"
+# while it enforces "no default export". A teammate on Codex reads this file and
+# is blocked by a rule it never mentioned, or by one it described as something
+# else. That is the drift the plugin exists to prevent, in the very artefact
+# meant to carry the doctrine outward.
+#
+# Analyser passthrough codes (PHPSTAN*, ESLINT*, DEPTRAC*) are outside this
+# contract: their text is the external tool's, not doctrine.
+source "$ROOT_DIR/ci/doctrine-export.sh"
+rm -f .craft-config.yml
+bash "$CLI" export --target agents-md >/dev/null 2>&1
+
+ENFORCED=$(grep -rhoE '\b(PHP|TS|LAYER|DB|PY|SH|SEC|GOD|LOC|NEST|PARAM|CTRL|RATCHET|WARN-[A-Z]+)[0-9]{3}\b' \
+    "$ROOT_DIR/hooks" "$ROOT_DIR/packs" 2>/dev/null | sort -u)
+
+UNDOCUMENTED=""
+UNRENDERED=""
+for rule in $ENFORCED; do
+    # A rule with no entry falls through to the default branch, which echoes
+    # the id straight back.
+    [[ "$(_doctrine_rule_text "$rule")" == "$rule" ]] && UNDOCUMENTED="${UNDOCUMENTED} ${rule}"
+    grep -q "\*\*${rule}\*\*" AGENTS.md 2>/dev/null || UNRENDERED="${UNRENDERED} ${rule}"
+done
+
+if [[ -z "$UNDOCUMENTED" ]]; then
+    log_pass "all $(echo "$ENFORCED" | wc -w | tr -d ' ') enforced rules have doctrine text"
+else
+    log_fail "doctrine drift" "enforced but undocumented:${UNDOCUMENTED}"
+fi
+
+if [[ -z "$UNRENDERED" ]]; then
+    log_pass "every enforced rule reaches the rendered file"
+else
+    log_fail "doctrine not rendered" "documented but absent from output:${UNRENDERED}"
+fi
+
+# A context file past 20000 characters is truncated by Hermes, 70% head and 20%
+# tail, so an overflowing doctrine loses its middle without saying so.
+DOCTRINE_SIZE=$(wc -c < AGENTS.md | tr -d ' ')
+if [[ "$DOCTRINE_SIZE" -lt 20000 ]]; then
+    log_pass "rendered doctrine is ${DOCTRINE_SIZE} chars, inside the 20000 context-file limit"
+else
+    log_fail "doctrine too large" "${DOCTRINE_SIZE} chars, harnesses truncate past 20000"
+fi
+
+echo ""
 echo "=== Regeneration is stable ==="
 
 cp AGENTS.md first-run.md
