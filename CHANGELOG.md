@@ -5,6 +5,127 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2026-07-28
+
+An audit release. Every finding below was reproduced before it was fixed, and
+each carries a test that fails when the fix is removed. The recurring shape is
+one defect wearing different clothes: a control that reports success when it
+did not run, and a measurement that reports a number the code does not have.
+
+### Security
+
+- **A cloned repository could write anywhere the developer could.**
+  `ratchet.py` wrote `.craftsman-baseline.json` with `write_text`, which follows
+  a symlink. A repo shipping that path as a link to `~/.claude/settings.json`
+  had the target overwritten on the first edit of any supported file. Writes go
+  through a sibling temp file and land with `os.replace`, which acts on the link
+  and never on its target.
+- **A cloned repository could switch the gates off.** `hooks.disabled` resolved
+  from the project file first, so a clone could ship
+  `hooks: {disabled: [config-protection, post-write-check]}` and open its first
+  session with every gate silent. It now follows the `external_packs`
+  asymmetry: a repository may tune what the gates check, never whether they run.
+- **A psr-4 key could disarm the layer rules.** `_layer_ns_regex` escaped
+  backslashes only, so a root such as `A(pp\` made every layer grep exit 2,
+  which reads as "not this layer". LAYER001 to LAYER003 stopped firing
+  repository-wide, in the hook and in CI.
+- **A file name could address the reviewer.** Names from `git diff` and from
+  `tool_input` were spliced verbatim into the Haiku review prompts. Names
+  outside a plain-path charset are dropped, and the drop is reported.
+- **A learned skill carried unsanitised text into the model's context.**
+  `pattern_summary` and `file_pattern` are not plugin-controlled, and a newline
+  in either opened a second YAML frontmatter block in the generated skill. They
+  are collapsed, capped and stripped of the fence character now. The skills
+  destination is confined to the project or `~/.claude`, and the rule id is
+  validated on read as well as on write.
+
+### Fixed
+
+- **CI reported a pass on a pipeline that inspected nothing.** The default scan
+  path was `src/`, so a Laravel `app/`, a monorepo `packages/` or a Next.js
+  `app/` matched nothing and the run exited 0 with `files_scanned: 0`. Every
+  common source root is scanned now, discovery is counted separately from
+  scanning so a stack exclusion stays a legitimate pass, and an empty discovery
+  fails loudly. The directory walk prunes `vendor`, `node_modules` and friends.
+  An unresolved severity resolves to block instead of quietly becoming a warning.
+- **Three blocking rules reported findings the code did not have.** SH002 and
+  WARN-SH001 counted braces without knowing which were shell, so a function
+  holding an embedded python or awk snippet never balanced and the rule fell
+  back to measuring header-to-header: a 14 line function was reported as 128.
+  PY001 grepped raw lines, so a docstring beginning with an English article
+  matched its two-letter-name pattern and the rule blocked writes on prose.
+  SH001 inspected the first 20 lines only, so a script whose header explains
+  itself was told it lacked the `set -u` it declares. All four measured from a
+  proper scanner now, and a function whose end cannot be located is reported as
+  nothing rather than as a guess.
+- **The exported doctrine covered 15 of 38 rules and described three of them
+  wrong.** PHP003 was documented as "private constructor plus factory" while it
+  enforces "no public setter", PHP004 as "no setters" while it enforces "no new
+  DateTime()", TS002 as "readonly by default" while it enforces "no default
+  export". A teammate on Codex read one rule and was blocked by another. A test
+  now fails when an enforced rule has no doctrine text, when a documented rule
+  never reaches the rendered file, or when the output passes the 20000 character
+  limit at which harnesses truncate a context file.
+- **The test suite trained the learning loop on its own fixtures.**
+  `tests/run-tests.sh` set no `CLAUDE_PLUGIN_DATA`, so four months of runs
+  recorded their fixtures as production violations: 3704 of 15588 violations
+  sat on a path this repository does not have. `test-suite-isolation.sh` could
+  not have caught it, since its signature swept `~/.claude` at maxdepth 1 and
+  the databases live four levels down.
+- **Session counters were decorrelated from reality.** SessionEnd re-queried
+  the violations table over a window the length of the session, which counts
+  every other session's rows: 236 sessions in one day reported 16236 warnings
+  against 1353 actually recorded, and a quiet day under-counted instead.
+  Counting is per session now, and the tallies restart at SessionStart so a
+  crashed SessionEnd no longer bills the next session.
+- **Level 2 and 3 could not run and said they were clean.** Every analyser was
+  capped at 2 seconds, below the cold start of all of them, and `|| true`
+  flattened the timeout into success. The budgets are realistic and a stopped
+  analyser is announced.
+- **Rules vanished in silence without python3.** Six checks shell out to it and
+  each returned quietly, so the packs reported every file clean on a machine
+  that has none. The absence is announced once per process and names the rules
+  that did not run. `sqlite3` gets the same treatment in the metrics layer,
+  where its absence previously produced an empty database and swallowed every
+  insert.
+- **Whole classes of file were never validated.** `post-write-check` allow-listed
+  the characters a path may contain and skipped anything else without a word,
+  so every Next.js App Router dynamic route, every route group and any accented
+  path went unchecked. The rule is inverted to refuse only what is dangerous.
+- **The test-path relaxation missed the PSR-4 convention.** It compared
+  case-sensitively, so `Tests/` resolved SEC001 to block while `tests/`
+  resolved it to warn.
+- **Bitbucket published a green PASSED on an unreadable report**, and sent a
+  negative sentinel in a NUMBER field once that was fixed. The verdict travels
+  in the result field and its reason in the free-form details line.
+- **A failed metrics adoption claimed success.** The marker was written whether
+  or not the copy succeeded, so a full disk discarded the previous database for
+  good and never retried.
+- **`metrics_project_hash` hashed `$PWD`**, filing one repository under a
+  different project for every subdirectory worked from, and
+  `metrics_file_pattern` recorded absolute paths, including the developer's home
+  directory, for every extension outside `php|ts|tsx`.
+
+### Added
+
+- **`adapters/`, a third front-end over the same core.** `hooks/` serves Claude
+  Code, `ci/craftsman-ci.sh` serves pipelines, and `adapters/<host>/` serves
+  other agent runtimes. The first is `adapters/hermes/`: a `pre_verify` hook
+  that refuses a conclusion rather than a write, because blocking a write
+  assumes somebody can break the loop it creates and an autonomous agent has
+  nobody. It derives its scope from git rather than from the agent's
+  self-report, since the host builds its changed-file list from tool names and
+  a write through a shell never appears there. Opt-in by construction: a test
+  fails if any hook or the plugin manifest reaches into `adapters/`.
+- **Test paths degrade the rules whose premise is production code.** LOC001,
+  NEST001, PARAM001, GOD001, CTRL001, SEC001 and SEC002 become warnings under
+  `tests/`, `spec/`, `__tests__/`, `__mocks__/`, `fixtures/` and `factories/`.
+  A long setup, a six-argument fixture builder and a credential in a fixture
+  are the normal shape of a test, and blocking on them is what teaches a
+  developer to reach for `craftsman-ignore`.
+- **A `source` column on `violations` and `corrections`**, so the next
+  contamination is a `DELETE` rather than an archaeology exercise.
+
 ## [4.1.2] - 2026-07-27
 
 CI duration, which on this project is CI cost: the macOS matrix leg bills at
