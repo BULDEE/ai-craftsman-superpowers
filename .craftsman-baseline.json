@@ -117,6 +117,7 @@
 {"complexity":16,"fan_out":1,"file_lines":139,"ignores":0,"max_fn_lines":96,"path":"tests/core/test-invocation-policy.sh"},
 {"complexity":9,"fan_out":1,"file_lines":135,"ignores":0,"max_fn_lines":44,"path":"tests/core/test-knowledge-integrity.sh"},
 {"complexity":28,"fan_out":4,"file_lines":106,"ignores":0,"max_fn_lines":106,"path":"tests/core/test-legacy-command.sh"},
+{"complexity":11,"fan_out":1,"file_lines":44,"ignores":0,"max_fn_lines":44,"path":"tests/core/test-lsp-policy.sh"},
 {"complexity":17,"fan_out":1,"file_lines":125,"ignores":0,"max_fn_lines":125,"path":"tests/core/test-observation.sh"},
 {"complexity":18,"fan_out":1,"file_lines":104,"ignores":0,"max_fn_lines":104,"path":"tests/core/test-okf-knowledge.sh"},
 {"complexity":37,"fan_out":3,"file_lines":372,"ignores":1,"max_fn_lines":352,"path":"tests/core/test-pack-loader.sh"},

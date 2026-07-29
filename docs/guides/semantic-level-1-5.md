@@ -6,16 +6,16 @@ The quality gate has always had three levels: regex (Level 1, always on), static
 
 ## How it activates
 
-The plugin ships an `.lsp.json` configuration for PHP ([intelephense](https://intelephense.com/)). Claude Code starts the server automatically **only if the binary is already installed** on your machine. The plugin never installs, bundles, or updates a language server: your toolchain stays yours (see the [established-tooling-first policy](../adr/0019-established-tooling-first.md)).
+Level 1.5 is wired through Anthropic's official per-language LSP plugins (`claude-plugins-official`), never through this plugin. Install the LSP plugin for your stack from the `/plugin` Discover tab, plus its server binary. The plugin never installs, bundles, or declares a language server itself: your toolchain stays yours (see the [established-tooling-first policy](../adr/0019-established-tooling-first.md), amended 2026-07-29).
 
 | Stack | Server | How to get it |
 |-------|--------|---------------|
-| PHP | intelephense | `npm install -g intelephense` (plugin ships the `.lsp.json`) |
-| TypeScript | typescript-language-server | Official LSP plugin from `claude-plugins-official` |
-| Python | pyright | Official LSP plugin from `claude-plugins-official` |
-| Rust | rust-analyzer | Official LSP plugin from `claude-plugins-official` |
+| PHP | intelephense | `php-lsp` official plugin + `npm install -g intelephense` |
+| TypeScript | typescript-language-server | `typescript-lsp` official plugin |
+| Python | pyright | `pyright-lsp` official plugin |
+| Rust | rust-analyzer | `rust-analyzer-lsp` official plugin |
 
-For TypeScript, Python, and Rust, install Anthropic's official LSP plugins rather than duplicating them here: same capability, maintained upstream.
+> Until 4.3.0 the plugin shipped its own `.lsp.json` for PHP, assuming Claude Code would skip the server when the binary was absent. It does not: Claude Code spawns the declared command unconditionally and reports `Command failed with ENOENT: intelephense --stdio` in the `/plugin` Errors tab on every machine without intelephense. 4.3.1 removed the file; the official `php-lsp` plugin covers the same capability as an explicit opt-in.
 
 ## What each level catches
 

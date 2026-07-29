@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.1] - 2026-07-29
+
+### Fixed
+
+- **The plugin errored on every machine without intelephense.** The bundled
+  `.lsp.json` assumed Claude Code starts a declared LSP server only when its
+  binary is already installed. It does not: the declared command is spawned
+  unconditionally, and a missing binary surfaces as
+  `Command failed with ENOENT: intelephense --stdio` in the `/plugin` Errors
+  tab. That contradicted the graceful-degradation contract (ADR-0019) the
+  file was shipped under. The `.lsp.json` is removed; PHP Level 1.5 now goes
+  through Anthropic's official `php-lsp` plugin, which carries the exact same
+  intelephense configuration as an explicit opt-in, and the healthcheck hints
+  point at the official per-language LSP plugins. ADR-0019 is amended
+  accordingly, and `tests/core/test-lsp-policy.sh` fails if an `.lsp.json` or
+  a manifest `lspServers` declaration ever comes back.
+
 ## [4.3.0] - 2026-07-29
 
 The agents join the system they were supposed to be part of. Before this

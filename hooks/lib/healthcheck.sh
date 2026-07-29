@@ -158,9 +158,11 @@ hc_check_session_bridge() {
 
 # --- Aggregate ---
 
-# Level 1.5 semantic validation (ADR-0019): report which language servers
-# are installed. The plugin never installs one; it only uses what the
-# stack already provides.
+# Level 1.5 semantic validation (ADR-0019, amended): report which language
+# servers are installed. The plugin never installs one and never ships an
+# .lsp.json - Claude Code spawns a declared server unconditionally and surfaces
+# a plugin error when the binary is missing, so LSP wiring belongs to the
+# official per-language plugins the user opts into.
 hc_check_lsp() {
     local found="" hints=""
     command -v intelephense >/dev/null 2>&1 && found="${found} intelephense(php)"
@@ -171,7 +173,7 @@ hc_check_lsp() {
     if [[ -n "$found" ]]; then
         _hc_record "lsp" "ok" "level-1.5 active:${found}"
     else
-        hints="none installed - Level 1.5 inactive; PHP: npm i -g intelephense, TS/Python/Rust: official LSP plugins from claude-plugins-official"
+        hints="none installed - Level 1.5 inactive; install the official LSP plugin for your stack (php-lsp, typescript-lsp, pyright-lsp, rust-analyzer-lsp) plus its server binary (PHP: npm i -g intelephense)"
         _hc_record "lsp" "warn" "$hints"
     fi
 }

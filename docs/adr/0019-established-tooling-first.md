@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted (amended 2026-07-29: LSP bullet revised, see Amendment)
 
 ## Date
 
@@ -18,7 +18,7 @@ The plugin's existing quality-gate philosophy already answers this for Levels 2 
 
 The plugin relies on each stack's established tooling and never substitutes for it. Concretely:
 
-- **LSP**: ship `.lsp.json` configurations only. A language server activates when its binary is already present on the user's machine (project or global install). The plugin never downloads, installs, or vendors a language server. Where an official LSP plugin exists in `claude-plugins-official` (TypeScript, Python, Rust), documentation points users there instead of duplicating it.
+- **LSP** (amended, see below): ship no LSP declaration at all. Documentation points users to the official per-language LSP plugins in `claude-plugins-official` (php-lsp, typescript-lsp, pyright-lsp, rust-analyzer-lsp); the user installs the plugin and the server binary as an explicit opt-in. The plugin never downloads, installs, or vendors a language server.
 - **Static analysis and architecture tools**: unchanged Level 2/3 behavior - detect, use, degrade gracefully.
 - **Formatters, test runners, package managers**: always the project's own (`vendor/bin/phpunit`, project ESLint config, etc.). The plugin invokes them; it never replaces or reconfigures them.
 - **Selection rule**: when the plugin needs a capability, prefer in order: (1) the tool the project already uses, (2) the community-standard tool for the stack if the user opts in, (3) nothing - degrade the check rather than impose a dependency.
@@ -49,6 +49,17 @@ Rejected: licensing complexity (e.g. freemium servers), platform-specific binari
 ### Alternative 2: Auto-install missing tools on first run
 
 Rejected: mutating the user's environment without an explicit request violates the trust contract of a quality plugin, and package-manager side effects are hard to reverse.
+
+## Amendment (2026-07-29)
+
+The original LSP decision shipped an `.lsp.json` for PHP (intelephense) on the assumption that Claude Code activates a declared server only when its binary is already installed. That assumption is false: Claude Code spawns the declared `command` unconditionally (the plugins reference states it "must be in PATH", and no field makes a declaration optional), so every machine without intelephense showed `Command failed with ENOENT: intelephense --stdio` in the `/plugin` Errors tab. This broke the graceful-degradation contract the rest of this ADR defends.
+
+Two facts settled the revision:
+
+1. A missing binary is a surfaced plugin error, not a silent skip - there is no graceful path for a bundled `.lsp.json`.
+2. `claude-plugins-official` now ships `php-lsp` with the exact same intelephense configuration, closing the gap that justified bundling one here.
+
+Decision revised: the plugin ships no `.lsp.json` and declares no `lspServers` in its manifest. `tests/core/test-lsp-policy.sh` enforces this. Removed in 4.3.1.
 
 ## References
 

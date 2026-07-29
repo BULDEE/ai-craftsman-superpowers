@@ -14,7 +14,7 @@ v3 made Claude a disciplined craftsman: rules enforced in real time, zero CI dri
 |-------|-------|------|
 | 1 | `commands/` deleted; all 21 workflows become skills with `context: fork`, agent binding, dynamic context injection, `allowed-tools` | [0017](adr/0017-skills-over-commands.md) |
 | 2 | Bash agent-hook wrappers replaced by native `agent`/`prompt` hooks (Haiku-tiered), `if` gating, `updatedInput` auto-fix, `PostToolBatch` | [0018](adr/0018-native-prompt-agent-hooks.md) |
-| 3 | Semantic Level 1.5 via `.lsp.json`, activating only on already-installed language servers | [0019](adr/0019-established-tooling-first.md) |
+| 3 | Semantic Level 1.5 via `.lsp.json`, activating only on already-installed language servers (bundled `.lsp.json` removed in 4.3.1: Claude Code spawns it unconditionally, see ADR-0019 amendment) | [0019](adr/0019-established-tooling-first.md) |
 | 4 | Correction learning closes the loop: candidate instincts, human review in `/craftsman:metrics`, generated learned skills; context budgets and per-hook kill switches | [0020](adr/0020-instinct-promotion-human-review.md), [0021](adr/0021-context-budgets-and-kill-switches.md) |
 | 5 | Setup by observation: generated project-conventions skill and cached codemap injected into reviewers | [0022](adr/0022-setup-by-observation.md) |
 | 6 | Deterministic verification: `asyncRewake` test failures, `TaskCompleted` evidence gate, optional `monitors/` watchers; `bin/`, `${CLAUDE_PLUGIN_DATA}`, config schema | [0023](adr/0023-deterministic-verification-loop.md) |
