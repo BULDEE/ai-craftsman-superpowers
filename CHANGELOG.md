@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [4.3.0] - 2026-07-29
+
+The agents join the system they were supposed to be part of. Before this
+release an agent was a fourth front-end without parity: it carried its own
+copy of the rules, re-derived structure the plugin had already computed, and
+nothing it produced fed the learning loop. Each fix below was reproduced
+before it was fixed and carries a test that fails if it regresses.
 
 ### Fixed
 
