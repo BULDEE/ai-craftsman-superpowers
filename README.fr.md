@@ -5,7 +5,8 @@
 [🇬🇧 English](README.md) | 🇫🇷 **Français**
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A52.1.218-blueviolet)](https://code.claude.com)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A52.1.218-blueviolet?logo=claude)](https://code.claude.com)
+[![Hermes](https://img.shields.io/badge/Hermes-compatible-14b8a6?logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjEuNyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj48cGF0aCBkPSJNMTIgNnYxNiIvPjxwYXRoIGQ9Ik0xMiA2LjJDMTAuMiA0LjYgNy42IDUgNyA3YzIgLjYgNC0uMiA1LS44IDEgLjYgMyAxLjQgNSAuOC0uNi0yLTMuMi0yLjQtNS0uOHoiIGZpbGw9IiNmZmYiIHN0cm9rZT0ibm9uZSIvPjxwYXRoIGQ9Ik04LjUgOS41YzIuMiAxLjYgNC44IDEuNiA3IDAiLz48cGF0aCBkPSJNMTUuNSAxM2MtMi4yIDEuNi00LjggMS42LTcgMCIvPjxwYXRoIGQ9Ik04LjUgMTYuNWMyLjIgMS42IDQuOCAxLjYgNyAwIi8%2BPGNpcmNsZSBjeD0iMTIiIGN5PSIzLjIiIHI9IjEuNCIgZmlsbD0iI2ZmZiIgc3Ryb2tlPSJub25lIi8%2BPC9nPjwvc3ZnPgo%3D)](adapters/hermes/README.md)
 [![Version](https://img.shields.io/github/v/release/BULDEE/ai-craftsman-superpowers?label=version)](CHANGELOG.md)
 [![CI](https://img.shields.io/github/actions/workflow/status/BULDEE/ai-craftsman-superpowers/ci.yml?label=CI)](.github/workflows/ci.yml)
 [![Skills](https://img.shields.io/badge/Skills-21-orange)](COMMANDS-QUICK-REF.md)
