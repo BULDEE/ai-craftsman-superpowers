@@ -617,6 +617,14 @@ test_workflow_command() {
     run_subtest "Workflow command tests pass" "$SCRIPT_DIR/core/test-workflow-command.sh" || true
 }
 
+# Test: Nothing points at a skill it cannot start
+test_invocation_policy() {
+    echo ""
+    log_info "Testing skill invocation policy (agents, workflow claims)"
+
+    run_subtest "Invocation policy tests pass" "$SCRIPT_DIR/core/test-invocation-policy.sh" || true
+}
+
 # Test: Team templates reference agents that exist
 test_team_templates() {
     echo ""
@@ -754,6 +762,7 @@ main() {
         test_craftsman_ci
         test_workflow_command
         test_legacy_command
+        test_invocation_policy
         test_team_templates
         test_hotspot_analysis
         test_quick_setup

@@ -118,6 +118,17 @@ hc_check_superpowers() {
     fi
 }
 
+# /craftsman:team's native mode depends on an experimental env flag; without it
+# the skill degrades to parallel subagent dispatch. Status is "ok" either way:
+# absence is a mode, not a fault. The message tells the user which mode they get.
+hc_check_agent_teams() {
+    if [[ -n "${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-}" ]]; then
+        _hc_record "agent-teams" "ok" "native teams enabled"
+    else
+        _hc_record "agent-teams" "ok" "env flag not set - /craftsman:team runs in degraded parallel mode"
+    fi
+}
+
 hc_check_session_bridge() {
     local bridge="${HOME}/.claude/craftsman-session-state-path"
 
@@ -180,6 +191,7 @@ hc_run_all() {
     hc_check_channels
     hc_check_lsp
     hc_check_superpowers
+    hc_check_agent_teams
     hc_check_session_bridge
 }
 

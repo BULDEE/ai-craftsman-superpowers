@@ -274,6 +274,22 @@ review does not silently run on whatever model you happen to have selected. See
 [Model Tiering Explained](../guides/model-tiering-explained.md) for the
 reasoning and the four ways to override it.
 
+### Who can start a skill
+
+Most skills carry `disable-model-invocation: true`: they start only when **you**
+type the slash command as the first thing in a prompt. Written mid-sentence
+("then run /craftsman:design") it stays plain text, and Claude cannot start it
+on your behalf. That is deliberate for anything that commits you to a direction.
+
+Claude can start these itself, so it may offer and run them inside a longer
+piece of work: `challenge`, `test`, `debug`, `team`, `rag`, `mlops`,
+`agent-design`.
+
+Everything else in the table below is yours to launch. `/craftsman:workflow`
+knows the difference: it prints the exact command to paste and waits, rather
+than pretending to start a step it cannot. See
+[ADR-0017](../adr/0017-skills-over-commands.md#amendment---2026-07-29).
+
 | Command | Pack | Purpose | Model | Effort |
 |---------|------|---------|-------|--------|
 | `/craftsman:design` | Core | DDD entity, value object, and aggregate design | `opus` | `high` |

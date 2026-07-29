@@ -72,22 +72,13 @@ fi
 
 # --- Structure Analyzer ---
 
-# Test: Structure analyzer skips when agent_hooks=false
-EXIT_CODE=0
-echo '{}' | CLAUDE_PLUGIN_OPTION_agent_hooks=false bash "$ROOT_DIR/hooks/agent-structure-analyzer.sh" >/dev/null 2>&1 || EXIT_CODE=$?
-if [[ $EXIT_CODE -eq 0 ]]; then
-    log_pass "structure-analyzer: skips when agent_hooks=false (exit 0)"
+# The structure analyzer is gone: it injected context on InstructionsLoaded,
+# a side-effects-only event, so nothing it emitted ever reached an agent.
+# dispatch-context.sh (tested in test-hooks.sh) is the replacement.
+if [[ ! -f "$ROOT_DIR/hooks/agent-structure-analyzer.sh" ]]; then
+    log_pass "structure-analyzer removed (dead InstructionsLoaded injector)"
 else
-    log_fail "structure-analyzer gate" "expected exit 0, got $EXIT_CODE"
-fi
-
-# Test: Structure analyzer runs (exits 0) with agent_hooks=true
-EXIT_CODE=0
-OUTPUT=$(echo '{}' | CLAUDE_PLUGIN_OPTION_agent_hooks=true CLAUDE_PLUGIN_DATA="/tmp/craftsman-agent-test-$$" bash "$ROOT_DIR/hooks/agent-structure-analyzer.sh" 2>/dev/null) || EXIT_CODE=$?
-if [[ $EXIT_CODE -eq 0 ]]; then
-    log_pass "structure-analyzer: exits 0 with agent_hooks=true"
-else
-    log_fail "structure-analyzer run" "expected exit 0, got $EXIT_CODE"
+    log_fail "structure-analyzer" "script still present - it can never reach an agent"
 fi
 
 # --- All agent hooks must always exit 0 (non-blocking) ---
@@ -99,7 +90,7 @@ echo "=== Agent Hook Non-Blocking Tests ==="
 NONGIT_DIR="/tmp/craftsman-agent-nongit-$$"
 mkdir -p "$NONGIT_DIR"
 
-for script in agent-ddd-verifier.sh agent-sentry-context.sh agent-final-review.sh agent-structure-analyzer.sh; do
+for script in agent-ddd-verifier.sh agent-sentry-context.sh agent-final-review.sh; do
     EXIT_CODE=0
     echo '{"tool_input":{"file_path":"/nonexistent/file.php"}}' | \
         CLAUDE_PLUGIN_OPTION_agent_hooks=true \
@@ -201,5 +192,99 @@ if [[ $(haiku_findings "$FLOOD" | grep -c .) -le 10 ]]; then
 else
     log_fail "flood cap" "more than 10 lines returned"
 fi
+
+# --- Subagent quality gate: it must actually validate, not just log ---
+echo ""
+echo "=== Subagent Quality Gate Validation Tests ==="
+
+SQG_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-sqg.XXXXXX")
+SQG_DATA="$SQG_DIR/data"
+mkdir -p "$SQG_DATA"
+
+cat > "$SQG_DIR/Bad.php" <<'PHPEOF'
+<?php
+class Bad {
+    public function setName($name) { $this->name = $name; }
+    public function when() { return new DateTime(); }
+}
+PHPEOF
+
+printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Write","input":{"file_path":"%s"}}]}}\n' \
+    "$SQG_DIR/Bad.php" > "$SQG_DIR/transcript.jsonl"
+
+SQG_EXIT=0
+SQG_OUT=$(jq -n --arg t "$SQG_DIR/transcript.jsonl" \
+    '{agent_type:"backend-craftsman", transcript_path:$t, cwd:"/tmp"}' | \
+    CLAUDE_PLUGIN_DATA="$SQG_DATA" bash "$ROOT_DIR/hooks/subagent-quality-gate.sh" 2>/dev/null) || SQG_EXIT=$?
+
+if [[ $SQG_EXIT -eq 0 ]]; then
+    log_pass "subagent gate: exits 0 with violations found (non-blocking)"
+else
+    log_fail "subagent gate exit" "expected 0, got $SQG_EXIT"
+fi
+
+if echo "$SQG_OUT" | jq -e '.hookSpecificOutput.additionalContext' >/dev/null 2>&1; then
+    log_pass "subagent gate: emits additionalContext JSON"
+else
+    log_fail "subagent gate output" "no additionalContext in: ${SQG_OUT:0:120}"
+fi
+
+SQG_CTX=$(echo "$SQG_OUT" | jq -r '.hookSpecificOutput.additionalContext' 2>/dev/null)
+if [[ "$SQG_CTX" == *"PHP002"* && "$SQG_CTX" == *"PHP004"* ]]; then
+    log_pass "subagent gate: findings include PHP002 and PHP004"
+else
+    log_fail "subagent gate findings" "expected PHP002+PHP004 in context"
+fi
+
+SQG_TAGGED=$(sqlite3 "$SQG_DATA/metrics.db" \
+    "SELECT COUNT(*) FROM violations WHERE source='subagent:backend-craftsman';" 2>/dev/null || echo 0)
+if [[ "$SQG_TAGGED" -ge 3 ]]; then
+    log_pass "subagent gate: violations tagged subagent:backend-craftsman ($SQG_TAGGED rows)"
+else
+    log_fail "subagent gate metrics" "expected >=3 tagged rows, got $SQG_TAGGED"
+fi
+
+# Missing transcript degrades to the old behavior: log only, no JSON, exit 0
+SQG_EXIT=0
+SQG_OUT=$(jq -n '{agent_type:"backend-craftsman", transcript_path:"/nonexistent/t.jsonl"}' | \
+    CLAUDE_PLUGIN_DATA="$SQG_DATA" bash "$ROOT_DIR/hooks/subagent-quality-gate.sh" 2>/dev/null) || SQG_EXIT=$?
+if [[ $SQG_EXIT -eq 0 && -z "$SQG_OUT" ]]; then
+    log_pass "subagent gate: missing transcript degrades silently (exit 0, no output)"
+else
+    log_fail "subagent gate degradation" "exit=$SQG_EXIT output='${SQG_OUT:0:80}'"
+fi
+
+# A clean file produces no context: the gate only speaks when it has findings
+cat > "$SQG_DIR/Clean.php" <<'PHPEOF'
+<?php
+
+declare(strict_types=1);
+
+final class Clean
+{
+    private function __construct()
+    {
+    }
+
+    public static function create(): self
+    {
+        return new self();
+    }
+}
+PHPEOF
+printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Write","input":{"file_path":"%s"}}]}}\n' \
+    "$SQG_DIR/Clean.php" > "$SQG_DIR/transcript-clean.jsonl"
+
+SQG_EXIT=0
+SQG_OUT=$(jq -n --arg t "$SQG_DIR/transcript-clean.jsonl" \
+    '{agent_type:"backend-craftsman", transcript_path:$t, cwd:"/tmp"}' | \
+    CLAUDE_PLUGIN_DATA="$SQG_DATA" bash "$ROOT_DIR/hooks/subagent-quality-gate.sh" 2>/dev/null) || SQG_EXIT=$?
+if [[ $SQG_EXIT -eq 0 && -z "$SQG_OUT" ]]; then
+    log_pass "subagent gate: clean file yields no context (silence is the pass signal)"
+else
+    log_fail "subagent gate clean file" "exit=$SQG_EXIT output='${SQG_OUT:0:80}'"
+fi
+
+rm -rf "$SQG_DIR"
 
 test_summary

@@ -576,32 +576,39 @@ else
     log_fail "Sentry context gate" "missing CLAUDE_PLUGIN_OPTION_sentry_org check"
 fi
 
-# Test: InstructionsLoaded command hook references structure analyzer
+# InstructionsLoaded is side-effects only: exit codes and JSON are ignored, so
+# a context injector wired there silently reaches nobody. The old
+# agent-structure-analyzer.sh did exactly that for two releases. Agents now get
+# their context by running dispatch-context.sh as their first action.
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
-hooks = d['hooks']['InstructionsLoaded'][0]['hooks']
-assert len(hooks) == 1
-assert hooks[0]['type'] == 'command'
-assert 'agent-structure-analyzer.sh' in hooks[0]['command']
+assert 'InstructionsLoaded' not in d['hooks']
 " 2>/dev/null; then
-    log_pass "InstructionsLoaded: command hook with structure analyzer"
+    log_pass "No hook wired on InstructionsLoaded (side-effects-only event)"
 else
-    log_fail "InstructionsLoaded hook" "missing or invalid"
+    log_fail "InstructionsLoaded" "a hook is wired on a side-effects-only event - it cannot inject context"
 fi
 
-# Test: Structure analyzer script contains corrections query
-if grep -q 'corrections' "$ROOT_DIR/hooks/agent-structure-analyzer.sh" 2>/dev/null; then
-    log_pass "Structure analyzer contains correction trends query"
+# Test: dispatch-context replaces the dead injector and stays non-blocking
+if [[ -f "$ROOT_DIR/hooks/lib/dispatch-context.sh" ]]; then
+    log_pass "dispatch-context.sh exists (agent context source)"
 else
-    log_fail "InstructionsLoaded corrections" "missing corrections reference"
+    log_fail "dispatch-context" "hooks/lib/dispatch-context.sh missing"
 fi
 
-# Test: Structure analyzer script contains channel status check
-if grep -q 'channel_status_summary' "$ROOT_DIR/hooks/agent-structure-analyzer.sh" 2>/dev/null; then
-    log_pass "Structure analyzer contains channel_status_summary"
+DC_EXIT=0
+DC_OUT=$(cd "$ROOT_DIR" && bash hooks/lib/dispatch-context.sh 2>/dev/null) || DC_EXIT=$?
+if [[ $DC_EXIT -eq 0 && "$DC_OUT" == *"Dispatch Context"* ]]; then
+    log_pass "dispatch-context.sh exits 0 and emits context"
 else
-    log_fail "InstructionsLoaded channel status" "missing channel_status_summary"
+    log_fail "dispatch-context run" "exit=$DC_EXIT, output header missing"
+fi
+
+if echo "$DC_OUT" | grep -q "Engineering Doctrine"; then
+    log_pass "dispatch-context includes resolved doctrine"
+else
+    log_fail "dispatch-context doctrine" "doctrine section missing from output"
 fi
 
 # Test: Stop has 2 command hooks (sentry-context + final-review); the DDD
@@ -756,17 +763,19 @@ else
     log_fail "post-compact-verify.sh" "missing or not executable"
 fi
 
-# Test: Total hook event count (13 events wired; TaskCompleted added in v4)
+# Test: Total hook event count (12 events wired; TaskCompleted added in v4,
+# InstructionsLoaded dropped: side-effects only, its injector never reached agents)
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 events = list(d['hooks'].keys())
-assert len(events) == 13, f'Expected 13 hook events, got {len(events)}: {events}'
+assert len(events) == 12, f'Expected 12 hook events, got {len(events)}: {events}'
 assert 'TaskCompleted' in events
+assert 'InstructionsLoaded' not in events
 " 2>/dev/null; then
-    log_pass "Total hook events: 13 (TaskCompleted evidence gate wired)"
+    log_pass "Total hook events: 12 (TaskCompleted wired, InstructionsLoaded dropped)"
 else
-    log_fail "Hook event count" "expected 13 incl. TaskCompleted"
+    log_fail "Hook event count" "expected 12 incl. TaskCompleted, excl. InstructionsLoaded"
 fi
 
 # =============================================================================

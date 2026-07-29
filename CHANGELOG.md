@@ -5,6 +5,79 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The orchestrator told the model to run skills the model cannot run.**
+  Sixteen of twenty-two skills carry `disable-model-invocation: true`, which
+  means only the user can start them by typing the slash command first in a
+  prompt. `/craftsman:workflow` nonetheless announced "Invoking
+  /craftsman:design..." for four of its seven steps, and five agents listed
+  locked skills in `skills:` frontmatter. Every one of those references was
+  unreachable: the Skill tool answers `cannot be used with Skill tool due to
+  disable-model-invocation` and the pipeline stops there. The workflow now
+  hands off, printing the exact command to paste and waiting, and the nine dead
+  agent references are gone.
+- **`/craftsman:team` could not be started by anything except a bare prompt.**
+  It was classified as a heavy review in ADR-0017 and given
+  `disable-model-invocation: true`, so no orchestrator could reach it. The flag
+  is dropped and the skill is model-invocable. It stays out of a fork on
+  purpose: it asks the user which template to use and calls `TeamCreate` to
+  spawn teammates into the session, and a fork would strand both.
+- **An agent could be told to fork into itself.** `agents/architect.md`
+  declared `craftsman:challenge`, which is bound to `agent: craftsman:architect`.
+  Same shape in `agents/team-lead.md` for `craftsman:team`.
+
+- **The subagent quality gate validated nothing.** Its header said "validates
+  code produced by subagents against craftsman rules"; its body logged an
+  agent_type and a timestamp. It now reads the subagent's transcript, runs
+  every file the subagent wrote through the same pack validators as the hooks
+  and CI, records each finding in the metrics DB tagged
+  `subagent:<agent_type>`, and surfaces the findings to the main loop as
+  additionalContext. Silence remains the pass signal, and the gate stays
+  non-blocking.
+- **The agent context injector never reached an agent.** The old
+  `agent-structure-analyzer.sh` asked each agent to re-scan the repository,
+  from a hook on `InstructionsLoaded` - a side-effects-only event whose output
+  the platform ignores, aimed at an event that does not fire on agent dispatch
+  anyway. Removed. Agents now start by running
+  `hooks/lib/dispatch-context.sh`, which returns the resolved doctrine (same
+  rules engine as hooks and CI), the HEAD-cached codemap, the top hotspots and
+  the correction trends: one deterministic turn instead of a self-guided scan.
+- **A review could silently run a tier below what the docs promise.**
+  `challenge` declares `model: opus` and forked into an `architect` declaring
+  `model: sonnet`; the platform does not document which wins. `architect`,
+  `legacy-surgeon` and `team-lead` now declare `opus`, matching the reference
+  table, and the invocation-policy test fails any forking skill whose bound
+  agent disagrees on the model.
+- **`subagent-quality-gate.sh` printed a bare counter onto its JSON channel.**
+  `session_state.py increment` echoes the new value; the hook never silenced
+  it, so every SubagentStop emitted a stray `1` on stdout.
+
+### Added
+
+- `hooks/lib/dispatch-context.sh`: single source of start-of-dispatch context
+  for all 12 agents (resolved doctrine, cached codemap, hotspots, correction
+  trends). The agent is a front-end of the rules engine like hooks and CI:
+  it no longer carries its own copy of the rules.
+- Per-agent violation metrics: the `source` column now distinguishes
+  `subagent:<agent_type>` rows, so `/craftsman:metrics` can show which agent
+  keeps producing which violation and agent prompts can be tuned from data.
+- Agent contracts: every craftsman agent ends with an Output Contract (test
+  evidence required before "done"), and every agent carries a one-line Memory
+  Contract saying exactly what it may persist; reviewers persist rejected
+  findings so the same false positive is not raised twice.
+- `/craftsman:team` degraded mode: when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`
+  is absent the skill announces it once and runs the same composition through
+  parallel subagent dispatches instead of failing; the healthcheck reports
+  which mode the environment provides. The team-lead delegation matrix also
+  gained the missing legacy row (legacy-surgeon / legacy-takeover template).
+- `tests/core/test-invocation-policy.sh` crosses every agent `skills:` entry and
+  every `**Invokes:**` claim with its target's invocation policy, and rejects
+  self-forking bindings. Nothing checked this before, which is why sixteen
+  locked skills and nine dead references coexisted with a green suite.
+
 ## [4.2.0] - 2026-07-28
 
 An audit release. Every finding below was reproduced before it was fixed, and

@@ -95,16 +95,6 @@
         ]
       }
     ],
-    "InstructionsLoaded": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-structure-analyzer.sh\""
-          }
-        ]
-      }
-    ],
     "FileChanged": [
       {
         "matcher": "*.php|*.ts|*.tsx",

@@ -2,7 +2,6 @@
 model: opus
 description: "Multi-agent orchestration with native Claude Code teams. Use when facing 2+ independent tasks needing parallel work, full-stack features requiring backend+frontend agents, code reviews needing multiple specialist perspectives, or security audits."
 effort: xhigh
-disable-model-invocation: true
 ---
 
 # /craftsman:team - Agent Team Manager (Native Teams)
@@ -15,7 +14,23 @@ disable-model-invocation: true
 
 You are the **team coordinator** for AI Craftsman Superpowers. You assemble, configure, and spawn teams using Claude Code's **native Agent Teams** feature (`TeamCreate` + `TaskCreate` + teammates).
 
-> **IMPORTANT**: This skill requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json env block and `teammateMode` set to `"iterm"` or `"tmux"`.
+> **IMPORTANT**: Native teams require `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in the settings.json env block and `teammateMode` set to `"iterm"` or `"tmux"`.
+
+## Degraded Mode (no native teams)
+
+If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is not set, or TeamCreate fails, do
+NOT abort and do not ask the user to reconfigure mid-task. Announce once:
+
+```
+Native teams unavailable (CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS not set).
+Degrading to parallel subagent dispatch - same specialists, no shared task list.
+```
+
+Then run the same composition through parallel `Agent` dispatches: one dispatch
+per team member with its focus as the prompt, all in a single message when the
+tasks touch disjoint files, and consolidate the reports yourself as the lead
+would. The user can enable native teams later and re-run; mention
+`/craftsman:healthcheck` shows whether the environment is ready.
 
 ## Subcommand Dispatch
 

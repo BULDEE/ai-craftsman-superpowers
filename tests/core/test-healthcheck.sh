@@ -119,6 +119,24 @@ fi
 rm -rf "$HOME"
 export HOME="$_ORIG_HOME"
 
+# Test: agent-teams check is ok in BOTH modes - absence of the experimental
+# flag is a mode (degraded parallel dispatch), never a fault
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="" hc_check_agent_teams
+if [[ "${_HC_STATUSES[0]}" == "ok" && "${_HC_MESSAGES[0]}" == *"degraded"* ]]; then
+    log_pass "hc_check_agent_teams: ok + degraded-mode message without the flag"
+else
+    log_fail "hc_check_agent_teams unset: ${_HC_STATUSES[0]} / ${_HC_MESSAGES[0]}"
+fi
+
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="1" hc_check_agent_teams
+if [[ "${_HC_STATUSES[0]}" == "ok" && "${_HC_MESSAGES[0]}" == *"native"* ]]; then
+    log_pass "hc_check_agent_teams: ok + native message with the flag"
+else
+    log_fail "hc_check_agent_teams set: ${_HC_STATUSES[0]} / ${_HC_MESSAGES[0]}"
+fi
+
 echo ""
 echo "Results: ${TESTS_PASSED} passed, ${TESTS_FAILED} failed"
 [[ $TESTS_FAILED -eq 0 ]] && exit 0 || exit 1

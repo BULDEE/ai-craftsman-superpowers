@@ -17,6 +17,7 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
 - CI adapters follow the `adapter_detect/run/annotate/comment/exit` interface.
 - All commands MUST have `description`, `effort` in frontmatter. `effort` is Claude Code's own frontmatter key, not project metadata: it overrides the session effort level, so only `low`, `medium`, `high`, `xhigh`, `max` are valid.
 - Templates MUST have: top-level heading, `## Mission` section, `## Context Files` section.
+- A skill with `disable-model-invocation: true` starts ONLY when the user types `/craftsman:<name>` first in a prompt; the Skill tool refuses it. So: an agent's `skills:` frontmatter may list only model-invocable skills and never one whose `agent:` binding points back at that agent; a skill body may write `**Invokes:** /craftsman:x` only when `x` is model-invocable, otherwise `**Hands off to:**` plus the command to paste. `tests/core/test-invocation-policy.sh` enforces both.
 
 ## Testing
 

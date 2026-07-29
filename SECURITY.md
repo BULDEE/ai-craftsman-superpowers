@@ -53,9 +53,8 @@ whose names start with `agent-` are shell scripts that shell out to a headless
 | `task-completed-verify.sh` | TaskCompleted | Evidence gate before a task closes | Session state |
 | `tool-failure-tracker.sh` | PostToolUseFailure | Records repeated tool failures | Session state |
 | `bias-detector.sh` | UserPromptSubmit | Cognitive bias detection | None |
-| `agent-structure-analyzer.sh` | InstructionsLoaded | Architectural context map | Cache under plugin data |
 | `file-changed.sh` | FileChanged | Tracks external file modifications | Session state |
-| `subagent-quality-gate.sh` | SubagentStop | Quality gate on a subagent's output | Session state |
+| `subagent-quality-gate.sh` | SubagentStop | Validates the subagent's written files through the pack validators | Session state, Metrics DB |
 | `pre-compact-save.sh` | PreCompact | Saves state before compaction | Session state |
 | `post-compact-verify.sh` | PostCompact | Restores state after compaction | Session state |
 | `agent-sentry-context.sh` | Stop | Error context from Sentry MCP | None |

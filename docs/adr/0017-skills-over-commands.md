@@ -37,6 +37,34 @@ Frontmatter policy per workflow class:
 
 Descriptions follow the discovery contract: key use case first, `when_to_use` for trigger phrases, combined text under the 1,536-character cap.
 
+## Amendment - 2026-07-29
+
+The table above put `team` and `legacy` under "Heavy review". Neither belongs
+there, and treating the table as normative produced two live defects.
+
+`team` is not a review. It asks the user which template to use, then calls
+`TeamCreate` to spawn teammates into the session. `context: fork` would strand
+both: the questions reach nobody and the teammates die with the fork. It is
+its own class, **interactive orchestration**: no fork, no
+`disable-model-invocation`, model-invocable so an orchestrator can offer it.
+`legacy` is a "Deliberate workflow", not a heavy review.
+
+The second defect was structural. `disable-model-invocation: true` means the
+skill starts only when the user types the slash command as the first thing in a
+prompt; the Skill tool refuses it. Sixteen of twenty-two skills carry the flag,
+yet `skills/workflow/SKILL.md` announced "Invoking /craftsman:design..." and
+five agents listed locked skills in `skills:` frontmatter. Every one of those
+references was unreachable.
+
+Two invariants follow, both enforced by `tests/core/test-invocation-policy.sh`:
+
+1. An agent's `skills:` frontmatter may only list model-invocable skills, and
+   may not list a skill whose `agent:` binding points back at that same agent
+   (it would fork the agent into itself).
+2. A skill body may only write `**Invokes:** /craftsman:x` when `x` is
+   model-invocable. For a locked skill, say `**Hands off to:**` and print the
+   command for the user to run.
+
 ## Consequences
 
 ### Positive
