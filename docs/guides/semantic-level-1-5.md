@@ -17,6 +17,12 @@ Level 1.5 is wired through Anthropic's official per-language LSP plugins (`claud
 
 > Until 4.3.0 the plugin shipped its own `.lsp.json` for PHP, assuming Claude Code would skip the server when the binary was absent. It does not: Claude Code spawns the declared command unconditionally and reports `Command failed with ENOENT: intelephense --stdio` in the `/plugin` Errors tab on every machine without intelephense. 4.3.1 removed the file; the official `php-lsp` plugin covers the same capability as an explicit opt-in.
 
+## Dockerized stacks
+
+A PHP runtime inside Docker changes nothing for Level 1.5. intelephense is a pure Node.js language server (Claude Code already requires Node on the host): it statically indexes the files on disk and never executes PHP. The one requirement is that `vendor/` is visible on the host filesystem, which the usual docker-compose volume mount already gives you. If `vendor/` lives only inside the container (COPY-based images, no mount), intelephense falls back to its built-in PHP core/extension stubs: project code is still analyzed, dependency symbols are not resolved.
+
+Levels 2 and 3 are the ones a Docker-only toolchain limits: `vendor/bin/phpstan` and deptrac need a PHP runtime to execute, so on a host without PHP they stay inactive and the gate degrades gracefully to Levels 1 and 1.5.
+
 ## What each level catches
 
 | Level | Mechanism | Catches | Latency |
