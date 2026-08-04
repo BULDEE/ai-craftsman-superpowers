@@ -263,14 +263,20 @@ def _cmd_init(args) -> int:
         arg for arg in args
         if not arg.startswith("--") and arg != str(baseline_file)
     ]
-    entries = {}
+    # A whole-tree photograph replaces the baseline: that is the adoption path
+    # and the --repair rebuild. Explicit paths re-photograph only what was
+    # named and keep every other row, because scoping a command must narrow
+    # what it writes, never widen what it deletes.
+    entries = {} if not roots else load_baseline(baseline_file)
+    written = 0
     for source in _iter_sources(roots):
         entry = _current_entry(source)
         if entry is None:
             continue
         entries[entry["path"]] = entry
+        written += 1
     save_baseline(baseline_file, entries)
-    print(f"baseline: {len(entries)} files -> {baseline_file}")
+    print(f"baseline: {written} files -> {baseline_file} ({len(entries)} rows)")
     return 0
 
 

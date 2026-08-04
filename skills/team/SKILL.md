@@ -370,7 +370,7 @@ For each custom team found, display:
 
 ### Step 3: List Active Teams
 
-!`ls ~/.claude/teams/*.json 2>/dev/null | xargs -I{} basename {} .json || echo "No active teams running."`
+!`ls ~/.claude/teams/*.json 2>/dev/null | xargs -I{} basename {} .json | grep . || echo "No active teams running."`
 
 For each active team:
 - Read the config to show member count and status

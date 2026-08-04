@@ -99,6 +99,29 @@ else
     log_fail "init" "$(cat "$BASE" 2>/dev/null)"
 fi
 
+# A scoped init re-photographs what it was given and leaves the rest alone.
+# It used to start from an empty dict, so `init one/file.sh` silently deleted
+# every other row: on this project that turned a 146-row baseline into a
+# 1-row one, erasing the whole debt record with no warning and no diff to
+# review before the next commit.
+mkdir -p other
+cat > other/keep.php <<'PHP'
+<?php
+final class Keep {
+    public function value(): int { return 1; }
+}
+PHP
+python3 "$RATCHET" init . --baseline "$BASE" >/dev/null
+ROWS_BEFORE=$(grep -c '^{' "$BASE")
+python3 "$RATCHET" init src/app.php --baseline "$BASE" >/dev/null
+ROWS_AFTER=$(grep -c '^{' "$BASE")
+
+if [[ "$ROWS_AFTER" -eq "$ROWS_BEFORE" ]] && grep -q '"other/keep.php"' "$BASE"; then
+    log_pass "scoped init keeps the rows it was not asked about"
+else
+    log_fail "scoped init" "baseline went from $ROWS_BEFORE to $ROWS_AFTER rows"
+fi
+
 EXIT_CODE=0
 python3 "$RATCHET" check src/app.php --baseline "$BASE" >/dev/null || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 0 ]]; then
