@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.2] - 2026-08-04
+
+### Fixed
+
+- **`/craftsman:challenge` was unusable outside a git repository.** The skill
+  injects live context with Claude Code's `` !`command` `` syntax, which the
+  harness expands *before* the skill loads. A pattern that exits non-zero
+  aborts the whole invocation: the prompt is discarded and the user only sees
+  `Error: Shell command failed for pattern "!`git log --oneline -10 2>/dev/null`"`.
+  Of the five injected patterns, `git log` was the only one without a fallback.
+  Its `2>/dev/null` silenced the message but not the exit code, which is 128
+  outside a repository, so running the skill from a home directory or any
+  non-versioned folder lost the prompt every time.
+
+  The three git-backed patterns are now guarded by `git rev-parse --git-dir`
+  and fall back to `no git context available`. The guard also covers a
+  repository with no commits yet, where `git diff HEAD` and `git log` fail for
+  a different reason. Version control is context, never a prerequisite: the
+  plugin reviews code the same way in a directory that has never seen git.
+
+### Added
+
+- `tests/core/test-dynamic-context.sh`: executes every `` !`...` `` pattern
+  declared under `skills/` in a directory with no git repository, no metrics
+  database and no generated codemap, and fails on any non-zero exit. Verified
+  red on the exact defect (exit 128) before being verified green on the fix.
+
 ## [4.3.1] - 2026-07-29
 
 ### Fixed
