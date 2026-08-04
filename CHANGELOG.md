@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.3] - 2026-08-04
+
+### Fixed
+
+- **`ratchet.py init <path>` deleted every baseline row it was not given.**
+  The command built its result from an empty dict and saved that, so scoping
+  it to one file dropped the other 145 rows of `.craftsman-baseline.json`
+  without a warning. The documented way to repair a single stale row was the
+  fastest way to destroy the whole debt record. A whole-tree `init` still
+  replaces the baseline, which is the ADR-0025 adoption path and what
+  `init --repair` rebuilds; with explicit paths it now loads the baseline
+  first and re-photographs only what was named.
+
+- **The team skill never printed "No active teams running."** In
+  `ls ~/.claude/teams/*.json | xargs -I{} basename {} .json || echo …` the
+  `||` reads the pipeline's exit code, which is `xargs`', not `ls`'. With no
+  team configured the branch was unreachable and the skill injected an empty
+  line instead of the message. A `| grep .` before the `||` restores it.
+
 ## [4.3.2] - 2026-08-04
 
 ### Fixed
