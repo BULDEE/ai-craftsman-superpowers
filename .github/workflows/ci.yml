@@ -642,10 +642,76 @@ jobs:
 
           exit $FAILED
 
+  structural-ratchet:
+    name: Structural Ratchet (ADR-0025)
+    runs-on: ubuntu-latest
+    needs: [validate-json]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+
+      # The local hook reports RATCHET001 as a warning, so a regression is easy
+      # to walk past. It was walked past often enough that 59 of 146 baseline
+      # rows had drifted by 4.3.2, and a gate nobody can pass cleanly is a gate
+      # everyone learns to ignore. This job is the blocking half: the baseline
+      # only moves when someone updates it in the same pull request.
+      - name: Check touched files against the committed baseline
+        run: |
+          set -uo pipefail
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+
+          if [[ -z "$BASE" || "$BASE" == "0000000000000000000000000000000000000000" ]]; then
+            echo "No usable base revision, nothing to compare."
+            exit 0
+          fi
+
+          CHANGED=$(git diff --name-only --diff-filter=d "$BASE" HEAD)
+          if [[ -z "$CHANGED" ]]; then
+            echo "No changed files."
+            exit 0
+          fi
+
+          FAILED=0
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            [[ -f "$file" ]] || continue
+            OUT=$(python3 hooks/lib/ratchet.py check "$file" \
+              --baseline .craftsman-baseline.json 2>/dev/null) || {
+              echo "✗ $file"
+              echo "$OUT" | sed 's/^/    /'
+              FAILED=1
+            }
+          done <<< "$CHANGED"
+
+          if [[ $FAILED -eq 1 ]]; then
+            echo ""
+            echo "A touched file loosened its structural budget."
+            echo "Either bring it back under its baseline, or raise the budget"
+            echo "on purpose in this same pull request:"
+            echo "  python3 hooks/lib/ratchet.py init <file>"
+            echo "That writes the new numbers into .craftsman-baseline.json,"
+            echo "where a reviewer sees them in the diff. Loosening stays"
+            echo "possible; it stops being silent."
+            exit 1
+          fi
+
+          echo "SUCCESS: no structural regression on changed files."
+
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [secrets-scan, validate-json, validate-hooks-schema, validate-plugin-manifest, validate-shell-scripts, validate-skills, validate-knowledge-base, lint-python, run-tests, check-agents]
+    needs: [secrets-scan, validate-json, validate-hooks-schema, validate-plugin-manifest, validate-shell-scripts, validate-skills, validate-knowledge-base, lint-python, run-tests, check-agents, structural-ratchet]
     if: always()
     steps:
       - name: Check all jobs status
@@ -667,6 +733,7 @@ jobs:
           echo "  - Python lint: ${{ needs.lint-python.result }}"
           echo "  - Test suite: ${{ needs.run-tests.result }}"
           echo "  - Agent definitions: ${{ needs.check-agents.result }}"
+          echo "  - Structural ratchet: ${{ needs.structural-ratchet.result }}"
           echo ""
 
           # Fail if any job failed
@@ -679,7 +746,8 @@ jobs:
              [[ "${{ needs.validate-knowledge-base.result }}" == "failure" ]] || \
              [[ "${{ needs.lint-python.result }}" == "failure" ]] || \
              [[ "${{ needs.run-tests.result }}" == "failure" ]] || \
-             [[ "${{ needs.check-agents.result }}" == "failure" ]]; then
+             [[ "${{ needs.check-agents.result }}" == "failure" ]] || \
+             [[ "${{ needs.structural-ratchet.result }}" == "failure" ]]; then
             echo "FAILED: One or more validation jobs failed"
             exit 1
           fi

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **The structural baseline is enforced in CI and was repaired first.** 59 of
+  its 146 rows had drifted since the initial photograph, and one pointed at a
+  deleted file, so touching 40% of the repository raised a RATCHET001 nobody
+  could clear. A gate that is red by default teaches people to scroll past it.
+  `ratchet init --repair` re-photographed the tree (168 rows, 0 drift, 23
+  files that had never been covered at all), and a new `structural-ratchet`
+  job checks every file a pull request touches against the committed baseline.
+  The local hook stays advisory; CI is the blocking half. Loosening a budget
+  is still allowed through `ratchet init <file>`, which puts the new numbers
+  in the diff where a reviewer sees them.
+
 ## [4.3.3] - 2026-08-04
 
 ### Fixed
