@@ -50,6 +50,22 @@ echo ""
 CHANGED=0
 DRIFTED=0
 
+# Not `sed -i ''`: BSD wants an empty suffix argument, GNU reads it as the
+# script. A temp file is the one form both accept, and it is poured back into
+# the original instead of moved over it: `mv` swaps the inode, so the result
+# carries the umask rather than the original mode. That is how a release
+# turned ci/craftsman-ci.sh from 755 into 644 and failed the executable-bit
+# check in CI.
+substitute_in_place() {
+    local file="$1"
+    local pattern="$2"
+    local replacement="$3"
+
+    sed "s|${pattern}|${replacement}|g" "$file" > "${file}.bump.tmp" \
+        && cat "${file}.bump.tmp" > "$file"
+    rm -f "${file}.bump.tmp"
+}
+
 bump_file() {
     local file="$1"
     local pattern="$2"
@@ -62,10 +78,7 @@ bump_file() {
     fi
 
     if grep -q "$pattern" "$file" 2>/dev/null; then
-        # Not `sed -i ''`: BSD wants an empty suffix argument, GNU reads it as
-        # the script. A temp file is the one form both accept.
-        sed "s|${pattern}|${replacement}|g" "$file" > "${file}.bump.tmp" \
-            && mv "${file}.bump.tmp" "$file"
+        substitute_in_place "$file" "$pattern" "$replacement"
         local count
         count=$(grep -c "$replacement" "$file" 2>/dev/null || echo "0")
         echo "  ✓  $label (${count} occurrence(s))"

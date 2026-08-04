@@ -95,7 +95,7 @@
 {"complexity":1,"fan_out":7,"file_lines":107,"ignores":0,"max_fn_lines":18,"path":"packs/symfony/knowledge/canonical/php-usecase.php"},
 {"complexity":1,"fan_out":1,"file_lines":173,"ignores":0,"max_fn_lines":14,"path":"packs/symfony/knowledge/canonical/php-value-object.php"},
 {"complexity":19,"fan_out":0,"file_lines":104,"ignores":0,"max_fn_lines":69,"path":"packs/symfony/static-analysis/phpstan.sh"},
-{"complexity":8,"fan_out":0,"file_lines":118,"ignores":0,"max_fn_lines":66,"path":"scripts/bump-version.sh"},
+{"complexity":7,"fan_out":0,"file_lines":131,"ignores":0,"max_fn_lines":63,"path":"scripts/bump-version.sh"},
 {"complexity":14,"fan_out":0,"file_lines":198,"ignores":0,"max_fn_lines":72,"path":"scripts/consolidate-metrics.sh"},
 {"complexity":33,"fan_out":0,"file_lines":214,"ignores":0,"max_fn_lines":124,"path":"scripts/validate-pack.sh"},
 {"complexity":32,"fan_out":2,"file_lines":235,"ignores":0,"max_fn_lines":202,"path":"tests/adapters/test-hermes-pre-verify.sh"},
