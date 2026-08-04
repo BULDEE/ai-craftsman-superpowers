@@ -109,6 +109,7 @@
 {"complexity":14,"fan_out":1,"file_lines":110,"ignores":0,"max_fn_lines":110,"path":"tests/core/test-dashboard.sh"},
 {"complexity":18,"fan_out":1,"file_lines":69,"ignores":0,"max_fn_lines":69,"path":"tests/core/test-design-panel.sh"},
 {"complexity":20,"fan_out":3,"file_lines":137,"ignores":1,"max_fn_lines":110,"path":"tests/core/test-dogfood.sh"},
+{"complexity":13,"fan_out":1,"file_lines":80,"ignores":0,"max_fn_lines":80,"path":"tests/core/test-dynamic-context.sh"},
 {"complexity":9,"fan_out":3,"file_lines":160,"ignores":0,"max_fn_lines":121,"path":"tests/core/test-external-packs.sh"},
 {"complexity":32,"fan_out":4,"file_lines":125,"ignores":0,"max_fn_lines":125,"path":"tests/core/test-healthcheck.sh"},
 {"complexity":106,"fan_out":43,"file_lines":1646,"ignores":5,"max_fn_lines":559,"path":"tests/core/test-hooks.sh"},

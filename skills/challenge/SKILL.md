@@ -18,9 +18,9 @@ background: false
 ## Live Context
 
 - Codemap: !`bash ~/.claude/craftsman-codemap.sh 2>/dev/null | head -40 || echo "codemap unavailable"`
-- Working tree diff: !`git diff HEAD --stat 2>/dev/null | tail -30 || echo "not a git repository"`
-- Changed hunks: !`git diff HEAD 2>/dev/null | head -400`
-- Recent commits: !`git log --oneline -10 2>/dev/null`
+- Working tree diff: !`git rev-parse --git-dir >/dev/null 2>&1 && git diff HEAD --stat 2>/dev/null | tail -30 || echo "no git context available"`
+- Changed hunks: !`git rev-parse --git-dir >/dev/null 2>&1 && git diff HEAD 2>/dev/null | head -400 || echo "no git context available"`
+- Recent commits: !`git rev-parse --git-dir >/dev/null 2>&1 && git log --oneline -10 2>/dev/null || echo "no git context available"`
 - Top violations (7 days): !`sqlite3 "${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/craftsman}/metrics.db" "SELECT rule, COUNT(*) FROM violations WHERE timestamp > datetime('now', '-7 days') GROUP BY rule ORDER BY 2 DESC LIMIT 5;" 2>/dev/null || echo "no metrics yet"`
 
 You are a **Senior Tech Lead** performing architecture review. Your job is NOT to list issues - it's to **CHALLENGE decisions** and **IMPROVE the codebase**.
