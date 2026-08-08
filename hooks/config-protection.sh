@@ -26,16 +26,16 @@ BASENAME="$(basename "$FILE_PATH")"
 # intentionally excluded - .craft-config.yml is the user-facing rule override
 # mechanism by design (see Rules Engine), and the others hold too much
 # unrelated project metadata to block wholesale.
+# Which files are a quality gate's own config is the packs' knowledge: the pack
+# that ships the analyser is the one that knows what configures it. The literal
+# list this replaces protected PHP and TypeScript only, so a pack could ship a
+# blocking Level 2 gate and leave its config freely relaxable.
+source "${SCRIPT_DIR}/lib/config.sh"
+source "${SCRIPT_DIR}/lib/pack-loader.sh"
+pack_loader_init
+
 is_protected_config() {
-    case "$BASENAME" in
-        phpstan.neon|phpstan.neon.dist|phpstan.dist.neon) return 0 ;;
-        .eslintrc|.eslintrc.js|.eslintrc.cjs|.eslintrc.json|.eslintrc.yml|.eslintrc.yaml) return 0 ;;
-        eslint.config.js|eslint.config.mjs|eslint.config.cjs|eslint.config.ts) return 0 ;;
-        .php-cs-fixer.php|.php-cs-fixer.dist.php) return 0 ;;
-        deptrac.yaml|deptrac.yml) return 0 ;;
-        .dependency-cruiser.js|.dependency-cruiser.cjs|dependency-cruiser.config.js) return 0 ;;
-        *) return 1 ;;
-    esac
+    lang_all_capability protected_configs 2>/dev/null | grep -qxF "$BASENAME"
 }
 
 is_protected_config || exit 0

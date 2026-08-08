@@ -225,12 +225,17 @@ add_violation() {
     _record_violation_metric "$rule" "$severity" "$ignored"
 }
 
+# A validator calling add_warning is stating an intent, not a verdict. The
+# verdict is the rules engine's, exactly as it is for add_violation: the rule's
+# advisory default lives in _rules_is_advisory, and .craft-config.yml or a
+# directory .craft-rules.yml can promote it to block or silence it.
+#
+# This used to write straight to WARNING_VIOLATIONS, bypassing severity
+# resolution and craftsman-ignore alike. SH001 was declared a blocking rule in
+# ci/doctrine-export.sh and emitted here as a warning, and no configuration in
+# either direction could reach it.
 add_warning() {
-    local rule="$1"
-    local message="$2"
-    metrics_record_violation "$rule" "$FILE_PATTERN" "warning" 0 0 2>/dev/null || true
-    WARNING_VIOLATIONS="${WARNING_VIOLATIONS}${rule}: ${message}\n"
-    ((WARNING_COUNT++)) || true
+    add_violation "$@"
 }
 
 # =============================================================================
@@ -261,48 +266,29 @@ _run_static_analysis() {
 # Run Validation - delegates to pack validators
 # =============================================================================
 
-case "$EXT" in
-    php)
-        if config_php_enabled; then
-            pack_run_validators "$FILE_PATH" "php"
-            pack_run_validators "$FILE_PATH" "php_layers"
-            pack_run_validators "$FILE_PATH" "php_persistence"
-            pack_run_validators "$FILE_PATH" "php_security"
-            _run_static_analysis "$FILE_PATH"
-        fi
-        ;;
-    ts|tsx)
-        if config_ts_enabled; then
-            pack_run_validators "$FILE_PATH" "typescript"
-            pack_run_validators "$FILE_PATH" "typescript_layers"
-            pack_run_validators "$FILE_PATH" "typescript_persistence"
-            pack_run_validators "$FILE_PATH" "typescript_security"
-            _run_static_analysis "$FILE_PATH"
-        fi
-        ;;
-    py)
-        pack_run_validators "$FILE_PATH" "python"
-        ;;
-    sh|bash)
-        pack_run_validators "$FILE_PATH" "bash"
-        ;;
-esac
+# One call, whatever the language. The list of extensions, the validators to
+# run and whether the language is enabled at all now come from the loaded
+# packs' manifests. The literal case statement this replaces was duplicated
+# across ten sites with no parity test, so a pack contributing a language the
+# engine had not been taught about loaded successfully and validated nothing.
+pack_dispatch_file "$FILE_PATH"
+
+# Level 2/3 runs only for a language whose pack declared a static_analysis
+# tool. Deriving it from "the language is known" would have started running
+# ESLint on .js the moment JavaScript was claimed for custom rules.
+_PWC_LANG=$(lang_for_file "$FILE_PATH")
+if [[ -n "$_PWC_LANG" ]] && [[ -n "$(lang_capability "$_PWC_LANG" "static_analysis")" ]]; then
+    _run_static_analysis "$FILE_PATH"
+fi
 
 # =============================================================================
 # Custom Rules Validation (from .craft-config.yml rules section)
 # =============================================================================
 _validate_custom_rules() {
     local file="$1"
-    local ext="${file##*.}"
-    local language=""
-    case "$ext" in
-        php) language="php" ;;
-        ts|tsx) language="typescript" ;;
-        js|jsx) language="javascript" ;;
-        py) language="python" ;;
-        sh|bash) language="bash" ;;
-        *) return ;;
-    esac
+    local language
+    language=$(lang_for_file "$file")
+    [[ -z "$language" ]] && return
 
     local custom_rules
     custom_rules=$(rules_custom_list "$language")

@@ -13,7 +13,7 @@
 # =============================================================================
 set -o pipefail
 
-VERSION="4.3.3"
+VERSION="4.4.0"
 
 # =============================================================================
 # Defaults
@@ -355,6 +355,7 @@ _severity_for() {
     case "$rule" in
         WARN*|PHP005|NEST001|LOC001|GOD001|PARAM001|CTRL001|RATCHET001) echo "warn"; return 0 ;;
         TS002|TS003|PHP003) echo "warn"; return 0 ;;
+        DB001|DB002|DB003|PY003|SH001|SH003|SH005) echo "warn"; return 0 ;;
     esac
     case "$STRICTNESS" in
         strict)   echo "block" ;;
@@ -468,39 +469,26 @@ scan_file() {
     local file="$1"
     local ext="${file##*.}"
 
-    # Discovered, as distinct from scanned. A file skipped because stack: says
-    # this project has no PHP is a deliberate exclusion and a legitimate pass.
-    # A repository where nothing was found at all is a gate that never ran.
-    case "$ext" in php|ts|tsx) FILES_DISCOVERED=$((FILES_DISCOVERED + 1)) ;; esac
+    local language=""
+    [[ "$PACKS_AVAILABLE" == true ]] && language=$(lang_for_file "$file")
+
+    # Discovered, as distinct from scanned. A file whose extension some
+    # installed pack declares counts as discovered even when this project's
+    # stack excludes that pack: that is a deliberate exclusion and a legitimate
+    # pass. A repository where nothing was recognised at all is a gate that
+    # never ran. Counting only php|ts|tsx here is what let one PHP file silence
+    # this guard for every Python and Bash file in a mixed repository.
+    if [[ "$PACKS_AVAILABLE" == true ]] && lang_extension_is_known "$file"; then
+        FILES_DISCOVERED=$((FILES_DISCOVERED + 1))
+    fi
 
     # Set globals for pack validator compatibility
     _CI_CURRENT_FILE="$file"
     FILE_PATH="$file"
     FILE_PATTERN="$file"
 
-    case "$ext" in
-        php)
-            _php_enabled || return 0
-            if [[ "$PACKS_AVAILABLE" == true ]]; then
-                pack_run_validators "$file" "php"
-                pack_run_validators "$file" "php_layers"
-                pack_run_validators "$file" "php_persistence"
-                pack_run_validators "$file" "php_security"
-            fi
-            ;;
-        ts|tsx)
-            _ts_enabled || return 0
-            if [[ "$PACKS_AVAILABLE" == true ]]; then
-                pack_run_validators "$file" "typescript"
-                pack_run_validators "$file" "typescript_layers"
-                pack_run_validators "$file" "typescript_persistence"
-                pack_run_validators "$file" "typescript_security"
-            fi
-            ;;
-        *)
-            return 0
-            ;;
-    esac
+    [[ -z "$language" ]] && return 0
+    pack_dispatch_file "$file"
 
     # Structural ratchet parity (ADR-0025): identical check to the hook.
     # CI never writes the baseline; the pipeline is read-only.
@@ -536,11 +524,6 @@ scan_file() {
 
     # Custom rules from rules engine (plugin context only)
     if [[ "$RULES_ENGINE_AVAILABLE" == true ]]; then
-        local language=""
-        case "$ext" in
-            php) language="php" ;;
-            ts|tsx) language="typescript" ;;
-        esac
         if [[ -n "$language" ]]; then
             local custom_rules
             custom_rules=$(rules_custom_list "$language")
@@ -565,6 +548,35 @@ scan_file() {
     FILES_SCANNED=$((FILES_SCANNED + 1))
 }
 
+# Build find's -name predicate from the loaded packs' declared extensions.
+#
+# The result is deliberately word-split into find's argument list, so every
+# extension is filtered to a conservative character class first. A pack manifest
+# is repository-supplied data, and an extension like `php" -o -exec rm {} +"`
+# would otherwise become executable argument structure.
+_find_name_predicate() {
+    local predicate="" extension
+    if [[ "$PACKS_AVAILABLE" == true ]]; then
+        while IFS= read -r extension; do
+            [[ -z "$extension" ]] && continue
+            [[ ! "$extension" =~ ^[A-Za-z0-9_+-]+$ ]] && continue
+            if [[ -z "$predicate" ]]; then
+                predicate="-name *.${extension}"
+            else
+                predicate="${predicate} -o -name *.${extension}"
+            fi
+        done <<< "$(lang_all_known_extensions)"
+    fi
+
+    # No pack, no language, nothing to walk. A predicate matching nothing keeps
+    # find syntactically valid, and FILES_DISCOVERED staying at zero is what
+    # makes the empty run report itself as "not a pass" rather than as green.
+    if [[ -z "$predicate" ]]; then
+        predicate="-name *.__craftsman_no_language__"
+    fi
+    printf '%s' "$predicate"
+}
+
 scan_paths() {
     local path
     for path in "${SCAN_PATHS[@]}"; do
@@ -579,7 +591,7 @@ scan_paths() {
             done < <(find "$path" \
                 \( -name vendor -o -name node_modules -o -name .git \
                    -o -name dist -o -name build -o -name var \) -prune -o \
-                -type f \( -name "*.php" -o -name "*.ts" -o -name "*.tsx" \) -print \
+                -type f \( $(_find_name_predicate) \) -print \
                 2>/dev/null | sort)
         fi
     done
@@ -715,8 +727,22 @@ EOF
 # =============================================================================
 # Main
 # =============================================================================
+# Packs are sourced at startup, before --config and .craft-config.yml have been
+# read, so that first load ran against the default stack. The stack filter is
+# what decides which languages exist, so the registry has to be rebuilt once the
+# real stack is known: otherwise `--config stack=symfony` still validates .ts,
+# because the React pack was admitted before anyone knew it should not be.
+_rebuild_registry_for_stack() {
+    [[ "$PACKS_AVAILABLE" == true ]] || return 0
+    [[ -d "$PLUGIN_ROOT/packs" ]] || return 0
+    export CLAUDE_PLUGIN_OPTION_stack="$STACK"
+    _pack_reset
+    pack_loader_init 2>/dev/null || true
+}
+
 main() {
     _resolve_config
+    _rebuild_registry_for_stack
     scan_paths
 
     case "$FORMAT" in

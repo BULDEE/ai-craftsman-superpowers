@@ -130,22 +130,7 @@ validate_one_file() {
     # post-write-check.sh.
     FILE_PATH="$1"
     FILE_PATTERN=$(metrics_file_pattern "$FILE_PATH")
-    case "${FILE_PATH##*.}" in
-        php)
-            pack_run_validators "$FILE_PATH" "php"
-            pack_run_validators "$FILE_PATH" "php_layers"
-            pack_run_validators "$FILE_PATH" "php_persistence"
-            pack_run_validators "$FILE_PATH" "php_security"
-            ;;
-        ts|tsx)
-            pack_run_validators "$FILE_PATH" "typescript"
-            pack_run_validators "$FILE_PATH" "typescript_layers"
-            pack_run_validators "$FILE_PATH" "typescript_persistence"
-            pack_run_validators "$FILE_PATH" "typescript_security"
-            ;;
-        py) pack_run_validators "$FILE_PATH" "python" ;;
-        sh|bash) pack_run_validators "$FILE_PATH" "bash" ;;
-    esac
+    pack_dispatch_file "$FILE_PATH"
 }
 
 while IFS= read -r touched; do

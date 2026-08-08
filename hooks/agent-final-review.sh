@@ -26,8 +26,27 @@ if [[ "${CLAUDE_PLUGIN_OPTION_strictness:-strict}" != "strict" ]]; then
 fi
 
 source "${SCRIPT_DIR}/lib/haiku-verify.sh"
+source "${SCRIPT_DIR}/lib/config.sh"
+source "${SCRIPT_DIR}/lib/pack-loader.sh"
+pack_loader_init
 
-CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null | grep -E '\.(php|ts|tsx)$' || true)
+# The reviewed extensions come from the loaded packs. Hard-coding php|ts|tsx
+# here meant the final review silently skipped every other language, including
+# ones whose pack was loaded and whose rules had blocked during the session.
+_final_review_extension_filter() {
+    local extensions
+    extensions=$(lang_all_extensions 2>/dev/null | tr '\n' '|' | sed 's/|$//')
+    # No language registered means no pack is active for this project. A
+    # hard-coded fallback here would reintroduce exactly the defect this
+    # replaces: reviewing php|ts|tsx because the engine remembers them, rather
+    # than because a pack asked for them.
+    [[ -z "$extensions" ]] && return 1
+    printf '\\.(%s)$' "$extensions"
+}
+
+REVIEW_FILTER=$(_final_review_extension_filter) || exit 0
+CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null \
+    | grep -E "$REVIEW_FILTER" || true)
 [[ -z "$CHANGED_FILES" ]] && exit 0
 
 # Rewake budget: at most 2 wake-ups per session

@@ -24,9 +24,11 @@ import subprocess
 import sys
 
 try:
+    import lang_registry_read
     import structural_metrics  # reuse the same complexity signal as the gate
 except ImportError:
     structural_metrics = None
+    lang_registry_read = None
 
 LANG_BY_EXT = {
     ".php": "php", ".ts": "ts", ".tsx": "ts", ".js": "ts", ".jsx": "ts",
@@ -91,11 +93,13 @@ def complexity_of(abspath):
     except OSError:
         return 0, 0
     findings = 0
-    ext = os.path.splitext(abspath)[1]
-    lang = LANG_BY_EXT.get(ext)
-    if structural_metrics is not None and lang in ("php", "ts"):
+    # The dialect comes from the pack that claims this file. Gating on
+    # lang in ("php", "ts") meant every other language scored on line count
+    # alone, so a 200-line Dart god class ranked below a 300-line data file.
+    dialect = lang_registry_read.dialect_for_path(abspath) if lang_registry_read else ""
+    if structural_metrics is not None and dialect:
         try:
-            findings = len(structural_metrics.analyze(abspath, lang))
+            findings = len(structural_metrics.analyze(abspath, dialect))
         except Exception:
             findings = 0
     # LOC is the base proxy; each structural finding adds weight.

@@ -22,8 +22,30 @@ EXIT_CODE=$(echo "$INPUT" | jq -r '.tool_result.exit_code // .tool_result.exitCo
 
 [[ -z "$COMMAND" ]] && exit 0
 
-# Match test runner commands
-if ! echo "$COMMAND" | grep -qE '(run-tests\.sh|phpunit|jest|vitest|pytest|cargo test|go test|npm test|pnpm test|yarn test)'; then
+# Which commands run a test suite is the packs' knowledge. The literal list
+# this replaces meant the deterministic verification loop (ADR-0023) was blind
+# to every language whose runner it had not been taught, so `flutter test`
+# failing left the session's "verified" flag standing.
+#
+# run-tests.sh stays here because it is this plugin's own runner, not any
+# language's: it belongs to the engine, and no pack should have to claim it.
+_test_command_pattern() {
+    local pattern="run-tests\\.sh" command
+    while IFS= read -r command; do
+        [[ -z "$command" ]] && continue
+        # Commands become part of a regex, and manifests are repository-supplied
+        # data. Accept a conservative charset and escape the rest.
+        [[ ! "$command" =~ ^[A-Za-z0-9_./\ -]+$ ]] && continue
+        pattern="${pattern}|$(printf '%s' "$command" | sed 's/[.]/\\./g')"
+    done <<< "$(lang_all_capability test_commands 2>/dev/null)"
+    printf '(%s)' "$pattern"
+}
+
+source "${SCRIPT_DIR}/lib/config.sh"
+source "${SCRIPT_DIR}/lib/pack-loader.sh"
+pack_loader_init
+
+if ! echo "$COMMAND" | grep -qE "$(_test_command_pattern)"; then
     exit 0
 fi
 

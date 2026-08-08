@@ -337,6 +337,13 @@ _rules_is_advisory() {
         # real work (ADR-0025). Set `RATCHET001: block` in .craft-config.yml to
         # opt in early; the default escalates once a full cycle runs clean.
         RATCHET001) return 0 ;;
+        # These were advisory de facto, by being emitted through add_warning
+        # instead of add_violation. That made the choice invisible here and,
+        # worse, unreachable: add_warning never consulted this engine, so a
+        # project could neither promote them to block nor set them to ignore.
+        # Declaring them advisory keeps today's behaviour and hands the
+        # decision back to .craft-config.yml and .craft-rules.yml.
+        DB001|DB002|DB003|PY003|SH001|SH003|SH005) return 0 ;;
     esac
     return 1
 }

@@ -26,14 +26,10 @@ FILE_PATH=$(echo "$INPUT" | jq -r '.file_path // empty' 2>/dev/null)
 # Exit silently if no file path or file doesn't exist
 [[ -z "$FILE_PATH" || ! -f "$FILE_PATH" ]] && exit 0
 
-# Only check source files
-EXT="${FILE_PATH##*.}"
-case "$EXT" in
-    php|ts|tsx) ;;
-    *) exit 0 ;;
-esac
-
-# Init metrics and pack loader
+# Whether this is a source file is the registry's answer, and the registry only
+# exists after pack_loader_init. The extension guard therefore moved below that
+# call: keeping it here is what made this hook blind to every language the
+# engine had not been taught about.
 metrics_init 2>/dev/null || true
 
 FILE_PATTERN=$(metrics_file_pattern "$FILE_PATH")
@@ -57,21 +53,12 @@ line_has_ignore() { return 1; }
 # Initialize pack loader (sources validators from compatible packs)
 pack_loader_init
 
+# Not a source file for any loaded pack: nothing to report, and saying so by
+# exiting is cheaper than dispatching to nothing.
+[[ -z "$(lang_for_file "$FILE_PATH")" ]] && exit 0
+
 # Level 1: Pack validators
-case "$EXT" in
-    php)
-        if config_php_enabled; then
-            pack_run_validators "$FILE_PATH" "php"
-            pack_run_validators "$FILE_PATH" "php_layers"
-        fi
-        ;;
-    ts|tsx)
-        if config_ts_enabled; then
-            pack_run_validators "$FILE_PATH" "typescript"
-            pack_run_validators "$FILE_PATH" "typescript_layers"
-        fi
-        ;;
-esac
+pack_dispatch_file "$FILE_PATH"
 
 # Output only if issues found
 if [[ $ISSUE_COUNT -gt 0 ]]; then

@@ -154,7 +154,7 @@ DON'T ADD THESE (plugin handles them):
 - <skill-routing> → Skills auto-activate via SKILL.md frontmatter
 - <self-check> → Plugin's post-write-check.sh hook
 - <references> to knowledge paths → Plugin's knowledge/ directory
-- <session-behavior> → Plugin's session-init skill
+- <session-behavior> → Plugin's session-start.sh hook
 - acceleration/scope-creep/over-optimize biases → Plugin's bias-detector.sh
 - SOLID/DDD/patterns explanations → Plugin's knowledge base
 -->
@@ -268,7 +268,7 @@ make test-e2e      # E2E with Cypress
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  1. SESSION START                                                    │
-│     └── Plugin hook: session-init skill loads                        │
+│     └── Plugin hook: session-start.sh runs                           │
 │         └── Shows available /craftsman:* skills                      │
 │                                                                      │
 │  2. USER PROMPT RECEIVED                                             │

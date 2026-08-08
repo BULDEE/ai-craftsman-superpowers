@@ -277,7 +277,7 @@ model at high effort is usually worse value than the next model up.
 
 | Tier | Effort | Skills | Why this tier |
 |---|---|---|---|
-| `haiku` | `low` | `verify`, `git`, `metrics`, `healthcheck`, `session-init` | Mechanical. Run a command, read the exit code, format the result. No design judgment involved, so a larger model buys nothing. |
+| `haiku` | `low` | `verify`, `git`, `metrics`, `healthcheck` | Mechanical. Run a command, read the exit code, format the result. No design judgment involved, so a larger model buys nothing. |
 | `sonnet` | `medium` | `spec`, `test`, `scaffold`, `ci`, `setup`, `workflow` | Applying a known pattern within a bounded scope, or walking the user through a guided flow. |
 | `opus` | `high` | `design`, `challenge`, `debug`, `refactor` | Judgment calls with consequences: aggregate boundaries, root causes, behaviour-preserving refactors. Reasoning that spans files. |
 | `opus` | `xhigh` | `plan`, `legacy`, `team`, `parallel`, `agent-design`, `rag`, `mlops` | Same reasoning, sustained over long horizons: campaigns, orchestration, pipeline architecture. |

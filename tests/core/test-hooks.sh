@@ -437,14 +437,32 @@ run_file_changed() {
 unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
-# Test: Ignores non-PHP/TS files
-result=$(run_file_changed "$ROOT_DIR/tests/run-tests.sh")
+# Test: Ignores files no loaded pack claims.
+#
+# This used to pass tests/run-tests.sh, on the assumption that a .sh file was
+# not source. The bash pack claims .sh, so that assumption stopped being true
+# the day it shipped, and the hook only kept agreeing with it because its
+# extension list was a literal php|ts|tsx. Use a file no pack declares.
+result=$(run_file_changed "$ROOT_DIR/README.md")
 exit_code="${result%%|*}"
 output="${result#*|}"
 if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
-    log_pass "FileChanged ignores non-PHP/TS files (silent exit 0)"
+    log_pass "FileChanged ignores files no loaded pack claims (silent exit 0)"
 else
     log_fail "FileChanged should ignore non-source files" "exit=$exit_code output=$output"
+fi
+
+# Test: a language contributed by a pack other than symfony/react is seen here
+# too. The assertion above no longer covers .sh, so this replaces the coverage
+# rather than dropping it: FileChanged and post-write-check must agree on what
+# counts as source, and they disagreed for as long as each held its own list.
+result=$(run_file_changed "$FIXTURES_DIR/unsafe.sh")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qE 'SH00[0-9]'; then
+    log_pass "FileChanged reports bash rules, so packs beyond php/ts reach it"
+else
+    log_fail "FileChanged should report bash rules" "exit=$exit_code output=$output"
 fi
 
 # Test: Detects PHP violations (non-blocking)

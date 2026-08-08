@@ -6,21 +6,30 @@ Usage: codemap.py <repo_root>
 Prints a markdown map (directories, file counts by language, entry points,
 test location). Callers handle caching; this script only observes.
 """
+import os
 import sys
 from collections import Counter
 from pathlib import Path
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    import lang_registry_read
+except ImportError:
+    lang_registry_read = None
+
 SKIP_DIRS = {".git", "node_modules", "vendor", "dist", "build", ".idea",
              ".vscode", "__pycache__", ".ruff_cache", "coverage", ".next"}
 CODE_EXTS = {".php", ".ts", ".tsx", ".js", ".py", ".sh", ".go", ".rs", ".java", ".md", ".yml", ".yaml", ".json"}
-ENTRY_MARKERS = {
-    "composer.json": "PHP (composer)",
-    "package.json": "Node (package.json)",
-    "pyproject.toml": "Python (pyproject)",
-    "Cargo.toml": "Rust (cargo)",
-    "go.mod": "Go (modules)",
-    "Makefile": "Make",
-}
+# Project markers come from the loaded packs, plus Make, which belongs to no
+# language. A literal table here meant a project whose pack declared its own
+# marker was reported as having no recognisable entry point.
+def _entry_markers() -> dict:
+    markers = {"Makefile": "Make"}
+    if lang_registry_read is None:
+        return markers
+    for marker, language in lang_registry_read.entry_markers().items():
+        markers.setdefault(marker, "%s (%s)" % (language, marker))
+    return markers
 MAX_DIRS = 20
 
 
@@ -60,7 +69,7 @@ def _safe_label(text: str, max_len: int = 60) -> str:
 
 
 def _entry_points(root: Path) -> list[str]:
-    return [label for marker, label in ENTRY_MARKERS.items() if (root / marker).exists()]
+    return [label for marker, label in _entry_markers().items() if (root / marker).exists()]
 
 
 def render(root: Path) -> str:

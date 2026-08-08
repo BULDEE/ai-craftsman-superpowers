@@ -4,7 +4,7 @@
 
 Claude Code plugin that transforms Claude into a disciplined Senior Software Craftsman. DDD, Clean Architecture, TDD methodology enforced through hooks, commands, agents, and a rules engine.
 
-**Current version:** 4.3.3
+**Current version:** 4.4.0
 **Stack:** Bash (hooks/CI), Markdown (skills/agents/templates), Python (metrics helpers), YAML (config)
 
 ## Development Rules
@@ -15,6 +15,22 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
 - The `metrics-query.py` helper MUST be used for all SQLite writes (parameterized queries). NEVER use string interpolation in SQL.
 - All writes to `session-state.json` MUST use atomic writes (`tempfile.mkstemp() + os.rename()`). Known TOCTOU window between read and rename when multiple async hooks fire simultaneously - acceptable at current hook frequencies but do not add file-locking without benchmarking first.
 - CI adapters follow the `adapter_detect/run/annotate/comment/exit` interface.
+- The engine holds no list of languages. A pack declares its own in `pack.yml`
+  under `languages:` (`extensions`, `validators`, `static_analysis`,
+  `test_commands`, `entry_markers`, `protected_configs`, `lsp`,
+  `metrics_dialect`), and `hooks/lib/lang-registry.sh` compiles those manifests
+  into the registry every hook and `ci/craftsman-ci.sh` reads. Never add a
+  `case "$EXT"` or an extension literal to a hook, to the pipeline or to a
+  Python helper: use `lang_for_file`, `lang_capability` or `pack_dispatch_file`.
+  `tests/core/test-lang-registry.sh` fails when a capability is declared but no
+  consumer reads it. `metrics_dialect` accepts `c-like` and `php-like` only;
+  a language whose structure the engine cannot extract declares none rather
+  than a dialect that would measure it wrongly.
+- Severity is the rules engine's decision, never the validator's. Emit through
+  `add_violation` or `add_warning` (both resolve `rules_severity_for_file`), and
+  declare a rule's advisory default in `_rules_is_advisory` plus its mirror in
+  `ci/craftsman-ci.sh`. `tests/ci/test-craftsman-ci.sh` fails when the two lists
+  drift.
 - All commands MUST have `description`, `effort` in frontmatter. `effort` is Claude Code's own frontmatter key, not project metadata: it overrides the session effort level, so only `low`, `medium`, `high`, `xhigh`, `max` are valid.
 - Templates MUST have: top-level heading, `## Mission` section, `## Context Files` section.
 - A skill with `disable-model-invocation: true` starts ONLY when the user types `/craftsman:<name>` first in a prompt; the Skill tool refuses it. So: an agent's `skills:` frontmatter may list only model-invocable skills and never one whose `agent:` binding points back at that agent; a skill body may write `**Invokes:** /craftsman:x` only when `x` is model-invocable, otherwise `**Hands off to:**` plus the command to paste. `tests/core/test-invocation-policy.sh` enforces both.

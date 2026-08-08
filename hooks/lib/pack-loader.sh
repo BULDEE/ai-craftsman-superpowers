@@ -16,6 +16,14 @@ _PACK_VALIDATORS=""
 _PACK_SA_TOOLS=""
 _PACK_SCAFFOLD_TYPES=""
 _PACKS_DIR=""
+_PACK_MANIFESTS=""
+_PACK_MANIFESTS_ALL=""
+
+# The registry turns the manifests this loader accepted into the engine's only
+# source of truth about languages. Sourced here so every caller of
+# pack_loader_init gets lang_for_file and pack_dispatch_file for free.
+# shellcheck source=./lang-registry.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lang-registry.sh"
 
 _pack_reset() {
     _LOADED_PACKS=""
@@ -23,6 +31,9 @@ _pack_reset() {
     _PACK_SA_TOOLS=""
     _PACK_SCAFFOLD_TYPES=""
     _PACKS_DIR=""
+    _PACK_MANIFESTS=""
+    _PACK_MANIFESTS_ALL=""
+    lang_registry_init
 }
 
 # Extract a top-level scalar value from a simple YAML file.
@@ -51,31 +62,33 @@ _pack_yml_array() {
 
 # Extract an inline YAML array nested under a parent key.
 # e.g.  compatibility:\n  stack: ["symfony"]  →  symfony
+# One awk pass, not two forks per line.
+#
+# This read the manifest line by line and ran `echo "$line" | grep` up to three
+# times per line. pack_loader_init calls it once per capability per pack, so a
+# five-pack install spent thousands of forks parsing a few hundred lines of
+# YAML: 2.9s per load, and craftsman-ci pays it twice. Declaring `languages:`
+# lengthened the manifests by roughly 40 percent and made it visible by timing
+# the CI suite out at 300s.
 _pack_yml_nested_array() {
     local parent="$1" child="$2" file="$3"
-    local in_parent=false
-    while IFS= read -r line; do
-        if echo "$line" | grep -qE "^${parent}:"; then
-            in_parent=true
-            continue
-        fi
-        if [[ "$in_parent" == true ]]; then
-            # A non-indented key signals we have left the parent block
-            if echo "$line" | grep -qE '^[a-zA-Z]'; then
-                in_parent=false
-                continue
-            fi
-            if echo "$line" | grep -qE "^[[:space:]]+${child}:"; then
-                echo "$line" \
-                    | sed -E 's/^[^[]*\[//' \
-                    | sed -E 's/\].*//' \
-                    | tr ',' '\n' \
-                    | sed -E 's/^[[:space:]]*"?//;s/"?[[:space:]]*$//' \
-                    | grep -v '^$'
-                return
-            fi
-        fi
-    done < "$file"
+    awk -v parent="$parent" -v child="$child" '
+        index($0, parent ":") == 1 { inside = 1; next }
+        inside && /^[a-zA-Z]/ { inside = 0 }
+        inside && $0 ~ ("^[[:space:]]+" child ":") {
+            line = $0
+            sub(/^[^[]*\[/, "", line)
+            sub(/\].*$/, "", line)
+            count = split(line, items, ",")
+            for (index_ = 1; index_ <= count; index_++) {
+                value = items[index_]
+                gsub(/^[[:space:]]*"?|"?[[:space:]]*$/, "", value)
+                gsub(/^'"'"'|'"'"'$/, "", value)
+                if (value != "") print value
+            }
+            exit
+        }
+    ' "$file" 2>/dev/null
 }
 
 # Return 0 if the pack at pack_dir is compatible with the current stack.
@@ -156,38 +169,102 @@ _load_pack() {
     _register_pack_components "$pack_dir" "$pack_name"
 
     _LOADED_PACKS="${_LOADED_PACKS}${pack_name}\n"
+    _PACK_MANIFESTS="${_PACK_MANIFESTS}${pack_dir}/pack.yml\n"
 }
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
-# Scan packs_dir, filter by stack compatibility, source validators.
+_pack_load_internal() {
+    local packs_dir="$1"
+    [[ ! -d "$packs_dir" ]] && return 0
+    local pack_dir
+    for pack_dir in "$packs_dir"/*/; do
+        [[ ! -f "$pack_dir/pack.yml" ]] && continue
+        _PACK_MANIFESTS_ALL="${_PACK_MANIFESTS_ALL}${pack_dir}/pack.yml\n"
+        if _pack_stack_compatible "$pack_dir"; then
+            _load_pack "$pack_dir"
+        fi
+    done
+    # An incompatible last pack would otherwise leave the loop's status at 1,
+    # which trips the fail-open `trap ERR` in pre-write-check.sh and silently
+    # turns the whole hook into a no-op.
+    return 0
+}
+
+_pack_load_external() {
+    type config_external_packs &>/dev/null || return 0
+    local ext_path
+    while IFS= read -r ext_path; do
+        [[ -z "$ext_path" ]] && continue
+        [[ ! -d "$ext_path" ]] && continue
+        [[ ! -f "$ext_path/pack.yml" ]] && continue
+        _PACK_MANIFESTS_ALL="${_PACK_MANIFESTS_ALL}${ext_path}/pack.yml\n"
+        if _pack_stack_compatible "$ext_path"; then
+            _load_pack "$ext_path"
+        fi
+    done <<< "$(config_external_packs)"
+    return 0
+}
+
+# Scan packs_dir, filter by stack compatibility, source validators, then build
+# the language registry from exactly the manifests that passed the filter. A
+# language is enabled because a compatible pack declared it, never because the
+# engine has heard of it.
+# CLAUDE_PLUGIN_ROOT is set by the harness and absent everywhere else: a test
+# harness, a CI shell, a developer running a hook by hand. It used to be a soft
+# dependency, because the extension list was a literal and dispatch worked
+# without any pack loaded. Now an unresolved packs directory means an empty
+# registry, which means every hook silently validates nothing. Derive the
+# location from this file instead, and keep the env var as the override.
+_pack_default_packs_dir() {
+    if [[ -n "${CLAUDE_PLUGIN_ROOT:-}" && -d "${CLAUDE_PLUGIN_ROOT}/packs" ]]; then
+        printf '%s' "${CLAUDE_PLUGIN_ROOT}/packs"
+        return 0
+    fi
+    printf '%s' "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/packs"
+}
+
 pack_loader_init() {
-    local packs_dir="${1:-${CLAUDE_PLUGIN_ROOT:-}/packs}"
+    local packs_dir="${1:-$(_pack_default_packs_dir)}"
     _PACKS_DIR="$packs_dir"
 
-    # 1. Load internal packs
-    if [[ -d "$packs_dir" ]]; then
-        for pack_dir in "$packs_dir"/*/; do
-            [[ ! -f "$pack_dir/pack.yml" ]] && continue
-            if _pack_stack_compatible "$pack_dir"; then
-                _load_pack "$pack_dir"
-            fi
-        done
+    _pack_load_internal "$packs_dir"
+    _pack_load_external
+    _pack_build_registry
+    return 0
+}
+
+_pack_manifest_list() {
+    local raw="$1"
+    local manifest
+    while IFS= read -r manifest; do
+        [[ -z "$manifest" ]] && continue
+        [[ -f "$manifest" ]] && printf '%s\n' "$manifest"
+    done <<< "$(printf '%b' "$raw")"
+}
+
+_pack_build_registry() {
+    local manifests=()
+    local manifest
+    while IFS= read -r manifest; do
+        [[ -n "$manifest" ]] && manifests+=("$manifest")
+    done <<< "$(_pack_manifest_list "$_PACK_MANIFESTS")"
+    if [[ ${#manifests[@]} -eq 0 ]]; then
+        lang_registry_init
+    else
+        lang_registry_init "${manifests[@]}"
     fi
 
-    # 2. Load external packs from .craft-config.yml
-    if type config_external_packs &>/dev/null; then
-        local ext_path
-        while IFS= read -r ext_path; do
-            [[ -z "$ext_path" ]] && continue
-            [[ ! -d "$ext_path" ]] && continue
-            [[ ! -f "$ext_path/pack.yml" ]] && continue
-            if _pack_stack_compatible "$ext_path"; then
-                _load_pack "$ext_path"
-            fi
-        done <<< "$(config_external_packs)"
+    local known=()
+    while IFS= read -r manifest; do
+        [[ -n "$manifest" ]] && known+=("$manifest")
+    done <<< "$(_pack_manifest_list "$_PACK_MANIFESTS_ALL")"
+    if [[ ${#known[@]} -eq 0 ]]; then
+        lang_registry_init_known
+    else
+        lang_registry_init_known "${known[@]}"
     fi
 }
 

@@ -145,7 +145,11 @@ def analyze(path, lang):
     stack = []
     control_depth = 0
     header_start = 0
-    func_name_re = FUNC_PHP_RE if lang == 'php' else FUNC_TS_NAMED_RE
+    # `lang` is a metrics dialect, not a language: 'php-like' or 'c-like'. Every
+    # brace-delimited language shares one extractor, which is what lets a pack
+    # get NEST/LOC/GOD/PARAM by declaring metrics_dialect: c-like and nothing
+    # else. 'php' and 'ts' are accepted as the pre-registry spellings.
+    func_name_re = FUNC_PHP_RE if lang in ('php', 'php-like') else FUNC_TS_NAMED_RE
     cursor, length = 0, len(source)
     while cursor < length:
         char = source[cursor]
@@ -164,7 +168,9 @@ def _open_brace(source, pos, header_start, lang, func_name_re, stack, control_de
     kind, name = 'other', None
     if CLASS_RE.search(header):
         kind = 'class'
-    elif func_name_re.search(header) or (lang != 'php' and ARROW_RE.search(header.rstrip())):
+    elif func_name_re.search(header) or (
+        lang not in ('php', 'php-like') and ARROW_RE.search(header.rstrip())
+    ):
         kind = 'func'
         match = func_name_re.search(header)
         name = match.group(1) if match else None

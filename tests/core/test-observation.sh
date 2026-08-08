@@ -57,7 +57,11 @@ echo ""
 echo "=== Codemap Generator ==="
 
 MAP=$(python3 "$CODEMAP" "$FIXTURE" 2>&1)
-if echo "$MAP" | grep -q "PHP (composer)"; then
+# Match the marker filename, not a hand-written label. Entry markers now come
+# from the packs, so the label is composed from the declaring language and the
+# marker itself; asserting the exact prose would pin a presentation detail and
+# would have to change again with the next pack.
+if echo "$MAP" | grep -q "composer.json"; then
     log_pass "codemap detects composer entry point"
 else
     log_fail "codemap entry points" "$MAP"

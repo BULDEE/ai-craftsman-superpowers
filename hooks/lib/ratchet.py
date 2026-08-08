@@ -26,7 +26,13 @@ import sys
 import tempfile
 from pathlib import Path
 
-SUPPORTED_EXTS = {".php", ".ts", ".tsx", ".py", ".sh"}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    import lang_registry_read
+except ImportError:
+    lang_registry_read = None
+
+
 # Reading a file costs roughly five times its size in memory once split into
 # lines. A hostile repository can ship a 1 GB "source" file, and this runs on
 # every write: anything past this size is not code worth measuring.
@@ -54,6 +60,22 @@ FN_RE = re.compile(
     r"(?!(?:" + CONTROL_WORDS + r")\b)\w+\s*\([^)]*\)\s*\{)"
 )
 IGNORE_RE = re.compile(r"craftsman-ignore:")
+
+
+# Which files are ratcheted is the loaded packs' answer. The literal set this
+# replaces named five extensions, so a project whose pack shipped a sixth got
+# no regression guard at all while the doctrine advertised one. An empty set is
+# the honest answer when no pack is loaded: ratcheting a file nobody claims
+# would compare it against a baseline nothing else maintains.
+#
+# Placed below the regex constants on purpose. complexity is measured per
+# function span, a span running from one def to the next, so a function
+# inserted above CONTROL_WORDS takes the keyword alternation into its own span
+# and scores 13 phantom decision points.
+def supported_extensions() -> set:
+    if lang_registry_read is None:
+        return set()
+    return lang_registry_read.known_extensions()
 
 
 def _function_spans(lines) -> list:
@@ -181,7 +203,7 @@ def _current_entry(file_path: Path):
 
 
 def _skipped(file_path: Path) -> bool:
-    if not file_path.is_file() or file_path.suffix not in SUPPORTED_EXTS:
+    if not file_path.is_file() or file_path.suffix not in supported_extensions():
         return True
     # A size cap alone is not enough: os.path.getsize("/dev/zero") is 0, so a
     # symlink to a character device would sail past it and read forever. Only

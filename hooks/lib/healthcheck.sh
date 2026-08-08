@@ -163,13 +163,19 @@ hc_check_session_bridge() {
 # .lsp.json - Claude Code spawns a declared server unconditionally and surfaces
 # a plugin error when the binary is missing, so LSP wiring belongs to the
 # official per-language plugins the user opts into.
-hc_check_lsp() {
-    local found="" hints=""
-    command -v intelephense >/dev/null 2>&1 && found="${found} intelephense(php)"
-    command -v typescript-language-server >/dev/null 2>&1 && found="${found} typescript-language-server(ts)"
-    command -v pyright-langserver >/dev/null 2>&1 && found="${found} pyright(python)"
-    command -v rust-analyzer >/dev/null 2>&1 && found="${found} rust-analyzer(rust)"
+# Which server serves which language is the packs' knowledge, not a literal list.
+_hc_installed_servers() {
+    local language server
+    while IFS= read -r language; do
+        server=$(lang_capability "$language" lsp 2>/dev/null)
+        [[ -z "$server" ]] && continue
+        command -v "$server" >/dev/null 2>&1 && printf ' %s(%s)' "$server" "$language"
+    done <<< "$(lang_registered 2>/dev/null)"
+}
 
+hc_check_lsp() {
+    local found hints=""
+    found=$(_hc_installed_servers)
     if [[ -n "$found" ]]; then
         _hc_record "lsp" "ok" "level-1.5 active:${found}"
     else

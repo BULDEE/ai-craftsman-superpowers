@@ -314,5 +314,7 @@ than pretending to start a step it cannot. See
 | `/craftsman:metrics` | Utility | Quality metrics and local dashboard | `haiku` | `low` |
 | `/craftsman:healthcheck` | Utility | Installation and runtime diagnostic | `haiku` | `low` |
 
-`session-init` is an internal skill (`haiku`) that loads craftsman context at
-session start; it is not invoked directly.
+Craftsman context is loaded at session start by `hooks/session-start.sh`, not by
+a skill. A `session-init` skill existed alongside it until v4.4.0 and was
+removed: nothing invoked it, and its command list had drifted from the shipped
+one.

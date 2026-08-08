@@ -5,6 +5,17 @@ compatibility:
   core: ">=2.4.0"
   stack: ["symfony", "fullstack"]
 
+languages:
+  - id: php
+    extensions: [php]
+    entry_markers: [composer.json]
+    protected_configs: ["phpstan.neon", "phpstan.neon.dist", "phpstan.dist.neon", "deptrac.yaml", "deptrac.yml", "phpunit.xml", "phpunit.xml.dist", ".php-cs-fixer.php", ".php-cs-fixer.dist.php"]
+    validators: ["hooks/php-validator.sh", "hooks/layer-validator.sh", "hooks/persistence-validator.sh", "hooks/security-validator.sh"]
+    static_analysis: ["static-analysis/phpstan.sh"]
+    test_commands: ["phpunit", "vendor/bin/phpunit", "bin/phpunit"]
+    lsp: "intelephense"
+    metrics_dialect: c-like
+
 rules:
   builtin: ["PHP001", "PHP002", "PHP003", "PHP004", "PHP005", "WARN-PHP001", "LAYER001", "LAYER002", "LAYER003", "NEST001", "LOC001", "GOD001", "PARAM001", "CTRL001"]
   static_analysis: ["PHPSTAN001", "PHPSTAN002", "PHPSTAN003", "PHPSTAN004", "PHPSTAN005", "DEPTRAC001"]

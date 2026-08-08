@@ -13,6 +13,10 @@ trap 'echo "WARNING: pre-write-check.sh failed at line $LINENO" >&2; exit 0' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/config.sh"
+# Needed for the language registry: which extensions are source files is the
+# packs' answer, not this hook's. The registry is cached on disk, so the extra
+# load costs a file read on the steady path.
+source "${SCRIPT_DIR}/lib/pack-loader.sh"
 
 # Read tool input from stdin
 INPUT=$(cat)
@@ -22,12 +26,11 @@ FILE_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.content // empty' 2>/dev/null)
 # Exit silently if no file path
 [[ -z "$FILE_PATH" ]] && exit 0
 
-# Only check source files
+# Only check source files, as declared by the loaded packs
+pack_loader_init
 EXT="${FILE_PATH##*.}"
-case "$EXT" in
-    php|ts|tsx) ;;
-    *) exit 0 ;;
-esac
+LANG_ID=$(lang_for_file "$FILE_PATH")
+[[ -z "$LANG_ID" ]] && exit 0
 
 VIOLATIONS=""
 VIOLATION_COUNT=0

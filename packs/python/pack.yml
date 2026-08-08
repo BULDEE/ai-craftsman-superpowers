@@ -5,6 +5,24 @@ compatibility:
   core: ">=3.1.0"
   stack: ["python", "ai-ml", "fullstack"]
 
+languages:
+  - id: python
+    extensions: [py]
+    entry_markers: [pyproject.toml, setup.py, requirements.txt]
+    # Not pyproject.toml or setup.cfg: they carry dependencies and packaging
+    # metadata as well as tool settings, so blocking them wholesale would stop
+    # ordinary work to guard a quality gate. Only files that exist solely to
+    # configure a gate belong here.
+    protected_configs: ["mypy.ini", ".flake8"]
+    validators: ["hooks/python-validator.sh"]
+    test_commands: ["pytest", "python -m pytest", "tox"]
+    lsp: "pyright-langserver"
+    # No metrics_dialect: the engine extracts structural metrics from
+    # brace-delimited sources only (c-like, php-like). Measuring an
+    # indentation-based language with a brace scanner reports zero nesting
+    # everywhere, and the ratchet would then guard a signal that is silently
+    # absent. NEST001 and GOD001 come from this pack's own validator instead.
+
 rules:
   builtin: ["PY001", "PY002", "PY003", "PY004", "PY005", "WARN-PY001", "NEST001", "GOD001"]
 

@@ -185,10 +185,15 @@ test_skill_structure() {
         log_fail "Missing 'description' field"
     fi
 
-    # Test 4: Has effort field (session-init exempt).
+    # Test 4: Has effort field.
     # Values are Claude Code's own effort levels: the key is read from the
     # frontmatter and overrides the session effort level, so anything outside
     # this set is not a naming preference, it is an unrecognised value.
+    #
+    # There is no exemption. session-init used to have one, and the missing
+    # field was the symptom rather than the special case: nothing invoked that
+    # skill, so nobody ever had to give it a tier. A skill with no effort and
+    # no outcome contract is a skill no one runs.
     if grep -q "^effort:" "$skill_file"; then
         local effort=$(grep "^effort:" "$skill_file" | head -1 | cut -d: -f2 | tr -d ' ')
         if [[ "$effort" =~ ^(low|medium|high|xhigh|max)$ ]]; then
@@ -197,11 +202,7 @@ test_skill_structure() {
             log_fail "Invalid effort value: $effort (must be low|medium|high|xhigh|max)"
         fi
     else
-        if [[ "$skill_name" == "session-init" ]]; then
-            log_skip "'effort' field (session-init exempt)"
-        else
-            log_fail "Missing 'effort' field"
-        fi
+        log_fail "Missing 'effort' field"
     fi
 
     # Test 4b: Declares a model tier.
@@ -232,11 +233,7 @@ test_skill_structure() {
             log_fail "Outcome Contract incomplete (needs Outcome, Done when, Evidence)"
         fi
     else
-        if [[ "$skill_name" == "session-init" ]]; then
-            log_skip "Outcome Contract (session-init exempt)"
-        else
-            log_fail "Missing '## Outcome Contract' section"
-        fi
+        log_fail "Missing '## Outcome Contract' section"
     fi
 
     # Test 6: context: fork requires an agent binding
@@ -589,6 +586,7 @@ test_session_metrics() {
     run_subtest "Runner integrity tests pass" "$SCRIPT_DIR/core/test-runner-integrity.sh" || true
     run_subtest "Circuit breaker and cache tests pass" "$SCRIPT_DIR/core/test-circuit-breaker.sh" || true
     run_subtest "External pack gating tests pass" "$SCRIPT_DIR/core/test-external-packs.sh" || true
+    run_subtest "Language registry tests pass" "$SCRIPT_DIR/core/test-lang-registry.sh" || true
     run_subtest "Healthcheck tests pass" "$SCRIPT_DIR/core/test-healthcheck.sh" || true
     run_subtest "LSP policy tests pass" "$SCRIPT_DIR/core/test-lsp-policy.sh" || true
     run_subtest "Pack loader tests pass" "$SCRIPT_DIR/core/test-pack-loader.sh" || true

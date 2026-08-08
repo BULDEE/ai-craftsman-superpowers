@@ -91,7 +91,13 @@ source "$ROOT_DIR/ci/doctrine-export.sh"
 rm -f .craft-config.yml
 bash "$CLI" export --target agents-md >/dev/null 2>&1
 
-ENFORCED=$(grep -rhoE '\b(PHP|TS|LAYER|DB|PY|SH|SEC|GOD|LOC|NEST|PARAM|CTRL|RATCHET|WARN-[A-Z]+)[0-9]{3}\b' \
+# -I and --exclude-dir: hooks/lib modules now import each other, so Python
+# writes __pycache__ there in normal use. grep reports "Binary file ... matches"
+# for a .pyc, that line lands in the rule list, and every downstream assertion
+# then compares a filename against the doctrine. The guard was reporting drift
+# that did not exist.
+ENFORCED=$(grep -rhoIE --exclude-dir=__pycache__ \
+    '\b(PHP|TS|LAYER|DB|PY|SH|SEC|GOD|LOC|NEST|PARAM|CTRL|RATCHET|WARN-[A-Z]+)[0-9]{3}\b' \
     "$ROOT_DIR/hooks" "$ROOT_DIR/packs" 2>/dev/null | sort -u)
 
 UNDOCUMENTED=""

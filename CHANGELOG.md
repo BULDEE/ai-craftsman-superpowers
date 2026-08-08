@@ -7,6 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-08-08
+
+### Added
+
+- **Packs declare the languages they cover, and the engine holds no list of its
+  own.** A `languages:` block in `pack.yml` names the extensions, validators,
+  static-analysis tools, test commands, entry markers, protected config files,
+  LSP server and metrics dialect for each language a pack contributes.
+  `hooks/lib/lang-registry.sh` compiles those manifests into one flat TSV,
+  cached on disk and invalidated by manifest mtime, and exposes `lang_for_file`,
+  `lang_capability` and `pack_dispatch_file`. Adding the fiftieth language is
+  adding a fiftieth pack, with no edit anywhere else.
+
+  Validator functions are discovered by prefix rather than declared twice: a
+  pack shipping `pack_validate_php`, `_php_layers`, `_php_persistence` and
+  `_php_security` gets all four called, so a manifest cannot drift from its own
+  scripts.
+
+### Changed
+
+- **BREAKING for pack authors: `languages:` is now required to dispatch.** A
+  pack without it loads, registers its agents and knowledge, and validates
+  nothing. Packs published before this release need the block added. In
+  practice nothing regresses: the dispatch was a literal `case "$EXT" in
+  php|ts|tsx)` duplicated across ten call sites, so a third-party pack was
+  already never reached. That is the defect this release closes, and the reason
+  it ships as a minor rather than a major.
+
+- **Rule severity is resolved for warnings too.** `add_warning` wrote straight
+  to the warning list, bypassing `rules_severity_for_file` and
+  `craftsman-ignore` alike. SH001 was declared a blocking rule in
+  `ci/doctrine-export.sh` and emitted as a warning, and no configuration in
+  either direction could reach it. Warnings now flow through the same
+  resolution as violations; DB001-003, PY003, SH001, SH003 and SH005 are
+  declared advisory so today's behaviour is unchanged and a project can now
+  promote or silence them.
+
+- **`craftsman-ci` is faster than before this release despite doing more.**
+  `_pack_yml_nested_array` read each manifest line by line, running
+  `echo "$line" | grep` up to three times per line, and `pack_loader_init`
+  calls it once per capability per pack. One awk pass replaces it: pack loading
+  went from 2891ms to 743ms, and a full `craftsman-ci` invocation from 2257ms
+  to 1597ms.
+
+### Fixed
+
+- **The `python` and `bash` packs never ran in CI.** `scan_paths` walked only
+  `*.php`, `*.ts` and `*.tsx`, and `scan_file` returned 0 on everything else.
+  PY001-005 and SH002-005 blocked on write and passed in the pipeline, while
+  `README.md` and `CLAUDE.md` both claimed the two front-ends could not
+  disagree. This repository is itself 124 shell scripts and 18 Python files.
+
+- **One PHP file silenced the empty-gate guard for every other language.**
+  `FILES_DISCOVERED` counted only `php|ts|tsx`, so a mixed repository reported
+  `No issues found in 1 file(s)` with unvalidated Python and Bash beside it.
+  Discovery now counts any extension an installed pack declares, which keeps
+  "excluded by stack" distinct from "never discovered": a `.php` file under
+  `stack: react` remains a legitimate pass.
+
+- **`tests/core/test-external-packs.sh` asserted the wrong thing.** It checked
+  that `pack_validate_go` was callable after loading, never that it was called
+  on a `.go` file, and stayed green while the feature was dead. Replaced by
+  `tests/core/test-lang-registry.sh`, which drives real fixtures through the
+  hook, the pipeline and the rules engine, and pairs every assertion with a
+  known-good control so a red result cannot be confused with a broken harness.
+
+- **`test-doctrine-export.sh` reported drift that did not exist.** Its
+  recursive grep matched the `__pycache__` files that now appear once
+  `hooks/lib` modules import each other, and `Binary file ... matches` entered
+  the rule list.
+
+### Removed
+
+- **The `session-init` skill.** Nothing invoked it: no hook, no manifest, and
+  `disable-model-invocation: true` kept the Skill tool away. Session context is
+  loaded by `hooks/session-start.sh`, which it duplicated. Its command list had
+  also drifted, still advertising `/craftsman:parallel` and omitting `team`,
+  `legacy`, `workflow`, `healthcheck` and `metrics`. The two test exemptions it
+  carried were the symptom, not the special case, and are gone with it.
+
+- **`cargo test`, `go test` and `rust-analyzer` are no longer recognised.**
+  They were literals in the test-detection regex and the LSP probe, and no
+  shipped pack claims them. A Rust or Go project therefore loses its
+  deterministic verification trigger and its LSP hint until a pack for that
+  language declares them. This is the visible cost of the rule that a language
+  exists because a pack contributes it.
+
 ### Changed
 
 - **The structural baseline is enforced in CI and was repaired first.** 59 of

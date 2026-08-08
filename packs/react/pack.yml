@@ -5,6 +5,23 @@ compatibility:
   core: ">=2.4.0"
   stack: ["react", "fullstack"]
 
+languages:
+  - id: typescript
+    extensions: [ts, tsx]
+    entry_markers: [package.json, tsconfig.json]
+    protected_configs: [".eslintrc", ".eslintrc.json", ".eslintrc.js", ".eslintrc.cjs", ".eslintrc.yml", ".eslintrc.yaml", "eslint.config.js", "eslint.config.mjs", "eslint.config.cjs", "eslint.config.ts", ".dependency-cruiser.js", ".dependency-cruiser.json", ".dependency-cruiser.cjs", "dependency-cruiser.config.js"]
+    validators: ["hooks/typescript-validator.sh", "hooks/layer-validator.sh", "hooks/persistence-validator.sh", "hooks/security-validator.sh"]
+    static_analysis: ["static-analysis/eslint.sh"]
+    test_commands: ["jest", "vitest", "npm test", "pnpm test", "yarn test"]
+    lsp: "typescript-language-server"
+    metrics_dialect: c-like
+  # JavaScript is claimed so custom rules scoped to it still resolve, but it
+  # declares no validator and no static analysis: the pack's doctrine is
+  # TypeScript, and silently running TS rules on .js would be a scope change.
+  - id: javascript
+    extensions: [js, jsx]
+    metrics_dialect: c-like
+
 rules:
   builtin: ["TS001", "TS002", "TS003", "WARN-TS001", "LAYER001", "NEST001", "LOC001", "GOD001", "PARAM001"]
   static_analysis: ["ESLINT001", "ESLINT002", "ESLINT003", "ESLINT004"]
