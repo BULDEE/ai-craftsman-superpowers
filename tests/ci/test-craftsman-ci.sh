@@ -593,6 +593,43 @@ else
         "engine: $(echo "$ENGINE_ADVISORY" | tr '\n' ' ') | ci: $(echo "$CI_ADVISORY" | tr '\n' ' ')"
 fi
 
+# Both lists above are fallbacks, consulted only when the rules engine could not
+# be sourced. Neither knows what a pack declared, so a rule its owner marks
+# `warn` in a manifest still resolves to `block` in that degraded mode: the
+# pipeline would then be stricter than the hooks on the same file, which is the
+# exact disagreement this section exists to prevent. Comparing the two copies
+# against each other cannot see it; comparing them against the registry can.
+source "$ROOT_DIR/hooks/lib/rule-registry.sh" 2>/dev/null || true
+DECLARED_WARN=""
+if type rule_default_severity &>/dev/null 2>&1; then
+    while IFS= read -r _rule; do
+        [[ -z "$_rule" ]] && continue
+        [[ "$(rule_default_severity "$_rule" 2>/dev/null)" == "warn" ]] || continue
+        DECLARED_WARN="${DECLARED_WARN} ${_rule}"
+    done <<< "$(rule_ids 2>/dev/null)"
+fi
+
+if [[ -z "${DECLARED_WARN// /}" ]]; then
+    log_fail "no advisory rule found in the registry" \
+        "the fallback comparison below would pass against an empty set"
+else
+    MISSING_FROM_CI=""
+    for _rule in $DECLARED_WARN; do
+        echo "$CI_ADVISORY" | grep -qx "$_rule" && continue
+        # WARN-* is matched by the CI fallback as a prefix pattern.
+        # -F: the CI fallback lists the literal pattern `WARN*`, and without it
+        # grep reads the asterisk as a quantifier and matches nothing.
+        [[ "$_rule" == WARN-* ]] && echo "$CI_ADVISORY" | grep -qxF 'WARN*' && continue
+        MISSING_FROM_CI="${MISSING_FROM_CI} ${_rule}"
+    done
+    if [[ -z "${MISSING_FROM_CI// /}" ]]; then
+        log_pass "every rule a manifest declares advisory is advisory in the CI fallback too"
+    else
+        log_fail "the CI fallback would block a rule its owner declared advisory" \
+            "${MISSING_FROM_CI} - in degraded mode the pipeline is stricter than the hooks"
+    fi
+fi
+
 # A directory-level relaxation the hooks honour must be honoured here too.
 if grep -q "rules_severity_for_file" "$ROOT_DIR/ci/craftsman-ci.sh"; then
     log_pass "CI resolves severity per file, so .craft-rules.yml applies in the pipeline"

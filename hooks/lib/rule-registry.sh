@@ -120,6 +120,14 @@ rule_is_known() {
     [[ -n "$(rule_owner "$1")" ]]
 }
 
+# Every registered rule id. Callers that need to walk the doctrine should use
+# this rather than reading the TSV, which also carries the group marker rows and
+# is only built once _rule_registry_ready has run.
+rule_ids() {
+    _rule_registry_ready || return 0
+    awk -F'\t' '$1 != "__group__" { print $1 }' "$_RULE_REGISTRY_FILE" 2>/dev/null
+}
+
 rule_groups() {
     _rule_registry_ready || return 0
     awk -F'\t' '$1 == "__group__" { print $2 "\t" $5 }' "$_RULE_REGISTRY_FILE" \

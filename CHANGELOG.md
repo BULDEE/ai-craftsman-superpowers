@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.6.1] - 2026-08-08
+
+### Fixed
+
+- **The hook/pipeline drift test compared two copies of a list that had stopped
+  being the source of truth.** Both `_rules_is_advisory` and its mirror in
+  `ci/craftsman-ci.sh` are fallbacks, read only when the rules engine cannot be
+  sourced, and neither knows what a pack declared. A rule its owner marks `warn`
+  in a manifest therefore still resolved to `block` in that degraded mode, so
+  the pipeline would block a file the hooks let through. Comparing the two
+  copies against each other could never see it. The suite now also checks every
+  advisory rule in the registry against the CI fallback, and `rule_ids()` was
+  added so callers can walk the doctrine without reading the TSV directly.
+
 ## [4.6.0] - 2026-08-08
 
 ### Added
