@@ -43,11 +43,20 @@ echo ""
 echo "=== Every test file is reachable from the runner ==="
 
 # Pack suites are globbed by test_pack_suites, so tests/packs/ is covered by
-# construction. tests/core/ and tests/ci/ are named one by one and are where a
+# construction. Every other directory names its files one by one and is where a
 # new file goes unnoticed.
+#
+# tests/templates/ was missing from this list, which is exactly how
+# test-templates.sh came to sit unexecuted with four red assertions while the
+# suite reported green. This guard existed to catch that and did not, because
+# it enumerated the directories instead of discovering them.
+#
+# tests/lib/ is excluded on purpose: it holds test-helpers.sh, a library that
+# the suites source rather than a suite the runner calls.
 UNREFERENCED=""
 CHECKED=0
-for script in "$ROOT_DIR"/tests/core/test-*.sh "$ROOT_DIR"/tests/ci/test-*.sh; do
+for script in "$ROOT_DIR"/tests/core/test-*.sh "$ROOT_DIR"/tests/ci/test-*.sh \
+              "$ROOT_DIR"/tests/adapters/test-*.sh "$ROOT_DIR"/tests/templates/test-*.sh; do
     [[ -f "$script" ]] || continue
     CHECKED=$((CHECKED + 1))
     name="$(basename "$script")"
@@ -58,7 +67,7 @@ done
 if [[ $CHECKED -eq 0 ]]; then
     log_fail "no test file found" "the check above verified nothing"
 elif [[ -z "$UNREFERENCED" ]]; then
-    log_pass "all ${CHECKED} core and ci test files are named in the runner"
+    log_pass "all ${CHECKED} test files outside tests/packs are named in the runner"
 else
     log_fail "test files the runner never mentions" "$UNREFERENCED"
 fi

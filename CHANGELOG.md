@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.1] - 2026-08-08
+
+### Fixed
+
+- **`tests/templates/test-templates.sh` was never executed.** `run-tests.sh`
+  named `tests/core/`, `tests/ci/` and `tests/adapters/` file by file and
+  globbed `tests/packs/`, but nothing mentioned `tests/templates/`. Sixty-eight
+  assertions, four of them red, sat outside every run while the suite reported
+  green and `CLAUDE.md` documented the file as a validation command. It is now
+  called from `main()` like the others.
+
+- **Four of its assertions targeted an architecture the project had left
+  behind.** Section 8 opened `skills/entity`, `skills/usecase`,
+  `skills/component` and `skills/hook`, one skill per scaffold type. Scaffolding
+  was unified into `skills/scaffold/SKILL.md` well before this, so all four
+  reported "command file not found". The section now checks the unified skill,
+  and reads the template list from `packs/*/templates/` instead of repeating the
+  six names: naming them in the test is how it drifted, and a pack shipping a
+  seventh template would have stayed invisible. A guard against the empty case
+  keeps the loop from passing vacuously.
+
+- **`test-runner-integrity.sh` existed to catch exactly this and did not.** It
+  verifies that every test file is reachable from the runner, but enumerated
+  the directories to walk rather than discovering them, and `tests/templates/`
+  was missing from that list. The guard now covers `tests/adapters/` and
+  `tests/templates/` as well. `tests/lib/` stays out on purpose: it holds
+  `test-helpers.sh`, a library the suites source rather than a suite the runner
+  calls.
+
 ## [4.4.0] - 2026-08-08
 
 ### Added

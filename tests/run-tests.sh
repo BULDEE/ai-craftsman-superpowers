@@ -535,6 +535,19 @@ test_config_resolution() {
 }
 
 # Test: Pack-specific test suites
+# Test: template and manifest validation
+#
+# tests/templates/test-templates.sh existed, was documented in CLAUDE.md as a
+# validation command, and was invoked by nothing. Four of its assertions had
+# been red for long enough that the architecture they targeted no longer
+# existed, and the suite reported green throughout. A test file that the runner
+# does not call is not a test.
+test_template_suite() {
+    echo ""
+    log_info "Testing templates and manifests"
+    run_subtest "Template suite passes" "$SCRIPT_DIR/templates/test-templates.sh" || true
+}
+
 test_pack_suites() {
     echo ""
     log_info "Testing pack suites"
@@ -765,6 +778,7 @@ main() {
         test_correction_learning
         test_session_metrics
         test_knowledge_integrity
+        test_template_suite
         test_pack_suites
         test_craftsman_ci
         test_workflow_command

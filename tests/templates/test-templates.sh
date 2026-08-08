@@ -289,49 +289,46 @@ fi
 echo ""
 echo "--- Section 8: Scaffolder Template Selection ---"
 
-for cmd in entity usecase; do
-    cmd_file="$ROOT_DIR/skills/${cmd}/SKILL.md"
-    if [[ -f "$cmd_file" ]]; then
-        if grep -q "## Template Selection" "$cmd_file" 2>/dev/null; then
-            pass "${cmd}.md: has Template Selection section"
-        else
-            fail "${cmd}.md: missing Template Selection section"
-        fi
+# Scaffolding is one unified skill, not one skill per type. This section used
+# to open skills/entity, skills/usecase, skills/component and skills/hook, which
+# have not existed since the scaffolder was unified: four assertions reported
+# "command file not found" against an architecture the project had left behind.
+#
+# The template list is read from disk rather than repeated here. Naming the six
+# templates in the test is how it drifted in the first place: a pack shipping a
+# seventh would have been invisible, and one deleting a template would have kept
+# a green assertion pointing at nothing.
+SCAFFOLD_SKILL="$ROOT_DIR/skills/scaffold/SKILL.md"
 
-        # Check it references all 3 symfony templates
-        for tpl in "bounded-context" "crud-api" "event-sourced"; do
-            if grep -q "$tpl" "$cmd_file" 2>/dev/null; then
-                pass "${cmd}.md: references ${tpl} template"
-            else
-                fail "${cmd}.md: missing reference to ${tpl} template"
-            fi
-        done
+if [[ ! -f "$SCAFFOLD_SKILL" ]]; then
+    fail "scaffold/SKILL.md not found - the scaffolder is the single entry point for entity, usecase, component and hook"
+else
+    if grep -q "^## Template Variants" "$SCAFFOLD_SKILL" 2>/dev/null; then
+        pass "scaffold/SKILL.md: has Template Variants section"
     else
-        fail "${cmd}.md: command file not found"
+        fail "scaffold/SKILL.md: missing '## Template Variants' section"
     fi
-done
 
-for cmd in component hook; do
-    cmd_file="$ROOT_DIR/skills/${cmd}/SKILL.md"
-    if [[ -f "$cmd_file" ]]; then
-        if grep -q "## Template Selection" "$cmd_file" 2>/dev/null; then
-            pass "${cmd}.md: has Template Selection section"
-        else
-            fail "${cmd}.md: missing Template Selection section"
-        fi
+    SHIPPED_TEMPLATES=$(find "$ROOT_DIR/packs" -name '*.template.md' 2>/dev/null \
+        | sed 's|.*/||; s|\.template\.md$||' | sort -u)
 
-        # Check it references all 3 react templates
-        for tpl in "bounded-context" "form-heavy" "dashboard-data"; do
-            if grep -q "$tpl" "$cmd_file" 2>/dev/null; then
-                pass "${cmd}.md: references ${tpl} template"
-            else
-                fail "${cmd}.md: missing reference to ${tpl} template"
-            fi
-        done
+    # An empty list would make every assertion below vacuously true, which is
+    # the failure mode this suite exists to catch elsewhere.
+    if [[ -z "$SHIPPED_TEMPLATES" ]]; then
+        fail "no pack template found under packs/*/templates - the checks below would pass against nothing"
     else
-        fail "${cmd}.md: command file not found"
+        template_count=$(echo "$SHIPPED_TEMPLATES" | wc -l | tr -d ' ')
+        pass "found ${template_count} pack template(s) to check the scaffolder against"
+        while IFS= read -r tpl; do
+            [[ -z "$tpl" ]] && continue
+            if grep -q "$tpl" "$SCAFFOLD_SKILL" 2>/dev/null; then
+                pass "scaffold/SKILL.md: references ${tpl}"
+            else
+                fail "scaffold/SKILL.md: shipped template ${tpl} is never offered"
+            fi
+        done <<< "$SHIPPED_TEMPLATES"
     fi
-done
+fi
 
 # =============================================================================
 # Summary
