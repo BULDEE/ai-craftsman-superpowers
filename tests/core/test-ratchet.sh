@@ -339,4 +339,99 @@ fi
 cd "$PREV_PWD"
 rm -rf "$WORK6" "$OUTSIDE"
 
+# =============================================================================
+# A span ends where the function ends, not where the next one starts
+# =============================================================================
+echo ""
+echo "=== Function spans stop at the body ==="
+
+# Spans used to run header-to-header, so every line between two functions was
+# charged to the earlier one. In a sequential test script that is the whole
+# file: a 7-line helper measured 600 lines and 119 decision points, which reads
+# as debt and invites a refactor that fixes nothing.
+SPAN_DIR="/tmp/craftsman-ratchet-span-$$"
+mkdir -p "$SPAN_DIR"
+cat > "$SPAN_DIR/sequential.sh" <<'SEQ'
+#!/usr/bin/env bash
+helper() {
+    echo "three"
+    echo "lines"
+}
+
+# 20 lines of top-level script follow, belonging to no function.
+for i in 1 2 3; do
+    if [[ "$i" == "2" ]]; then
+        echo "two"
+    elif [[ "$i" == "3" ]]; then
+        echo "three"
+    fi
+done
+while read -r line; do
+    case "$line" in
+        a) echo a ;;
+        b) echo b ;;
+    esac
+done < /dev/null
+SEQ
+
+SEQ_MAX=$(python3 "$RATCHET" measure "$SPAN_DIR/sequential.sh" 2>/dev/null \
+    | grep -oE '"max_fn_lines":[[:space:]]*[0-9]+' | grep -oE '[0-9]+$')
+if [[ -n "$SEQ_MAX" && "$SEQ_MAX" -le 6 ]]; then
+    log_pass "a short helper followed by top-level code measures its own body (${SEQ_MAX} lines)"
+else
+    log_fail "function span leaks into top-level code" \
+        "max_fn_lines=${SEQ_MAX:-unset}, expected the helper's own 4 lines, not the rest of the file"
+fi
+rm -rf "$SPAN_DIR"
+
+# =============================================================================
+# Loosening a budget requires a stated reason
+# =============================================================================
+echo ""
+echo "=== init --reason ==="
+
+WORK7="/tmp/craftsman-ratchet-reason-$$"
+mkdir -p "$WORK7/src"
+PREV_PWD="$PWD"
+cd "$WORK7"
+printf '#!/usr/bin/env bash\nset -u\nfoo() { echo a; }\n' > src/s.sh
+
+# Directory and bare forms are adoption and --repair, not a loosening. Three
+# suites already call `init .`, `init src` and `init deep`.
+python3 "$RATCHET" init src --baseline b.json >/dev/null 2>&1
+dir_rc=$?
+if [[ $dir_rc -eq 0 ]]; then
+    log_pass "control: photographing a directory needs no reason"
+else
+    log_fail "init on a directory was refused" "exit $dir_rc - the assertions below are undetermined"
+fi
+
+python3 "$RATCHET" init src/s.sh --baseline b.json >/dev/null 2>&1
+file_rc=$?
+if [[ $file_rc -eq 2 ]]; then
+    log_pass "re-photographing one file without --reason is refused"
+else
+    log_fail "silent loosening allowed" \
+        "exit $file_rc - a budget can be raised leaving only numbers in the diff"
+fi
+
+python3 "$RATCHET" init src/s.sh --baseline b.json --reason "seam work" >/dev/null 2>&1
+if grep -q '"reason":"seam work"' b.json 2>/dev/null; then
+    log_pass "the stated reason is persisted in the entry"
+else
+    log_fail "reason not recorded" "$(grep -o '"path":"src/s.sh"[^}]*' b.json 2>/dev/null | head -1)"
+fi
+
+# A later tightening rebuilds the entry from the measurement, which dropped the
+# reason and left the raised figure unexplained.
+python3 "$RATCHET" update src/s.sh --baseline b.json >/dev/null 2>&1
+if grep -q '"reason":"seam work"' b.json 2>/dev/null; then
+    log_pass "the reason survives a subsequent update"
+else
+    log_fail "reason lost on update" "the record of why a budget was raised is gone"
+fi
+
+cd "$PREV_PWD"
+rm -rf "$WORK7"
+
 test_summary

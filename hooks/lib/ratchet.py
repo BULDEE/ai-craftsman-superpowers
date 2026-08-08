@@ -78,13 +78,61 @@ def supported_extensions() -> set:
     return lang_registry_read.known_extensions()
 
 
+def _indent_of(line: str) -> int:
+    return len(line) - len(line.lstrip())
+
+
+def _body_end(lines, start: int, limit: int) -> int:
+    """First line past the function body that opens at `start`.
+
+    Spans used to run from one header to the next, which charged every line
+    between them to the earlier function. In a sequential test script that is
+    the whole file: run_file_changed in tests/core/test-hooks.sh is 7 lines and
+    was measured at 600, and a function inserted above a block of regex
+    constants took their keywords into its own complexity. Both numbers then
+    look like debt, and refactoring in response to them is refactoring to
+    flatter a broken instrument.
+
+    Brace-delimited bodies close on balance. Indentation-delimited ones close
+    on the first line indented no deeper than the header. Anything unresolved
+    falls back to the old bound, so this can only narrow a span, never widen it.
+    """
+    header = lines[start]
+    depth = header.count("{") - header.count("}")
+    if depth > 0:
+        return _brace_end(lines, start, limit, depth)
+    return _indent_end(lines, start, limit)
+
+
+def _brace_end(lines, start: int, limit: int, depth: int) -> int:
+    for index in range(start + 1, limit):
+        depth += lines[index].count("{") - lines[index].count("}")
+        if depth <= 0:
+            return index + 1
+    return limit
+
+
+def _indent_end(lines, start: int, limit: int) -> int:
+    base = _indent_of(lines[start])
+    for index in range(start + 1, limit):
+        line = lines[index]
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if _indent_of(line) <= base:
+            return index
+    return limit
+
+
 def _function_spans(lines) -> list:
-    """Half-open [start, end) line ranges, one per function-looking header."""
+    """Half-open [start, end) line ranges, one per function body."""
     starts = [index for index, line in enumerate(lines) if FN_RE.match(line)]
     if not starts:
         return [(0, len(lines))]
     bounds = starts + [len(lines)]
-    return [(bounds[pos], bounds[pos + 1]) for pos in range(len(starts))]
+    return [
+        (bounds[pos], _body_end(lines, bounds[pos], bounds[pos + 1]))
+        for pos in range(len(starts))
+    ]
 
 
 def _decision_points(lines) -> int:
@@ -109,6 +157,28 @@ def _baseline_path(args) -> Path:
     if "--baseline" in args:
         return Path(args[args.index("--baseline") + 1])
     return Path(BASELINE_NAME)
+
+
+def _flag_value(args, flag: str) -> str:
+    if flag in args:
+        position = args.index(flag) + 1
+        if position < len(args):
+            return args[position]
+    return ""
+
+
+def _flag_operands(args, baseline_file: Path) -> list:
+    """Positional arguments, with flag values removed."""
+    consumed = set()
+    for flag in ("--baseline", "--reason"):
+        if flag in args:
+            consumed.add(args.index(flag) + 1)
+    return [
+        arg for position, arg in enumerate(args)
+        if not arg.startswith("--")
+        and position not in consumed
+        and arg != str(baseline_file)
+    ]
 
 
 def _is_measurement(value) -> bool:
@@ -263,6 +333,11 @@ def _cmd_update(args) -> int:
     tightened = {"path": current["path"]}
     for name in RATCHETED_METRICS:
         tightened[name] = min(known.get(name, current[name]), current[name])
+    # The reason a budget was raised outlives the tightening that follows it.
+    # Rebuilding the entry from scratch dropped it, so the next reader saw a
+    # loosened figure with no record of why it had been accepted.
+    if isinstance(known.get("reason"), str) and known["reason"]:
+        tightened["reason"] = known["reason"]
     entries[current["path"]] = tightened
     save_baseline(baseline_file, entries)
     return 0
@@ -279,24 +354,55 @@ def _iter_sources(roots):
         yield from _sources_under(root)
 
 
-def _cmd_init(args) -> int:
-    baseline_file = _baseline_path(args)
-    roots = [
-        arg for arg in args
-        if not arg.startswith("--") and arg != str(baseline_file)
-    ]
-    # A whole-tree photograph replaces the baseline: that is the adoption path
-    # and the --repair rebuild. Explicit paths re-photograph only what was
-    # named and keep every other row, because scoping a command must narrow
-    # what it writes, never widen what it deletes.
-    entries = {} if not roots else load_baseline(baseline_file)
+# A scoped init is the only way to loosen a budget, and one loosened without a
+# stated reason is how a ratchet becomes a rubber stamp: the entry stores
+# numbers only, so a reviewer reading the diff sees a figure go up and nothing
+# about why. Refuse rather than record it silently. A whole-tree init is the
+# adoption path and the --repair rebuild, not a loosening, so it needs none.
+def _refuse_silent_loosening(roots) -> None:
+    print(
+        f"ratchet: refusing to re-photograph {', '.join(roots)} without "
+        "--reason.\n"
+        "  A scoped init raises budgets, and the entry records numbers only.\n"
+        '  Example: ratchet.py init path/to/file.sh --reason "..."',
+        file=sys.stderr,
+    )
+
+
+# A whole-tree photograph replaces the baseline: that is the adoption path and
+# the --repair rebuild. Explicit paths re-photograph only what was named and
+# keep every other row, because scoping a command must narrow what it writes,
+# never widen what it deletes.
+def _photograph_into(entries: dict, roots: list, reason: str) -> int:
     written = 0
     for source in _iter_sources(roots):
         entry = _current_entry(source)
         if entry is None:
             continue
+        if reason:
+            entry["reason"] = reason
         entries[entry["path"]] = entry
         written += 1
+    return written
+
+
+def _cmd_init(args) -> int:
+    baseline_file = _baseline_path(args)
+    roots = _flag_operands(args, baseline_file)
+    reason = _flag_value(args, "--reason").strip()
+
+    # Naming a file re-photographs that one budget, which is the loosening
+    # path. Naming a directory photographs a tree, which is adoption or
+    # --repair. Only the first needs a stated reason: gating on "any argument"
+    # would refuse `init .`, `init src` and `init deep`, the form three test
+    # suites already use.
+    named_files = [root for root in roots if Path(root).is_file()]
+    if named_files and not reason:
+        _refuse_silent_loosening(named_files)
+        return 2
+
+    entries = {} if not roots else load_baseline(baseline_file)
+    written = _photograph_into(entries, roots, reason)
     save_baseline(baseline_file, entries)
     print(f"baseline: {written} files -> {baseline_file} ({len(entries)} rows)")
     return 0

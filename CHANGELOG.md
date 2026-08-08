@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`ratchet.py init <file>` requires `--reason`, and records it.** A scoped
+  init is the only way to raise a budget, and the entry stores numbers only, so
+  a reviewer saw a figure go up with nothing about why. That is how a ratchet
+  becomes a rubber stamp. Naming a directory or nothing at all stays free: that
+  is adoption and `--repair`, and `init .`, `init src` and `init deep` are the
+  forms three suites already use. The reason survives later `update` calls,
+  which rebuilt the entry from the measurement and dropped it.
+
+### Fixed
+
+- **`max_fn_lines` and `complexity` measured the gap between functions, not the
+  functions.** A span ran from one header to the next, charging every line
+  between them to the earlier one. In a sequential script that is the whole
+  file: `run_file_changed` in `tests/core/test-hooks.sh` is seven lines and
+  measured 600, and the file scored 119 decision points it does not contain.
+  Five of the eight `max_fn_lines` drifts open at the time were this artefact,
+  and acting on them would have meant restructuring 1720 lines of working tests
+  to satisfy a broken instrument.
+
+  Spans now end where the body ends: brace-delimited on balance,
+  indentation-delimited on the first line indented no deeper than the header,
+  with a fallback to the previous bound. The computation can only narrow a span,
+  so it cannot turn a passing file into a regression. `test-hooks.sh` drops from
+  600/119 to 11/2.
+
 ## [4.4.1] - 2026-08-08
 
 ### Fixed
