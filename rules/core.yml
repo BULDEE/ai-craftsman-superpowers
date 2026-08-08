@@ -1,0 +1,86 @@
+# Rules the engine owns because no pack does.
+#
+# Layer boundaries, security and structural metrics are enforced across every
+# language, so attaching them to symfony or react would make a React-only
+# project lose them. Everything a pack does own lives in that pack's own
+# pack.yml under `rules.owned`.
+#
+# `groups` fixes the order sections appear in the exported doctrine. A pack may
+# introduce a group of its own; unknown groups are appended after these.
+groups:
+  - PHP
+  - TypeScript
+  - Python
+  - Shell
+  - Layers
+  - Persistence
+  - Security
+  - Structure
+  - Advisory
+
+rules:
+  - id: LAYER001
+    group: Layers
+    text: "Domain must not import Infrastructure"
+    default_severity: block
+  - id: LAYER002
+    group: Layers
+    text: "Domain must not import Presentation"
+    default_severity: block
+  - id: LAYER003
+    group: Layers
+    text: "Application must not import Presentation"
+    default_severity: block
+  - id: LAYER004
+    group: Layers
+    text: "no raw SQL or DQL inside Domain - persistence lives behind a repository interface"
+    default_severity: block
+
+  - id: DB001
+    group: Persistence
+    text: "no SELECT * - name the columns you need"
+    default_severity: warn
+  - id: DB002
+    group: Persistence
+    text: "every migration up() has a tested down()"
+    default_severity: warn
+  - id: DB003
+    group: Persistence
+    text: "no query inside a loop - batch it or eager-load"
+    default_severity: warn
+
+  - id: SEC001
+    group: Security
+    text: "no hardcoded secret - read it from the environment or a vault"
+    default_severity: block
+  - id: SEC002
+    group: Security
+    text: "never eval or shell out with a value you did not author"
+    default_severity: block
+  - id: SEC003
+    group: Security
+    text: "no SQL built by concatenation or template literal - bind the parameters"
+    default_severity: block
+
+  - id: GOD001
+    group: Structure
+    text: "a class spanning too many lines carries too many responsibilities"
+    default_severity: warn
+  - id: LOC001
+    group: Structure
+    text: "a function body past the limit is extracted"
+    default_severity: warn
+  - id: NEST001
+    group: Structure
+    text: "control flow nested three levels deep - use guard clauses"
+    default_severity: warn
+  - id: PARAM001
+    group: Structure
+    text: "more than three parameters - pass an object"
+    default_severity: warn
+  # Ships advisory while the metric core is validated against real work
+  # (ADR-0025). Set `RATCHET001: block` in .craft-config.yml to opt in early.
+  - id: RATCHET001
+    group: Structure
+    text: "structural metrics may improve, never regress"
+    default_severity: warn

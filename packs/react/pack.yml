@@ -23,6 +23,25 @@ languages:
     metrics_dialect: c-like
 
 rules:
+  # Rules this pack owns: the wording and the default severity that the
+  # exported doctrine and the rules engine both read from here.
+  owned:
+    - id: TS001
+      group: TypeScript
+      text: "no any - use a precise type or unknown"
+      default_severity: block
+    - id: TS002
+      group: TypeScript
+      text: "no default export - use named exports"
+      default_severity: warn
+    - id: TS003
+      group: TypeScript
+      text: "no non-null assertion (!) - handle null explicitly"
+      default_severity: warn
+    - id: WARN-TS001
+      group: Advisory
+      text: "four or more parameters - consider an object"
+      default_severity: warn
   builtin: ["TS001", "TS002", "TS003", "WARN-TS001", "LAYER001", "NEST001", "LOC001", "GOD001", "PARAM001"]
   static_analysis: ["ESLINT001", "ESLINT002", "ESLINT003", "ESLINT004"]
 
@@ -40,3 +59,8 @@ agents: ["agents/frontend-craftsman.md", "agents/react-reviewer.md"]
 knowledge: ["knowledge/"]
 
 templates: ["templates/"]
+
+# Command suggestions this pack contributes to the routing table.
+routes:
+  - trigger: "Scaffold React component, hook, branded type"
+    command: "/craftsman:scaffold"

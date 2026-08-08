@@ -27,24 +27,52 @@ _register_core_routes() {
 - First time setup, quick onboarding → /craftsman:setup --quick"
 }
 
+# Suggestions a pack contributes, read from its own manifest.
+#
+# This matched pack names as literals, so a pack the engine had not been taught
+# about never appeared in the routing table however many commands it shipped.
+# A pack declares them itself:
+#
+#   routes:
+#     - trigger: "Design RAG pipeline, semantic search"
+#       command: "/craftsman:rag"
 _register_pack_routes() {
-    local packs="$1"
-    local routes=""
-    if echo "$packs" | grep -q "ai-ml"; then
-        routes="${routes}
-- Design RAG pipeline, semantic search → /craftsman:rag
-- Design AI agent, autonomous workflow → /craftsman:agent-design
-- ML pipeline audit, production readiness → /craftsman:mlops"
-    fi
-    if echo "$packs" | grep -q "symfony"; then
-        routes="${routes}
-- Scaffold PHP entity, use case, repository → /craftsman:scaffold"
-    fi
-    if echo "$packs" | grep -q "react"; then
-        routes="${routes}
-- Scaffold React component, hook, branded type → /craftsman:scaffold"
-    fi
+    # Called with no argument by a caller that loaded no pack. Under `set -u`
+    # an unguarded $1 aborts the whole function, and routing_table then emits
+    # nothing at all: the core routes disappear along with the pack ones.
+    local packs="${1:-}"
+    local routes="" pack_dir manifest trigger command
+    [[ -z "$packs" ]] && { echo ""; return 0; }
+    for pack_dir in "${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"/packs/*/; do
+        manifest="${pack_dir}pack.yml"
+        [[ -f "$manifest" ]] || continue
+        # Only packs the stack admitted, same gate as dispatch and doctrine.
+        echo "$packs" | grep -q "$(basename "${pack_dir%/}")" || continue
+        while IFS=$'\t' read -r trigger command; do
+            [[ -z "$trigger" || -z "$command" ]] && continue
+            routes="${routes}
+- ${trigger} → ${command}"
+        done <<< "$(_pack_route_pairs "$manifest")"
+    done
     echo "$routes"
+}
+
+# trigger<TAB>command, one route per line.
+_pack_route_pairs() {
+    awk '
+        /^routes:/ { inside = 1; next }
+        inside && /^[a-zA-Z]/ { inside = 0 }
+        inside && /trigger:/ {
+            line = $0
+            sub(/^[^:]*:[[:space:]]*"?/, "", line); sub(/"[[:space:]]*$/, "", line)
+            trigger = line
+        }
+        inside && /command:/ {
+            line = $0
+            sub(/^[^:]*:[[:space:]]*"?/, "", line); sub(/"[[:space:]]*$/, "", line)
+            if (trigger != "") { print trigger "\t" line; trigger = "" }
+        }
+    ' "$1" 2>/dev/null
 }
 
 _detect_superpowers_synergy() {

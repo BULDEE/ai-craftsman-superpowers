@@ -36,6 +36,11 @@ _RULES_STORE=""
 _RULES_PROJECT_DIR=""
 _RULES_STRICTNESS="strict"
 
+# A rule's default severity belongs to whoever owns the rule, so severity
+# resolution needs the rule registry whether or not the caller loaded the packs.
+# shellcheck source=./rule-registry.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/rule-registry.sh"
+
 _rules_store_dir() {
     local namespace="$1"
     echo "$_RULES_STORE/$namespace"
@@ -348,15 +353,36 @@ _rules_is_advisory() {
     return 1
 }
 
+# What a rule defaults to when no configuration names it.
+#
+# The owning pack states the intent (rules/core.yml or its own manifest), and
+# strictness then applies on top: `relaxed` still relaxes everything, `moderate`
+# still keeps only boundary rules blocking. Returning the declared value
+# directly made a project's `strictness: relaxed` a no-op, which is a setting
+# silently ignored rather than a visible failure.
+_rules_declared_severity() {
+    local rule_id="$1" declared=""
+    if type rule_default_severity &>/dev/null 2>&1; then
+        declared=$(rule_default_severity "$rule_id" 2>/dev/null)
+    fi
+    if [[ -z "$declared" ]]; then
+        # No declaration: a rule a validator emits without owning it, or a
+        # caller that never loaded the packs.
+        _rules_is_advisory "$rule_id" && declared="warn" || declared="block"
+    fi
+    printf '%s' "$declared"
+}
+
 _rules_default_severity() {
-    local rule_id="$1"
-    _rules_is_advisory "$rule_id" && { echo "warn"; return 0; }
+    local rule_id="$1" declared
+    declared=$(_rules_declared_severity "$rule_id")
+    [[ "$declared" == "ignore" ]] && { echo "ignore"; return 0; }
+    [[ "$declared" == "warn" ]] && { echo "warn"; return 0; }
 
     case "$_RULES_STRICTNESS" in
-        strict)   echo "block" ;;
         relaxed)  echo "warn" ;;
-        moderate) case "$rule_id" in LAYER*) echo "block" ;; *) echo "warn" ;; esac ;;
-        *)        echo "block" ;;
+        moderate) case "$rule_id" in LAYER*) echo "$declared" ;; *) echo "warn" ;; esac ;;
+        *)        echo "$declared" ;;
     esac
 }
 

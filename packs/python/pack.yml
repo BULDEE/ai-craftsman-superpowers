@@ -24,6 +24,33 @@ languages:
     # absent. NEST001 and GOD001 come from this pack's own validator instead.
 
 rules:
+  # Rules this pack owns: the wording and the default severity that the
+  # exported doctrine and the rules engine both read from here.
+  owned:
+    - id: PY001
+      group: Python
+      text: "no one or two character names - use descriptive ones"
+      default_severity: block
+    - id: PY002
+      group: Python
+      text: "a function past 30 lines is extracted"
+      default_severity: block
+    - id: PY003
+      group: Python
+      text: "every public function declares its return type"
+      default_severity: warn
+    - id: PY004
+      group: Python
+      text: "no bare except - catch the exception you mean"
+      default_severity: block
+    - id: PY005
+      group: Python
+      text: "no mutable default argument - default to None and assign"
+      default_severity: block
+    - id: WARN-PY001
+      group: Advisory
+      text: "four or more parameters - consider an object"
+      default_severity: warn
   builtin: ["PY001", "PY002", "PY003", "PY004", "PY005", "WARN-PY001", "NEST001", "GOD001"]
 
 hooks:

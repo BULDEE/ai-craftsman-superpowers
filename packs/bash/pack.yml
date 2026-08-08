@@ -17,6 +17,33 @@ languages:
     # c-like extractor would under-report nesting rather than fail visibly.
 
 rules:
+  # Rules this pack owns: the wording and the default severity that the
+  # exported doctrine and the rules engine both read from here.
+  owned:
+    - id: SH001
+      group: Shell
+      text: "set -u in every executable script"
+      default_severity: warn
+    - id: SH002
+      group: Shell
+      text: "a function past 30 lines is extracted"
+      default_severity: block
+    - id: SH003
+      group: Shell
+      text: "no single-character variable names outside loop conventions"
+      default_severity: warn
+    - id: SH004
+      group: Shell
+      text: "no eval"
+      default_severity: block
+    - id: SH005
+      group: Shell
+      text: "quote every variable used in a file operation"
+      default_severity: warn
+    - id: WARN-SH001
+      group: Advisory
+      text: "a function assigns without declaring local"
+      default_severity: warn
   builtin: ["SH001", "SH002", "SH003", "SH004", "SH005", "WARN-SH001"]
 
 hooks:

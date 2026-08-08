@@ -13,7 +13,7 @@
 # =============================================================================
 set -o pipefail
 
-VERSION="4.5.0"
+VERSION="4.6.0"
 
 # =============================================================================
 # Defaults
@@ -85,6 +85,13 @@ if [[ "${1:-}" == "export" ]]; then
     if [[ -f "$EXPORT_PLUGIN_ROOT/hooks/lib/rules-engine.sh" ]]; then
         source "$EXPORT_PLUGIN_ROOT/hooks/lib/rules-engine.sh"
         rules_init "$PWD" "${HOME:-}" 2>/dev/null || true
+    fi
+    # Rule ids, wording and grouping live in the rule registry, which the pack
+    # loader builds. Without this the Rules section renders empty, which reads
+    # as "nothing is enforced".
+    if [[ -f "$EXPORT_PLUGIN_ROOT/hooks/lib/pack-loader.sh" ]]; then
+        source "$EXPORT_PLUGIN_ROOT/hooks/lib/pack-loader.sh"
+        pack_loader_init 2>/dev/null || true
     fi
     source "${SCRIPT_DIR}/doctrine-export.sh"
     doctrine_export "$EXPORT_TARGET"

@@ -24,6 +24,8 @@ _PACK_MANIFESTS_ALL=""
 # pack_loader_init gets lang_for_file and pack_dispatch_file for free.
 # shellcheck source=./lang-registry.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lang-registry.sh"
+# shellcheck source=./rule-registry.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/rule-registry.sh"
 
 _pack_reset() {
     _LOADED_PACKS=""
@@ -265,6 +267,27 @@ _pack_build_registry() {
         lang_registry_init_known
     else
         lang_registry_init_known "${known[@]}"
+    fi
+
+    _pack_build_rule_registry "${manifests[@]:-}"
+}
+
+# Doctrine follows the same rule as dispatch: only packs the stack admits
+# contribute. rules/core.yml is always in, because layer, security and
+# structural rules belong to no pack and a React-only project still needs them.
+_pack_build_rule_registry() {
+    local core_rules
+    core_rules="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/rules/core.yml"
+    local sources=()
+    [[ -f "$core_rules" ]] && sources+=("$core_rules")
+    local manifest
+    for manifest in "$@"; do
+        [[ -n "$manifest" && -f "$manifest" ]] && sources+=("$manifest")
+    done
+    if [[ ${#sources[@]} -eq 0 ]]; then
+        rule_registry_init
+    else
+        rule_registry_init "${sources[@]}"
     fi
 }
 

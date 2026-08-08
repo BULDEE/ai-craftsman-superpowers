@@ -17,6 +17,37 @@ languages:
     metrics_dialect: c-like
 
 rules:
+  # Rules this pack owns: the wording and the default severity that the
+  # exported doctrine and the rules engine both read from here.
+  owned:
+    - id: PHP001
+      group: PHP
+      text: "declare(strict_types=1) in every PHP file"
+      default_severity: block
+    - id: PHP002
+      group: PHP
+      text: "every class is final"
+      default_severity: block
+    - id: PHP003
+      group: PHP
+      text: "no public setter - use behavioral methods"
+      default_severity: warn
+    - id: PHP004
+      group: PHP
+      text: "no new DateTime() - inject a Clock abstraction"
+      default_severity: block
+    - id: PHP005
+      group: PHP
+      text: "no empty catch block"
+      default_severity: warn
+    - id: CTRL001
+      group: Structure
+      text: "a Controller performs no persistence - move it into an Application UseCase"
+      default_severity: warn
+    - id: WARN-PHP001
+      group: Advisory
+      text: "four or more parameters - consider an object"
+      default_severity: warn
   builtin: ["PHP001", "PHP002", "PHP003", "PHP004", "PHP005", "WARN-PHP001", "LAYER001", "LAYER002", "LAYER003", "NEST001", "LOC001", "GOD001", "PARAM001", "CTRL001"]
   static_analysis: ["PHPSTAN001", "PHPSTAN002", "PHPSTAN003", "PHPSTAN004", "PHPSTAN005", "DEPTRAC001"]
 
@@ -34,3 +65,8 @@ agents: ["agents/backend-craftsman.md", "agents/api-craftsman.md", "agents/symfo
 knowledge: ["knowledge/"]
 
 templates: ["templates/"]
+
+# Command suggestions this pack contributes to the routing table.
+routes:
+  - trigger: "Scaffold PHP entity, use case, repository"
+    command: "/craftsman:scaffold"

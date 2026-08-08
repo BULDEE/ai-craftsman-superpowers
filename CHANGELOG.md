@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.6.0] - 2026-08-08
+
+### Added
+
+- **Packs own the rules they enforce.** `ci/doctrine-export.sh` held every rule
+  id, its section and its wording in four constants and a 38-branch case, and
+  `hooks/lib/rules-engine.sh` held the advisory defaults, so a pack shipping
+  `DART001` had nowhere to declare any of it. A pack now lists its rules under
+  `rules.owned` in `pack.yml` with an id, a group, a sentence and a
+  `default_severity`, and `hooks/lib/rule-registry.sh` compiles those manifests
+  into the registry that both the exported doctrine and the severity resolution
+  read.
+
+  Rules belonging to no pack live in `rules/core.yml`: layer boundaries,
+  security and structural metrics apply across every language, so attaching
+  them to symfony or react would cost a React-only project its layer rules.
+  That file also fixes the order sections appear in; a pack introducing a group
+  of its own gets it appended.
+
+  Two ids colliding is refused rather than resolved by load order, which would
+  make the same install document two different wordings depending on discovery
+  order. Core rules win outright: a third-party pack declaring `SEC001` with
+  `default_severity: ignore` cannot disarm it from its own manifest, whichever
+  order the manifests are read in. Lowering a rule stays in
+  `.craft-config.yml`, which is reviewed user code.
+
+- **Packs contribute their own command suggestions.** `routing-table.sh`
+  matched pack names as literals, so a pack the engine had not been taught
+  about never appeared however many commands it shipped. A pack declares
+  `routes:` as trigger and command pairs.
+
 ## [4.5.0] - 2026-08-08
 
 ### Added

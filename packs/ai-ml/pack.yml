@@ -19,3 +19,11 @@ agents: ["agents/ai-engineer.md"]
 
 knowledge: ["knowledge/"]
 
+# Command suggestions this pack contributes to the routing table.
+routes:
+  - trigger: "Design RAG pipeline, semantic search"
+    command: "/craftsman:rag"
+  - trigger: "Design AI agent, autonomous workflow"
+    command: "/craftsman:agent-design"
+  - trigger: "ML pipeline audit, production readiness"
+    command: "/craftsman:mlops"

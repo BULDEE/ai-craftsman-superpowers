@@ -12,70 +12,14 @@
 # craftsman-ci.sh), config_stack(), config_strictness().
 # =============================================================================
 
-# Every rule the engine can emit, grouped for reading. The list used to be four
-# constants covering 15 of the 38 rules actually enforced, and three of those 15
-# described the wrong rule: PHP003 was documented as "private constructor plus
-# factory" while it enforces "no public setter", PHP004 as "no setters" while it
-# enforces "no new DateTime()", TS002 as "readonly by default" while it enforces
-# "no default export". A teammate read one rule here and was blocked by another.
-# tests/ci/test-doctrine-export.sh fails when a rule the validators emit has no
-# entry below, so the two cannot drift apart again.
+# Rule ids, their grouping and their wording used to be four constants and a
+# 38-branch case statement here, which meant a pack could not declare a rule it
+# enforces: a pack shipping DART001 had nowhere to put its id, its section or
+# its sentence. They now come from hooks/lib/rule-registry.sh, which compiles
+# rules/core.yml and the loaded packs' manifests.
 #
 # Analyser passthrough codes (PHPSTAN*, ESLINT*, DEPTRAC*) are deliberately
 # absent: their text is whatever the external tool says, not doctrine.
-DOCTRINE_GROUPS="PHP:PHP TypeScript:TS Python:PY Shell:SH Layers:LAYER Persistence:DB Security:SEC Structure:STRUCT Advisory:WARN"
-
-DOCTRINE_RULES_PHP="PHP001 PHP002 PHP003 PHP004 PHP005"
-DOCTRINE_RULES_TS="TS001 TS002 TS003"
-DOCTRINE_RULES_PY="PY001 PY002 PY003 PY004 PY005"
-DOCTRINE_RULES_SH="SH001 SH002 SH003 SH004 SH005"
-DOCTRINE_RULES_LAYER="LAYER001 LAYER002 LAYER003 LAYER004"
-DOCTRINE_RULES_DB="DB001 DB002 DB003"
-DOCTRINE_RULES_SEC="SEC001 SEC002 SEC003"
-DOCTRINE_RULES_STRUCT="GOD001 LOC001 NEST001 PARAM001 CTRL001 RATCHET001"
-DOCTRINE_RULES_WARN="WARN-PHP001 WARN-TS001 WARN-PY001 WARN-SH001"
-
-_doctrine_rule_text() {
-    case "$1" in
-        PHP001) echo "declare(strict_types=1) in every PHP file" ;;
-        PHP002) echo "every class is final" ;;
-        PHP003) echo "no public setter - use behavioral methods" ;;
-        PHP004) echo "no new DateTime() - inject a Clock abstraction" ;;
-        PHP005) echo "no empty catch block" ;;
-        TS001) echo "no any - use a precise type or unknown" ;;
-        TS002) echo "no default export - use named exports" ;;
-        TS003) echo "no non-null assertion (!) - handle null explicitly" ;;
-        PY001) echo "no one or two character names - use descriptive ones" ;;
-        PY002) echo "a function past 30 lines is extracted" ;;
-        PY003) echo "every public function declares its return type" ;;
-        PY004) echo "no bare except - catch the exception you mean" ;;
-        PY005) echo "no mutable default argument - default to None and assign" ;;
-        SH001) echo "set -u in every executable script" ;;
-        SH002) echo "a function past 30 lines is extracted" ;;
-        SH003) echo "no single-character variable names outside loop conventions" ;;
-        SH004) echo "no eval" ;;
-        SH005) echo "quote every variable used in a file operation" ;;
-        LAYER001) echo "Domain must not import Infrastructure" ;;
-        LAYER002) echo "Domain must not import Presentation" ;;
-        LAYER003) echo "Application must not import Presentation" ;;
-        LAYER004) echo "no raw SQL or DQL inside Domain - persistence lives behind a repository interface" ;;
-        DB001) echo "no SELECT * - name the columns you need" ;;
-        DB002) echo "every migration up() has a tested down()" ;;
-        DB003) echo "no query inside a loop - batch it or eager-load" ;;
-        SEC001) echo "no hardcoded secret - read it from the environment or a vault" ;;
-        SEC002) echo "never eval or shell out with a value you did not author" ;;
-        SEC003) echo "no SQL built by concatenation or template literal - bind the parameters" ;;
-        GOD001) echo "a class spanning too many lines carries too many responsibilities" ;;
-        LOC001) echo "a function body past the limit is extracted" ;;
-        NEST001) echo "control flow nested three levels deep - use guard clauses" ;;
-        PARAM001) echo "more than three parameters - pass an object" ;;
-        CTRL001) echo "a Controller performs no persistence - move it into an Application UseCase" ;;
-        RATCHET001) echo "structural metrics may improve, never regress" ;;
-        WARN-PHP001|WARN-TS001|WARN-PY001) echo "four or more parameters - consider an object" ;;
-        WARN-SH001) echo "a function assigns without declaring local" ;;
-        *) echo "$1" ;;
-    esac
-}
 
 _doctrine_emit_group() {
     local title="$1" rules="$2" rule severity
@@ -87,7 +31,7 @@ _doctrine_emit_group() {
             printf '\n### %s\n\n' "$title"
             emitted=true
         fi
-        printf -- '- **%s** (%s): %s\n' "$rule" "$severity" "$(_doctrine_rule_text "$rule")"
+        printf -- '- **%s** (%s): %s\n' "$rule" "$severity" "$(rule_text "$rule")"
     done
 }
 
@@ -132,14 +76,35 @@ FOOTER
 
 _doctrine_body() {
     _doctrine_header
-    local pair title key rules
-    for pair in $DOCTRINE_GROUPS; do
-        title="${pair%%:*}"
-        key="${pair##*:}"
-        eval "rules=\"\$DOCTRINE_RULES_${key}\""
-        _doctrine_emit_group "$title" "$rules"
-    done
+    _doctrine_from_registry
     _doctrine_footer
+}
+
+# A caller may source this file without having loaded the packs: `craftsman-ci
+# export` resolves the rules engine but not the loader. Building the registry on
+# demand keeps the export honest, because an empty doctrine reads as "nothing is
+# enforced" rather than as "the registry never ran".
+_doctrine_from_registry() {
+    type rule_groups &>/dev/null 2>&1 || return 1
+    if [[ -z "${CRAFTSMAN_RULE_REGISTRY:-}" ]] && type pack_loader_init &>/dev/null 2>&1; then
+        pack_loader_init 2>/dev/null || true
+    fi
+
+    local groups
+    groups=$(rule_groups 2>/dev/null)
+    if [[ -z "$groups" ]]; then
+        echo "craftsman: no rule registry, doctrine would be empty" >&2
+        return 1
+    fi
+
+    local group rules
+    while IFS= read -r group; do
+        [[ -z "$group" ]] && continue
+        rules=$(rules_in_group "$group" 2>/dev/null | tr '\n' ' ')
+        [[ -z "${rules// /}" ]] && continue
+        _doctrine_emit_group "$group" "$rules"
+    done <<< "$groups"
+    return 0
 }
 
 _doctrine_write_cursor() {
