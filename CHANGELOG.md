@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.6.3] - 2026-08-09
+
+### Fixed
+
+- **The deptrac adapter had never produced a single verdict.** It called
+  `--formatter=compact`, a formatter that exists in no version of deptrac, not
+  1.x, not 2.x, not 4.x. The call failed, the output was swallowed by
+  `2>/dev/null` and `|| true`, and `DEPTRAC001` was never emitted once. Every
+  layer violation ever reported by this plugin came from the import regex in
+  `layer-validator.sh`; the architecture analysis users believed they were
+  running was silently absent. Nothing caught it because no test asserted that
+  the analyser produced output, only that the code path ran. The adapter now
+  reads `github-actions` output, verified against deptrac 4.7.1 rather than a
+  stub.
+- **A project could not configure the severity of a layer verdict.** deptrac
+  findings arrived under `DEPTRAC001`, so a `LAYER001: warn` in a project's
+  `.craft-config.yml` had no effect on them: the doctrine was silently ignored
+  the moment the tool was installed. Verdicts now carry the plugin's own
+  `LAYER001` to `LAYER004` codes, so `block`, `warn` and `ignore` produce three
+  different outcomes where all three previously produced `exit 2`. A violation
+  matching none of the four layer pairs still reports under `DEPTRAC001` rather
+  than being filed under an approximate code.
+
+### Changed
+
+- The symfony pack declares `vendor/bin/deptrac=LAYER001,LAYER002,LAYER003,LAYER004`
+  under `supersedes:`, which makes the level precedence shipped in 4.6.2 active
+  for the first time: where deptrac answers, the regex finding is deferred, and
+  where deptrac is absent, times out or is configured not to check the
+  boundary, `precedence_flush` re-emits it.
+- `packs/symfony/static-analysis/phpstan.sh` splits its single 45-line function
+  into eleven named ones. Complexity falls from 19 to 6 and the longest
+  function from 68 to 21 lines.
+
 ## [4.6.2] - 2026-08-09
 
 ### Fixed

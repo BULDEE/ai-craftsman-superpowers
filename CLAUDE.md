@@ -4,7 +4,7 @@
 
 Claude Code plugin that transforms Claude into a disciplined Senior Software Craftsman. DDD, Clean Architecture, TDD methodology enforced through hooks, commands, agents, and a rules engine.
 
-**Current version:** 4.6.1
+**Current version:** 4.6.3
 **Stack:** Bash (hooks/CI), Markdown (skills/agents/templates), Python (metrics helpers), YAML (config)
 
 ## Development Rules
@@ -113,10 +113,20 @@ fork.
 
 ## Version Sync Checklist
 
+Run `scripts/bump-version.sh <version>`: it updates the four tracked files and
+exits non-zero on any that drifted. It does not write the changelog or the tag.
+
 When bumping version, update ALL of these:
 - `.claude-plugin/plugin.json` → `version`
 - `.claude-plugin/marketplace.json` → root `version` + plugin `version`
 - `ci/craftsman-ci.sh` → `VERSION=`
+- `CLAUDE.md` → `**Current version:**` (this file; the checklist used to omit
+  itself, so 4.6.2 shipped with 4.6.1 written here and only the bump script
+  caught it)
 - `CHANGELOG.md` → new entry
 - `README.md` → Version badge
 - `README.fr.md` → Version badge + sync any README.md content changes (French mirror, English is the source of truth)
+
+Then tag with `claude plugin tag --push`, which produces the
+`craftsman--v<version>` tag that plugin dependency resolution reads. A plain
+`v<version>` tag is kept alongside it for release continuity.
