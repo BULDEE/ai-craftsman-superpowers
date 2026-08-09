@@ -37,6 +37,7 @@ LIST_CAPABILITIES = (
     "validators",
     "static_analysis",
     "test_commands",
+    "supersedes",  # <tool>=<RULE>,... see precedence_defers in precedence.sh
 )
 
 SCALAR_CAPABILITIES = (
@@ -176,6 +177,36 @@ def _emit(lang_id: str, capability: str, value: str, pack_dir: str) -> None:
     sys.stdout.write(f"{lang_id}\t{capability}\t{value}\t{pack_dir}\n")
 
 
+def _as_list(value) -> list:
+    if value is None:
+        return []
+    return value if isinstance(value, list) else [value]
+
+
+def _tool_name(spec: str) -> str:
+    """What a tool spec resolves to: no directory, no file extension."""
+    name = str(spec).strip().split("/")[-1]
+    return name.rsplit(".", 1)[0] if "." in name else name
+
+
+# A tool may not be declared the owner of its own verdicts, and both shapes of
+# that loop are readable from the manifest alone. Either the named tool IS one
+# of the language's own Level 2/3 adapters, so it would outrank the level it
+# belongs to; or the rule id is that tool's own code family (`<tool>NNN`),
+# which is the same loop written in the other column. Either way the analyser
+# would fall silent because the analyser is present.
+#
+# The engine holds no list of tools or rules to check this against: the
+# contradiction is between two lines of the same manifest.
+def _self_superseding(tool: str, rule: str, analysers: list) -> bool:
+    name = _tool_name(tool)
+    if not name:
+        return True
+    if any(_tool_name(adapter) == name for adapter in analysers):
+        return True
+    return rule.rstrip("0123456789").lower() == name.lower()
+
+
 class _Indexer:
     """Carries the cross-manifest state (which language owns which extension)
     so the per-capability helpers stay within the three-parameter budget."""
@@ -197,7 +228,9 @@ class _Indexer:
         for capability in KNOWN_CAPABILITIES:
             if capability not in entry:
                 continue
-            if capability in LIST_CAPABILITIES:
+            if capability == "supersedes":
+                self._index_supersedes(lang_id, entry)
+            elif capability in LIST_CAPABILITIES:
                 self._index_list(lang_id, capability, entry[capability])
             else:
                 _emit(
@@ -206,6 +239,34 @@ class _Indexer:
                     str(entry[capability]).strip(),
                     self._pack_dir,
                 )
+
+    def _index_supersedes(self, lang_id: str, entry: dict) -> None:
+        """Compile-time refusal, so a self-silencing pair never reaches the
+        registry the hooks read. Deferring already makes it structurally
+        impossible for a Level 2/3 verdict to be held; this is the net under
+        it, and it fires at the manifest rather than at runtime."""
+        analysers = _as_list(entry.get("static_analysis"))
+        for item in _as_list(entry.get("supersedes")):
+            tool, separator, rules = str(item).strip().partition("=")
+            if not separator:
+                continue
+            kept = self._keep_claims(tool, rules, analysers)
+            if kept:
+                _emit(lang_id, "supersedes", f"{tool}={kept}", self._pack_dir)
+
+    def _keep_claims(self, tool: str, rules: str, analysers: list) -> str:
+        kept = []
+        for rule in (part.strip() for part in rules.split(",")):
+            if not rule:
+                continue
+            if _self_superseding(tool, rule, analysers):
+                sys.stderr.write(
+                    f"craftsman: '{tool}' cannot supersede '{rule}' - a tool "
+                    f"may not outrank its own verdicts; entry ignored\n"
+                )
+                continue
+            kept.append(rule)
+        return ",".join(kept)
 
     def _index_list(self, lang_id: str, capability: str, value) -> None:
         values = value if isinstance(value, list) else [value]

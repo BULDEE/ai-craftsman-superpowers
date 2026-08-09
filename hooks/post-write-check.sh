@@ -23,6 +23,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Load helpers
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
 source "${SCRIPT_DIR}/lib/static-analysis.sh"
+source "${SCRIPT_DIR}/lib/precedence.sh"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/rules-engine.sh"
 source "${SCRIPT_DIR}/lib/pack-loader.sh"
@@ -201,11 +202,24 @@ _record_violation_metric() {
         "$metric_blocked" "$ignored" 2>/dev/null || true
 }
 
+# The single funnel every violation passes through, Level 1 and Level 2/3
+# alike, which is why level precedence is arbitrated here and in no validator.
+#
+# A rule a higher level claims is HELD, not dropped: precedence_flush emits it
+# at the end of the run unless that higher level actually produced a verdict
+# for it. Severity is resolved on the way out, not here, because a finding that
+# never comes back has no verdict to resolve and one that does must get the
+# same resolution as any other.
 add_violation() {
     local rule="$1"
     local message="$2"
     local file_path="${3:-$FILE_PATH}"
     local ignored=0
+
+    if precedence_defers "$rule" "$file_path"; then
+        precedence_hold "$rule" "$file_path" "0" "$message"
+        return
+    fi
 
     local severity
     severity=$(rules_severity_for_file "$file_path" "$rule")
@@ -238,6 +252,29 @@ add_warning() {
     add_violation "$@"
 }
 
+# The two callbacks precedence_flush calls at the end of the run.
+#
+# A flushed finding re-enters add_violation, so it is resolved, suppressed and
+# recorded exactly like any other. The higher level is out of the picture by
+# then, which is what makes the second pass terminate.
+precedence_emit() {
+    add_violation "$1" "$4" "$2"
+}
+
+# A held finding the higher level answered for is still a defect this gate saw.
+# Returning silently would leave no trace of it anywhere, and the correction
+# learning reads absence as "the developer fixed it" - it would learn from a
+# rule that merely changed owner. `overridden` is the correction table's own
+# word for a verdict another authority settled.
+precedence_note_superseded() {
+    local rule="$1" pattern
+    pattern=$(metrics_file_pattern "$2")
+    if declare -F metrics_record_correction >/dev/null 2>&1; then
+        metrics_record_correction "$rule" "$pattern" "overridden" \
+            "level 2/3 answered for this rule" 2>/dev/null || true
+    fi
+}
+
 # =============================================================================
 # Static Analysis Helper - parses structured CODE:LINE:MESSAGE output
 # =============================================================================
@@ -247,6 +284,9 @@ _run_static_analysis() {
     errors=$(sa_analyze_file "$file" 2>/dev/null) || true
     [[ -z "$errors" ]] && return
 
+    # Level 2/3 emits directly: never held, never superseded, not even by a
+    # manifest that names the analyser as owner of the analyser's own codes.
+    precedence_higher_level_begin
     while IFS= read -r err_line; do
         [[ -z "$err_line" ]] && continue
         local sa_code sa_lineno sa_msg
@@ -254,12 +294,15 @@ _run_static_analysis() {
         sa_lineno=$(echo "$err_line" | cut -d: -f2)
         sa_msg=$(echo "$err_line" | cut -d: -f3-)
         sa_msg="${sa_msg#"${sa_msg%%[![:space:]]*}"}"
+        # A verdict on a code is the higher level answering for that code.
+        precedence_declare_covered "$sa_code"
         if [[ -n "$sa_lineno" && "$sa_lineno" -gt 0 ]] 2>/dev/null; then
             add_warning "${sa_code}" "line ${sa_lineno}: ${sa_msg}"
         else
             add_warning "${sa_code}" "${sa_msg}"
         fi
     done <<< "$errors"
+    precedence_higher_level_end
 }
 
 # =============================================================================
@@ -271,13 +314,17 @@ _run_static_analysis() {
 # packs' manifests. The literal case statement this replaces was duplicated
 # across ten sites with no parity test, so a pack contributing a language the
 # engine had not been taught about loaded successfully and validated nothing.
+precedence_reset
 pack_dispatch_file "$FILE_PATH"
 
 # Level 2/3 runs only for a language whose pack declared a static_analysis
 # tool. Deriving it from "the language is known" would have started running
 # ESLint on .js the moment JavaScript was claimed for custom rules.
+#
+# sa_language_has_analyser memoises that lookup, which the precedence resolver
+# needs too: it was an awk fork answered twice, ten lines apart, per edit.
 _PWC_LANG=$(lang_for_file "$FILE_PATH")
-if [[ -n "$_PWC_LANG" ]] && [[ -n "$(lang_capability "$_PWC_LANG" "static_analysis")" ]]; then
+if sa_language_has_analyser "$_PWC_LANG"; then
     _run_static_analysis "$FILE_PATH"
 fi
 
@@ -308,9 +355,6 @@ _validate_custom_rules() {
 }
 _validate_custom_rules "$FILE_PATH"
 
-# Check for corrections (violation fixed since last block)
-_check_corrections "$FILE_PATH"
-
 # =============================================================================
 # Structural ratchet (ADR-0025): a touched file may improve or stay equal,
 # never regress. Inert until the project opts in via `ratchet.py init`.
@@ -332,6 +376,18 @@ if [[ -f "$PWD/.craftsman-baseline.json" ]] && command -v python3 >/dev/null 2>&
             --baseline "$PWD/.craftsman-baseline.json" >/dev/null 2>&1 || true
     fi
 fi
+
+# Last emitter has run, so every finding a higher level claimed can now be
+# settled: answered for, or emitted after all. This has to come after the
+# ratchet, which is itself an emitter, or a held RATCHET001 would never be
+# flushed at all.
+precedence_flush
+
+# Corrections are read after the flush, not before. A rule the flush brings
+# back is still violated, and a check that ran first would have seen it absent
+# and recorded it as fixed - teaching the correction learning the opposite of
+# what happened.
+_check_corrections "$FILE_PATH"
 
 # =============================================================================
 # Output Decision

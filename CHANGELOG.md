@@ -37,6 +37,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on, `TeamCreate` or `TeamDelete` reappears in the team skill or the
   `team-lead` agent. Prose documenting the removal stays legal. The check was
   verified red against a reintroduced call before being kept.
+- **Level precedence between validation levels**, in `hooks/lib/precedence.sh`.
+  A rule a Level 2/3 analyser owns is declared by its pack under `supersedes:`
+  and is DEFERRED, never dropped: the Level 1 finding is held, the analyser
+  emits directly and declares the codes it answered for, and `precedence_flush`
+  re-emits everything left over with full severity resolution.
+  No verdict is not a clean verdict, so a `sa_timeout` at 124 on a cold start,
+  a crashed analyser, or one configured to ignore the rule all end with the
+  regex reporting. That property is what keeps a project's tool configuration
+  from silently disabling a `block` rule the machine owner declared, and it is
+  why deferring was chosen over the simpler "never supersede a blocking rule":
+  `TS001`, `PHP002` and `LAYER004` are all `block`, so that restriction would
+  have emptied the feature instead of fixing it.
+  `lang_registry.py` refuses at compile time any claim where a tool would
+  outrank its own verdicts. Metrics record both outcomes, a covered rule with a
+  `superseded` marker and a flushed one normally, so correction learning never
+  reads "resolved" where the truth is "silenced".
+  No pack declares `supersedes` yet: the mechanism ships inert, pending the
+  adapter work that emits layer verdicts under the plugin's own rule codes.
 
 ## [4.6.1] - 2026-08-08
 

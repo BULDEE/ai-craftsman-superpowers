@@ -223,6 +223,16 @@ if [[ -f "$PLUGIN_ROOT/hooks/lib/static-analysis.sh" ]]; then
     SA_AVAILABLE=true
 fi
 
+# Level precedence is the same arbitration in both front-ends. Resolving it in
+# one only would put the pipeline and the editor in disagreement on a project
+# whose analysers are installed: green locally, red in CI, on a rule neither of
+# them decided differently.
+PRECEDENCE_AVAILABLE=false
+if [[ -f "$PLUGIN_ROOT/hooks/lib/precedence.sh" ]]; then
+    source "$PLUGIN_ROOT/hooks/lib/precedence.sh"
+    PRECEDENCE_AVAILABLE=true
+fi
+
 # Init packs (discovers and sources pack validators + SA tools)
 if [[ "$PACKS_AVAILABLE" == true && -d "$PLUGIN_ROOT/packs" ]]; then
     pack_loader_init 2>/dev/null || true
@@ -391,11 +401,22 @@ W_SEVERITIES=()
 FILES_SCANNED=0
 FILES_DISCOVERED=0
 
+# Same funnel and same arbitration as the hook's add_violation: a finding a
+# higher level claims is HELD here too, and scan_file flushes it once the
+# analysers have had their say on that file.
+#
+# precedence.sh is optional (PRECEDENCE_AVAILABLE); with no library there is no
+# deferral, so every Level 1 rule reports - which is the safe direction.
 _add_violation() {
     local file="$1"
     local line="$2"
     local rule="$3"
     local message="$4"
+
+    if [[ "$PRECEDENCE_AVAILABLE" == true ]] && precedence_defers "$rule" "$file"; then
+        precedence_hold "$rule" "$file" "$line" "$message"
+        return 0
+    fi
 
     local severity
     severity=$(_severity_for "$rule" "$file")
@@ -468,6 +489,44 @@ metrics_record_violation() { :; }
 metrics_file_pattern() { echo "$1"; }
 metrics_init() { :; }
 
+# The flush callback: a held finding no analyser answered for re-enters the
+# funnel and is resolved, counted and reported like any other.
+precedence_emit() {
+    _add_violation "$2" "$3" "$1" "$4"
+}
+
+# The pipeline records no metrics - it is stateless by design and runs on a
+# machine that is not the developer's. Defined rather than omitted so the two
+# front-ends have the same shape and the difference is a decision on show,
+# not an accident of what got implemented where.
+precedence_note_superseded() {
+    :
+}
+
+# Level 2/3 for one file. Its verdicts are emitted directly - never held,
+# never superseded - and each code it reports is recorded as answered for, so
+# the flush knows which held findings still need to come back.
+_run_static_analysis() {
+    local file="$1" sa_errors
+    [[ "$SA_AVAILABLE" == true ]] || return 0
+    sa_errors=$(sa_analyze_file "$file" 2>/dev/null) || true
+    [[ -z "$sa_errors" ]] && return 0
+
+    [[ "$PRECEDENCE_AVAILABLE" == true ]] && precedence_higher_level_begin
+    while IFS= read -r err_line; do
+        [[ -z "$err_line" ]] && continue
+        local sa_code sa_lineno sa_msg
+        sa_code=$(echo "$err_line" | cut -d: -f1)
+        sa_lineno=$(echo "$err_line" | cut -d: -f2)
+        sa_msg=$(echo "$err_line" | cut -d: -f3-)
+        sa_msg="${sa_msg#"${sa_msg%%[![:space:]]*}"}"
+        [[ "$PRECEDENCE_AVAILABLE" == true ]] && precedence_declare_covered "$sa_code"
+        _add_violation "$file" "${sa_lineno:-0}" "$sa_code" "$sa_msg"
+    done <<< "$sa_errors"
+    [[ "$PRECEDENCE_AVAILABLE" == true ]] && precedence_higher_level_end
+    return 0
+}
+
 # =============================================================================
 # File scanner - delegates to pack validators (single source of truth)
 # =============================================================================
@@ -495,6 +554,10 @@ scan_file() {
     FILE_PATTERN="$file"
 
     [[ -z "$language" ]] && return 0
+
+    # Per file, not per run: a verdict on one file answers for nothing in the
+    # next, and a held finding must not survive into another file's flush.
+    [[ "$PRECEDENCE_AVAILABLE" == true ]] && precedence_reset
     pack_dispatch_file "$file"
 
     # Structural ratchet parity (ADR-0025): identical check to the hook.
@@ -513,21 +576,7 @@ scan_file() {
     fi
 
     # Static analysis Level 2/3 (PHPStan, ESLint, Deptrac, dependency-cruiser)
-    if [[ "$SA_AVAILABLE" == true ]]; then
-        local sa_errors
-        sa_errors=$(sa_analyze_file "$file" 2>/dev/null) || true
-        if [[ -n "$sa_errors" ]]; then
-            while IFS= read -r err_line; do
-                [[ -z "$err_line" ]] && continue
-                local sa_code sa_lineno sa_msg
-                sa_code=$(echo "$err_line" | cut -d: -f1)
-                sa_lineno=$(echo "$err_line" | cut -d: -f2)
-                sa_msg=$(echo "$err_line" | cut -d: -f3-)
-                sa_msg="${sa_msg#"${sa_msg%%[![:space:]]*}"}"
-                _add_violation "$file" "${sa_lineno:-0}" "$sa_code" "$sa_msg"
-            done <<< "$sa_errors"
-        fi
-    fi
+    _run_static_analysis "$file"
 
     # Custom rules from rules engine (plugin context only)
     if [[ "$RULES_ENGINE_AVAILABLE" == true ]]; then
@@ -551,6 +600,10 @@ scan_file() {
             done <<< "$custom_rules"
         fi
     fi
+
+    # Every emitter for this file has run. What no analyser answered for comes
+    # back now, with the same severity resolution it would have had first time.
+    [[ "$PRECEDENCE_AVAILABLE" == true ]] && precedence_flush
 
     FILES_SCANNED=$((FILES_SCANNED + 1))
 }

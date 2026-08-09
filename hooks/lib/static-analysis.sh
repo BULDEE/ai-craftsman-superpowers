@@ -48,11 +48,11 @@ _sa_tools_trusted() {
 # to no analysis when the registry is absent keeps this library usable
 # standalone, and silence is the honest answer when nothing claims the file.
 _sa_language_of() {
-    type lang_for_file &>/dev/null 2>&1 || return 0
+    type lang_for_file >/dev/null 2>&1 || return 0
     # A caller that sourced this library without initialising the registry would
     # otherwise get silence, which reads as "nothing to analyse" rather than as
     # "the analyser never ran". Building it is idempotent and disk-cached.
-    if [[ -z "${_LANG_REGISTRY_FILE:-}" ]] && type pack_loader_init &>/dev/null 2>&1; then
+    if [[ -z "${_LANG_REGISTRY_FILE:-}" ]] && type pack_loader_init >/dev/null 2>&1; then
         pack_loader_init 2>/dev/null || true
     fi
     lang_for_file "$1"

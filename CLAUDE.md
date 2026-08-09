@@ -18,7 +18,7 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
 - The engine holds no list of languages. A pack declares its own in `pack.yml`
   under `languages:` (`extensions`, `validators`, `static_analysis`,
   `test_commands`, `entry_markers`, `protected_configs`, `lsp`,
-  `metrics_dialect`), and `hooks/lib/lang-registry.sh` compiles those manifests
+  `metrics_dialect`, `supersedes`), and `hooks/lib/lang-registry.sh` compiles those manifests
   into the registry every hook and `ci/craftsman-ci.sh` reads. Never add a
   `case "$EXT"` or an extension literal to a hook, to the pipeline or to a
   Python helper: use `lang_for_file`, `lang_capability` or `pack_dispatch_file`.
@@ -26,6 +26,16 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
   consumer reads it. `metrics_dialect` accepts `c-like` and `php-like` only;
   a language whose structure the engine cannot extract declares none rather
   than a dialect that would measure it wrongly.
+- `supersedes:` declares which Level 1 rules a Level 2/3 analyser owns, one
+  `<tool>=<RULE>,<RULE>` entry per line (`vendor/bin/deptrac=LAYER001,LAYER002`).
+  A claimed rule is DEFERRED, never dropped: `hooks/lib/precedence.sh` holds the
+  Level 1 finding, the analyser emits directly and declares the codes it
+  answered for (`precedence_declare_covered`), and `precedence_flush` re-emits
+  everything left over with full severity resolution. No verdict is not a clean
+  verdict, so a timeout, a crash or an analyser configured to ignore the rule
+  all end with the regex reporting. `lang_registry.py` refuses at compile time
+  any entry where a tool would outrank its own verdicts.
+  `tests/core/test-precedence.sh` covers both directions.
 - Severity is the rules engine's decision, never the validator's. Emit through
   `add_violation` or `add_warning` (both resolve `rules_severity_for_file`), and
   declare a rule's advisory default in `_rules_is_advisory` plus its mirror in
