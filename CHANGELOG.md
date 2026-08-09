@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.6.2] - 2026-08-09
+
+### Fixed
+
+- **`/craftsman:team` gated native teams on a tool Claude Code had removed, so
+  every session degraded to parallel subagent dispatch.** The skill and the
+  `team-lead` agent treated a missing `TeamCreate` as proof of a broken
+  environment. Claude Code deleted `TeamCreate` and `TeamDelete` in v2.1.178:
+  the team is now created automatically at session start under a session-derived
+  name, and the runtime lists both tools among those whose absence is expected.
+  The check could therefore only ever fail, which made the degraded path the
+  only reachable one and printed "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS not set"
+  at users who had set it. Native teams now gate on that variable alone, the
+  spawn step reads the existing `~/.claude/teams/<team-name>/config.json`
+  instead of creating anything, and teammates are spawned with an explicit
+  `name` rather than the `team_name` input the runtime ignores. `TeamCreate` is
+  gone from the `team-lead` tool list.
+- **`teammateMode` was documented as a requirement with two values that do not
+  exist.** It gates the display only and never blocks a team. The real values
+  are `in-process` (the default since v2.1.179), `auto`, `tmux` and `iterm2`;
+  the skill previously demanded `"iterm"` or `"tmux"`.
+- **The plugin entry in `marketplace.json` still advertised 4.5.0** while the
+  marketplace root and every other version anchor had moved on.
+
+### Added
+
+- `tests/core/test-invocation-policy.sh` fails when a call to, or a conditional
+  on, `TeamCreate` or `TeamDelete` reappears in the team skill or the
+  `team-lead` agent. Prose documenting the removal stays legal. The check was
+  verified red against a reintroduced call before being kept.
+
 ## [4.6.1] - 2026-08-08
 
 ### Fixed
