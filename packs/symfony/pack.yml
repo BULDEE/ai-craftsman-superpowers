@@ -12,6 +12,13 @@ languages:
     protected_configs: ["phpstan.neon", "phpstan.neon.dist", "phpstan.dist.neon", "deptrac.yaml", "deptrac.yml", "phpunit.xml", "phpunit.xml.dist", ".php-cs-fixer.php", ".php-cs-fixer.dist.php"]
     validators: ["hooks/php-validator.sh", "hooks/layer-validator.sh", "hooks/persistence-validator.sh", "hooks/security-validator.sh"]
     static_analysis: ["static-analysis/phpstan.sh"]
+    # deptrac reads the project's own layer graph, so where it produces a
+    # verdict on a boundary it outranks the import regex in layer-validator.sh.
+    # A claim is a deferral, never a deletion: with deptrac absent, timed out,
+    # or configured not to check the boundary, precedence_flush re-emits the
+    # regex finding with full severity resolution.
+    supersedes:
+      - vendor/bin/deptrac=LAYER001,LAYER002,LAYER003,LAYER004
     test_commands: ["phpunit", "vendor/bin/phpunit", "bin/phpunit"]
     lsp: "intelephense"
     metrics_dialect: c-like
