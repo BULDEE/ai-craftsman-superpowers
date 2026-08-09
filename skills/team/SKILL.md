@@ -12,14 +12,36 @@ effort: xhigh
 - **Done when**: every dispatched agent reported, conflicting recommendations are resolved explicitly, and the consolidated result is verified as a whole.
 - **Evidence**: the per-agent outputs and the verification run on the merged result.
 
-You are the **team coordinator** for AI Craftsman Superpowers. You assemble, configure, and spawn teams using Claude Code's **native Agent Teams** feature (`TeamCreate` + `TaskCreate` + teammates).
+You are the **team coordinator** for AI Craftsman Superpowers. You assemble, configure, and spawn teams using Claude Code's **native Agent Teams** feature (`TaskCreate` + named teammates + `SendMessage`).
 
-> **IMPORTANT**: Native teams require `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in the settings.json env block and `teammateMode` set to `"iterm"` or `"tmux"`.
+> **IMPORTANT**: Native teams require exactly one thing: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in the settings.json env block or in the environment. Nothing else gates them.
 
-## Degraded Mode (no native teams)
+## What Changed in Claude Code v2.1.178
 
-If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is not set, or TeamCreate fails, do
-NOT abort and do not ask the user to reconfigure mid-task. Announce once:
+The `TeamCreate` and `TeamDelete` tools **no longer exist**. Do not look for
+them, do not call them, and never treat their absence as a broken environment:
+Claude Code lists them among the tools whose absence is expected.
+
+With the flag set, the team is created **automatically at session start**. The
+session is its own team, named `session-` plus the first eight characters of
+the session ID. Its config lives at `~/.claude/teams/<team-name>/config.json`
+and its shared task list at `~/.claude/tasks/<team-name>/`. The main session is
+already registered there as the lead. The `team_name` input on the `Agent` tool
+is still accepted but ignored: a session has exactly one implicit team.
+
+To confirm the team is live before announcing anything, read the config:
+
+```bash
+cat ~/.claude/teams/session-*/config.json
+```
+
+A `members` array containing a `team-lead` entry means native teams are working.
+
+## Degraded Mode (flag not set)
+
+Degrade **only** when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is unset or empty.
+A missing `TeamCreate` tool is not a degradation trigger. Do NOT abort and do
+not ask the user to reconfigure mid-task. Announce once:
 
 ```
 Native teams unavailable (CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS not set).
@@ -144,22 +166,23 @@ Show the generated config to the user and ask for confirmation before proceeding
 
 ### Step 4: Spawn the Team (Native Agent Teams)
 
-**This is the critical step.** Use Claude Code's native team infrastructure, NOT raw `Agent` calls.
+**This is the critical step.** Drive the shared task list, do not fire off
+isolated one-shot `Agent` calls and call it a team.
 
-#### Step 4.1: Create the Team
+#### Step 4.1: Confirm the Team Exists
 
-Use the `TeamCreate` tool:
+There is no team to create. With the flag set, Claude Code already wrote the
+team config and the shared task list at session start, and registered the main
+session as the lead. The team name is session-derived, so the `<team-name>` in
+the rest of this skill is that name, not a name you choose.
 
+Read it once if you need it:
+
+```bash
+cat ~/.claude/teams/session-*/config.json
 ```
-TeamCreate({
-  team_name: "<team-name>",
-  description: "<purpose from team config>"
-})
-```
 
-This creates:
-- `~/.claude/teams/<team-name>.json` - team config with member registry
-- `~/.claude/tasks/<team-name>/` - shared task list directory
+Never call `TeamCreate`: it was removed in Claude Code v2.1.178.
 
 #### Step 4.2: Create Tasks
 
@@ -182,24 +205,30 @@ TaskCreate({ title: "Consolidation review - merge findings and resolve conflicts
 
 #### Step 4.3: Spawn Teammates
 
-Use the `Agent` tool with the `team_name` parameter to spawn each teammate:
+Use the `Agent` tool, giving every teammate an explicit `name`:
 
 ```
 Agent({
   description: "<3-5 word summary>",
   prompt: "<full task brief including team context>",
   subagent_type: "<agent-slug>",
-  name: "<agent-name>",
-  team_name: "<team-name>"
+  name: "<agent-name>"
 })
 ```
 
-**CRITICAL**: Include `team_name` - this is what makes the agent a **teammate** instead of an isolated subagent. Teammates:
-- Appear in their own terminal window (iTerm tab or tmux pane)
-- Share a task list at `~/.claude/tasks/<team-name>/`
+**CRITICAL**: `name` is what makes a teammate addressable - it becomes the
+agent ID `<name>@<team-name>` used by `SendMessage` and by `TaskUpdate` owners.
+Do not pass `team_name`: the session has a single implicit team and the
+parameter is ignored. Teammates:
+- Share the task list at `~/.claude/tasks/<team-name>/`
 - Can send messages to each other via `SendMessage`
 - Go idle between turns and can be re-activated
-- Are visible and observable by the user
+- Are visible and observable by the user in the agent panel
+- Get their own split pane only when `teammateMode` selects one; the default
+  `in-process` mode keeps them in the lead's terminal, and that is not a failure
+
+The lead never picks the transport. If the user wants split panes, that is a
+`teammateMode` setting, not something this skill works around.
 
 For each teammate prompt, include:
 1. The team name and purpose
@@ -214,9 +243,9 @@ For each teammate prompt, include:
 Launch ALL teammates in a single message (multiple Agent tool calls):
 ```
 // Single message with multiple parallel Agent calls
-Agent({ ..., name: "arch-reviewer", team_name: "code-review" })
-Agent({ ..., name: "sec-pentester", team_name: "code-review" })
-Agent({ ..., name: "domain-reviewer", team_name: "code-review" })
+Agent({ ..., name: "arch-reviewer" })
+Agent({ ..., name: "sec-pentester" })
+Agent({ ..., name: "domain-reviewer" })
 ```
 
 **Sequential workflow:**
@@ -408,7 +437,7 @@ Run /craftsman:team context to get a recommendation.
 /craftsman:team - Agent Team Manager (Native Teams)
 
 SUBCOMMANDS
-  /craftsman:team create   - Interactive team builder (uses TeamCreate)
+  /craftsman:team create   - Interactive team builder (spawns named teammates)
   /craftsman:team context  - Analyze codebase and get team recommendation
   /craftsman:team list     - List templates, custom teams, and active teams
 
@@ -419,6 +448,9 @@ EXAMPLES
   /craftsman:team list                  → see what's available
 
 REQUIREMENTS
-  - settings.json: CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
-  - settings.json: teammateMode: "iterm" | "tmux"
+  - settings.json: CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1   (the only gate)
+
+OPTIONAL
+  - settings.json: teammateMode: "in-process" (default) | "auto" | "tmux" | "iterm2"
+    Display only. Split panes need tmux, or iTerm2 with the it2 CLI.
 ```

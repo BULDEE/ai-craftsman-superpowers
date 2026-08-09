@@ -171,13 +171,39 @@ else
     log_pass "craftsman:team is model-invocable"
 fi
 
-# Interactive, and TeamCreate spawns teammates into the live session. A fork
-# would strand both.
+# Interactive, and teammates are spawned into the live session. A fork would
+# strand both.
 if frontmatter "$(skill_file craftsman:team)" | grep -q '^context:[[:space:]]*fork'; then
     log_fail "craftsman:team runs in a fork" \
-        "it asks the user questions and calls TeamCreate - both need the main session"
+        "it asks the user questions and spawns teammates - both need the main session"
 else
     log_pass "craftsman:team runs in the main session"
+fi
+
+echo ""
+echo "=== native teams gate on the flag, never on a removed tool ==="
+
+# TeamCreate and TeamDelete were removed from Claude Code in v2.1.178. Claude
+# Code now lists them as expected-absent, so any instruction that calls one, or
+# that reads its absence as a broken environment, degrades every session to
+# parallel subagent dispatch. Prose that documents the removal is fine; a call
+# or a conditional is not.
+TEAM_TOOL_OFFENDERS=""
+for f in "$(skill_file craftsman:team)" "$ROOT_DIR/agents/team-lead.md"; do
+    [[ -f "$f" ]] || continue
+    if grep -nE 'Team(Create|Delete)\(|Use the `Team(Create|Delete)` tool|if Team(Create|Delete) fails|Team(Create|Delete) (fails|is missing|not (available|found))' "$f" >/dev/null 2>&1; then
+        TEAM_TOOL_OFFENDERS="$TEAM_TOOL_OFFENDERS $f"
+    fi
+    if grep -nE '^[[:space:]]*-[[:space:]]*Team(Create|Delete)[[:space:]]*$' "$f" >/dev/null 2>&1; then
+        TEAM_TOOL_OFFENDERS="$TEAM_TOOL_OFFENDERS $f(frontmatter)"
+    fi
+done
+
+if [[ -n "$TEAM_TOOL_OFFENDERS" ]]; then
+    log_fail "removed team tools drive a decision:$TEAM_TOOL_OFFENDERS" \
+        "TeamCreate/TeamDelete no longer exist - gate on CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS instead"
+else
+    log_pass "no call to or conditional on TeamCreate/TeamDelete"
 fi
 
 test_summary

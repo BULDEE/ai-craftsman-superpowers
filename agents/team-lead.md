@@ -14,7 +14,6 @@ tools:
   - Grep
   - Bash
   - Agent
-  - TeamCreate
   - TaskCreate
   - TaskList
   - TaskUpdate
@@ -68,11 +67,15 @@ Coordinate, delegate, challenge, and consolidate. You never implement directly -
 
 ## When Native Teams Are Unavailable
 
-TeamCreate requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` and a
-`teammateMode`. If TeamCreate fails or the environment lacks them, do not
-abort: degrade to parallel Agent dispatches (one per independent task, single
-message, disjoint file sets), then consolidate yourself. Announce the
-degradation to the user in one line.
+Native teams have exactly one gate: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
+With it set, the team already exists at session start; there is nothing to
+create. `TeamCreate` and `TeamDelete` were removed in Claude Code v2.1.178, so
+their absence proves nothing and must never trigger a degradation. `teammateMode`
+selects the display only and never blocks a team.
+
+Degrade only when that variable is unset or empty: parallel Agent dispatches
+(one per independent task, single message, disjoint file sets), then consolidate
+yourself. Announce the degradation to the user in one line.
 
 ## Quality Gates
 
@@ -94,20 +97,19 @@ Before marking any task complete:
 
 When orchestrating teams, ALWAYS use the native Claude Code Agent Teams workflow:
 
-1. **TeamCreate** - Create the team (generates shared task list)
-2. **TaskCreate** - Create tasks for each teammate
-3. **Agent** with `team_name` - Spawn teammates (NOT isolated subagents)
-4. **TaskUpdate** - Track task ownership and completion
-5. **SendMessage** - Coordinate with teammates
-6. **TaskList** - Monitor overall progress
+1. **TaskCreate** - Create tasks for each teammate (the shared list already exists)
+2. **Agent** with an explicit `name` - Spawn teammates (NOT isolated subagents)
+3. **TaskUpdate** - Track task ownership and completion
+4. **SendMessage** - Coordinate with teammates, addressing them by name
+5. **TaskList** - Monitor overall progress
 
-Teammates appear in their own terminal windows, share a task list, and can communicate with each other. This is NOT the same as spawning isolated Agent subagents.
+Teammates share a task list and can communicate with each other. This is NOT the same as spawning isolated Agent subagents. They appear in the agent panel; they get their own pane only when `teammateMode` asks for one.
 
 ## Rules
 
 - NEVER implement code yourself
 - NEVER skip review of teammate output
-- NEVER spawn agents without `team_name` - always use native teams
+- NEVER spawn a teammate without an explicit `name` - an unnamed agent cannot be addressed or assigned a task
 - ALWAYS use TaskCreate/TaskUpdate for tracking
 - ALWAYS require plan approval for risky tasks
 - Conventional Commits format for all git operations
