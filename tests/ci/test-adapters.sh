@@ -667,7 +667,7 @@ else
     log_fail "unaccepted payload" "a negative sentinel risks the report being rejected"
 fi
 
-if grep -q 'details="Craftsman gate FAILED' "$ROOT_DIR/ci/adapters/bitbucket.sh"; then
+if grep -qE '[Dd][Ee][Tt][Aa][Ii][Ll][Ss]="Craftsman gate FAILED' "$ROOT_DIR/ci/adapters/bitbucket.sh"; then
     log_pass "the unreadable case carries its reason in the free-form details field"
 else
     log_fail "silent failure" "FAILED is reported with no reason a human can read"

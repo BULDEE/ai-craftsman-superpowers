@@ -33,13 +33,23 @@ pipeline {
         stage('Craftsman Quality Gate') {
             steps {
                 sh 'chmod +x ci/craftsman-ci.sh'
-                sh 'bash ci/craftsman-ci.sh --format json > craftsman-report.json || true'
+                // Runs through the generic adapter, so this stage gets the same
+                // verdict as every other provider: annotations on stdout,
+                // craftsman-comment.md written, and the fail-closed exit code
+                // (2 = violations, 1 = warnings only, and an unreadable or
+                // empty scan is a failure, not a pass). Parsing the JSON here
+                // instead, as this template used to, bypassed all of that and
+                // never produced the comment file it archives below.
                 script {
-                    def report = readJSON file: 'craftsman-report.json'
-                    echo "Scanned ${report.summary.files_scanned} files: ${report.summary.violations} violations, ${report.summary.warnings} warnings"
-
-                    if (report.summary.violations > 0) {
-                        error "Craftsman found ${report.summary.violations} violation(s). Fix before merging."
+                    int status = sh(
+                        script: 'bash ci/craftsman-ci.sh ci --provider generic',
+                        returnStatus: true
+                    )
+                    if (status == 2) {
+                        error 'Craftsman quality gate failed. See the annotations above.'
+                    }
+                    if (status == 1) {
+                        unstable 'Craftsman reported warnings.'
                     }
                 }
             }

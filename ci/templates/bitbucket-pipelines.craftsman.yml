@@ -4,8 +4,13 @@
 # If you already have bitbucket-pipelines.yml, merge this step into your
 # existing pipeline definition.
 #
-# Required variables (set in Repository settings > Pipelines > Variables):
-#   BITBUCKET_TOKEN  - App password or OAuth token for PR comments and reports
+# Variables (Repository settings > Pipelines > Variables):
+#   BITBUCKET_TOKEN  - OPTIONAL, and only for the PR comment. Code Insights
+#                      needs no credentials inside Pipelines: the adapter goes
+#                      through the documented proxy on localhost:29418, which
+#                      adds the auth header itself. If you do set it, it must be
+#                      a Bearer-capable token (an app password is Basic auth and
+#                      will not authenticate).
 # =============================================================================
 
 pipelines:
@@ -23,8 +28,6 @@ pipelines:
             - if [ -f "package.json" ]; then npm ci; fi
             - chmod +x ci/craftsman-ci.sh
             - bash ci/craftsman-ci.sh ci --provider bitbucket
-          artifacts:
-            - craftsman-report.json
 
   branches:
     main:

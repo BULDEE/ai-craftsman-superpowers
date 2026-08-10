@@ -5,7 +5,11 @@
 #   include: '.gitlab-ci.craftsman.yml'
 #
 # Required variables (set in CI/CD settings or pass via pipeline):
-#   GITLAB_TOKEN  - API token for MR comments (CI_JOB_TOKEN works for same-project)
+#   GITLAB_TOKEN  - project access token or PAT, for the MR comment only.
+#                   CI_JOB_TOKEN does NOT work: GitLab grants it read-only
+#                   access to the notes API, so posting a note with it can only
+#                   fail. The quality gate itself needs no token; without one
+#                   you get the verdict and the exit code, just no MR comment.
 # =============================================================================
 
 craftsman-quality-gate:

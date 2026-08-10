@@ -24,107 +24,149 @@ adapter_run() {
     echo "$report_file"
 }
 
+_BB_API_URL=""
+_BB_CURL_AUTH=()
+_BB_REPORT_ID="craftsman-quality-gate"
+_BB_VIOLATIONS=0; _BB_WARNINGS=0; _BB_FILES=0; _BB_RESULT=""; _BB_DETAILS=""
+
+# Inside Pipelines the documented path needs no credentials at all: a proxy on
+# localhost:29418 adds a valid Auth header to a plain http request against
+# api.bitbucket.org. Requiring BITBUCKET_TOKEN meant that a user following the
+# shipped template, which described it as an app password (Basic auth) while
+# this sent Bearer, got no Code Insights and a single line on stderr.
+_bb_transport() {
+    if [[ -n "${BITBUCKET_TOKEN:-}" ]]; then
+        _BB_API_URL="https://api.bitbucket.org/2.0"
+        _BB_CURL_AUTH=(-H "Authorization: Bearer ${BITBUCKET_TOKEN}")
+    elif [[ -n "${BITBUCKET_BUILD_NUMBER:-}" ]]; then
+        _BB_API_URL="http://api.bitbucket.org/2.0"
+        _BB_CURL_AUTH=(--proxy "http://localhost:29418")
+    else
+        return 1
+    fi
+
+    [[ -n "${BITBUCKET_WORKSPACE:-}" && -n "${BITBUCKET_REPO_SLUG:-}" \
+       && -n "${BITBUCKET_COMMIT:-}" ]]
+}
+
+_bb_report_url() {
+    printf '%s/repositories/%s/%s/commit/%s/reports/%s' \
+        "$_BB_API_URL" "$BITBUCKET_WORKSPACE" "$BITBUCKET_REPO_SLUG" \
+        "$BITBUCKET_COMMIT" "$_BB_REPORT_ID"
+}
+
+# A delivery failure used to be indistinguishable from success: every call was
+# `>/dev/null 2>&1` with its status dropped. Code Insights is the whole verdict
+# surface on this platform, so an undelivered report is the deptrac failure
+# again, one layer out.
+_bb_put() {
+    curl -sf -X PUT "${_BB_CURL_AUTH[@]}" \
+        -H "Content-Type: application/json" \
+        --data "$2" "$1" >/dev/null
+}
+
+# An unreadable report is not a clean one. These three defaulted to 0 on a parse
+# failure and the gate then published a green PASSED against the commit.
+_bb_read_counts() {
+    local report_file="$1"
+    _BB_DETAILS=""
+    _BB_VIOLATIONS=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['violations'])" < "$report_file" 2>/dev/null) || _BB_VIOLATIONS=""
+    _BB_WARNINGS=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['warnings'])" < "$report_file" 2>/dev/null) || _BB_WARNINGS=""
+    _BB_FILES=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['files_scanned'])" < "$report_file" 2>/dev/null) || _BB_FILES=""
+
+    if [[ ! "$_BB_VIOLATIONS" =~ ^[0-9]+$ || ! "$_BB_FILES" =~ ^[0-9]+$ ]]; then
+        echo "Bitbucket adapter: ${report_file} is unreadable, reporting FAILED rather than a green gate" >&2
+        # Zero in the NUMBER fields, and the truth in the free-form details
+        # line. A negative sentinel read well to a human but the Reports API is
+        # not documented to accept one, and a rejected report is a FAILED
+        # verdict that never reaches the commit: worse than the green gate this
+        # branch exists to prevent.
+        _BB_VIOLATIONS=0 ; _BB_WARNINGS=0 ; _BB_FILES=0
+        _BB_DETAILS="Craftsman gate FAILED: the report could not be read, so no file is known to have passed."
+        _BB_RESULT="FAILED"
+    elif [[ "$_BB_VIOLATIONS" -gt 0 || "$_BB_FILES" -eq 0 ]]; then
+        _BB_RESULT="FAILED"
+    else
+        _BB_RESULT="PASSED"
+    fi
+
+    [[ -n "$_BB_DETAILS" ]] || _BB_DETAILS="Scanned ${_BB_FILES} files: ${_BB_VIOLATIONS} violations, ${_BB_WARNINGS} warnings"
+}
+
 adapter_annotate() {
     local report_file="$1"
 
     [[ ! -f "$report_file" ]] && return 0
 
-    local workspace="${BITBUCKET_WORKSPACE:-}"
-    local repo_slug="${BITBUCKET_REPO_SLUG:-}"
-    local commit="${BITBUCKET_COMMIT:-}"
-    local token="${BITBUCKET_TOKEN:-}"
-    local api_url="https://api.bitbucket.org/2.0"
-
-    if [[ -z "$workspace" || -z "$repo_slug" || -z "$commit" || -z "$token" ]]; then
-        echo "Warning: Bitbucket API vars not set, skipping report annotations" >&2
+    if ! _bb_transport; then
+        echo "Warning: no Bitbucket credentials and no pipeline proxy, skipping report annotations" >&2
         return 0
     fi
 
-    local report_id="craftsman-quality-gate"
+    _bb_read_counts "$report_file"
 
-    # An unreadable report is not a clean one. These three defaulted to 0 on a
-    # parse failure and the gate below then published a green PASSED against
-    # the commit: adapter_compute_exit was hardened for exactly this and the
-    # annotation path was left behind.
-    local violations warnings files_scanned result details=""
-    violations=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['violations'])" < "$report_file" 2>/dev/null) || violations=""
-    warnings=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['warnings'])" < "$report_file" 2>/dev/null) || warnings=""
-    files_scanned=$(python3 -c "import json,sys; print(json.load(sys.stdin)['summary']['files_scanned'])" < "$report_file" 2>/dev/null) || files_scanned=""
-
-    if [[ ! "$violations" =~ ^[0-9]+$ || ! "$files_scanned" =~ ^[0-9]+$ ]]; then
-        echo "Bitbucket adapter: ${report_file} is unreadable, reporting FAILED rather than a green gate" >&2
-        # Zero in the NUMBER fields, and the truth in the free-form details
-        # line. A negative sentinel read well to a human but the Bitbucket
-        # Reports API is not documented to accept one, and a rejected report is
-        # a FAILED verdict that never reaches the commit: worse than the green
-        # gate this branch exists to prevent. The result field carries the
-        # verdict; the counters only decorate it.
-        violations=0 ; warnings=0 ; files_scanned=0
-        details="Craftsman gate FAILED: the report could not be read, so no file is known to have passed."
-        result="FAILED"
-    elif [[ "$violations" -gt 0 || "$files_scanned" -eq 0 ]]; then
-        result="FAILED"
-    else
-        result="PASSED"
+    if ! _bb_put_summary; then
+        echo "craftsman-ci: the Bitbucket report was not delivered, the commit carries no verdict" >&2
+        return 1
     fi
-
-    [[ -n "$details" ]] || details="Scanned ${files_scanned} files: ${violations} violations, ${warnings} warnings"
-    _bb_put_summary "$result" "$files_scanned" "$violations" "$warnings" "$details"
     _bb_put_annotations "$report_file"
 }
 
 _bb_put_summary() {
-    local result="$1" files_scanned="$2" violations="$3" warnings="$4" details="$5"
-    curl -sf \
-        -X PUT \
-        -H "Authorization: Bearer ${token}" \
-        -H "Content-Type: application/json" \
-        --data "{
+    _bb_put "$(_bb_report_url)" "{
             \"title\": \"Craftsman Quality Gate\",
-            \"details\": \"${details}\",
+            \"details\": \"${_BB_DETAILS}\",
             \"report_type\": \"BUG\",
-            \"result\": \"${result}\",
+            \"result\": \"${_BB_RESULT}\",
             \"data\": [
-                {\"title\": \"Files scanned\", \"type\": \"NUMBER\", \"value\": ${files_scanned}},
-                {\"title\": \"Violations\", \"type\": \"NUMBER\", \"value\": ${violations}},
-                {\"title\": \"Warnings\", \"type\": \"NUMBER\", \"value\": ${warnings}}
+                {\"title\": \"Files scanned\", \"type\": \"NUMBER\", \"value\": ${_BB_FILES}},
+                {\"title\": \"Violations\", \"type\": \"NUMBER\", \"value\": ${_BB_VIOLATIONS}},
+                {\"title\": \"Warnings\", \"type\": \"NUMBER\", \"value\": ${_BB_WARNINGS}}
             ]
-        }" \
-        "${api_url}/repositories/${workspace}/${repo_slug}/commit/${commit}/reports/${report_id}" \
-        >/dev/null 2>&1
+        }"
+}
+
+# line 0 is deliberately preserved: Bitbucket Cloud documents it as the
+# file-level default ("it will appear at the top of the file specified by the
+# path field"), which is the right rendering for a finding with no known line.
+_bb_annotation_payloads() {
+    python3 -c "
+import json, sys
+
+for index, v in enumerate(json.load(sys.stdin).get('violations', [])):
+    path = str(v.get('file', ''))
+    path = path[2:] if path.startswith('./') else path
+    try:
+        line = int(v.get('line', 0))
+    except (TypeError, ValueError):
+        line = 0
+    print(json.dumps({
+        'external_id': 'craftsman-%d' % index,
+        'annotation_type': 'BUG',
+        'severity': 'CRITICAL' if v.get('severity') == 'critical' else 'MEDIUM',
+        'path': path,
+        'line': max(line, 0),
+        'summary': '[%s] %s' % (v.get('rule', ''), v.get('message', '')),
+    }))
+" < "$1" 2>/dev/null
 }
 
 _bb_put_annotations() {
-    local report_file="$1"
-    python3 -c "
-import json, sys
-report = json.load(sys.stdin)
-annotations = []
-for i, v in enumerate(report.get('violations', [])):
-    sev = 'CRITICAL' if v.get('severity') == 'critical' else 'MEDIUM'
-    annotations.append({
-        'external_id': f'craftsman-{i}',
-        'annotation_type': 'BUG',
-        'severity': sev,
-        'path': v.get('file', ''),
-        'line': v.get('line', 1),
-        'summary': f\"[{v.get('rule', '')}] {v.get('message', '')}\"
-    })
-print(json.dumps(annotations))
-" < "$report_file" 2>/dev/null | python3 -c "
-import json, sys
-annotations = json.load(sys.stdin)
-for ann in annotations:
-    print(json.dumps(ann))
-" 2>/dev/null | while IFS= read -r annotation; do
-        curl -sf \
-            -X PUT \
-            -H "Authorization: Bearer ${token}" \
-            -H "Content-Type: application/json" \
-            --data "$annotation" \
-            "${api_url}/repositories/${workspace}/${repo_slug}/commit/${commit}/reports/${report_id}/annotations/$(echo "$annotation" | python3 -c "import json,sys; print(json.load(sys.stdin)['external_id'])" 2>/dev/null)" \
-            >/dev/null 2>&1
-    done
+    local annotation external_id undelivered=0
+
+    while IFS= read -r annotation; do
+        [[ -z "$annotation" ]] && continue
+        external_id=$(printf '%s' "$annotation" \
+            | python3 -c "import json,sys; print(json.load(sys.stdin)['external_id'])" 2>/dev/null)
+        [[ -z "$external_id" ]] && continue
+        _bb_put "$(_bb_report_url)/annotations/${external_id}" "$annotation" \
+            || undelivered=$((undelivered + 1))
+    done < <(_bb_annotation_payloads "$1")
+
+    if [[ "$undelivered" -gt 0 ]]; then
+        echo "craftsman-ci: ${undelivered} Bitbucket annotation(s) were not delivered" >&2
+        return 1
+    fi
 }
 
 adapter_comment() {

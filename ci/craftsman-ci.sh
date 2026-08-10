@@ -400,6 +400,7 @@ W_SEVERITIES=()
 
 FILES_SCANNED=0
 FILES_DISCOVERED=0
+FIND_PREDICATE=()
 
 # Same funnel and same arbitration as the hook's add_violation: a finding a
 # higher level claims is HELD here too, and scan_file flushes it once the
@@ -610,31 +611,35 @@ scan_file() {
 
 # Build find's -name predicate from the loaded packs' declared extensions.
 #
-# The result is deliberately word-split into find's argument list, so every
-# extension is filtered to a conservative character class first. A pack manifest
-# is repository-supplied data, and an extension like `php" -o -exec rm {} +"`
-# would otherwise become executable argument structure.
+# Fills the FIND_PREDICATE array. It used to return a string that the call site
+# expanded unquoted, which meant `*.php` and its siblings were glob-expanded
+# against the working directory before find ever saw them: one matching file at
+# the repository root replaced a whole language with a single literal filename
+# (deleting, for instance, every shell rule including SH004), and two aborted
+# the walk outright with "unknown primary or operator". find then printed
+# nothing and a dead scanner was indistinguishable from a clean tree.
+#
+# An array keeps every extension a separate argv element, so a pack manifest
+# can never become argument structure. The conservative character class below
+# stays as defence in depth rather than as the only barrier.
 _find_name_predicate() {
-    local predicate="" extension
+    FIND_PREDICATE=()
+    local extension
     if [[ "$PACKS_AVAILABLE" == true ]]; then
         while IFS= read -r extension; do
             [[ -z "$extension" ]] && continue
             [[ ! "$extension" =~ ^[A-Za-z0-9_+-]+$ ]] && continue
-            if [[ -z "$predicate" ]]; then
-                predicate="-name *.${extension}"
-            else
-                predicate="${predicate} -o -name *.${extension}"
-            fi
+            [[ ${#FIND_PREDICATE[@]} -gt 0 ]] && FIND_PREDICATE+=(-o)
+            FIND_PREDICATE+=(-name "*.${extension}")
         done <<< "$(lang_all_known_extensions)"
     fi
 
     # No pack, no language, nothing to walk. A predicate matching nothing keeps
     # find syntactically valid, and FILES_DISCOVERED staying at zero is what
     # makes the empty run report itself as "not a pass" rather than as green.
-    if [[ -z "$predicate" ]]; then
-        predicate="-name *.__craftsman_no_language__"
+    if [[ ${#FIND_PREDICATE[@]} -eq 0 ]]; then
+        FIND_PREDICATE=(-name "*.__craftsman_no_language__")
     fi
-    printf '%s' "$predicate"
 }
 
 scan_paths() {
@@ -643,16 +648,22 @@ scan_paths() {
         if [[ -f "$path" ]]; then
             scan_file "$path"
         elif [[ -d "$path" ]]; then
+            _find_name_predicate
             # Dependency and build trees are not the project's code, and the
             # walk had no exclusions at all: harmless while the default was
             # src/, ruinous the moment a path resolves to the repository root.
+            #
+            # find's stderr is NOT discarded. Silencing it is what hid the
+            # broken predicate above for the life of the pipeline; a walk that
+            # complains has to reach the build log, and a walk that found
+            # nothing is caught by the FILES_DISCOVERED guard in main().
             while IFS= read -r file; do
                 scan_file "$file"
             done < <(find "$path" \
                 \( -name vendor -o -name node_modules -o -name .git \
                    -o -name dist -o -name build -o -name var \) -prune -o \
-                -type f \( $(_find_name_predicate) \) -print \
-                2>/dev/null | sort)
+                -type f \( "${FIND_PREDICATE[@]}" \) -print \
+                | sort)
         fi
     done
 }
