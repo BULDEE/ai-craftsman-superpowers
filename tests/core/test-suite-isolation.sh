@@ -36,6 +36,32 @@ else
         "the suite writes its fixtures into ~/.claude/plugins/data/craftsman/metrics.db"
 fi
 
+# A subtest must not need the runner to be honest. When only run-tests.sh
+# redirected plugin data, a script run on its own read the developer's real
+# state directory instead of an empty one, so it measured something else:
+# tests/ci/test-ratchet-ci.sh passed in the suite and failed alone, and the
+# failure it reported alone was the true one. Sourcing the helpers is what every
+# test already does, so that is where the isolation has to happen.
+# Sourced in a fresh bash, not in a subshell: this script has already sourced
+# the helpers, and their double-source guard would return before the isolation
+# runs. The subshell version of this check reported the failure it was written
+# to detect, on a tree where the fix was present.
+HELPER_DATA=$(
+    unset CLAUDE_PLUGIN_DATA
+    env -u CLAUDE_PLUGIN_DATA -u _TEST_HELPERS_LOADED bash -c \
+        'source "$1" >/dev/null 2>&1; printf "%s" "${CLAUDE_PLUGIN_DATA:-}"' \
+        _ "$ROOT_DIR/tests/lib/test-helpers.sh"
+)
+if [[ -z "$HELPER_DATA" ]]; then
+    log_fail "sourcing test-helpers.sh leaves CLAUDE_PLUGIN_DATA unset" \
+        "a test run outside the runner reads and writes the developer's real plugin data, so it means something different depending on how it was invoked"
+elif [[ "$HELPER_DATA" == "$HOME/.claude/plugins/data/craftsman" ]]; then
+    log_fail "test-helpers.sh points at the real plugin data directory" \
+        "got '$HELPER_DATA'"
+else
+    log_pass "sourcing test-helpers.sh isolates plugin data on its own ($HELPER_DATA)"
+fi
+
 if [[ "${CRAFTSMAN_ISOLATION_AUDIT:-0}" != "1" ]]; then
     echo ""
     echo "Suite isolation audit skipped (costs a full suite run)."

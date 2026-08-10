@@ -366,4 +366,89 @@ else
         "got exit $php_cfg_code - the assertion below is undetermined"
 fi
 
+# =============================================================================
+# The manifest reader without PyYAML must agree with the one with it.
+#
+# lang_registry.py carries a hand-rolled fallback, so the manifest format has
+# two implementations and only one of them runs on a developer machine: PyYAML
+# is installed here and absent from the CI runner. The divergence is silent by
+# construction, because a wrong registry does not raise, it routes files to the
+# wrong language or to none, and the validators simply stop running.
+#
+# A trailing block sequence followed by another entry is the case that broke:
+# both real packs and fixtures are compared, so the next manifest to use the
+# `supersedes:` form documented in CLAUDE.md cannot lose a language quietly.
+# =============================================================================
+echo ""
+echo "=== The fallback manifest reader agrees with PyYAML ==="
+
+NOYAML_DIR="$TMPDIR_BASE/noyaml"
+mkdir -p "$NOYAML_DIR"
+cat > "$NOYAML_DIR/sitecustomize.py" <<'PY'
+import sys
+
+
+class _BlockYaml:
+    def find_spec(self, name, path=None, target=None):
+        if name == "yaml" or name.startswith("yaml."):
+            raise ImportError("PyYAML made unavailable for this test")
+        return None
+
+
+sys.meta_path.insert(0, _BlockYaml())
+PY
+
+registry_of() {
+    python3 "$ROOT_DIR/hooks/lib/lang_registry.py" "$1" 2>/dev/null
+}
+
+# craftsman-ignore: WARN-SH001 - PYTHONPATH here is a one-command environment
+# prefix, not a function-scoped variable: `local` would change what it means.
+registry_without_pyyaml() {
+    PYTHONPATH="$NOYAML_DIR" python3 "$ROOT_DIR/hooks/lib/lang_registry.py" "$1" 2>/dev/null
+}
+
+# Control. Every assertion below compares two readers, and if PyYAML is not
+# actually blocked they are the same reader and the comparison proves nothing.
+if PYTHONPATH="$NOYAML_DIR" python3 -c "import yaml" 2>/dev/null; then
+    log_fail "control: PyYAML was not blocked" \
+        "the fallback reader never ran, so the parity assertions below are undetermined, not green"
+elif ! python3 -c "import yaml" 2>/dev/null; then
+    # Not a failure and not a pass: with one reader installed there is nothing
+    # to compare. This is the CI runner's situation, which is also the only
+    # environment that runs the fallback for real, so the comparison lives on
+    # the machines that have both and has to be loud where it cannot run.
+    echo "  NOT RUN: PyYAML is absent, so both readers here are the fallback."
+    echo "           The manifest parity assertion did not execute."
+else
+    log_pass "control: PyYAML is present and can be blocked (both readers are reachable)"
+
+    MULTI_MANIFEST="$TMPDIR_BASE/multi-pack.yml"
+    cat > "$MULTI_MANIFEST" <<'YAML'
+name: multi
+languages:
+  - id: first
+    extensions: ["one"]
+    supersedes:
+      - tools/first-check=ONE001
+  - id: second
+    extensions: ["two"]
+    validators: ["hooks/second.sh"]
+YAML
+
+    PARITY_BROKEN=""
+    for manifest in "$MULTI_MANIFEST" "$ROOT_DIR"/packs/*/pack.yml; do
+        if [[ "$(registry_of "$manifest")" != "$(registry_without_pyyaml "$manifest")" ]]; then
+            PARITY_BROKEN="${PARITY_BROKEN} ${manifest#$ROOT_DIR/}"
+        fi
+    done
+
+    if [[ -z "$PARITY_BROKEN" ]]; then
+        log_pass "every manifest compiles to the same registry with and without PyYAML"
+    else
+        log_fail "the two manifest readers disagree" \
+            "on:${PARITY_BROKEN} - on a machine without PyYAML those languages are routed wrongly or not at all, and no validator says so"
+    fi
+fi
+
 test_summary

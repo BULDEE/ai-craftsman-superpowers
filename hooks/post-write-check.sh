@@ -69,11 +69,28 @@ _write_session_state() {
 }
 
 # Detect cross-file patterns: same rule in 3+ files → suggest project-wide fix
+#
+# Filtered through the rules engine on the way out, like every other emitter.
+# The suggestion names a rule id, so the developer reads it as a verdict, and
+# the pattern state outlives both the session and the configuration that filled
+# it: a rule switched to `ignore` today kept being reported from violations
+# recorded while it was `block`. An explicit ignore is an instruction, not a
+# preference, and this was the one channel that walked around it.
 _detect_cross_file_patterns() {
     $HAS_PYTHON3 || return 0
     [[ ! -f "$SESSION_STATE" ]] && return
 
-    python3 "$SCRIPT_DIR/lib/session_state.py" detect-patterns "$SESSION_STATE" 2>&1 || echo "WARNING: cross-file pattern detection failed" >&2
+    local raw
+    raw=$(python3 "$SCRIPT_DIR/lib/session_state.py" detect-patterns "$SESSION_STATE" 2>&1) \
+        || { echo "WARNING: cross-file pattern detection failed" >&2; return 0; }
+
+    local line rule
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        rule=$(echo "$line" | cut -d: -f2)
+        [[ "$(rules_severity_for_file "$FILE_PATH" "$rule")" == "ignore" ]] && continue
+        printf '%s\n' "$line"
+    done <<< "$raw"
 }
 
 _check_corrections() {

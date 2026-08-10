@@ -221,4 +221,72 @@ print('yes' if len(bv) > 0 else 'no')
     fi
 fi
 
+# =============================================================================
+# A rule the developer switched off must not come back as a pattern suggestion.
+#
+# The pattern state is written when a rule blocks and read on every later write,
+# so it outlives the configuration that filled it. It named the rule id in the
+# output while the rules engine had resolved that same rule to `ignore` for that
+# file, which is the engine's decision being overruled by a cache. The state is
+# seeded here rather than accumulated: the defect was originally only visible on
+# a machine that had run the suite before, and a guard that needs yesterday's
+# run to fail is not a guard.
+# =============================================================================
+echo ""
+echo "--- An ignored rule is not replayed through the pattern channel ---"
+
+PATTERN_DIR="$FIXTURES_DIR/pattern"
+mkdir -p "$PATTERN_DIR/src"
+printf 'v: 4\nstrictness: strict\nstack: symfony\n' > "$PATTERN_DIR/.craft-config.yml"
+cat > "$PATTERN_DIR/src/Nested.php" <<'PHP'
+<?php
+declare(strict_types=1);
+final class Nested {
+    private function __construct() {}
+    public function grow(int $value): int {
+        if ($value) { if ($value > 1) { if ($value > 2) { return 2; } } }
+        return 0;
+    }
+}
+PHP
+
+# The seeded rule and the rule that keeps the hook talking are deliberately
+# different. Silencing the only rule the file violates also removes the message
+# the suggestion is appended to, so the hook falls silent for a reason that has
+# nothing to do with the pattern channel and the guard passes on broken code.
+# NEST001 stays active and carries the output; RATCHET001 is the seeded one.
+seed_pattern_state() {
+    printf '{"patterns":{"RATCHET001":{"src":["src/A.php","src/B.php"]}}}' > "$SESSION_STATE"
+}
+
+pattern_hook_output() {
+    (
+        cd "$PATTERN_DIR" || exit 1
+        printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$PATTERN_DIR/src/Nested.php" \
+            | bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1
+    )
+}
+
+# Control first: with no override, the seeded pattern must actually surface.
+# Without it, the silence asserted below is satisfied by a hook that never read
+# the state at all, and by a threshold that was never reached.
+rm -f "$PATTERN_DIR/src/.craft-rules.yml"
+seed_pattern_state
+if pattern_hook_output | grep -q "DIRECTORY PATTERN: RATCHET001"; then
+    log_pass "control: the seeded pattern is reported when the rule is active"
+
+    printf 'rules:\n  RATCHET001: ignore\n' > "$PATTERN_DIR/src/.craft-rules.yml"
+    seed_pattern_state
+    if pattern_hook_output | grep -q "RATCHET001"; then
+        log_fail "an ignored rule was replayed as a pattern suggestion" \
+            "the rules engine resolved RATCHET001 to ignore for this file and the pattern channel reported it anyway - an explicit ignore is an instruction, not a preference"
+    else
+        log_pass "a rule resolved to ignore is not replayed as a pattern suggestion"
+    fi
+    rm -f "$PATTERN_DIR/src/.craft-rules.yml"
+else
+    log_fail "control: the seeded pattern never surfaced" \
+        "the assertion below cannot tell a resolved severity from a pattern channel that never ran"
+fi
+
 test_summary

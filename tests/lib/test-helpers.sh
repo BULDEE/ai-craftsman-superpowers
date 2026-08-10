@@ -139,6 +139,20 @@ setup_test_env() {
     mkdir -p "$CLAUDE_PLUGIN_DATA"
 }
 
+# Isolation is not opt-in. Only run-tests.sh used to redirect plugin data, so a
+# script that did not call setup_test_env itself measured one thing inside the
+# runner and another thing run on its own: under the runner it read an empty
+# state directory, alone it read the developer's real one, accumulated by every
+# previous run. tests/ci/test-ratchet-ci.sh passed in the suite and failed by
+# itself for exactly that reason, and the failure it reported was real.
+#
+# A test must mean the same thing wherever it is invoked from, so every script
+# that sources these helpers gets its own directory here, before its first line
+# runs. A script that wants a specific path still sets CLAUDE_PLUGIN_DATA after
+# sourcing, and wins.
+setup_test_env
+trap 'cleanup_test_env' EXIT
+
 # cleanup_test_env - remove temp dir
 cleanup_test_env() {
     [[ -n "${CLAUDE_PLUGIN_DATA:-}" ]] && rm -rf "$CLAUDE_PLUGIN_DATA"

@@ -79,6 +79,12 @@ class _FallbackReader:
     list (`extensions: [dart]`) and a block sequence. The hand-rolled reader in
     pack-loader.sh only ever handled the inline form, which silently produced
     empty packs for anyone writing idiomatic YAML.
+
+    Indentation decides what a `- ` opens, because nothing else can. Telling a
+    new entry from an item of a block sequence by "is a key pending" made a
+    trailing `supersedes:` swallow the entry after it, and that entry's
+    `extensions` overwrote the previous one's: a language silently stopped
+    claiming its own files, on every machine without PyYAML.
     """
 
     def __init__(self) -> None:
@@ -86,6 +92,7 @@ class _FallbackReader:
         self._current: dict | None = None
         self._pending_key: str | None = None
         self._in_languages = False
+        self._entry_indent: int | None = None
 
     def feed(self, raw: str) -> None:
         line = raw.rstrip("\n")
@@ -95,7 +102,7 @@ class _FallbackReader:
             self._enter_top_level(line)
             return
         if self._in_languages:
-            self._read_entry_line(line.strip())
+            self._read_entry_line(line)
 
     def result(self) -> list[dict]:
         self._close_current()
@@ -105,27 +112,34 @@ class _FallbackReader:
         self._close_current()
         self._in_languages = line.startswith("languages:")
         self._pending_key = None
+        self._entry_indent = None
 
     def _close_current(self) -> None:
         if self._current:
             self.languages.append(self._current)
         self._current = None
 
-    def _read_entry_line(self, stripped: str) -> None:
-        if stripped.startswith("- ") and not self._pending_key:
-            self._close_current()
-            self._current = {}
-            stripped = stripped[2:].strip()
-            if not stripped:
-                return
-        if self._current is None:
+    def _is_sequence_item(self, indent: int) -> bool:
+        deeper = self._entry_indent is not None and indent > self._entry_indent
+        return bool(self._pending_key) and self._current is not None and deeper
+
+    def _read_entry_line(self, line: str) -> None:
+        indent = len(line) - len(line.lstrip(" "))
+        stripped = line.strip()
+        if not stripped.startswith("-"):
+            if self._current is not None:
+                self._read_key_value(stripped)
             return
-        if stripped.startswith("- ") and self._pending_key:
-            self._current.setdefault(self._pending_key, []).append(
-                _unquote(stripped[2:])
-            )
+        rest = stripped[1:].strip()
+        if self._is_sequence_item(indent):
+            self._current.setdefault(self._pending_key, []).append(_unquote(rest))
             return
-        self._read_key_value(stripped)
+        self._close_current()
+        self._current = {}
+        self._entry_indent = indent
+        self._pending_key = None
+        if rest:
+            self._read_key_value(rest)
 
     def _read_key_value(self, stripped: str) -> None:
         match = _KEY_RE.match(stripped)
