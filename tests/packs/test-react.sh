@@ -76,12 +76,24 @@ else
     log_fail "LAYER001: detects domain→infrastructure import" "not detected"
 fi
 
-# Test: ESLint error mapping
-result=$(_pack_sa_eslint_map_error "src/foo.ts: line 5, Error - msg (no-explicit-any)")
+# Test: ESLint rule id mapping
+# The mapper takes a rule id now, not a line of `compact` output: the adapter
+# reads --format=json, which hands over the id directly. Asserting ESLINT001
+# alone would also pass with the case statement deleted, since ESLINT001 is the
+# fallback, so a rule that maps elsewhere is checked alongside it. What the
+# analysers actually answer is in tests/packs/test-eslint-verdict.sh.
+result=$(_pack_sa_eslint_code_for_rule "no-explicit-any")
 if [[ "$result" == "ESLINT001" ]]; then
     log_pass "ESLint: no-explicit-any → ESLINT001"
 else
     log_fail "ESLint: no-explicit-any → ESLINT001" "got $result"
+fi
+
+result=$(_pack_sa_eslint_code_for_rule "@typescript-eslint/no-unused-vars")
+if [[ "$result" == "ESLINT004" ]]; then
+    log_pass "ESLint: no-unused-vars → ESLINT004"
+else
+    log_fail "ESLint: no-unused-vars → ESLINT004" "got $result"
 fi
 
 # Test: All referenced files exist

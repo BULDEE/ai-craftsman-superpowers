@@ -1420,12 +1420,25 @@ else
     log_fail "sa: generic phpstan error default" "got $result, expected PHPSTAN001"
 fi
 
-# Test: _pack_sa_eslint_map_error maps no-explicit-any to ESLINT001
-result=$(_pack_sa_eslint_map_error "src/foo.ts: line 5, col 10, Error - Unexpected any (no-explicit-any)" 2>/dev/null || true)
-if echo "$result" | grep -qE "^ESLINT[0-9]{3}$"; then
-    log_pass "sa: eslint error maps to ESLINT code"
+# Test: the eslint rule id mapper answers with the code that names the defect.
+# It used to be handed a line of `compact` output and asserted against
+# ^ESLINT[0-9]{3}$, which ESLINT001 satisfies as the fallback: the assertion
+# held with the whole case statement deleted, and with an adapter that had
+# never produced a line to map. A rule that maps away from the fallback is what
+# makes it an assertion. The verdicts themselves are in
+# tests/packs/test-eslint-verdict.sh.
+result=$(_pack_sa_eslint_code_for_rule "@typescript-eslint/no-explicit-any" 2>/dev/null || true)
+if [[ "$result" == "ESLINT001" ]]; then
+    log_pass "sa: no-explicit-any maps to ESLINT001"
 else
-    log_fail "sa: eslint error mapping" "got $result"
+    log_fail "sa: eslint rule id mapping" "got $result, expected ESLINT001"
+fi
+
+result=$(_pack_sa_eslint_code_for_rule "import/no-cycle" 2>/dev/null || true)
+if [[ "$result" == "ESLINT003" ]]; then
+    log_pass "sa: import/no-cycle maps to ESLINT003, not to the fallback"
+else
+    log_fail "sa: eslint rule id mapping" "got $result, expected ESLINT003"
 fi
 
 # Test: pack_sa_php not installed = graceful degradation (empty output, exit 0)
