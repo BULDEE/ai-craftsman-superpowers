@@ -614,6 +614,7 @@ test_session_metrics() {
     run_subtest "Doctrine export tests pass" "$SCRIPT_DIR/ci/test-doctrine-export.sh" || true
     run_subtest "Rule registry tests pass" "$SCRIPT_DIR/ci/test-rule-registry.sh" || true
     run_subtest "Ratchet CI parity tests pass" "$SCRIPT_DIR/ci/test-ratchet-ci.sh" || true
+    run_subtest "Turn budget delivery tests pass" "$SCRIPT_DIR/core/test-turn-budget.sh" || true
 
     run_subtest "Suite isolation audit" "$SCRIPT_DIR/core/test-suite-isolation.sh" || true
 

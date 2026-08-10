@@ -4,7 +4,7 @@
 
 Claude Code plugin that transforms Claude into a disciplined Senior Software Craftsman. DDD, Clean Architecture, TDD methodology enforced through hooks, commands, agents, and a rules engine.
 
-**Current version:** 4.6.3
+**Current version:** 4.6.4
 **Stack:** Bash (hooks/CI), Markdown (skills/agents/templates), Python (metrics helpers), YAML (config)
 
 ## Development Rules
@@ -43,6 +43,18 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
   drift.
 - All commands MUST have `description`, `effort` in frontmatter. `effort` is Claude Code's own frontmatter key, not project metadata: it overrides the session effort level, so only `low`, `medium`, `high`, `xhigh`, `max` are valid.
 - Templates MUST have: top-level heading, `## Mission` section, `## Context Files` section.
+- An agent that declares `maxTurns` MUST carry a `## Turn Budget` section ending
+  on "never let your final action be a tool call". When the cap lands on a tool
+  call the agent loop stops there and returns no text, and a forked skill in that
+  state surfaces as the bare string `Command completed` with no error: 23 of
+  `craftsman:architect`'s first 38 runs ended that way. A read-only agent (no
+  `Write`/`Edit` in `tools:`) MUST NOT declare `isolation: worktree`, because a
+  worktree is a clean checkout and the uncommitted diff it was asked to review is
+  absent from it. `context: fork` is refused into any agent without the delivery
+  contract, and never belongs on a skill that delivers a verdict to the user
+  (ADR-0028): a fork carries neither the conversation nor the user's attachments.
+  `tests/core/test-turn-budget.sh` enforces all three, with fixtures that prove
+  each check can fail.
 - A skill with `disable-model-invocation: true` starts ONLY when the user types `/craftsman:<name>` first in a prompt; the Skill tool refuses it. So: an agent's `skills:` frontmatter may list only model-invocable skills and never one whose `agent:` binding points back at that agent; a skill body may write `**Invokes:** /craftsman:x` only when `x` is model-invocable, otherwise `**Hands off to:**` plus the command to paste. `tests/core/test-invocation-policy.sh` enforces both.
 
 ## Testing

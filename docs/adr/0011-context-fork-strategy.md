@@ -2,7 +2,12 @@
 
 ## Status
 
-Accepted
+Accepted, amended 2026-08-10 by
+[ADR-0028](./0028-review-runs-in-the-main-session.md), which removes `challenge`
+from the forking set. The three benefits claimed below did not hold for a skill
+that delivers a verdict to the user: the fork dropped the attachments and the
+conversation it needed for scope, and one run in two returned nothing while
+Claude Code reported `Command completed`. The rest of the table stands.
 
 ## Date
 
@@ -27,9 +32,12 @@ Use `context: fork` for skills that:
 |-------|------------|--------|
 | `debug` | general-purpose | Investigation is self-contained |
 | `refactor` | general-purpose | Changes are isolated |
-| `challenge` | general-purpose | Review should be independent |
 | `plan` | Plan | Planning is comprehensive task |
 | `mlops` | Explore | Audit explores codebase |
+
+A skill that delivers a verdict to the user does not belong here: see ADR-0028.
+Any addition to this table must clear `tests/core/test-turn-budget.sh`, which
+refuses a fork into an agent that can return nothing.
 
 ### Skills WITHOUT context: fork
 

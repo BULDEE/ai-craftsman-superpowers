@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.6.4] - 2026-08-10
+
+### Fixed
+
+- **`/craftsman:challenge` returned nothing at all, one run in two.** The skill
+  forked into `craftsman:architect`, which declared `maxTurns: 20`. When the cap
+  lands on a tool call the agent loop stops there and returns no text, and Claude
+  Code's forked-command handler substitutes the literal string `Command
+  completed` for the missing result, then ends the turn with `shouldQuery:
+  false`. No error, no partial, no retry: the user saw one line of output and a
+  dead prompt. 23 of the agent's first 38 recorded runs ended that way. Every
+  truncated subagent transcript on the machine was this agent, all at exactly 20
+  turns with `stop_reason: tool_use`, and no other agent type ever truncated.
+- **The review could not see what it was reviewing.** A forked skill receives its
+  `SKILL.md` as a plain string: text arguments are appended as `ARGUMENTS:`,
+  attachments are not carried, and the conversation is not carried either. A
+  review invoked with seven screenshots received seven `[Image #14]` tokens and
+  zero images, and one asked to look at what the user had just been discussing
+  derived its scope from `git log` and reviewed a different subsystem. The skill
+  now runs in the main session (ADR-0028) and fans out to reviewer subagents,
+  writing their prompts, when the scope is large.
+- **`craftsman:architect` reviewed a tree in which the diff did not exist.** It
+  declared `isolation: worktree` while declaring no `Write` or `Edit`. A worktree
+  is a clean checkout of a commit, so the uncommitted changes its injected
+  `git diff HEAD` context points at are absent from it. Removed.
+
+### Added
+
+- Every agent declaring `maxTurns` now carries a `## Turn Budget` contract: emit
+  the deliverable as soon as the evidence justifies it, reserve the last third of
+  the budget for writing, name what was not covered under `NOT REVIEWED`, and
+  never end on a tool call. Applied to all twelve capped agents, core and packs.
+  The cap was never the whole defect, since an agent that keeps no budget for
+  writing fails at any cap, so the contract is what is enforced rather than a
+  number. `craftsman:architect` also moves to `maxTurns: 60`.
+- `tests/core/test-turn-budget.sh` fails when a capped agent lacks the delivery
+  contract, when a read-only agent declares `isolation: worktree`, and when a
+  skill forks into an agent that can return nothing. Each check ships with a
+  fixture proving it can go red, and the contract check was verified red against
+  the real `agents/architect.md` before being restored.
+- `tests/core/test-invocation-policy.sh` no longer fails merely because no skill
+  forks. Zero forks is now the intended state, so the fork/model agreement check
+  proves its liveness against a mismatched fixture pair instead.
+
 ## [4.6.3] - 2026-08-09
 
 ### Fixed

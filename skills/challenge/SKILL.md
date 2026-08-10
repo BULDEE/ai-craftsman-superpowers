@@ -2,9 +2,6 @@
 model: opus
 description: Senior architecture review and code challenge. Use when reviewing code or PRs for quality, auditing architecture decisions, or responding to code review comments.
 effort: high
-context: fork
-agent: craftsman:architect
-background: false
 ---
 
 # /craftsman:challenge - Senior Architecture Review
@@ -14,6 +11,19 @@ background: false
 - **Outcome**: a merge decision on the reviewed scope: APPROVE, REQUEST_CHANGES, or BLOCK, with every finding tied to a file and line.
 - **Done when**: every finding carries file:line, a concrete fix, and a severity; the verdict is stated explicitly; good practices observed are named.
 - **Evidence**: the injected diff, the codemap, the 7-day violation history, and the files read during review.
+
+## Scope Comes From the Conversation
+
+This review runs in the main session, so the brief is whatever the user just
+said, plus anything they attached. Screenshots, stack traces and pasted logs are
+evidence: read them before the diff. Only when the user gave no brief at all do
+you fall back to the injected diff, and then you say which scope you picked in
+the first line of the report.
+
+This skill used to run in a forked subagent (ADR-0011), which cost it both the
+conversation and the attachments. It reviewed what it could guess from
+`git log` instead of what was asked, and one run in two returned nothing at all.
+See ADR-0028. Do not reintroduce `context: fork` here.
 
 ## Live Context
 
@@ -78,11 +88,26 @@ The 7-day violation history is already inlined in the Live Context section above
 
 ### Review Process
 
-1. **Read the code** thoroughly
-2. **Check against rules** from user's CLAUDE.md
-3. **Categorize issues** by severity
-4. **Provide fixes** not just complaints
-5. **Acknowledge good practices**
+1. **Fix the scope first** - the user's brief, else the injected diff. Name it.
+2. **Read what the scope names**, not the repository. The codemap and the diff
+   are already injected above; re-reading the tree to rediscover them is the
+   single most common way this review runs out of budget before it concludes.
+3. **Check against rules** from user's CLAUDE.md
+4. **Categorize issues** by severity
+5. **Provide fixes** not just complaints
+6. **Acknowledge good practices**
+
+### Delivery Is Not Optional
+
+A review that ends without a verdict is worse than no review: it costs the same
+and teaches the user to distrust the command. So:
+
+- Emit the report **as soon as the findings you already hold justify a verdict**.
+  Depth beyond that point is optional; the verdict is not.
+- If the budget runs short, ship what you have, mark the scope you did not reach
+  under `NOT REVIEWED`, and still state a verdict. `BLOCK` on partial evidence is
+  a legitimate answer. Silence is not.
+- Never let the last action of this skill be a tool call.
 
 ### Output Format
 
@@ -114,6 +139,9 @@ The 7-day violation history is already inlined in the Live Context section above
 - [What's done well - reinforce good patterns]
 - [Another positive]
 
+### NOT REVIEWED
+- [Scope reached for but not covered, and why - omit the section when empty]
+
 ---
 
 ## Summary
@@ -138,21 +166,27 @@ After review, ask thought-provoking questions:
 
 ### Deep Review Mode (for complex PRs)
 
-For PRs touching 5+ files or 3+ bounded contexts, use **parallel reviewer agents**:
+For PRs touching 5+ files or 3+ bounded contexts, delegate the reading to
+**parallel reviewer agents** and keep the synthesis here. You hold the user's
+brief and their attachments; the subagents do not, so you write their prompts.
 
 1. **Spawn specialized reviewers** using the Agent tool:
-   - Architecture reviewer: checks layer violations, aggregate boundaries
-   - Security reviewer: checks OWASP top 10, input validation
-   - Performance reviewer: checks N+1 queries, memory leaks
+   - `craftsman:architect`: layer violations, aggregate boundaries
+   - `craftsman:security-pentester`: OWASP top 10, input validation
+   - A `general-purpose` reviewer for performance: N+1 queries, memory leaks
 
-2. **Each reviewer** gets:
+2. **Each reviewer prompt carries**, because none of it crosses the boundary:
+   - The scope you fixed above, restated in full
    - The list of changed files
-   - Access to Read/Grep/Glob tools
-   - Specific review checklist for their domain
+   - Any evidence the user gave in prose (a subagent never sees their images)
+   - The specific checklist for that domain
 
-3. **Aggregate results** from all reviewers into a single review report
+3. **Aggregate results** into a single report and a single verdict. A reviewer
+   that returns nothing is a gap in your evidence, not an absence of findings:
+   say so in `NOT REVIEWED` rather than reading its silence as clean.
 
-Use the Agent tool with `subagent_type` matching the reviewer specialty when available.
+This is where isolation belongs: fan out from a session that knows the brief,
+instead of forking away the brief itself.
 
 ---
 

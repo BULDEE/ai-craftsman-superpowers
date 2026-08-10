@@ -131,6 +131,14 @@ agent_file_for() {
     return 1
 }
 
+declared_model() {
+    frontmatter "$1" | sed -n 's/^model:[[:space:]]*//p' | head -1
+}
+
+fork_models_agree() {
+    [[ -n "$1" && "$1" == "$2" ]]
+}
+
 FORKS_CHECKED=0
 for skill_md in "$ROOT_DIR"/skills/*/SKILL.md; do
     [[ -f "$skill_md" ]] || continue
@@ -141,15 +149,15 @@ for skill_md in "$ROOT_DIR"/skills/*/SKILL.md; do
 
     FORKS_CHECKED=$((FORKS_CHECKED + 1))
     rel="${skill_md#"$ROOT_DIR"/}"
-    skill_model="$(echo "$skill_fm" | sed -n 's/^model:[[:space:]]*//p' | head -1)"
+    skill_model="$(declared_model "$skill_md")"
 
     agent_md="$(agent_file_for "$bound")" || {
         log_fail "$rel forks into $bound" "no agent definition found"
         continue
     }
-    agent_model="$(frontmatter "$agent_md" | sed -n 's/^model:[[:space:]]*//p' | head -1)"
+    agent_model="$(declared_model "$agent_md")"
 
-    if [[ -n "$skill_model" && "$skill_model" == "$agent_model" ]]; then
+    if fork_models_agree "$skill_model" "$agent_model"; then
         log_pass "$rel and $bound agree on model: $skill_model"
     else
         log_fail "$rel forks into $bound" \
@@ -157,8 +165,42 @@ for skill_md in "$ROOT_DIR"/skills/*/SKILL.md; do
     fi
 done
 
+# No skill forks since ADR-0028, so the loop above is empty and its green means
+# nothing on its own. Zero forks is the intended state, not a defect, so the
+# liveness proof moves to a fixture: the same extraction and the same comparison
+# run against a mismatched pair, and must report the mismatch. Re-adding a fork
+# then lands on a guard that has been seen red.
 if [[ $FORKS_CHECKED -eq 0 ]]; then
-    log_fail "no forking skill found" "the check above verified nothing"
+    FIXTURE_DIR="$CLAUDE_PLUGIN_DATA/fork-model-fixtures"
+    mkdir -p "$FIXTURE_DIR"
+
+    printf -- '---\nname: forker\nmodel: opus\ncontext: fork\nagent: craftsman:mismatched\n---\n\n# Forker\n' \
+        > "$FIXTURE_DIR/skill.md"
+    printf -- '---\nname: mismatched\nmodel: sonnet\n---\n\n# Mismatched\n' \
+        > "$FIXTURE_DIR/agent.md"
+
+    fx_skill_model="$(declared_model "$FIXTURE_DIR/skill.md")"
+    fx_agent_model="$(declared_model "$FIXTURE_DIR/agent.md")"
+
+    if [[ "$fx_skill_model" == "opus" && "$fx_agent_model" == "sonnet" ]]; then
+        log_pass "no forking skill: model extraction still reads both sides"
+    else
+        log_fail "no forking skill: model extraction is broken" \
+            "read '$fx_skill_model' and '$fx_agent_model' from the fixtures"
+    fi
+
+    if ! fork_models_agree "$fx_skill_model" "$fx_agent_model"; then
+        log_pass "no forking skill: a mismatched pair would still be rejected"
+    else
+        log_fail "no forking skill: a mismatched pair passes" \
+            "the comparison cannot fail, so re-adding a fork would ship unguarded"
+    fi
+
+    if fork_models_agree "opus" "opus"; then
+        log_pass "no forking skill: a matching pair would still be accepted"
+    else
+        log_fail "no forking skill: a matching pair is rejected" "the comparison rejects everything"
+    fi
 fi
 
 echo ""
