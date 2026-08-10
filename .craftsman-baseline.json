@@ -142,7 +142,7 @@
 {"complexity":1,"fan_out":17,"file_lines":582,"ignores":0,"max_fn_lines":10,"path":"tests/core/test-hostile-repo.sh"},
 {"complexity":21,"fan_out":1,"file_lines":108,"ignores":0,"max_fn_lines":108,"path":"tests/core/test-hotspot-analysis.sh"},
 {"complexity":41,"fan_out":3,"file_lines":342,"ignores":0,"max_fn_lines":342,"path":"tests/core/test-instincts.sh"},
-{"complexity":2,"fan_out":1,"file_lines":184,"ignores":0,"max_fn_lines":7,"path":"tests/core/test-invocation-policy.sh"},
+{"complexity":2,"fan_out":1,"file_lines":210,"ignores":0,"max_fn_lines":7,"path":"tests/core/test-invocation-policy.sh","reason":"v4.6.2 native teams gate: the suite grew by the guard that fails when a call to or a conditional on the removed TeamCreate/TeamDelete tools reappears in the team skill or the team-lead agent. Coverage grew, so the file grew."},
 {"complexity":0,"fan_out":1,"file_lines":135,"ignores":0,"max_fn_lines":5,"path":"tests/core/test-knowledge-integrity.sh"},
 {"complexity":1,"fan_out":3,"file_lines":370,"ignores":0,"max_fn_lines":7,"path":"tests/core/test-lang-registry.sh"},
 {"complexity":28,"fan_out":4,"file_lines":106,"ignores":0,"max_fn_lines":106,"path":"tests/core/test-legacy-command.sh"},
@@ -178,6 +178,6 @@
 {"complexity":0,"fan_out":3,"file_lines":289,"ignores":3,"max_fn_lines":7,"path":"tests/packs/test-security.sh"},
 {"complexity":0,"fan_out":5,"file_lines":139,"ignores":0,"max_fn_lines":1,"path":"tests/packs/test-structural.sh"},
 {"complexity":0,"fan_out":5,"file_lines":118,"ignores":0,"max_fn_lines":1,"path":"tests/packs/test-symfony.sh"},
-{"complexity":20,"fan_out":1,"file_lines":816,"ignores":1,"max_fn_lines":125,"path":"tests/run-tests.sh","reason":"v4.6.0 rule registry: packs declare the rules they own and the routes they suggest, so doctrine ids, wording and default severity moved out of ci/doctrine-export.sh and hooks/lib/rules-engine.sh into rules/core.yml and the pack manifests."},
+{"complexity":22,"fan_out":1,"file_lines":818,"ignores":1,"max_fn_lines":125,"path":"tests/run-tests.sh","reason":"v4.6.3 CI adapter delivery: the runner registers tests/ci/test-adapter-delivery.sh, the suite that proves an adapter delivers a well-formed annotation and a fail-closed exit code rather than merely running."},
 {"complexity":0,"fan_out":0,"file_lines":344,"ignores":0,"max_fn_lines":5,"path":"tests/templates/test-templates.sh"}
 ]
