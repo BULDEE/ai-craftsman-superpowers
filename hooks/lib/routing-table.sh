@@ -24,6 +24,7 @@ _register_core_routes() {
 - Check plugin health, diagnose issues → /craftsman:healthcheck
 - Before claiming work is done → /craftsman:verify
 - Full development cycle, new feature, guided methodology → /craftsman:workflow
+- Iterate until green: ratchet campaign, red-test burn-down, bounded fix loop → /craftsman:loop
 - First time setup, quick onboarding → /craftsman:setup --quick"
 }
 
