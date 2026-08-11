@@ -15,6 +15,13 @@ HAIKU_VERIFY_MODEL="${CRAFTSMAN_VERIFY_MODEL:-claude-haiku-4-5-20251001}"
 # CLI is unavailable or the subprocess fails: callers degrade to no-op.
 haiku_verify() {
     local prompt="$1"
+    # Advisory layer only. Hooks receive the session effort level (v2.1.128+,
+    # $CLAUDE_EFFORT): at low effort the user asked for speed over depth, so
+    # semantic verification steps aside. Deterministic Level 1-3 gates never
+    # read this variable: a blocking verdict cannot depend on a reasoning
+    # dial, or the hook and CI front-ends would answer differently for the
+    # same file. tests/core/test-gate-independence.sh enforces both sides.
+    [[ "${CLAUDE_EFFORT:-}" == "low" ]] && return 1
     command -v claude >/dev/null 2>&1 || return 1
     CRAFTSMAN_HEADLESS_VERIFY=1 claude -p "$prompt" \
         --model "$HAIKU_VERIFY_MODEL" \
