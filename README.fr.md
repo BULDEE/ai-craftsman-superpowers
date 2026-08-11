@@ -264,8 +264,8 @@ et vérifie qu'elle échoue. Détail complet : [SECURITY.md](SECURITY.md).
 
 **Par choix :** les violations de règles bloquent, la détection de biais se
 contente d'avertir ; pas d'auto-commit ; les commandes sont invoquées
-explicitement, jamais déclenchées seules ; la méthodologie est opinionated
-(DDD/Clean Architecture).
+explicitement, jamais déclenchées seules ; la méthodologie assume ses partis
+pris (DDD/Clean Architecture).
 
 **Contraintes actuelles :** PHP et TypeScript ont une couverture de règles
 complète, les autres langages un support de base ; les patterns de détection de
