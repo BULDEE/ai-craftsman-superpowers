@@ -129,7 +129,7 @@
 {"complexity":0,"fan_out":1,"file_lines":167,"ignores":0,"max_fn_lines":7,"path":"tests/core/test-bias-detector.sh"},
 {"complexity":1,"fan_out":3,"file_lines":309,"ignores":0,"max_fn_lines":8,"path":"tests/core/test-circuit-breaker.sh"},
 {"complexity":0,"fan_out":1,"file_lines":60,"ignores":0,"max_fn_lines":7,"path":"tests/core/test-config-protection.sh"},
-{"complexity":102,"fan_out":2,"file_lines":505,"ignores":0,"max_fn_lines":505,"path":"tests/core/test-config.sh"},
+{"complexity":10,"fan_out":2,"file_lines":577,"ignores":0,"max_fn_lines":30,"path":"tests/core/test-config.sh","reason":"extraction campaign: whole-file span 102 to 10, longest span 505 to 30 lines, 21 section functions; file_lines 505 to 577 is the function boilerplate paid for it"},
 {"complexity":1,"fan_out":1,"file_lines":166,"ignores":0,"max_fn_lines":7,"path":"tests/core/test-consolidate-metrics.sh"},
 {"complexity":3,"fan_out":5,"file_lines":293,"ignores":0,"max_fn_lines":7,"path":"tests/core/test-correction-learning.sh","reason":"v4.6.3 instrument repair: PyYAML is absent from the CI runner, so the registry reader gained a fallback path and its parity is now asserted on all five packs; test-helpers.sh isolates CLAUDE_PLUGIN_DATA for the nineteen suites that silently depended on the runner doing it; and the RATCHET001 ignore bypass in the hook is covered. Coverage grew, so these files grew."},
 {"complexity":14,"fan_out":1,"file_lines":110,"ignores":0,"max_fn_lines":110,"path":"tests/core/test-dashboard.sh"},
