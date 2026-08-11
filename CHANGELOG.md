@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.8.0] - 2026-08-11
+
+### Changed
+
+- **Structural debt campaign, first production run of `/craftsman:loop`.**
+  The two worst production offenders in the ratchet baseline were extracted
+  under their marks with behaviour intact (full suite green at every
+  iteration): `hooks/session-metrics.sh` worst-span complexity 37 to 8 and
+  longest span 131 to 16 lines (duration, write counter, violation counter
+  and summary builder each became a function); `hooks/lib/dispatch-context.sh`
+  complexity 28 to 11 and longest span 97 to 27 (one emitter function per
+  context section, early returns instead of nesting). The `file_lines` rises
+  (131 to 149, 97 to 110) are the function boilerplate paid for it and are
+  recorded in the baseline with that reason; every other mark tightened
+  one-way.
+
 ## [4.7.0] - 2026-08-11
 
 ### Added
