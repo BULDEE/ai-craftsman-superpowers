@@ -1,6 +1,6 @@
 {
   "name": "craftsman",
-  "description": "Senior craftsman methodology for AI-assisted development. DDD, Clean Architecture, TDD, and systematic workflows that transform Claude into a disciplined software engineer.",
+  "description": "Refuses any edit that breaks your architecture rules, before it reaches disk. A prompt asks; this enforces. SOLID, Clean Architecture, hexagonal, DDD and legacy rescue, with the same rules in your editor and your CI.",
   "version": "4.7.0",
   "author": {
     "name": "Alexandre Mallet",
