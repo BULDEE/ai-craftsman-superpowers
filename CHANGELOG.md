@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.7.0] - 2026-08-11
+
+### Added
+
+- **`/craftsman:loop`: bounded verification loop.** The "repeat" layer on top
+  of the pipeline: a loop card (goal, verify command, max iterations, stop
+  conditions, escalation question), one atomic act per iteration, a full
+  verify after each, and an iteration ledger. Stops on green, on two
+  identical failure sets (no_progress), or on budget; always ends with a
+  verdict. The verify command is the only judge and no iteration may weaken
+  it. Cross-turn cadence hands off to the native `/loop` runner; in-session
+  iteration is the default.
+- **`tests/core/test-gate-independence.sh`.** Auto mode becomes the default
+  permission mode on 2026-08-14; the hooks reference evaluates a PreToolUse
+  deny before the permission system, so the only way auto mode could soften
+  a gate is a hook reading `permission_mode` and deciding to. The suite now
+  proves the blocking gates answer identically under `default`, `auto` and
+  `bypassPermissions`, that clean content still passes, that Level 1 ignores
+  the effort dial, and a static guard fails the build if any hook ever reads
+  `permission_mode`.
+- **`docs/guides/context-footprint.md`.** What the plugin injects per
+  session and per event, how to measure it (`/usage`, plugin context cost,
+  hook profiles), and which knobs reduce it, with one fixed rule: a blocking
+  verdict is never traded for context savings silently.
+
+### Changed
+
+- **The advisory Haiku layer respects the effort dial.** At
+  `CLAUDE_EFFORT=low` the headless semantic verification steps aside
+  (`haiku_verify` returns before spawning anything). Deterministic Level 1-3
+  gates never read the variable: hook and CI front-ends must answer the same
+  verdict for the same file, and the new gate-independence tests enforce
+  both sides.
+- **`/craftsman:team` offers the native Workflow tool as an explicit
+  opt-in.** Scripted, deterministic fan-outs (find then verify stages,
+  resume cache) for pipelines whose stages are known before launch; teams
+  remain the default for exploratory collaboration. Never auto-triggered.
+- **`/craftsman:workflow` documents the native `/goal` mapping.** Outcome
+  Contract "Done when" lines are written to be pasted into `/goal` verbatim;
+  the mapping stays documentation because the Stop-hook final review is
+  already the plugin's completion loop.
+- **`/craftsman:challenge` states its position vs native reviewers.**
+  `/code-review`, ultrareview and security-guidance hunt correctness and
+  vulnerability bugs; challenge judges architecture and DDD against the
+  rules engine, the violation history and CI-parity severity. Verdicts stay
+  separate on purpose; no finding ingestion, no format coupling.
+- **`/craftsman:metrics` publication is explicit, never a side effect.**
+  Every view stays on the machine unless the user asks for a published page
+  in so many words in the current session.
+- **`/craftsman:debug` points long reproductions at the native Monitor
+  tool** instead of sleep-and-recheck polling.
+- **ADR-0028 addendum.** The fork premise is re-dated: the current harness
+  documents full-conversation inheritance for forked subagents, attachments
+  remain unverified, and the decision stands on the delivery contract, which
+  is fork-agnostic.
+- **ADR-0019 amendment.** LSP verdicts are model-plane: no hook, and
+  therefore neither the precedence layer nor the rules engine, ever sees
+  them, so a `supersedes:` entry targeting an LSP would drop a rule, not
+  defer it. `supersedes:` stays restricted to executable analysers the
+  engine invokes and parses; LSP remains the complementary Level 1.5.
+
 ## [4.6.4] - 2026-08-10
 
 ### Fixed

@@ -12,6 +12,7 @@ One-line cheat sheet for every `/craftsman:*` command. See [README.md](README.md
 | `/craftsman:challenge` | Senior architecture review and code challenge |
 | `/craftsman:verify` | Evidence-based verification before completion claims |
 | `/craftsman:workflow` | Full pipeline: design → spec → plan → implement → test → verify → commit |
+| `/craftsman:loop` | Bounded verification loop: act, verify, repeat until green, no-progress or budget |
 | `/craftsman:spec` | Specification-first development (TDD/BDD) |
 | `/craftsman:refactor` | Systematic refactoring with behavior preservation (safety-net-first, Mikado mode) |
 | `/craftsman:legacy` | Legacy rescue: hotspot audit, characterization tests, strangler-fig migration |
