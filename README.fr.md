@@ -380,7 +380,7 @@ C'est la seule métrique que ce projet collecte.
 
 <br>
 
-Fait avec craftsmanship par [Alexandre Mallet](https://github.com/woprrr) · Sponsorisé par [BULDEE](https://buldee.com) & [M.A. LucasFireDev](https://www.malucasfire.dev)
+Forgé par [Alexandre Mallet](https://github.com/woprrr) · Sponsorisé par [BULDEE](https://buldee.com) & [M.A. LucasFireDev](https://www.malucasfire.dev)
 
 [ai-craftsman.dev](https://ai-craftsman.dev)
 

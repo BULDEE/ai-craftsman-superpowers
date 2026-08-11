@@ -367,7 +367,7 @@ It is the only metric this project collects.
 
 <br>
 
-Made with craftsmanship by [Alexandre Mallet](https://github.com/woprrr) · Sponsored by [BULDEE](https://buldee.com) & [M.A. LucasFireDev](https://www.malucasfire.dev)
+Forged by [Alexandre Mallet](https://github.com/woprrr) · Sponsored by [BULDEE](https://buldee.com) & [M.A. LucasFireDev](https://www.malucasfire.dev)
 
 [ai-craftsman.dev](https://ai-craftsman.dev)
 
