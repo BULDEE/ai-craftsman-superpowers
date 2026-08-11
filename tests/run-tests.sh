@@ -601,6 +601,7 @@ test_session_metrics() {
     run_subtest "External pack gating tests pass" "$SCRIPT_DIR/core/test-external-packs.sh" || true
     run_subtest "Language registry tests pass" "$SCRIPT_DIR/core/test-lang-registry.sh" || true
     run_subtest "Level precedence tests pass" "$SCRIPT_DIR/core/test-precedence.sh" || true
+    run_subtest "Gate independence tests pass" "$SCRIPT_DIR/core/test-gate-independence.sh" || true
     run_subtest "Healthcheck tests pass" "$SCRIPT_DIR/core/test-healthcheck.sh" || true
     run_subtest "LSP policy tests pass" "$SCRIPT_DIR/core/test-lsp-policy.sh" || true
     run_subtest "Pack loader tests pass" "$SCRIPT_DIR/core/test-pack-loader.sh" || true
