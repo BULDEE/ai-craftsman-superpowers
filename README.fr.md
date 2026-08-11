@@ -1,6 +1,8 @@
-# AI Craftsman Superpowers
-
 <div align="center">
+
+<a href="https://ai-craftsman.dev">
+  <img src="https://raw.githubusercontent.com/BULDEE/ai-craftsman-superpowers/main/.github/assets/github-banner.png" alt="AI Craftsman Superpowers - un prompt demande, ceci impose" width="100%">
+</a>
 
 [🇬🇧 English](README.md) | 🇫🇷 **Français**
 
@@ -15,6 +17,8 @@
 
 **Transformez Claude en Senior Software Craftsman discipliné**
 
+[Site](https://ai-craftsman.dev) •
+[Installation](#installation) •
 [Démarrage rapide](#démarrage-rapide) •
 [Commandes](#commandes) •
 [Sécurité](#sécurité) •
@@ -57,9 +61,35 @@ sur Haiku, l'application de patterns sur Sonnet, le jugement architectural sur
 Opus. Vous ne choisissez pas, et vous ne payez pas le tarif Opus pour formater
 un message de commit.
 
+## À quoi ça ressemble
+
+Claude tente d'écrire une entité qui importe depuis la couche infrastructure. Le
+fichier n'atteint jamais votre disque :
+
+```console
+● Write(src/Domain/User/User.php)
+
+🚫 BLOCKED by AI Craftsman - 2 violation(s) detected before write:
+  ✗ LAYER001: Domain imports Infrastructure - DDD layer violation
+  ✗ PHP001: Missing declare(strict_types=1)
+Fix these before writing. Use // craftsman-ignore: <RULE_ID> to suppress.
+```
+
+Claude lit les deux mêmes lignes que vous, corrige l'import et réécrit. La
+correction est enregistrée ; si cette règle revient sur plusieurs fichiers, elle
+vous est proposée comme instinct candidat dans `/craftsman:metrics`. Et si la
+violation atteint une pull request à la place, la règle identique fait échouer
+le pipeline : un seul moteur, un seul verdict, zéro dérive entre votre éditeur
+et votre CI.
+
 ## Pourquoi Craftsman ? - Différenciateurs clés
 
 Ce qui rend ce plugin réellement unique dans l'écosystème Claude Code :
+
+<details>
+<summary><b>Dix mécanismes, en détail</b> : la boucle d'apprentissage, le rules engine, le cliquet structurel, le panel adverse, et six autres</summary>
+
+<br>
 
 1. **Correction Learning System (boucle fermée)** : enregistre chaque correction de violation, injecte les tendances au démarrage de session, et promeut les corrections récurrentes (3+ sur 3+ fichiers) en instincts candidats que vous validez dans `/craftsman:metrics`. Les instincts approuvés deviennent des skills projet avec provenance : Claude cesse de faire l'erreur au lieu d'en être rappelé.
 2. **Rules Engine avec héritage à 3 niveaux** : surcharges Global → Projet → Répertoire. Forme courte (`PHP001: warn`) ou forme longue (règles regex custom). Le code legacy coexiste avec du code neuf strict via la relaxation par répertoire.
@@ -71,6 +101,8 @@ Ce qui rend ce plugin réellement unique dans l'écosystème Claude Code :
 8. **Panel de contradiction au design** : trois contradicteurs (YAGNI, invariants et frontières, faisabilité) attaquent le design pendant `/craftsman:design`, avant qu'une ligne existe. Chaque objection atterrit dans une table retenue ou écartée : le silence n'est pas une option. Contredire un design coûte bien moins cher que contredire le code bâti dessus.
 9. **Sécurité et onboarding situationnel** : SEC001-003 (secrets en dur, eval dynamique, SQL par concaténation) vérifiés dans les hooks et en CI avec routage de la doctrine au blocage ; le setup observe le dépôt et pose au plus quatre questions en langage courant, et le mode guidé fait que chaque blocage s'explique.
 10. **Tiering de modèle par tâche** : chaque skill déclare le modèle le moins cher capable de faire son travail et l'effort de réflexion associé, appliqué le temps de son exécution. Formater un commit tourne sur Haiku en effort `low` ; une revue d'architecture sur Opus en `high`. Les paliers sont des alias, donc ils suivent les sorties de modèles, et une variable d'environnement suffit à remapper un palier entier. Voir [Model Tiering Explained](docs/guides/model-tiering-explained.md).
+
+</details>
 
 > Aucun autre plugin Claude Code ne combine tout cela : apprentissage des erreurs passées, personnalisation des règles de niveau entreprise, protection cognitive, validation temps réel, zéro dérive CI, tendances qualité mesurables, et économie de modèle par tâche.
 
@@ -311,12 +343,33 @@ Apache License 2.0 : voir [LICENSE](LICENSE)
 - Discussions : [GitHub Discussions](https://github.com/BULDEE/ai-craftsman-superpowers/discussions)
 - Documentation : [Claude Code Plugins](https://code.claude.com/docs/en/plugins)
 
+## Contributeurs
+
+<table>
+  <tr>
+    <td align="center" width="180">
+      <a href="https://github.com/woprrr"><img src="https://github.com/woprrr.png" width="72" alt="" style="border-radius:50%"><br><b>Alexandre Mallet</b></a><br>
+      <sub>Auteur et mainteneur</sub><br>
+      <sub><a href="https://buldee.com">BULDEE</a></sub>
+    </td>
+    <td align="center" width="180">
+      <a href="https://github.com/Lucr4m"><img src="https://github.com/Lucr4m.png" width="72" alt="" style="border-radius:50%"><br><b>Marc Lucas</b></a><br>
+      <sub>Architecture des hooks et résolution de config</sub><br>
+      <sub>CEO, <a href="https://www.malucasfire.dev">M.A. LucasFireDev</a></sub>
+    </td>
+  </tr>
+</table>
+
+[**Marc Lucas**](https://github.com/Lucr4m) ([LinkedIn](https://www.linkedin.com/in/marc-lucas-75a012120/)), CEO de [M.A. LucasFireDev](https://www.malucasfire.dev), contribue activement au plugin : la migration des agent hooks vers des command hooks gatés, le fallback vers le `~/.claude/.craft-config.yml` global, la résolution des chemins de hooks, et les tests qui les couvrent. M.A. LucasFireDev est une société de conseil PHP/Symfony : audit de code, maintenance et coaching d'équipe.
+
+Votre nom a sa place ici aussi : voir [Contribution](#contribution).
+
 ## Sponsors
 
 | Sponsor | Description |
 |---------|-------------|
 | **[BULDEE](https://buldee.com)** | Construire le futur du développement assisté par IA |
-| **[Time Hacking Limited](https://thelabio.com)** | Maximiser la productivité des développeurs |
+| **[M.A. LucasFireDev](https://www.malucasfire.dev)** | Conseil PHP/Symfony, sponsor du plugin en temps d'ingénierie |
 
 Envie de sponsoriser ? [Contactez-nous](https://github.com/BULDEE/ai-craftsman-superpowers/discussions)
 
@@ -326,6 +379,10 @@ Construit selon les [directives officielles des plugins Anthropic](https://code.
 
 ---
 
-**Fait avec craftsmanship par [Alexandre Mallet](https://github.com/woprrr)**
+<div align="center">
 
-*Sponsorisé par [BULDEE](https://buldee.com) & [Time Hacking Limited](https://thelabio.com)*
+**Fait avec craftsmanship par [Alexandre Mallet](https://github.com/woprrr)** · Sponsorisé par [BULDEE](https://buldee.com) & [M.A. LucasFireDev](https://www.malucasfire.dev)
+
+[ai-craftsman.dev](https://ai-craftsman.dev) · [Discord](https://discord.gg/eBpgHAGu) · [Changelog](CHANGELOG.md) · Apache 2.0
+
+</div>

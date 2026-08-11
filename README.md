@@ -1,6 +1,8 @@
-# AI Craftsman Superpowers
-
 <div align="center">
+
+<a href="https://ai-craftsman.dev">
+  <img src="https://raw.githubusercontent.com/BULDEE/ai-craftsman-superpowers/main/.github/assets/github-banner.png" alt="AI Craftsman Superpowers - a prompt asks, this enforces" width="100%">
+</a>
 
 🇬🇧 **English** | [🇫🇷 Français](README.fr.md)
 
@@ -15,6 +17,8 @@
 
 **Transform Claude into a disciplined Senior Software Craftsman**
 
+[Website](https://ai-craftsman.dev) •
+[Install](#installation) •
 [Quick Start](#quick-start) •
 [Commands](#commands) •
 [Security](#security) •
@@ -54,9 +58,34 @@ And it does this on the cheapest model that can do each job: mechanical work on
 Haiku, pattern application on Sonnet, architectural judgment on Opus. You do
 not pick, and you do not pay Opus rates to format a commit message.
 
+## What it looks like
+
+Claude tries to write an entity that imports from the infrastructure layer. The
+file never reaches your disk:
+
+```console
+● Write(src/Domain/User/User.php)
+
+🚫 BLOCKED by AI Craftsman - 2 violation(s) detected before write:
+  ✗ LAYER001: Domain imports Infrastructure - DDD layer violation
+  ✗ PHP001: Missing declare(strict_types=1)
+Fix these before writing. Use // craftsman-ignore: <RULE_ID> to suppress.
+```
+
+Claude reads the same two lines you do, corrects the import, and writes again.
+The correction is recorded; if that same rule keeps coming back across files, it
+is offered to you as a candidate instinct in `/craftsman:metrics`. And if the
+violation ever reaches a pull request instead, the identical rule fails the
+pipeline - one engine, one verdict, no drift between your editor and your CI.
+
 ## Why Craftsman? - Core Differentiators
 
 What makes this plugin genuinely unique in the Claude Code ecosystem:
+
+<details>
+<summary><b>Ten mechanisms, in detail</b> - the learning loop, the rules engine, the ratchet, the adversarial panel, and six more</summary>
+
+<br>
 
 1. **Correction Learning System (closed loop)** - records every violation fix, injects correction trends at session start, and promotes recurring fixes (3+ across 3+ files) into candidate instincts you approve in `/craftsman:metrics`. Approved instincts become project skills with provenance - Claude stops making the mistake instead of being reminded about it.
 2. **Rules Engine with 3-Level Inheritance** - Global → Project → Directory overrides. Short form (`PHP001: warn`) or long form (custom regex rules). Legacy code coexists with strict new code via directory-level relaxation.
@@ -68,6 +97,8 @@ What makes this plugin genuinely unique in the Claude Code ecosystem:
 8. **Adversarial Design Panel** - three contradictors (YAGNI, invariants and boundaries, feasibility) attack a design during `/craftsman:design`, before any code exists. Every objection lands in a retained or dismissed table: silence is not an option. Contradicting a design costs far less than contradicting the code built on it.
 9. **Security and Situational Onboarding** - SEC001-003 (hardcoded secrets, dynamic eval, SQL by concatenation) verified in hooks and CI with their doctrine routed on block; setup observes the repository and asks at most four plain-language questions, and guided mode makes every block explain itself.
 10. **Per-Task Model Tiering** - each skill declares the cheapest model that can do its job and how hard it should think, enforced for the turn it runs in. Formatting a commit runs on Haiku at low effort; an architecture review runs on Opus at high. Tiers are aliases, so they follow model releases, and you can remap a whole tier with one environment variable. See [Model Tiering Explained](docs/guides/model-tiering-explained.md).
+
+</details>
 
 > No other Claude Code plugin combines all of these: learning from past mistakes, enterprise rule customization, cognitive protection, real-time validation, zero CI drift, measurable quality trends, and per-task model economics.
 
@@ -307,12 +338,33 @@ Apache License 2.0 - see [LICENSE](LICENSE)
 - Discussions: [GitHub Discussions](https://github.com/BULDEE/ai-craftsman-superpowers/discussions)
 - Documentation: [Claude Code Plugins](https://code.claude.com/docs/en/plugins)
 
+## Contributors
+
+<table>
+  <tr>
+    <td align="center" width="180">
+      <a href="https://github.com/woprrr"><img src="https://github.com/woprrr.png" width="72" alt="" style="border-radius:50%"><br><b>Alexandre Mallet</b></a><br>
+      <sub>Author and maintainer</sub><br>
+      <sub><a href="https://buldee.com">BULDEE</a></sub>
+    </td>
+    <td align="center" width="180">
+      <a href="https://github.com/Lucr4m"><img src="https://github.com/Lucr4m.png" width="72" alt="" style="border-radius:50%"><br><b>Marc Lucas</b></a><br>
+      <sub>Hooks architecture and config resolution</sub><br>
+      <sub>CEO, <a href="https://www.malucasfire.dev">M.A. LucasFireDev</a></sub>
+    </td>
+  </tr>
+</table>
+
+[**Marc Lucas**](https://github.com/Lucr4m) ([LinkedIn](https://www.linkedin.com/in/marc-lucas-75a012120/)), CEO of [M.A. LucasFireDev](https://www.malucasfire.dev), contributes actively to the plugin: the migration from agent hooks to gated command hooks, the global `~/.claude/.craft-config.yml` fallback, hook path resolution, and the test suite that covers them. M.A. LucasFireDev is a PHP/Symfony consultancy doing code audit, maintenance and team coaching.
+
+Your name belongs here too - see [Contributing](#contributing).
+
 ## Sponsors
 
 | Sponsor | Description |
 |---------|-------------|
 | **[BULDEE](https://buldee.com)** | Building the future of AI-assisted development |
-| **[Time Hacking Limited](https://thelabio.com)** | Maximizing developer productivity |
+| **[M.A. LucasFireDev](https://www.malucasfire.dev)** | PHP/Symfony consultancy, sponsoring the plugin with engineering time |
 
 Interested in sponsoring? [Contact us](https://github.com/BULDEE/ai-craftsman-superpowers/discussions)
 
@@ -322,6 +374,10 @@ Built following [Anthropic's official plugin guidelines](https://code.claude.com
 
 ---
 
-**Made with craftsmanship by [Alexandre Mallet](https://github.com/woprrr)**
+<div align="center">
 
-*Sponsored by [BULDEE](https://buldee.com) & [Time Hacking Limited](https://thelabio.com)*
+**Made with craftsmanship by [Alexandre Mallet](https://github.com/woprrr)** · Sponsored by [BULDEE](https://buldee.com) & [M.A. LucasFireDev](https://www.malucasfire.dev)
+
+[ai-craftsman.dev](https://ai-craftsman.dev) · [Discord](https://discord.gg/eBpgHAGu) · [Changelog](CHANGELOG.md) · Apache 2.0
+
+</div>
