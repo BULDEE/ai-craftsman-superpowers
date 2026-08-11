@@ -431,6 +431,21 @@ Run /craftsman:team context to get a recommendation.
 
 ---
 
+## Workflow Tool Variant (explicit opt-in)
+
+Native teams above are imperative: this skill spawns and steers each
+teammate. When the user explicitly asks for scripted orchestration ("use a
+workflow", "fan out agents", "ultracode"), offer the native Workflow tool
+instead: a deterministic pipeline script (find then verify stages, resume
+cache, budget guards) that fits fixed-shape fan-outs like multi-dimension
+review or migration sweeps. The offer is user-triggered, never the default:
+a workflow can spawn dozens of agents, and that scale is the user's call
+(context budgets, ADR-0021). Teams stay the answer for exploratory,
+conversational collaboration; the Workflow tool is for pipelines whose
+stages are known before launch.
+
+---
+
 ## Help (no subcommand)
 
 ```

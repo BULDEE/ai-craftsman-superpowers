@@ -303,3 +303,15 @@ Step VERIFY found issues. Options:
 **Acceleration:** "Skip to implement" → "Consider: design and spec prevent rework. Skip only if the domain is already understood."
 
 **Scope Creep:** Adding features mid-workflow → "Finish the current workflow first. Note the idea for the next iteration."
+
+## Native /goal Mapping
+
+Every step's skill carries an Outcome Contract whose "Done when" line is a
+completion condition. Claude Code's native `/goal` keeps a session working
+until such a condition holds; the contracts are written to be pasted there
+verbatim when the user wants a goal-driven session. This mapping stays
+documentation, not wiring: the Stop-hook final review already re-wakes this
+plugin's sessions on violations, and two completion loops fighting each
+other would burn tokens for no extra safety. For bounded in-session
+iteration over a single verify command, the user runs `/craftsman:loop`
+instead.

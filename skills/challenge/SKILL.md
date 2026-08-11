@@ -271,3 +271,15 @@ Check against user's CLAUDE.md rules:
 **Acceleration:** Don't rush review. Check all levels.
 
 **Over-optimization:** Flag YAGNI violations, don't add them.
+
+## Positioning vs Native Reviewers
+
+Claude Code ships `/code-review` (correctness bugs), ultrareview (cloud
+fleet review) and the security-guidance plugin. This skill competes with
+none of them and ingests none of their findings: their output formats move
+weekly, and coupling this verdict to them would couple it to that churn.
+The division: native reviewers hunt correctness and vulnerability bugs;
+`/craftsman:challenge` judges architecture, DDD and design against the
+rules engine, the 7-day violation history and CI-parity severity
+resolution, context the native reviewers do not have. Run both when the
+scope warrants it; the verdicts stay separate on purpose.

@@ -187,3 +187,12 @@ bash ~/.claude/craftsman-dashboard.sh --serve
 This aggregates every repository recorded in the metrics database into one self-contained HTML page served on `127.0.0.1:8787` (add a port number after `--serve` to change it): quality score, violations per repository, most-violated rules, corrections applied, learned instincts, and the 30-day trend. Nothing leaves the machine.
 
 Without `--serve`, the page is written next to the database and its path is printed. `--json` emits the same aggregates as machine-readable data.
+
+### Publication is explicit, never a side effect
+
+Every metrics view stays on the machine by default (`127.0.0.1`, file next
+to the database). Publishing a trend report as a shareable page is a
+data-exposure decision: violation lists describe a private codebase. So a
+published artifact happens only when the user asks for it in so many words
+in the current session, and no metrics flow leaves the machine as a side
+effect of any other step.

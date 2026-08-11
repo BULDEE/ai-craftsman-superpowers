@@ -200,6 +200,13 @@ valgrind --leak-check=full ./program
 [What to remember for next time]
 ```
 
+## Long-Running Reproductions
+
+When the reproduction is a long build, a soak test or a log to tail, the
+native Monitor tool streams the process's events back into the session, so
+the investigation reacts to output as it lands instead of polling with
+sleep-and-recheck. Prefer it whenever the harness offers it.
+
 ## Bias Protection
 
 **Acceleration:** "Just fix it quickly"
