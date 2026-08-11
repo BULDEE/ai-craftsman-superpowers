@@ -61,6 +61,23 @@ Two facts settled the revision:
 
 Decision revised: the plugin ships no `.lsp.json` and declares no `lspServers` in its manifest. `tests/core/test-lsp-policy.sh` enforces this. Removed in 4.3.1.
 
+## Amendment (2026-08-11): LSP verdicts are model-plane, never engine-plane
+
+With the official LSP plugins installed, Claude receives diagnostics after
+every edit. Those diagnostics land in the model's context: no hook, and
+therefore neither `precedence.sh` nor the rules engine, ever sees them. A
+`supersedes:` entry deferring a Level 1 rule to an LSP would defer to an
+analyser whose verdict the engine cannot read, and the precedence contract
+("no verdict is not a clean verdict") makes that a dropped rule, not a
+deferred one.
+
+Decision: `supersedes:` targets executable analysers only, tools the engine
+invokes and whose output it parses (deptrac, ESLint, PHPStan class). LSP
+stays Level 1.5: a model-side aid that complements the gates and never
+stands in for one. `/craftsman:healthcheck` keeps recommending the official
+per-language plugins; `tests/core/test-lsp-policy.sh` keeps refusing any LSP
+declaration inside this plugin.
+
 ## References
 
 - ADR-0016 (v4 clean break)

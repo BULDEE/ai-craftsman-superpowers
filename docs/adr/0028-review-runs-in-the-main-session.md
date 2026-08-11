@@ -112,6 +112,19 @@ one that faces the user directly.
   which is the delivery path for a user-facing verdict. Any future fork must
   clear the `test-turn-budget.sh` check.
 
+## Addendum (2026-08-11): the fork premise, re-verified
+
+Section 2 states a forked skill "has no conversation history" and that
+attachments are not carried. On the current harness that premise is half
+stale: the Agent tool now documents `subagent_type: "fork"` as inheriting
+the full conversation context. Attachment delivery through a fork remains
+unverified. The decision does not move, because it rests on the delivery
+contract (a user-facing verdict must end in the user's session, never on a
+tool call) and on sections 1 and 3, which are fork-agnostic. What changes is
+the justification's shelf life: a future proposal to fork a verdict-delivering
+skill must re-test inheritance against the harness of the day instead of
+citing section 2, and still clears `tests/core/test-turn-budget.sh`.
+
 ## References
 
 - [ADR-0011: Context Fork Strategy](./0011-context-fork-strategy.md)
