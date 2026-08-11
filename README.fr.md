@@ -35,8 +35,8 @@ n'est pas un problème de discipline, c'est un problème d'architecture : rien d
 la boucle ne vérifie.
 
 Craftsman met la vérification dans la boucle. Les mêmes règles tournent en hooks
-sur chaque Write, en gate dans votre CI, et comme critères lus par un agent
-reviewer. Les violations de couche et l'absence de `strict_types` sont refusées
+sur chaque Write, en garde-fou dans votre CI, et comme critères lus par un agent
+relecteur. Les violations de couche et l'absence de `strict_types` sont refusées
 avant que l'écriture atterrisse, le reste est rendu directement à Claude comme un
 constat auquel il doit répondre, et la même règle fait échouer votre pipeline si
 elle atteint une pull request.
@@ -61,7 +61,7 @@ Fix these before writing. Use // craftsman-ignore: <RULE_ID> to suppress.
 exit=2
 ```
 
-Ce n'est pas une maquette : l'enregistrement fait passer deux fixtures dans
+Ce n'est pas une maquette : l'enregistrement fait passer deux fichiers d'essai dans
 `hooks/pre-write-check.sh` et montre ce qui en sort. Le code de sortie 2 est le
 refus.
 
@@ -85,11 +85,11 @@ avez déjà écrit, et les linters que vous faites déjà tourner.
 | Claude voit la violation *avant* d'écrire | non | non | oui |
 | Même verdict sur votre machine et dans le pipeline | n/a | partiel | oui |
 | Empêche Claude de refaire la même erreur | non | non | oui |
-| Bloque une décision d'archi prise sans passe de design | non | non | oui |
+| Bloque une décision d'architecture prise sans passe de design | non | non | oui |
 
 ## Ce qu'il fait vraiment
 
-**Il bloque.** Un seul rules engine, appliqué à l'identique en hooks et en CI.
+**Il bloque.** Un seul moteur de règles, appliqué à l'identique en hooks et en CI.
 Aucune dérive entre ce que votre éditeur autorise et ce que votre pipeline
 refuse. GitHub, GitLab et Bitbucket reçoivent des annotations natives ; Jenkins
 passe par l'adaptateur générique.
@@ -108,17 +108,17 @@ formater un commit sur Haiku en effort faible, une revue d'architecture sur Opus
 en effort élevé. Vous ne payez jamais le tarif Opus pour un message de commit.
 
 <details>
-<summary><b>Sept autres mécanismes</b> : le rules engine, le cliquet structurel, le panel de design adverse, la détection de biais, et trois autres</summary>
+<summary><b>Sept autres mécanismes</b> : le moteur de règles, le cliquet structurel, le panel de design adverse, la détection de biais, et trois autres</summary>
 
 <br>
 
-1. **Rules Engine à 3 niveaux d'héritage** : Global → Projet → Répertoire. Forme courte (`PHP001: warn`) ou forme longue (règles regex personnalisées). Le code legacy coexiste avec du code strict via une relaxation au niveau répertoire.
-2. **Cliquet structurel** : une baseline committée enregistre le plus haut niveau structurel de chaque fichier (complexité, taille, plus longue fonction, fan-out d'imports, nombre de suppressions). Un fichier que vous touchez peut s'améliorer ou rester égal, jamais régresser : la marque se resserre automatiquement sur un passage vert et ne se desserre que par une suppression documentée et comptée. Le legacy non touché n'est jamais puni pour une dette qu'il avait déjà.
+1. **Moteur de règles à 3 niveaux d'héritage** : Global → Projet → Répertoire. Forme courte (`PHP001: warn`) ou forme longue (règles regex personnalisées). Le code hérité coexiste avec du code strict via une relaxation au niveau répertoire.
+2. **Cliquet structurel** : une baseline committée (`.craftsman-baseline.json`) enregistre le plus haut niveau structurel de chaque fichier (complexité, taille, plus longue fonction, fan-out d'imports, nombre de suppressions). Un fichier que vous touchez peut s'améliorer ou rester égal, jamais régresser : la marque se resserre automatiquement sur un passage vert et ne se desserre que par une suppression documentée et comptée. Le code hérité non touché n'est jamais puni pour une dette qu'il avait déjà.
 3. **Panel de design adverse** : trois contradicteurs (YAGNI, invariants et frontières, faisabilité) attaquent un design pendant `/craftsman:design`, avant qu'une ligne de code existe. Chaque objection atterrit dans un tableau retenue ou écartée : le silence n'est pas une option. Contredire un design coûte bien moins cher que contredire le code bâti dessus.
 4. **Détecteur de biais cognitifs** : détection en temps réel du biais d'accélération, du scope creep et de la sur-optimisation dans vos prompts, bilingue FR/EN, sensible au contexte pour limiter les faux positifs.
-5. **Quality gate temps réel** : validation progressive sur chaque Write/Edit : regex (<50ms, toujours active) → sémantique LSP (via le plugin LSP officiel de votre langage) → analyse statique et architecture (PHPStan/ESLint/deptrac, opt-in par machine parce que lancer les analyseurs d'un projet exécute son code, voir [SECURITY.md](SECURITY.md)). Se dégrade proprement sans aucun outil installé.
+5. **Contrôle qualité en temps réel** : validation progressive sur chaque Write/Edit : regex (<50ms, toujours active) → sémantique LSP (via le plugin LSP officiel de votre langage) → analyse statique et architecture (PHPStan/ESLint/deptrac, à activer machine par machine parce que lancer les analyseurs d'un projet exécute son code, voir [SECURITY.md](SECURITY.md)). Se dégrade proprement sans aucun outil installé.
 6. **Métriques et tendances** : suivi SQLite des violations, corrections et sessions, avec des vues 7 jours / 30 jours pour identifier vos règles les plus violées.
-7. **Règles de sécurité** : SEC001-003 (secrets en dur, eval dynamique, SQL par concaténation) vérifiées en hooks et en CI, avec leur doctrine routée vers Claude au blocage. Le setup observe le dépôt et pose au plus quatre questions en langage clair.
+7. **Règles de sécurité** : SEC001-003 (secrets en dur, eval dynamique, SQL par concaténation) vérifiées en hooks et en CI, avec leur doctrine routée vers Claude au blocage. `/craftsman:setup` observe le dépôt et pose au plus quatre questions en langage clair.
 
 </details>
 
@@ -205,14 +205,14 @@ automatiquement. Référence complète : [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-
 | Utilitaires | `metrics`, `setup`, `team`, `healthcheck` |
 | CI/CD | `ci` |
 
-Les scaffolders proposent une variante de template avant de générer le code
+Les générateurs (`/craftsman:scaffold`) proposent une variante de gabarit avant de générer le code
 (`bounded-context` ou `event-sourced` pour une entité, par exemple). Les agents
 derrière ces commandes : `team-lead`, `architect` (sans Write/Edit),
 `doc-writer`, `security-pentester`, `legacy-surgeon`, `ui-ux-director`, plus les
-reviewers spécifiques aux packs Symfony, React et AI/ML. Roster complet :
+agents relecteurs spécifiques aux packs Symfony, React et AI/ML. Liste complète :
 [référence des agents](docs/reference/agents.md).
 
-## Rules Engine
+## Moteur de règles
 
 Surchargez n'importe quelle règle par projet ou par répertoire, avec 3 niveaux
 d'héritage :
@@ -229,7 +229,7 @@ en ligne avec `// craftsman-ignore: RULE_ID`.
 
 ## Intégration CI/CD
 
-La CI source les mêmes validateurs de pack et le même rules engine que les
+La CI source les mêmes validateurs de pack et le même moteur de règles que les
 hooks, donc une règle ne peut pas vouloir dire une chose sur votre machine et
 une autre dans le pipeline. Exportez un pipeline avec `/craftsman:ci export`.
 
@@ -243,7 +243,7 @@ une autre dans le pipeline. Exportez un pipeline avec `/craftsman:ci export`.
 ## Coût et confidentialité
 
 Tout ce qui précède fonctionne à **coût API nul** au-delà de votre usage normal
-de Claude Code : validation regex, rules engine, détection de biais, export CI et
+de Claude Code : validation regex, moteur de règles, détection de biais, export CI et
 métriques sont locaux. Une couche optionnelle ajoute de l'analyse sémantique via
 des agent hooks Haiku, autour de 0,15 à 0,30 dollar par session de 50 opérations
 Write/Edit. Désactivez-la avec `agent_hooks: false`, tout le reste continue.
@@ -268,7 +268,7 @@ explicitement, jamais déclenchées seules ; la méthodologie assume ses partis
 pris (DDD/Clean Architecture).
 
 **Contraintes actuelles :** PHP et TypeScript ont une couverture de règles
-complète, les autres langages un support de base ; les patterns de détection de
+complète, les autres langages un support de base ; les motifs de détection de
 biais sont EN/FR uniquement ; les métriques sont par machine, pas partagées en
 équipe ; l'auto-correction des violations et les plugins IDE ne sont pas
 supportés, par choix.
@@ -289,7 +289,7 @@ Plus de détail dans la [FAQ](FAQ.md).
 ## Avec le plugin Superpowers
 
 Craftsman et [Superpowers](https://github.com/anthropics/claude-code-plugins/tree/main/superpowers)
-se chargent simultanément sans conflit. Superpowers orchestre le workflow
+se chargent simultanément sans conflit. Superpowers orchestre l'enchaînement
 (brainstorming, planification, TDD, développement par sous-agents) ; Craftsman
 impose la qualité à l'intérieur.
 
@@ -328,7 +328,7 @@ Les contributions sont bienvenues. Forkez, branchez, suivez la méthodologie
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Vous cherchez par où commencer ? Les [good first issues](https://github.com/BULDEE/ai-craftsman-superpowers/labels/good%20first%20issue)
-sont du vrai travail, pas de l'occupationnel : nouveaux packs de langage,
+sont du vrai travail, pas des tâches d'occupation : nouveaux packs de langage,
 couverture de règles, exemples, traductions.
 
 ## Contributeurs
@@ -348,7 +348,7 @@ couverture de règles, exemples, traductions.
   </tr>
 </table>
 
-[**Marc Lucas**](https://github.com/Lucr4m) ([LinkedIn](https://www.linkedin.com/in/marc-lucas-75a012120/)), CEO de [M.A. LucasFireDev](https://www.malucasfire.dev), contribue activement au plugin : la migration des agent hooks vers des command hooks gatés, le fallback vers le `~/.claude/.craft-config.yml` global, la résolution des chemins de hooks, et les tests qui les couvrent. M.A. LucasFireDev est une société de conseil PHP/Symfony : audit de code, maintenance et coaching d'équipe.
+[**Marc Lucas**](https://github.com/Lucr4m) ([LinkedIn](https://www.linkedin.com/in/marc-lucas-75a012120/)), CEO de [M.A. LucasFireDev](https://www.malucasfire.dev), contribue activement au plugin : la migration des agent hooks vers des command hooks conditionnés, le fallback vers le `~/.claude/.craft-config.yml` global, la résolution des chemins de hooks, et les tests qui les couvrent. M.A. LucasFireDev est une société de conseil PHP/Symfony : audit de code, maintenance et coaching d'équipe.
 
 Votre nom a sa place ici aussi.
 
