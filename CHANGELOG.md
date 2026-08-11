@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.8.1] - 2026-08-11
+
+### Changed
+
+- **`tests/core/test-config.sh` split into 21 section functions.** The last
+  whole-file span in the top three structural offenders: complexity 102 to
+  10, longest span 505 to 30 lines, 90 assertions before and after (proved
+  against HEAD), shared inter-section state kept deliberate and commented.
+  SH002 blocked two oversized intermediate functions during the campaign and
+  both were re-split instead of suppressed. `file_lines` 505 to 577 is the
+  function boilerplate paid for it, recorded in the baseline with that
+  reason.
+
 ## [4.8.0] - 2026-08-11
 
 ### Changed
