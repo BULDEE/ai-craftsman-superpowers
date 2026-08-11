@@ -8,340 +8,328 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A52.1.218-blueviolet?logo=claude)](https://code.claude.com)
-[![Hermes](https://img.shields.io/badge/Hermes-compatible-14b8a6?logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPGcgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjEuNyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj48cGF0aCBkPSJNMTIgNnYxNiIvPjxwYXRoIGQ9Ik0xMiA2LjJDMTAuMiA0LjYgNy42IDUgNyA3YzIgLjYgNC0uMiA1LS44IDEgLjYgMyAxLjQgNSAuOC0uNi0yLTMuMi0yLjQtNS0uOHoiIGZpbGw9IiNmZmYiIHN0cm9rZT0ibm9uZSIvPjxwYXRoIGQ9Ik04LjUgOS41YzIuMiAxLjYgNC44IDEuNiA3IDAiLz48cGF0aCBkPSJNMTUuNSAxM2MtMi4yIDEuNi00LjggMS42LTcgMCIvPjxwYXRoIGQ9Ik04LjUgMTYuNWMyLjIgMS42IDQuOCAxLjYgNyAwIi8%2BPGNpcmNsZSBjeD0iMTIiIGN5PSIzLjIiIHI9IjEuNCIgZmlsbD0iI2ZmZiIgc3Ryb2tlPSJub25lIi8%2BPC9nPjwvc3ZnPgo%3D)](adapters/hermes/README.md)
 [![Version](https://img.shields.io/github/v/release/BULDEE/ai-craftsman-superpowers?label=version)](CHANGELOG.md)
 [![CI](https://img.shields.io/github/actions/workflow/status/BULDEE/ai-craftsman-superpowers/ci.yml?label=CI)](.github/workflows/ci.yml)
-[![Skills](https://img.shields.io/badge/Skills-19-orange)](COMMANDS-QUICK-REF.md)
-[![Agents](https://img.shields.io/badge/Agents-12-red)](#agents-spécialisés)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-**Transformez Claude en Senior Software Craftsman discipliné**
+**Claude écrit le code. Vos règles d'architecture décident de ce qui atterrit.**
+
+Pour les équipes qui font tourner Claude Code sur une base où une violation de
+couche coûte plus cher que la fonctionnalité elle-même.
 
 [Site](https://ai-craftsman.dev) •
 [Installation](#installation) •
-[Démarrage rapide](#démarrage-rapide) •
 [Commandes](#commandes) •
-[Sécurité](#sécurité) •
+[Docs](https://ai-craftsman.dev/docs) •
 [Contribution](#contribution)
 
 </div>
-
-> [!WARNING]
-> N'installez ce plugin que depuis les sources officielles listées ci-dessous. Ne faites pas confiance aux forks, miroirs, ou "copies améliorées" distribuées ailleurs : voir [Vérification avant installation](#vérification-avant-installation).
 
 ---
 
 ## Un prompt demande. Ceci impose.
 
 Vous pouvez écrire « toujours des classes final » dans votre `CLAUDE.md`. Claude
-va s'y tenir, jusqu'à ce que le contexte se remplisse, ou que la tâche
-s'allonge, ou qu'arrive le dixième fichier d'un refactor. Les instructions se
-délitent. Ce n'est pas un problème de discipline, c'est un problème
-d'architecture : rien dans la boucle ne vérifie.
+va s'y tenir, jusqu'à ce que le contexte se remplisse, que la tâche s'allonge, ou
+qu'arrive le dixième fichier d'un refactor. Les instructions se dégradent. Ce
+n'est pas un problème de discipline, c'est un problème d'architecture : rien dans
+la boucle ne vérifie.
 
-Craftsman met la vérification dans la boucle. Les mêmes règles tournent en
-hooks à chaque Write, en gate dans votre CI, et comme critères lus par les
-agents de revue. Une violation n'est pas un rappel poli au paragraphe suivant :
-les violations de couche et l'absence de `strict_types` sont refusées avant que
-l'écriture n'aboutisse, le reste revient directement à Claude comme un constat
-dont il doit répondre, et la même règle fait échouer votre pipeline si elle
-atteint une pull request.
+Craftsman met la vérification dans la boucle. Les mêmes règles tournent en hooks
+sur chaque Write, en gate dans votre CI, et comme critères lus par un agent
+reviewer. Les violations de couche et l'absence de `strict_types` sont refusées
+avant que l'écriture atterrisse, le reste est rendu directement à Claude comme un
+constat auquel il doit répondre, et la même règle fait échouer votre pipeline si
+elle atteint une pull request.
 
-Trois conséquences en découlent, et ce sont elles qui distinguent ce plugin
-d'un prompt bien écrit :
-
-| | |
-|---|---|
-| **Il bloque** | Un seul rules engine, appliqué à l'identique en hooks et en CI. Aucune dérive entre ce que votre éditeur autorise et ce que votre pipeline refuse. |
-| **Il apprend** | Chaque violation que vous corrigez est enregistrée. Un motif qui se répète sur plusieurs fichiers devient un instinct candidat que vous approuvez, et Claude cesse de commettre l'erreur au lieu qu'on la lui rappelle. |
-| **Il prouve** | « Terminé » exige des preuves. Une tâche ne peut pas être marquée complète sans trace de vérification, et un test qui échoue révoque une trace existante. |
-
-Le tout sur le modèle le moins cher capable de faire le travail : le mécanique
-sur Haiku, l'application de patterns sur Sonnet, le jugement architectural sur
-Opus. Vous ne choisissez pas, et vous ne payez pas le tarif Opus pour formater
-un message de commit.
-
-## À quoi ça ressemble
+## Voyez-le refuser
 
 Claude tente d'écrire une entité qui importe depuis la couche infrastructure. Le
 fichier n'atteint jamais votre disque :
 
+<img src="https://raw.githubusercontent.com/BULDEE/ai-craftsman-superpowers/main/.github/assets/craftsman-demo.gif" alt="Le hook pre-write refuse une entité domaine qui importe l'infrastructure, puis accepte le fichier corrigé" width="100%">
+
+<details>
+<summary>La même exécution, en texte</summary>
+
 ```console
-● Write(src/Domain/User/User.php)
+$ ./check.sh User.before.php.txt /srv/app/src/Domain/User/User.php
 
 🚫 BLOCKED by AI Craftsman - 2 violation(s) detected before write:
   ✗ LAYER001: Domain imports Infrastructure - DDD layer violation
-  ✗ PHP001: Missing declare(strict_types=1)
+  ✗ PHP001: Missing declare(strict_types=1) in class file
 Fix these before writing. Use // craftsman-ignore: <RULE_ID> to suppress.
+exit=2
 ```
+
+Ce n'est pas une maquette : l'enregistrement fait passer deux fixtures dans
+`hooks/pre-write-check.sh` et montre ce qui en sort. Le code de sortie 2 est le
+refus.
+
+</details>
 
 Claude lit les deux mêmes lignes que vous, corrige l'import et réécrit. La
 correction est enregistrée ; si cette règle revient sur plusieurs fichiers, elle
 vous est proposée comme instinct candidat dans `/craftsman:metrics`. Et si la
-violation atteint une pull request à la place, la règle identique fait échouer
-le pipeline : un seul moteur, un seul verdict, zéro dérive entre votre éditeur
-et votre CI.
+violation atteint une pull request à la place, la règle identique fait échouer le
+pipeline : un seul moteur, un seul verdict, zéro dérive entre votre éditeur et
+votre CI.
 
-## Pourquoi Craftsman ? - Différenciateurs clés
+## Face à ce que vous avez déjà
 
-Ce qui rend ce plugin réellement unique dans l'écosystème Claude Code :
+Votre vraie alternative n'est pas un autre plugin. C'est le `CLAUDE.md` que vous
+avez déjà écrit, et les linters que vous faites déjà tourner.
+
+| | CLAUDE.md seul | Linter et CI | Craftsman |
+|---|---|---|---|
+| Tient encore au fichier 300 d'un refactor | non | oui | oui |
+| Claude voit la violation *avant* d'écrire | non | non | oui |
+| Même verdict sur votre machine et dans le pipeline | n/a | partiel | oui |
+| Empêche Claude de refaire la même erreur | non | non | oui |
+| Bloque une décision d'archi prise sans passe de design | non | non | oui |
+
+## Ce qu'il fait vraiment
+
+**Il bloque.** Un seul rules engine, appliqué à l'identique en hooks et en CI.
+Aucune dérive entre ce que votre éditeur autorise et ce que votre pipeline
+refuse. GitHub, GitLab et Bitbucket reçoivent des annotations natives ; Jenkins
+passe par l'adaptateur générique.
+
+**Il apprend.** Chaque violation corrigée est enregistrée localement. Une
+correction qui revient 3 fois sur 3 fichiers devient un instinct candidat que
+vous validez dans `/craftsman:metrics`, puis un skill projet avec provenance. La
+détection est automatique, la codification reste sous contrôle humain.
+
+**Il prouve.** « Terminé » exige des preuves. Une tâche ne peut pas être marquée
+complète sans trace de vérification, et un test qui échoue révoque une trace
+existante.
+
+Et chaque travail tourne sur le modèle le moins cher qui en est capable :
+formater un commit sur Haiku en effort faible, une revue d'architecture sur Opus
+en effort élevé. Vous ne payez jamais le tarif Opus pour un message de commit.
 
 <details>
-<summary><b>Dix mécanismes, en détail</b> : la boucle d'apprentissage, le rules engine, le cliquet structurel, le panel adverse, et six autres</summary>
+<summary><b>Sept autres mécanismes</b> : le rules engine, le cliquet structurel, le panel de design adverse, la détection de biais, et trois autres</summary>
 
 <br>
 
-1. **Correction Learning System (boucle fermée)** : enregistre chaque correction de violation, injecte les tendances au démarrage de session, et promeut les corrections récurrentes (3+ sur 3+ fichiers) en instincts candidats que vous validez dans `/craftsman:metrics`. Les instincts approuvés deviennent des skills projet avec provenance : Claude cesse de faire l'erreur au lieu d'en être rappelé.
-2. **Rules Engine avec héritage à 3 niveaux** : surcharges Global → Projet → Répertoire. Forme courte (`PHP001: warn`) ou forme longue (règles regex custom). Le code legacy coexiste avec du code neuf strict via la relaxation par répertoire.
-3. **Détecteur de biais cognitifs** : détection en temps réel du biais d'accélération, du scope creep et de la sur-optimisation dans vos prompts, bilingue FR/EN, contextuel pour réduire les faux positifs.
-4. **Quality Gate temps réel** : validation progressive sur chaque Write/Edit : regex (<50ms, toujours actif) → sémantique LSP (en direct, via le plugin LSP officiel de votre langage) → analyse statique et architecture (PHPStan/ESLint/deptrac, activation explicite par machine car exécuter les analyseurs d'un projet revient à exécuter son code, voir [SECURITY.md](SECURITY.md)). Dégradation gracieuse sans aucun outil installé.
-5. **Pipeline CI multi-provider** : la CI charge les mêmes validateurs de pack et le même rules engine que les hooks, et résout la sévérité fichier par fichier, donc un `.craft-rules.yml` de répertoire s'applique des deux côtés. GitHub Actions, GitLab CI et Bitbucket Pipelines ont des annotations natives ; Jenkins passe par l'adaptateur générique.
-6. **Métriques & analyse de tendances** : suivi SQLite des violations, corrections et sessions, avec vues de tendances à 7 et 30 jours pour identifier vos règles les plus violées.
-7. **Cliquet structurel** : un baseline committé enregistre le high-water mark structurel de chaque fichier (complexité, taille, plus longue fonction, fan-out d'imports, nombre de suppressions). Un fichier que vous touchez peut s'améliorer ou rester égal, jamais régresser : la marque se resserre automatiquement au passage vert et ne se desserre que par une suppression documentée et comptée. Appliqué à l'identique dans les hooks et en CI ; le legacy non touché n'est jamais puni pour une dette qu'il avait déjà.
-8. **Panel de contradiction au design** : trois contradicteurs (YAGNI, invariants et frontières, faisabilité) attaquent le design pendant `/craftsman:design`, avant qu'une ligne existe. Chaque objection atterrit dans une table retenue ou écartée : le silence n'est pas une option. Contredire un design coûte bien moins cher que contredire le code bâti dessus.
-9. **Sécurité et onboarding situationnel** : SEC001-003 (secrets en dur, eval dynamique, SQL par concaténation) vérifiés dans les hooks et en CI avec routage de la doctrine au blocage ; le setup observe le dépôt et pose au plus quatre questions en langage courant, et le mode guidé fait que chaque blocage s'explique.
-10. **Tiering de modèle par tâche** : chaque skill déclare le modèle le moins cher capable de faire son travail et l'effort de réflexion associé, appliqué le temps de son exécution. Formater un commit tourne sur Haiku en effort `low` ; une revue d'architecture sur Opus en `high`. Les paliers sont des alias, donc ils suivent les sorties de modèles, et une variable d'environnement suffit à remapper un palier entier. Voir [Model Tiering Explained](docs/guides/model-tiering-explained.md).
+1. **Rules Engine à 3 niveaux d'héritage** : Global → Projet → Répertoire. Forme courte (`PHP001: warn`) ou forme longue (règles regex personnalisées). Le code legacy coexiste avec du code strict via une relaxation au niveau répertoire.
+2. **Cliquet structurel** : une baseline committée enregistre le plus haut niveau structurel de chaque fichier (complexité, taille, plus longue fonction, fan-out d'imports, nombre de suppressions). Un fichier que vous touchez peut s'améliorer ou rester égal, jamais régresser : la marque se resserre automatiquement sur un passage vert et ne se desserre que par une suppression documentée et comptée. Le legacy non touché n'est jamais puni pour une dette qu'il avait déjà.
+3. **Panel de design adverse** : trois contradicteurs (YAGNI, invariants et frontières, faisabilité) attaquent un design pendant `/craftsman:design`, avant qu'une ligne de code existe. Chaque objection atterrit dans un tableau retenue ou écartée : le silence n'est pas une option. Contredire un design coûte bien moins cher que contredire le code bâti dessus.
+4. **Détecteur de biais cognitifs** : détection en temps réel du biais d'accélération, du scope creep et de la sur-optimisation dans vos prompts, bilingue FR/EN, sensible au contexte pour limiter les faux positifs.
+5. **Quality gate temps réel** : validation progressive sur chaque Write/Edit : regex (<50ms, toujours active) → sémantique LSP (via le plugin LSP officiel de votre langage) → analyse statique et architecture (PHPStan/ESLint/deptrac, opt-in par machine parce que lancer les analyseurs d'un projet exécute son code, voir [SECURITY.md](SECURITY.md)). Se dégrade proprement sans aucun outil installé.
+6. **Métriques et tendances** : suivi SQLite des violations, corrections et sessions, avec des vues 7 jours / 30 jours pour identifier vos règles les plus violées.
+7. **Règles de sécurité** : SEC001-003 (secrets en dur, eval dynamique, SQL par concaténation) vérifiées en hooks et en CI, avec leur doctrine routée vers Claude au blocage. Le setup observe le dépôt et pose au plus quatre questions en langage clair.
 
 </details>
-
-> Aucun autre plugin Claude Code ne combine tout cela : apprentissage des erreurs passées, personnalisation des règles de niveau entreprise, protection cognitive, validation temps réel, zéro dérive CI, tendances qualité mesurables, et économie de modèle par tâche.
-
-
-## Ouvrir un dépôt non fiable
-
-Les hooks du plugin s'exécutent automatiquement : un dépôt cloné est donc une entrée non fiable (noms de fichiers, contenus, fichiers de config, et tout outil qu'il embarque). Deux capacités qui exécuteraient du code fourni par le dépôt sont éteintes sauf si **vous** les autorisez dans votre propre `~/.claude/.craft-config.yml`, et un fichier projet ne peut jamais les accorder :
-
-| Capacité | Pourquoi elle est verrouillée |
-|----------|-------------------------------|
-| `trust_project_tools: true` | Le Level 2 exécute `vendor/bin/phpstan`, `node_modules/.bin/eslint` et les configs qu'ils découvrent seuls. La config plate d'ESLint est du JavaScript exécutable par conception ; `bootstrapFiles` de PHPStan charge du PHP arbitraire. |
-| `packs.external[].path` | Les validators d'un pack externe sont sourcés comme du code shell. |
-
-Tout le reste continue de fonctionner sur un dépôt non fiable : rules engine, règles de couches, de persistence et de sécurité, cliquet structurel, métriques et gate CI sont notre propre code. `tests/core/test-hostile-repo.sh` rejoue chaque attaque de ce modèle et vérifie qu'elle échoue. Détail complet : [SECURITY.md](SECURITY.md).
-
-## Prérequis
-
-- Claude Code v2.1.218 ou plus récent (`claude --version` pour vérifier). Versions plus anciennes : installez la branche gelée 3.9.x.
-- `python3` 3.9 ou plus récent. Ce plancher est celui de `/usr/bin/python3` sur un Mac sans homebrew ; la CI importe chaque bibliothèque de hook sous 3.9, donc le plancher ne peut pas remonter en silence.
-- `bash`, `grep`, `jq`, `sqlite3`. GNU coreutils n'est pas requis : le plugin fonctionne sur un macOS d'origine.
 
 ## Installation
 
+> [!WARNING]
+> N'installez ce plugin que depuis les sources officielles ci-dessous. Ne faites
+> pas confiance aux forks, miroirs ou « copies améliorées » distribuées ailleurs.
+> Étapes de vérification : [SECURITY.md](SECURITY.md#pre-installation-verification).
+
 ```bash
-# 1. Add the marketplace
+# 1. Ajouter la marketplace
 /plugin marketplace add BULDEE/ai-craftsman-superpowers
 
-# 2. Install the plugin
+# 2. Installer le plugin
 /plugin install craftsman@ai-craftsman-superpowers
 
-# 3. Restart Claude Code
+# 3. Redémarrer Claude Code, puis configurer
 exit
 claude
+/craftsman:setup --quick
 ```
 
+C'est toute l'installation. `--quick` lit votre dépôt et choisit les défauts ;
+lancez `/craftsman:setup` sans l'option pour répondre à quatre questions en
+langage clair.
+
 <details>
-<summary>Installer depuis un clone local</summary>
+<summary>Prérequis, installation locale, et vérification</summary>
+
+<br>
+
+**Prérequis**
+
+- Claude Code v2.1.218 ou plus (`claude --version`). Versions antérieures : installez la ligne 3.9.x gelée.
+- `python3` 3.9 ou plus. C'est le plancher parce que c'est ce que `/usr/bin/python3` fournit sur un Mac sans homebrew ; la CI importe chaque bibliothèque de hook sous 3.9 pour que le plancher ne monte pas en silence.
+- `bash`, `grep`, `jq`, `sqlite3`. GNU coreutils n'est pas requis : le plugin tourne sur un macOS d'origine.
+
+**Installation depuis un clone local**
 
 ```bash
-git clone https://github.com/BULDEE/ai-craftsman-superpowers.git /path/to/ai-craftsman-superpowers
-/plugin marketplace add /path/to/ai-craftsman-superpowers
+git clone https://github.com/BULDEE/ai-craftsman-superpowers.git /chemin/vers/ai-craftsman-superpowers
+/plugin marketplace add /chemin/vers/ai-craftsman-superpowers
 /plugin install craftsman@ai-craftsman-superpowers
 ```
-</details>
 
-<details>
-<summary>Vérifier l'installation</summary>
+**Vérifier**
 
 ```bash
 /plugin
-# "Installed" tab → craftsman plugin should appear
-# "Errors" tab → check here if skills don't appear
+# Onglet "Installed" → le plugin craftsman doit apparaître
+# Onglet "Errors" → à consulter si les skills n'apparaissent pas
 ```
+
 </details>
 
 ## Démarrage rapide
 
 ```bash
-# Design a new entity (follows DDD phases)
-/craftsman:design
-I need to create a User entity for an e-commerce platform.
-
-# Debug an issue systematically (ReAct pattern)
-/craftsman:debug
-I have a memory leak in my Node.js app.
-
-# Review code for architecture issues
-/craftsman:challenge
-[paste your code]
-
-# Run the full development workflow (design → spec → plan → implement → test → verify → commit)
+# Le cycle complet : design → spec → plan → implémentation → tests → vérification → commit
 /craftsman:workflow
-I need to add a forgot password feature.
-
-# Quick setup (zero questions, smart defaults)
-/craftsman:setup --quick
+Je dois ajouter une fonctionnalité de mot de passe oublié.
 ```
 
-Nouveau sur la méthodologie ? Commencez par le [guide débutant](docs/guides/beginner.md) : il présente les concepts DDD et les commandes de base avec des exemples travaillés. Voir [`/examples`](examples/) pour des exemples d'usage détaillés avec les sorties attendues, et [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md) pour la liste complète des commandes.
+À ce stade tous les hooks tournent déjà. Points d'entrée individuels quand vous
+ne voulez pas le cycle entier : `/craftsman:design` (modélisation DDD),
+`/craftsman:debug` (investigation systématique), `/craftsman:challenge` (revue
+d'architecture), `/craftsman:verify` (preuves avant de déclarer terminé).
 
-## Modèle de coût API (optionnel)
-
-Les différenciateurs ci-dessus fonctionnent avec **zéro coût API** au-delà de votre usage normal de Claude Code : validation regex, rules engine, détection de biais, export CI et métriques sont tous locaux.
-
-Une couche optionnelle ajoute une analyse sémantique plus profonde via des hooks agents Haiku (violations de couches DDD, contexte d'erreur Sentry, revue d'architecture) : ~0,15-0,30 $ par session (50 opérations Write/Edit).
-
-**Désactivation :** définissez `agent_hooks: false` dans la config du plugin. Tout le reste continue de fonctionner.
+Nouveau sur la méthodologie ? Le [guide débutant](docs/guides/beginner.md)
+déroule les concepts DDD avec des exemples travaillés, et
+[`/examples`](examples/) montre chaque commande avec sa sortie attendue.
 
 ## Commandes
 
-Toutes les commandes s'invoquent explicitement avec `/craftsman:nom-de-commande`. Référence complète : [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md). En v4 elles deviennent des skills avec exécution forkée et injection de contexte en direct, invocations inchangées : voir [ADR-0017](docs/adr/0017-skills-over-commands.md).
+Toutes les commandes sont invoquées explicitement, jamais déclenchées
+automatiquement. Référence complète : [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md).
 
 | Catégorie | Commandes |
 |-----------|-----------|
-| Méthodologie de base | `design`, `debug`, `plan`, `challenge`, `verify`, `workflow`, `spec`, `refactor`, `legacy`, `test`, `git`, `parallel` |
+| Méthodologie | `design`, `debug`, `plan`, `challenge`, `verify`, `workflow`, `spec`, `refactor`, `legacy`, `test`, `git`, `parallel` |
 | Scaffolding | `scaffold entity/usecase/component/hook/api-resource/pack` |
 | Ingénierie AI/ML | `rag`, `mlops`, `agent-design` |
 | Utilitaires | `metrics`, `setup`, `team`, `healthcheck` |
 | CI/CD | `ci` |
 
-Les scaffolders proposent une variante de template avant de générer le code (ex. `bounded-context` vs `event-sourced` pour les entités) : voir [Template Variants](skills/scaffold/SKILL.md#template-variants-v210).
-
-## Agents spécialisés
-
-Agents core (d'autres se chargent automatiquement avec les packs) : `team-lead` (orchestrateur), `architect` (DDD/Clean Architecture, sans Write/Edit), `doc-writer` (ADR, README, CHANGELOG), `security-pentester`, `legacy-surgeon`, `ui-ux-director` : plus des reviewers/craftsmen spécifiques pour Symfony, React et AI/ML. Liste complète et model tiering : [référence des agents](docs/reference/agents.md).
+Les scaffolders proposent une variante de template avant de générer le code
+(`bounded-context` ou `event-sourced` pour une entité, par exemple). Les agents
+derrière ces commandes : `team-lead`, `architect` (sans Write/Edit),
+`doc-writer`, `security-pentester`, `legacy-surgeon`, `ui-ux-director`, plus les
+reviewers spécifiques aux packs Symfony, React et AI/ML. Roster complet :
+[référence des agents](docs/reference/agents.md).
 
 ## Rules Engine
 
-Surchargez n'importe quelle règle par projet ou par répertoire avec l'héritage de config à 3 niveaux :
+Surchargez n'importe quelle règle par projet ou par répertoire, avec 3 niveaux
+d'héritage :
 
 ```
-~/.claude/.craft-config.yml          ← Global defaults
-  └─ {project}/.craft-config.yml     ← Project overrides
-      └─ {dir}/.craft-rules.yml      ← Directory overrides
+~/.claude/.craft-config.yml          ← Défauts globaux
+  └─ {projet}/.craft-config.yml      ← Surcharges projet
+      └─ {dir}/.craft-rules.yml      ← Surcharges répertoire
 ```
 
-Forme courte : `PHP001: warn` / `TS001: ignore`. Forme longue : règles custom avec regex, sévérité, langages. Suppression ponctuelle en ligne avec `// craftsman-ignore: RULE_ID`.
+Forme courte : `PHP001: warn` / `TS001: ignore`. Forme longue : règles
+personnalisées avec regex, sévérité, langages. Supprimez une occurrence unique
+en ligne avec `// craftsman-ignore: RULE_ID`.
 
 ## Intégration CI/CD
 
-La CI charge les mêmes validateurs de pack et le même rules engine que les
-hooks : une règle ne peut pas vouloir dire une chose sur votre machine et une
-autre dans le pipeline.
+La CI source les mêmes validateurs de pack et le même rules engine que les
+hooks, donc une règle ne peut pas vouloir dire une chose sur votre machine et
+une autre dans le pipeline. Exportez un pipeline avec `/craftsman:ci export`.
 
-| Provider | Template | Adaptateur |
-|----------|----------|------------|
+| Fournisseur | Template | Adaptateur |
+|-------------|----------|------------|
 | GitHub Actions | `craftsman-quality-gate.yml` | Natif : annotations inline et commentaire de PR |
 | GitLab CI | `.gitlab-ci.craftsman.yml` | Natif : rapport code-quality et note de MR |
 | Bitbucket Pipelines | `bitbucket-pipelines.craftsman.yml` | Natif : rapport de build |
-| Jenkins | `Jenkinsfile.craftsman` | Générique : sortie de log et fichier markdown, sans annotations natives |
+| Jenkins | `Jenkinsfile.craftsman` | Générique : log brut et fichier markdown |
 
-Utilisez `/craftsman:ci export` ou `craftsman-ci.sh init --provider` en CLI.
+## Coût et confidentialité
 
-Également appliqué par des hooks : le [Circuit Breaker](docs/reference/hooks.md#circuit-breaker-v210) protège l'intégration Sentry pendant les pannes, et l'[Iron Law Pattern](docs/reference/hooks.md#iron-law-pattern-v210) bloque les changements d'architecture impulsifs faits sans passage préalable par `/craftsman:design`. Comportement complet des hooks, codes de sortie et IDs de règles : [référence des hooks](docs/reference/hooks.md).
+Tout ce qui précède fonctionne à **coût API nul** au-delà de votre usage normal
+de Claude Code : validation regex, rules engine, détection de biais, export CI et
+métriques sont locaux. Une couche optionnelle ajoute de l'analyse sémantique via
+des agent hooks Haiku, autour de 0,15 à 0,30 dollar par session de 50 opérations
+Write/Edit. Désactivez-la avec `agent_hooks: false`, tout le reste continue.
 
-## Le knowledge en bundle OKF
+**Aucune télémétrie, aucune analytique, aucun phone-home.** Les métriques ne
+quittent jamais votre machine. Le contenu des fichiers édités n'atteint l'API
+Anthropic que si `agent_hooks: true`. Les command hooks n'écrivent que dans la
+base de métriques locale et l'état de session.
 
-Le savoir méthodologique du plugin (Clean Architecture, DDD, persistence, legacy, refactoring) est livré en bundle [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) : du Markdown curé avec frontmatter YAML, versionné dans git, relu en PR. Un lookup déterministe route chaque règle vers le concept qui l'explique (un blocage LAYER004 pointe vers le doc repository-pattern), sans embedding, sans index, sans service externe. Vos propres outils de mémoire (Obsidian, claude-mem, tout consommateur OKF) lisent le bundle directement : c'est du Markdown sur disque.
+Un dépôt cloné est une entrée non fiable, donc les deux capacités qui
+exécuteraient du code fourni par le dépôt (`trust_project_tools` et les chemins
+de packs externes) restent désactivées tant que **vous** ne les activez pas dans
+votre config globale, et un fichier projet ne peut jamais les accorder.
+`tests/core/test-hostile-repo.sh` reproduit chaque attaque couverte par ce modèle
+et vérifie qu'elle échoue. Détail complet : [SECURITY.md](SECURITY.md).
 
-## Configuration CLAUDE.md
+## Limites connues
 
-Ordre de priorité : instruction utilisateur explicite → `CLAUDE.md` de projet → plugin (skills, hooks, knowledge) → `CLAUDE.md` global (`~/.claude/CLAUDE.md`).
+**Par choix :** les violations de règles bloquent, la détection de biais se
+contente d'avertir ; pas d'auto-commit ; les commandes sont invoquées
+explicitement, jamais déclenchées seules ; la méthodologie est opinionated
+(DDD/Clean Architecture).
 
-Mettez le profil DISC/style de communication/biais personnels dans votre CLAUDE.md **global**, l'architecture/entités clés/règles projet dans votre CLAUDE.md **projet**, et laissez le **plugin** gérer l'application des règles de code et les design patterns. Guide complet : [CLAUDE.md Best Practices Guide](docs/guides/claude-md-best-practices.md).
+**Contraintes actuelles :** PHP et TypeScript ont une couverture de règles
+complète, les autres langages un support de base ; les patterns de détection de
+biais sont EN/FR uniquement ; les métriques sont par machine, pas partagées en
+équipe ; l'auto-correction des violations et les plugins IDE ne sont pas
+supportés, par choix.
 
-## Nouveautés v4.0.0 - Le système craftsman auto-apprenant
+Plus de détail dans la [FAQ](FAQ.md).
 
-v4 est une **rupture nette** ciblant Claude Code >= 2.1.218, sans rétrocompatibilité (la branche 3.9.x reste disponible et gelée). Les grandes lignes :
+## Pour aller plus loin
 
-- **Boucle d'apprentissage fermée** : les corrections récurrentes deviennent des instincts candidats que vous validez dans `/craftsman:metrics` ; les instincts approuvés sont codifiés en skills projet. La détection reste automatique, la codification reste validée par un humain.
-- **Architecture native-first** : les workflows deviennent des skills forkés avec injection de contexte en direct, et la vérification s'appuie sur `asyncRewake` et un gate `TaskCompleted`. La vérification sémantique tourne sur Haiku dans des sous-processus headless derrière des hooks `command` conditionnés, et non via les types de hooks natifs `agent`/`prompt` : ceux-ci n'offrent aucun gating par option de plugin et vous retireraient la possibilité de désactiver la vérification ([ADR-0018](docs/adr/0018-native-prompt-agent-hooks.md)).
-- **Niveau 1.5 sémantique** : validation LSP entre le gate regex et l'analyse statique, branchée sur les plugins LSP officiels par langage que vous installez explicitement : le plugin orchestre l'outillage de votre stack, il ne s'y substitue jamais.
-- **Discipline de contexte** : chaque injection plafonnée par des budgets configurables, chaque hook désactivable individuellement.
+| | |
+|---|---|
+| [Nouveautés v4](https://github.com/BULDEE/ai-craftsman-superpowers/releases/latest) | Rupture nette visant Claude Code >= 2.1.218 : boucle d'apprentissage fermée, skills natifs, Level 1.5 sémantique, budgets de contexte. Changements cassants dans [MIGRATION.md](MIGRATION.md). |
+| [Décisions d'architecture](docs/adr/) | 28 ADR couvrant chaque choix majeur. Commencez par [ADR-0016](docs/adr/0016-v4-clean-break-native-first.md) et [ADR-0005](docs/adr/0005-knowledge-first-architecture.md). |
+| [Bundle de connaissance](knowledge/) | La méthodologie est livrée en bundle [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) : du Markdown versionné dans git, lisible par Obsidian ou n'importe quel consommateur OKF. Zéro embedding, zéro index, zéro service externe. |
+| [Guide CLAUDE.md](docs/guides/claude-md-best-practices.md) | Ce qui va dans votre fichier global, dans votre fichier projet, et ce que le plugin doit porter à la place. |
+| [Référence des hooks](docs/reference/hooks.md) | Chaque hook, code de sortie et identifiant de règle, dont le Circuit Breaker et l'Iron Law Pattern. |
+| [Dépannage](TROUBLESHOOTING.md) | Quand un skill n'apparaît pas, qu'un hook ne se déclenche pas, ou qu'une règle se déclenche trop. |
 
-Plan complet et phases : [docs/v4-roadmap.md](docs/v4-roadmap.md). Décisions : ADR [0016](docs/adr/0016-v4-clean-break-native-first.md) à [0023](docs/adr/0023-deterministic-verification-loop.md). Changements cassants : [MIGRATION.md](MIGRATION.md).
+## Avec le plugin Superpowers
 
-## Décisions d'architecture
+Craftsman et [Superpowers](https://github.com/anthropics/claude-code-plugins/tree/main/superpowers)
+se chargent simultanément sans conflit. Superpowers orchestre le workflow
+(brainstorming, planification, TDD, développement par sous-agents) ; Craftsman
+impose la qualité à l'intérieur.
 
-28 ADR couvrent le raisonnement derrière chaque choix de conception majeur : voir [`/docs/adr`](docs/adr/). Commencez par [ADR-0016: v4 Clean Break](docs/adr/0016-v4-clean-break-native-first.md) et [ADR-0005: Knowledge-First Architecture](docs/adr/0005-knowledge-first-architecture.md) si vous évaluez la conception du plugin.
-
-## Utilisation avec le plugin Superpowers
-
-Craftsman et [Superpowers](https://github.com/anthropics/claude-code-plugins/tree/main/superpowers) sont complémentaires et se chargent simultanément sans conflit. Superpowers gère l'orchestration de workflow (brainstorming, planification, TDD, développement piloté par subagents) ; Craftsman gère l'application de la qualité spécifique au domaine (règles DDD, validation architecturale, correction learning).
+<details>
+<summary>La boucle combinée, étape par étape</summary>
 
 ```
-1. /superpowers:brainstorming     → Design the solution collaboratively
-2. /superpowers:writing-plans     → Create implementation plan
-3. /superpowers:subagent-driven-development → Execute with fresh subagents
-   ├── Craftsman hooks fire on every Write/Edit (real-time quality gate)
-   ├── /craftsman:design           → DDD modeling when domain entities appear
-   └── /craftsman:challenge        → Architecture review at milestones
-4. /craftsman:verify              → Evidence-based verification before commit
-5. /superpowers:finishing-a-development-branch → PR and merge
+1. /superpowers:brainstorming     → Concevoir la solution en collaboration
+2. /superpowers:writing-plans     → Créer le plan d'implémentation
+3. /superpowers:subagent-driven-development → Exécuter avec des sous-agents frais
+   ├── Les hooks Craftsman se déclenchent sur chaque Write/Edit
+   ├── /craftsman:design           → Modélisation DDD quand des entités apparaissent
+   └── /craftsman:challenge        → Revue d'architecture aux jalons
+4. /craftsman:verify              → Vérification par preuves avant commit
+5. /superpowers:finishing-a-development-branch → PR et merge
 ```
+
+</details>
 
 ## Philosophie
 
-> "Des semaines de code peuvent économiser des heures de planification."
+> « Des semaines de code peuvent économiser des heures de planification. »
 
-Design avant le code. Test-first. Débogage systématique plutôt que correctifs au hasard. YAGNI. Clean Architecture : les dépendances pointent vers l'intérieur. Make it work, make it right, make it fast, dans cet ordre.
+Concevoir avant de coder. Tests d'abord. Débogage systématique plutôt que
+correctifs au hasard. YAGNI. Clean Architecture, les dépendances pointent vers
+l'intérieur. Faire marcher, faire bien, faire vite, dans cet ordre.
 
-Pragmatisme plutôt que dogmatisme : 80 % de couverture sur les chemins critiques vaut mieux que 100 % partout ; DDD pour les domaines complexes, pas pour tous ; concret d'abord, abstraction quand réellement nécessaire.
-
-## Sécurité
-
-Les command hooks n'écrivent que dans la base de métriques locale et l'état de session. Les agent hooks (Haiku) ne modifient jamais de fichiers. La détection de biais avertit seulement (exit 0). Les violations de couche et `strict_types` sont refusées avant l'écriture ; les autres règles remontent la violation à Claude après coup et font échouer la CI sur une pull request.
-
-Chaque agent déclare son propre périmètre d'outils dans `tools:`. La plupart des craftsmen détiennent `Write`/`Edit`/`Bash` parce que leur métier est de modifier du code ; `architect` et `team-lead` n'ont ni `Write` ni `Edit`. Lisez la frontmatter de l'agent plutôt que de déduire un périmètre de son nom.
-
-**Pas de télémétrie, pas d'analytics, pas de phone-home.** Avec `agent_hooks: false` et sans config Sentry, zéro activité réseau. Le contenu des fichiers édités n'atteint l'API Anthropic que si `agent_hooks: true` (défaut) ; Sentry n'est interrogé que si configuré ; les métriques ne quittent jamais votre machine. Détail complet : [SECURITY.md](SECURITY.md#data--network-transparency).
-
-### Vérification avant installation
-
-```bash
-git clone https://github.com/BULDEE/ai-craftsman-superpowers.git
-cd ai-craftsman-superpowers
-
-# Review hooks - the only executable code
-cat hooks/bias-detector.sh hooks/post-write-check.sh hooks/pre-write-check.sh hooks/session-metrics.sh
-
-# Verify no network calls
-grep -r "curl\|wget\|fetch\|http" hooks/
-# Should return nothing (hooks are 100% local)
-```
-
-## Limitations connues
-
-**Par conception :** les violations de règles de code bloquent, la détection de biais avertit seulement ; pas d'auto-commit ; les commandes sont explicitement invoquées, jamais auto-déclenchées ; la méthodologie est opinionated (DDD/Clean Architecture).
-
-**Contraintes actuelles :** PHP/TypeScript ont une couverture de règles complète, les autres langages n'ont qu'un support basique ; les métriques sont locales à la machine, pas partagées entre équipiers ; les patterns de détection de biais sont EN/FR uniquement ; la correction automatique des violations et les plugins IDE ne sont pas supportés par conception.
-
-Plus de détails dans la [FAQ](FAQ.md).
+Pragmatisme plutôt que dogmatisme : 80 % de couverture sur les chemins critiques
+vaut mieux que 100 % partout ; le DDD pour les domaines complexes, pas pour tous ;
+le concret d'abord, l'abstraction quand elle est réellement nécessaire.
 
 ## Contribution
 
-Les contributions sont bienvenues : c'est un projet open source.
+Les contributions sont bienvenues. Forkez, branchez, suivez la méthodologie
+(`/craftsman:design` d'abord), ajoutez des tests, ouvrez une PR. Détails dans
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-1. Forkez le dépôt
-2. Créez une branche de feature
-3. Suivez la méthodologie craftsman (`/craftsman:design` d'abord !)
-4. Ajoutez des tests pour les nouvelles fonctionnalités
-5. Soumettez une PR
-
-Voir [CONTRIBUTING.md](CONTRIBUTING.md) pour les directives détaillées. Envie de contribuer ? Nouvelles skills pour d'autres frameworks (Django, Rails, Go), support de langages additionnels pour les hooks, exemples et documentation, tests d'intégration, et traductions sont tous bienvenus.
-
-## Dépannage
-
-Déplacé vers [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
-
-## Licence
-
-Apache License 2.0 : voir [LICENSE](LICENSE)
-
-## Support
-
-- Discord : [rejoignez la communauté](https://discord.gg/eBpgHAGu)
-- Issues : [GitHub Issues](https://github.com/BULDEE/ai-craftsman-superpowers/issues)
-- Discussions : [GitHub Discussions](https://github.com/BULDEE/ai-craftsman-superpowers/discussions)
-- Documentation : [Claude Code Plugins](https://code.claude.com/docs/en/plugins)
+Vous cherchez par où commencer ? Les [good first issues](https://github.com/BULDEE/ai-craftsman-superpowers/labels/good%20first%20issue)
+sont du vrai travail, pas de l'occupationnel : nouveaux packs de langage,
+couverture de règles, exemples, traductions.
 
 ## Contributeurs
 
@@ -362,7 +350,7 @@ Apache License 2.0 : voir [LICENSE](LICENSE)
 
 [**Marc Lucas**](https://github.com/Lucr4m) ([LinkedIn](https://www.linkedin.com/in/marc-lucas-75a012120/)), CEO de [M.A. LucasFireDev](https://www.malucasfire.dev), contribue activement au plugin : la migration des agent hooks vers des command hooks gatés, le fallback vers le `~/.claude/.craft-config.yml` global, la résolution des chemins de hooks, et les tests qui les couvrent. M.A. LucasFireDev est une société de conseil PHP/Symfony : audit de code, maintenance et coaching d'équipe.
 
-Votre nom a sa place ici aussi : voir [Contribution](#contribution).
+Votre nom a sa place ici aussi.
 
 ## Sponsors
 
@@ -373,16 +361,27 @@ Votre nom a sa place ici aussi : voir [Contribution](#contribution).
 
 Envie de sponsoriser ? [Contactez-nous](https://github.com/BULDEE/ai-craftsman-superpowers/discussions)
 
-## Remerciements
+## Support
 
-Construit selon les [directives officielles des plugins Anthropic](https://code.claude.com/docs/en/discover-plugins), inspiré des principes DDD, Clean Architecture et TDD. Merci à tous les contributeurs et sponsors !
+[Discord](https://discord.gg/eBpgHAGu) •
+[Issues](https://github.com/BULDEE/ai-craftsman-superpowers/issues) •
+[Discussions](https://github.com/BULDEE/ai-craftsman-superpowers/discussions) •
+[Changelog](CHANGELOG.md)
+
+Apache License 2.0, voir [LICENSE](LICENSE).
 
 ---
 
 <div align="center">
 
-**Fait avec craftsmanship par [Alexandre Mallet](https://github.com/woprrr)** · Sponsorisé par [BULDEE](https://buldee.com) & [M.A. LucasFireDev](https://www.malucasfire.dev)
+**Si Craftsman a refusé une écriture que vous auriez mergée, mettez une étoile.**
+<br>
+C'est la seule métrique que ce projet collecte.
 
-[ai-craftsman.dev](https://ai-craftsman.dev) · [Discord](https://discord.gg/eBpgHAGu) · [Changelog](CHANGELOG.md) · Apache 2.0
+<br>
+
+Fait avec craftsmanship par [Alexandre Mallet](https://github.com/woprrr) · Sponsorisé par [BULDEE](https://buldee.com) & [M.A. LucasFireDev](https://www.malucasfire.dev)
+
+[ai-craftsman.dev](https://ai-craftsman.dev)
 
 </div>
