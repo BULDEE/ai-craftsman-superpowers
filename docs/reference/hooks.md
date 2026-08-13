@@ -337,9 +337,9 @@ The `bias-detector.sh` hook (UserPromptSubmit) detects cognitive biases in your 
 
 | Bias | Trigger Keywords | Warning |
 |------|-----------------|---------|
-| Acceleration | "vite", "quick", "just do it" | STOP - Design first |
-| Scope Creep | "et aussi", "while we're at it" | STOP - Is this in scope? |
-| Over-Optimization | "abstraire", "generalize" | STOP - YAGNI |
+| Acceleration | "vite", "quick", "hazlo rápido" | STOP - Design first |
+| Scope Creep | "et aussi", "while we're at it", "y además agrega" | STOP - Is this in scope? |
+| Over-Optimization | "abstraire", "generalize", "hazlo configurable" | STOP - YAGNI |
 
 Bias detection is **warning-only** (exit 0) - it never blocks your workflow.
 

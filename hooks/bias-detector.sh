@@ -26,26 +26,27 @@ fi
 [[ -z "$PROMPT" ]] && exit 0
 
 # =============================================================================
-# Bias Patterns (case-insensitive, bilingual FR/EN)
+# Bias Patterns (case-insensitive, trilingual FR/EN/ES)
 # =============================================================================
 
 # Acceleration bias: rushing without thinking
 # Context-aware: requires imperative verb context or explicit rush indicators
 # Reduced false positives: "quick fix" alone won't trigger, "just do it quick" will
-ACCELERATION_PATTERNS="(fais.{0,10}vite|code direct|pas le temps|no time|just do it|skip the (design|test|review)|hurry up|asap|do it now|juste code|sans (réfléchir|tester|design))"
+ACCELERATION_PATTERNS="(fais.{0,10}vite|code direct|pas le temps|no time|just do it|skip the (design|test|review)|hurry up|asap|do it now|juste code|sans (réfléchir|tester|design)|hazlo (ya|ahora|rápido)|no hay tiempo|omite (el )?(diseño|test|pruebas|revisión)|(hazlo|programa|implementa) sin (pensar|probar|diseñar))"
 
 # Scope creep: adding features beyond scope
 # Context-aware: requires action verb + addition pattern
-SCOPE_CREEP_PATTERNS="(et (aussi|en plus) (ajoute|fais|met|ajoutons)|tant qu'on y est|while we're at it.*(add|change|also)|also add|let's also (add|do|change)|and also (add|do|implement)|ajoutons aussi|rajoute)"
+SCOPE_CREEP_PATTERNS="(et (aussi|en plus) (ajoute|fais|met|ajoutons)|tant qu'on y est|while we're at it.*(add|change|also)|also add|let's also (add|do|change)|and also (add|do|implement)|ajoutons aussi|rajoute|y (también|además) (añade|agrega|implementa|cambia|haz)|ya que estamos.*(añade|agrega|implementa|cambia|haz)|agrega también)"
 
 # Over-optimization: premature abstraction
 # Context-aware: requires explicit generalization intent
-OVER_OPT_PATTERNS="(abstraire|généraliser|make it (abstract|configurable|generic|extensible)|future[- ]proof|pour (le futur|plus tard)|rends[- ]?(le )?(configurable|générique|abstrait))"
+OVER_OPT_PATTERNS="(abstraire|généraliser|make it (abstract|configurable|generic|extensible)|future[- ]proof|pour (le futur|plus tard)|rends[- ]?(le )?(configurable|générique|abstrait)|(abstrae|generaliza) (esto|este|esta|el|la)|vamos a (abstraer|generalizar)|hazlo (abstracto|configurable|genérico|extensible))"
 
 # Workflow enforcement: domain modeling without /craftsman:design
 # FR: crée une entité|value object|agrégat
 # EN: create entity|value object|aggregate
-DOMAIN_MODELING_PATTERNS="(create (a |an |the )?(entity|value object|aggregate|domain event|domain service)|crée (une |un |l'?)?(entité|value object|agrégat|événement de domaine))"
+# ES: crea una entidad|objeto de valor|agregado
+DOMAIN_MODELING_PATTERNS="(create (a |an |the )?(entity|value object|aggregate|domain event|domain service)|crée (une |un |l'?)?(entité|value object|agrégat|événement de domaine)|crea (una |un |la |el )?(entidad|objeto de valor|agregado|evento de dominio|servicio de dominio))"
 
 # =============================================================================
 # Detection & Warnings
