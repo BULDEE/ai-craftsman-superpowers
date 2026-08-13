@@ -51,6 +51,15 @@ else
     log_fail "EN 'just do it quick' should detect acceleration" "exit=$exit_code"
 fi
 
+result=$(run_bias "hazlo rápido, no hay tiempo")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qi "Acceleration"; then
+    log_pass "ES 'hazlo rápido' detects acceleration bias"
+else
+    log_fail "ES 'hazlo rápido' should detect acceleration" "exit=$exit_code"
+fi
+
 # =============================================================================
 # Scope Creep Detection
 # =============================================================================
@@ -75,6 +84,15 @@ else
     log_fail "EN 'let's also add' should detect scope creep" "exit=$exit_code"
 fi
 
+result=$(run_bias "y además agrega registros")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qi "Scope Creep"; then
+    log_pass "ES 'y además agrega' detects scope creep"
+else
+    log_fail "ES 'y además agrega' should detect scope creep" "exit=$exit_code"
+fi
+
 # =============================================================================
 # Over-Optimization Detection
 # =============================================================================
@@ -90,6 +108,15 @@ else
     log_fail "FR 'abstraire ce pattern' should detect over-optimization" "exit=$exit_code"
 fi
 
+result=$(run_bias "hazlo configurable para el futuro")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qi "Over-Optimization"; then
+    log_pass "ES 'hazlo configurable' detects over-optimization"
+else
+    log_fail "ES 'hazlo configurable' should detect over-optimization" "exit=$exit_code"
+fi
+
 # =============================================================================
 # Domain Modeling Suggestion
 # =============================================================================
@@ -103,6 +130,15 @@ if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qi "Domain Modeling"; the
     log_pass "FR 'crée une entité' detects domain modeling suggestion"
 else
     log_fail "FR 'crée une entité' should detect domain modeling" "exit=$exit_code"
+fi
+
+result=$(run_bias "crea una entidad Usuario")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qi "Domain Modeling"; then
+    log_pass "ES 'crea una entidad' detects domain modeling suggestion"
+else
+    log_fail "ES 'crea una entidad' should detect domain modeling" "exit=$exit_code"
 fi
 
 # =============================================================================
@@ -145,6 +181,42 @@ if [[ "$exit_code" == "0" ]] && [[ -z "$output" || ! "$output" =~ "BIAS DETECTED
     log_pass "'summarize the changes' no false positive"
 else
     log_fail "'summarize the changes' should not detect bias" "got output: $output"
+fi
+
+result=$(run_bias "el arreglo rápido pasó todas las pruebas")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
+    log_pass "ES descriptive use of 'rápido' has no false positive"
+else
+    log_fail "ES descriptive 'rápido' should not detect bias" "got output: $output"
+fi
+
+result=$(run_bias "además, el registro muestra el error")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
+    log_pass "ES non-imperative 'además' has no false positive"
+else
+    log_fail "ES non-imperative 'además' should not detect bias" "got output: $output"
+fi
+
+result=$(run_bias "documenta la configuración para el futuro")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
+    log_pass "ES descriptive future use has no false positive"
+else
+    log_fail "ES descriptive future use should not detect bias" "got output: $output"
+fi
+
+result=$(run_bias "explica qué es una entidad")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
+    log_pass "ES explanatory 'entidad' has no false positive"
+else
+    log_fail "ES explanatory 'entidad' should not detect bias" "got output: $output"
 fi
 
 # =============================================================================
