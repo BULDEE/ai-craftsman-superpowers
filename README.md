@@ -372,3 +372,7 @@ Forged by [Alexandre Mallet](https://github.com/woprrr) · Sponsored by [BULDEE]
 [ai-craftsman.dev](https://ai-craftsman.dev)
 
 </div>
+
+
+## Documentation
+- [Worked example for /craftsman:legacy in /examples](docs/guides/legacy-rescue.md)
