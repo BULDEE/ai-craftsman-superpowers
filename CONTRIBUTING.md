@@ -167,3 +167,41 @@ Contributors are recognized in:
 - README acknowledgments
 
 Thank you for helping make AI-assisted development more rigorous!
+
+## Developper sans casser son installation
+
+Ne modifie jamais les fichiers du plugin installe dans `~/.claude/plugins/cache/`, et ne copie
+pas un fichier depuis ton depot vers cette installation. Dans les deux cas l'installation
+diverge du depot en silence, et tu finis par deboguer une version qui n'existe nulle part.
+
+**Utilise un marketplace local.** Il expose ton depot comme n'importe quel marketplace
+distant, mais depuis le disque, donc tu passes par le meme chemin d'installation qu'un
+utilisateur.
+
+Cree `.claude-plugin/marketplace.json` dans un dossier parent qui contient ton plugin :
+
+```json
+{
+  "name": "mon-marketplace-dev",
+  "owner": { "name": "Ton Nom" },
+  "plugins": [
+    { "name": "mon-plugin", "source": "./mon-plugin", "description": "..." }
+  ]
+}
+```
+
+Puis :
+
+```bash
+claude plugin marketplace add ~/chemin/vers/le/dossier
+/plugin install mon-plugin@mon-marketplace-dev
+/plugin marketplace update mon-marketplace-dev   # apres chaque modification
+```
+
+Une source locale doit commencer par `./` et rester sous la racine du marketplace : `../` est
+refuse. Les mises a jour automatiques sont desactivees pour un marketplace local, le
+rafraichissement est donc explicite.
+
+Interet reel : tu rencontres les memes bugs d'installation qu'un utilisateur, tu n'as aucun
+chemin absolu a declarer dans `settings.json`, et un manifeste malforme echoue chez toi avant
+d'echouer chez lui.
