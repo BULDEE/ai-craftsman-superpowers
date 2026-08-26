@@ -128,6 +128,70 @@ if [[ "$found_any" == "false" ]]; then
 fi
 
 # =============================================================================
+# Signal tier behavior (controlled pattern dir via CRAFTSMAN_BIAS_PATTERNS_DIR)
+# =============================================================================
+echo ""
+echo "--- Signal tier ---"
+
+SIGNAL_DIR=$(mktemp -d "${TMPDIR:-/tmp}/bias-signal-fixtures.XXXXXX")
+trap 'rm -rf "$SIGNAL_DIR"; cleanup_test_env' EXIT
+
+cat > "$SIGNAL_DIR/en.conf" <<'EOF'
+BIAS_REGISTERED_LANGS+=("en")
+BIAS_EN_MODE="curated"
+BIAS_EN_ACCELERATION="just do it"
+EOF
+
+cat > "$SIGNAL_DIR/xx.conf" <<'EOF'
+BIAS_REGISTERED_LANGS+=("xx")
+BIAS_XX_MODE="signal"
+BIAS_XX_ACCELERATION="xx-hurry|Xx-hurry"
+BIAS_XX_DOMAIN_MODELING="xx-entity"
+EOF
+
+run_bias_dir() {
+    local prompt="$1"
+    local output
+    output=$(echo "{\"prompt\":\"$prompt\"}" \
+        | CRAFTSMAN_BIAS_PATTERNS_DIR="$SIGNAL_DIR" bash "$ROOT_DIR/hooks/bias-detector.sh" 2>/dev/null)
+    echo "$?|$output"
+}
+
+result=$(run_bias_dir "please xx-hurry with this task")
+exit_code="${result%%|*}"; output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | grep -q 'Bias signal (acceleration): lexeme "xx-hurry"' \
+    && ! echo "$output" | jq -e . >/dev/null 2>&1; then
+    log_pass "signal hit emits plain-stdout note with slug and lexeme"
+else
+    log_fail "signal hit should emit adjudication note" "exit=$exit_code output=$output"
+fi
+
+result=$(run_bias_dir "just do it and also xx-hurry")
+exit_code="${result%%|*}"; output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | jq -e .systemMessage >/dev/null 2>&1 \
+    && ! echo "$output" | grep -q "Bias signal ("; then
+    log_pass "curated warning wins: JSON only, no signal note (exclusive formats)"
+else
+    log_fail "curated must suppress every signal note" "exit=$exit_code output=$output"
+fi
+
+result=$(run_bias_dir "a perfectly clean prompt")
+exit_code="${result%%|*}"; output="${result#*|}"
+if [[ "$exit_code" == "0" && -z "$output" ]]; then
+    log_pass "clean prompt emits nothing from either tier"
+else
+    log_fail "clean prompt should be silent" "exit=$exit_code output=$output"
+fi
+
+result=$(run_bias_dir "we should xx-entity here")
+exit_code="${result%%|*}"; output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | grep -q "Bias signal (domain_modeling)"; then
+    log_pass "signal domain_modeling emits note when design_used flag is absent"
+else
+    log_fail "signal domain_modeling should note without design session" "exit=$exit_code output=$output"
+fi
+
+# =============================================================================
 # Exit code must ALWAYS be 0 (non-blocking hook), whatever the prompt
 # =============================================================================
 echo ""

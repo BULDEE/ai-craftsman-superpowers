@@ -65,6 +65,32 @@ warn_missing_design() {
     add_warning "Workflow: Domain modeling without /craftsman:design. Run /craftsman:design to model the domain properly before creating entities."
 }
 
+SIGNAL_NOTES=""
+
+_signal_intent() {
+    case "$1" in
+        acceleration)     printf 'rushing past design and tests' ;;
+        scope_creep)      printf 'adding work beyond the current scope' ;;
+        over_optimization) printf 'abstracting or generalizing prematurely' ;;
+        domain_modeling)  printf 'modeling the domain without a design session' ;;
+    esac
+}
+
+add_signal_note() {
+    local slug="$1" lexeme="$2"
+    SIGNAL_NOTES="${SIGNAL_NOTES}- Bias signal (${slug}): lexeme \"${lexeme}\" suggests $(_signal_intent "$slug")."$'\n'
+}
+
+# Design-session predicate, shared by the curated and the signal domain-modeling
+# paths: both defer to /craftsman:design having already run.
+_design_was_used() {
+    local design_used=false
+    if [[ -f "$SESSION_STATE" ]]; then
+        design_used=$(python3 "$LIB_DIR/session_state.py" check-flag "$SESSION_STATE" design_used 2>/dev/null) || design_used=false
+    fi
+    [[ "$design_used" == "true" ]]
+}
+
 # Check each curated category. bias_combined_pattern returns non-zero when no
 # language declares a category, and the grep MUST be skipped then: an empty
 # pattern matches every prompt.
@@ -80,20 +106,40 @@ fi
 
 # Workflow enforcement: warn if domain modeling without /craftsman:design
 if pat=$(bias_combined_pattern DOMAIN_MODELING curated) && echo "$PROMPT" | grep -iEq "$pat"; then
-    design_used=false
-    if [[ -f "$SESSION_STATE" ]]; then
-        design_used=$(python3 "$LIB_DIR/session_state.py" check-flag "$SESSION_STATE" design_used 2>/dev/null) || design_used=false
-    fi
-    if [[ "$design_used" != "true" ]]; then
-        warn_missing_design
-    fi
+    _design_was_used || warn_missing_design
 fi
 
-# Output structured JSON if warnings were collected
+# Signal tier (ADR-0030): only when NO curated warning fired. A signal match
+# is not a verdict; the main model adjudicates it in context. Matching is
+# case-sensitive on purpose: signal patterns carry explicit case variants
+# because grep -i case folding is locale-dependent beyond ASCII.
+if [[ -z "$WARNINGS" ]]; then
+    for _cat_pair in "ACCELERATION acceleration" "SCOPE_CREEP scope_creep" \
+                     "OVER_OPT over_optimization" "DOMAIN_MODELING domain_modeling"; do
+        _cat="${_cat_pair%% *}"
+        _slug="${_cat_pair##* }"
+        pat=$(bias_combined_pattern "$_cat" signal) || continue
+        _match=$(echo "$PROMPT" | grep -oE "$pat" 2>/dev/null | head -1) || true
+        [[ -z "$_match" ]] && continue
+        if [[ "$_slug" == "domain_modeling" ]] && _design_was_used; then
+            continue
+        fi
+        add_signal_note "$_slug" "$_match"
+    done
+fi
+
+# Exclusive output formats: stdout is parsed as ONE payload by UserPromptSubmit.
+# Curated verdicts ship as JSON (systemMessage, user-visible, today's behavior).
+# Signal notes ship as plain stdout, the documented context channel the model
+# sees; they are emitted only when no curated warning fired at all.
 if [[ -n "$WARNINGS" ]]; then
     jq -n --arg msg "$WARNINGS" '{
         systemMessage: $msg
     }'
+elif [[ -n "$SIGNAL_NOTES" ]]; then
+    printf '%s\n%s' \
+        "Bias signal from the prompt lexicon. The matcher has no conversation context; you have all of it. For each signal below: if it reflects the user's real intent, surface that discipline warning in their language; if the match is incidental (quoted text, descriptive use, topic discussion), ignore it silently and never mention this note." \
+        "$SIGNAL_NOTES"
 fi
 
 # Always exit 0 (warning only, never block)
