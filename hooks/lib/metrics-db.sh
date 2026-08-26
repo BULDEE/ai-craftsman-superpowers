@@ -346,3 +346,28 @@ if parts:
 db.close()
 " "$METRICS_DB" "$project_hash" 2>/dev/null || true
 }
+
+# Machine-wide variant of metrics_correction_trends: same shape, no project
+# filter. The Hermes gateway process does not live in any workspace, so a
+# project-scoped query from its cwd returns nothing; habits are per machine
+# anyway (ADR-0029 inject).
+metrics_correction_trends_global() {
+    python3 -c "
+import sqlite3, sys
+db = sqlite3.connect(sys.argv[1])
+fixed = db.execute('SELECT rule, COUNT(*) as c FROM corrections '
+    \"WHERE action='fixed' AND timestamp > datetime('now','-7 days') \"
+    'GROUP BY rule ORDER BY c DESC LIMIT 5').fetchall()
+violated = db.execute('SELECT rule, COUNT(*) as c FROM violations '
+    \"WHERE blocked=1 AND timestamp > datetime('now','-7 days') \"
+    'GROUP BY rule ORDER BY c DESC LIMIT 5').fetchall()
+parts = []
+if fixed:
+    parts.append('Recently fixed: ' + ', '.join(f'{r}({c}x)' for r, c in fixed))
+if violated:
+    parts.append('Recurring violations: ' + ', '.join(f'{r}({c}x)' for r, c in violated))
+if parts:
+    print(' | '.join(parts))
+db.close()
+" "$METRICS_DB" 2>/dev/null || true
+}

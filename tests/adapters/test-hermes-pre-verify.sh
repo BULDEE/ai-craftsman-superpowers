@@ -140,7 +140,31 @@ if [[ -z "$OUT" ]]; then
 else
     log_fail "warning loop" "attempt 1 still nudges: $OUT"
 fi
+if ! _payload "src/Warn.ts" 1 0 | bash "$HOOK" 2>/dev/null | grep -q "refactor"; then
+    log_pass "a non-structural finding carries no refactor-skill hint"
+else
+    log_fail "spurious hint" "TS002 alone routed to the refactor skill"
+fi
 rm -f src/Warn.ts
+
+# A structural finding names the method, not just the fault: the directive
+# routes the agent to the refactor skill instead of an inline patch.
+# RATCHET001 is the structural rule the CI-backed gate actually emits, so the
+# fixture is a committed baseline plus a file that regressed past it.
+printf 'export const grow = 1;\n' > src/Grow.ts
+python3 "$ROOT_DIR/hooks/lib/ratchet.py" init src/Grow.ts \
+    --baseline .craftsman-baseline.json --reason "fixture" >/dev/null 2>&1
+git add -A >/dev/null 2>&1
+git -c user.email=t@t -c user.name=t commit -qm ratchet-base >/dev/null 2>&1
+for i in 1 2 3 4 5 6 7 8 9 10; do printf 'export const grow%s = %s;\n' "$i" "$i" >> src/Grow.ts; done
+OUT=$(_payload "src/Grow.ts" 1 0 | bash "$HOOK" 2>/dev/null)
+if printf '%s' "$OUT" | grep -q "RATCHET001" && printf '%s' "$OUT" | grep -q "refactor"; then
+    log_pass "a structural finding routes the agent to the refactor skill"
+else
+    log_fail "no skill hint" "RATCHET001 directive lacks the refactor route: ${OUT:-<empty>}"
+fi
+git reset -q --hard HEAD~1 >/dev/null 2>&1
+git checkout -q -- . 2>/dev/null; rm -f src/Grow.ts
 
 # An autonomous agent commits. Scope taken from the worktree alone left a
 # committed violation invisible: clean worktree, silent gate, everything the

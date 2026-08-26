@@ -48,6 +48,12 @@ _INJECT_TRENDS = True
 # in-flight correction attribution, never a verdict.
 _session_rules: dict[str, set[str]] = {}
 
+# Last workspace each session's gate ran in, plus the last one seen at all:
+# the gateway process does not live in any workspace, so injection resolved
+# from os.getcwd() queried the wrong project hash and returned nothing.
+_session_cwd: dict[str, str] = {}
+_last_cwd: str = ""
+
 
 def _log(message: str) -> None:
     print(f"[craftsman] {message}", file=sys.stderr)
@@ -130,6 +136,25 @@ def _learn(session_id: str, attempt: int, directive: dict[str, Any] | None, cwd:
     _session_rules[session_id] = current
 
 
+def _track_workspace(session_id: str, cwd: str) -> None:
+    global _last_cwd
+    if session_id:
+        _session_cwd[session_id] = cwd
+    _last_cwd = cwd
+
+
+def _resolve_trends(session_id: str) -> str:
+    # The gateway process lives outside any workspace: prefer the last
+    # workspace this session's gate ran in, then the last one seen at all,
+    # and fall back to machine-wide trends when the project-scoped query has
+    # nothing to say (a session's first turn precedes its first gate run).
+    cwd = _session_cwd.get(session_id) or _last_cwd or os.getcwd()
+    trends = _metrics_call(cwd, "metrics_correction_trends")
+    if not trends:
+        trends = _metrics_call(cwd, "metrics_correction_trends_global")
+    return trends
+
+
 def _payload(session_id: str, cwd: str, coding: bool, attempt: int, changed_paths: list[str]) -> dict[str, Any]:
     return {
         "hook_event_name": "pre_verify",
@@ -148,6 +173,7 @@ def on_pre_verify(
 ) -> dict[str, Any] | None:
     try:
         cwd = str(kwargs.get("cwd") or os.getcwd())
+        _track_workspace(session_id, cwd)
         attempt = int(attempt or 0)
         directive = _run_gate(_payload(session_id, cwd, bool(coding), attempt, list(changed_paths or [])), cwd)
         try:
@@ -175,7 +201,7 @@ def on_pre_llm_call(
     if not is_first_turn or not _INJECT_TRENDS:
         return None
     try:
-        trends = _metrics_call(os.getcwd(), "metrics_correction_trends")
+        trends = _resolve_trends(session_id)
         if not trends:
             return None
         return {
