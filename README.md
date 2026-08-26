@@ -137,6 +137,15 @@ claude
 /craftsman:setup --quick
 ```
 
+**Running [Hermes](https://hermes-agent.nousresearch.com) agents instead of (or next to) Claude Code?** The same repository is a native Hermes plugin:
+
+```bash
+git clone https://github.com/BULDEE/ai-craftsman-superpowers ~/.hermes/plugins/craftsman
+hermes plugins enable craftsman
+```
+
+Your autonomous agent gets the same gate (it cannot conclude a coding turn that leaves critical violations), the correction-learning loop, `/craftsman` on demand and the craftsman doctrine as a skill. Details and threat model: [adapters/hermes/README.md](adapters/hermes/README.md).
+
 That is the whole setup. `--quick` reads your repository and picks defaults; run
 `/craftsman:setup` without it to answer four plain-language questions instead.
 

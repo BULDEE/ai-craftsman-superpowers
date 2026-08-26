@@ -1,10 +1,44 @@
 # Hermes host adapter
 
 Runs the craftsman gate inside [Hermes](https://hermes-agent.nousresearch.com),
-Nous Research's agent runtime. Two independent paths, usable together.
+Nous Research's agent runtime. Three independent paths; the plugin is the one
+to start with.
 
 Every environment claim below was measured on a running
 `nousresearch/hermes-agent` container, not read from documentation.
+
+## Path 0: native Hermes plugin (recommended)
+
+Two commands, no Docker, no config file edit:
+
+```bash
+git clone https://github.com/BULDEE/ai-craftsman-superpowers ~/.hermes/plugins/craftsman
+hermes plugins enable craftsman
+```
+
+`plugin.yaml` and `__init__.py` at the repository root make the clone itself
+the plugin; the implementation is `craftsman_plugin.py` in this directory.
+The dependency surface is python3, bash and git, all present in the stock
+image: no jq (python parses the payloads), no sqlite3 CLI (metrics fall back
+to the parameterized python helper), no Claude Code binary.
+
+What it registers (the three ADR-0029 verbs):
+
+- **gate**: `pre_verify` delegated to `pre-verify.sh` below, so every
+  behaviour documented for Path 1 (git-derived scope, self-protection,
+  advisory channel, fail-closed) holds identically, and the parity suite
+  covers both through the same entry point. A handler exception returns a
+  block, never a silent pass.
+- **inject**: on each session's first turn, correction trends from
+  `metrics.db` reach the agent as context: what this machine keeps fixing.
+- **record**: violations at attempt 0 and `fixed` corrections when a later
+  attempt clears a rule, tagged `source=hermes`, threaded by the payload's
+  `attempt` counter. No log mining, no model judgment.
+- `/craftsman` (on-demand verdict) and `/craftsman status`, plus the
+  `craftsman-quality` skill so the agent knows the doctrine it is gated by.
+
+Config (`~/.hermes/config.yaml`, `plugins.entries.craftsman`): `gate_seconds`
+(default 45), `inject_trends` (`on`/`off`).
 
 ## Path 1: native Hermes hook
 

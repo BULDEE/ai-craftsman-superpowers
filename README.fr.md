@@ -142,6 +142,15 @@ claude
 /craftsman:setup --quick
 ```
 
+**Vous faites tourner des agents [Hermes](https://hermes-agent.nousresearch.com) au lieu de (ou à côté de) Claude Code ?** Le même dépôt est un plugin Hermes natif :
+
+```bash
+git clone https://github.com/BULDEE/ai-craftsman-superpowers ~/.hermes/plugins/craftsman
+hermes plugins enable craftsman
+```
+
+Votre agent autonome reçoit la même porte (impossible de conclure un tour de code qui laisse des violations critiques), la boucle d'apprentissage des corrections, `/craftsman` à la demande et la doctrine craftsman en skill. Détails et modèle de menace : [adapters/hermes/README.md](adapters/hermes/README.md).
+
 C'est toute l'installation. `--quick` lit votre dépôt et choisit les défauts ;
 lancez `/craftsman:setup` sans l'option pour répondre à quatre questions en
 langage clair.

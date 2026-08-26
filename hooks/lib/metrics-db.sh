@@ -14,8 +14,37 @@ METRICS_DB_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
 METRICS_DB="${METRICS_DB_DIR}/metrics.db"
 METRICS_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# DDL and reads used to require the sqlite3 binary while DML went through
+# python, so a host without the CLI (the Hermes image, before its Docker layer
+# added one) got an empty file and "no such table" on every insert, swallowed.
+# Both now fall back to the same parameterized helper the DML uses.
+# CRAFTSMAN_NO_SQLITE_CLI=1 forces the fallback so a test can exercise it on a
+# machine that has the binary.
+_metrics_has_cli() {
+    [[ -z "${CRAFTSMAN_NO_SQLITE_CLI:-}" ]] && command -v sqlite3 >/dev/null 2>&1
+}
+
+# stdin: SQL script (DDL and migrations, no bind parameters).
+_metrics_sql() {
+    if _metrics_has_cli; then
+        sqlite3 "$METRICS_DB"
+    else
+        python3 "${METRICS_LIB_DIR}/metrics-query.py" --script "$METRICS_DB" "$(cat)"
+    fi
+}
+
+# $1: one read statement. Prints rows the way the sqlite3 CLI does: columns
+# joined with |, nothing at all on an empty result.
+_metrics_sql_read() {
+    if _metrics_has_cli; then
+        sqlite3 "$METRICS_DB" "$1" 2>/dev/null
+    else
+        python3 "${METRICS_LIB_DIR}/metrics-query.py" --raw "$METRICS_DB" "$1" 2>/dev/null
+    fi
+}
+
 _metrics_create_core_tables() {
-    sqlite3 "$METRICS_DB" <<'SQL'
+    _metrics_sql <<'SQL'
 CREATE TABLE IF NOT EXISTS violations (
     id INTEGER PRIMARY KEY,
     timestamp TEXT NOT NULL DEFAULT (datetime('now')),
@@ -45,7 +74,7 @@ SQL
 }
 
 _metrics_create_corrections_table() {
-    sqlite3 "$METRICS_DB" <<'SQL'
+    _metrics_sql <<'SQL'
 CREATE TABLE IF NOT EXISTS corrections (
     id INTEGER PRIMARY KEY,
     timestamp TEXT NOT NULL DEFAULT (datetime('now')),
@@ -62,14 +91,14 @@ SQL
 
 _metrics_migrate_severity_info() {
     local has_info
-    has_info=$(sqlite3 "$METRICS_DB" "SELECT sql FROM sqlite_master WHERE name='violations';" 2>/dev/null)
+    has_info=$(_metrics_sql_read "SELECT sql FROM sqlite_master WHERE name='violations';")
     if [[ -n "$has_info" ]] && ! echo "$has_info" | grep -q "'info'"; then
         # Wrapped in a transaction, and copying named columns rather than
         # SELECT *, which maps by position: a schema that had drifted by one
         # column would have silently shifted every value one place. A failure
         # midway used to leave violations empty and violations_old orphaned,
         # with no backup to restore from.
-        sqlite3 "$METRICS_DB" <<'MIGRATE'
+        _metrics_sql <<'MIGRATE'
 BEGIN IMMEDIATE;
 ALTER TABLE violations RENAME TO violations_old;
 CREATE TABLE violations (
@@ -95,9 +124,9 @@ MIGRATE
 # ALTER TABLE ADD COLUMN is idempotent-guarded via pragma inspection.
 _metrics_migrate_writes_count() {
     local has_col
-    has_col=$(sqlite3 "$METRICS_DB" "SELECT COUNT(*) FROM pragma_table_info('sessions') WHERE name='writes_count';" 2>/dev/null)
+    has_col=$(_metrics_sql_read "SELECT COUNT(*) FROM pragma_table_info('sessions') WHERE name='writes_count';")
     if [[ "$has_col" == "0" ]]; then
-        sqlite3 "$METRICS_DB" "ALTER TABLE sessions ADD COLUMN writes_count INTEGER DEFAULT 0;" 2>/dev/null
+        _metrics_sql <<< "ALTER TABLE sessions ADD COLUMN writes_count INTEGER DEFAULT 0;" 2>/dev/null
     fi
 }
 
@@ -143,23 +172,17 @@ metrics_source() {
 _metrics_migrate_source_column() {
     local table
     for table in violations corrections; do
-        if ! sqlite3 "$METRICS_DB" "PRAGMA table_info(${table});" 2>/dev/null | grep -q '|source|'; then
-            sqlite3 "$METRICS_DB" \
-                "ALTER TABLE ${table} ADD COLUMN source TEXT NOT NULL DEFAULT 'session';" 2>/dev/null
+        if ! _metrics_sql_read "PRAGMA table_info(${table});" | grep -q '|source|'; then
+            _metrics_sql <<< "ALTER TABLE ${table} ADD COLUMN source TEXT NOT NULL DEFAULT 'session';" 2>/dev/null
         fi
     done
 }
 
-# The DDL goes through the sqlite3 binary while the DML goes through python.
-# Without sqlite3 no table was ever created, python then made an empty file,
-# every INSERT raised "no such table", and each caller swallowed it: the
-# healthcheck reported 0 rows, indistinguishable from a quiet week. The
-# portability audit that added portable-timeout stopped at `timeout` and never
-# asked which other binary the plugin assumes.
+# Everything now routes through _metrics_sql, so a missing CLI degrades to
+# the python fallback instead of an empty file and swallowed inserts.
 metrics_init() {
-    if ! command -v sqlite3 >/dev/null 2>&1; then
-        echo "craftsman: sqlite3 not found, metrics are disabled for this session" >&2
-        return 1
+    if ! _metrics_has_cli; then
+        echo "craftsman: sqlite3 CLI not found, metrics use the python fallback" >&2
     fi
     mkdir -p "$METRICS_DB_DIR"
     _metrics_migrate_legacy_location

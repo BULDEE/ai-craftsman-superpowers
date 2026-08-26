@@ -1,0 +1,21 @@
+name: craftsman
+version: 4.8.1
+manifest_version: 2
+api_version: 1
+description: "Craftsman quality gate for coding agents. Refuses to conclude a turn that leaves architecture violations (layer imports, strict types, any, hardcoded secrets), surfaces advisory findings once, records every violation and fix so the agent's instincts improve, and answers /craftsman on demand."
+author: Alexandre Mallet
+license: Apache-2.0
+homepage: https://github.com/BULDEE/ai-craftsman-superpowers
+tags: [quality, architecture, ddd, craftsmanship, guardrail]
+provides_hooks:
+  - pre_verify
+  - pre_llm_call
+config_schema:
+  gate_seconds:
+    type: int
+    default: 45
+    description: "Budget in seconds for one gate run before it reports itself as unable to conclude"
+  inject_trends:
+    type: str
+    default: "on"
+    description: "on | off - inject correction trends into the first turn of each session"
