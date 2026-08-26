@@ -1,0 +1,6 @@
+expect|ACCELERATION|signal|mach das schnell, wir haben keine Zeit
+expect|ACCELERATION|signal|Schnell bitte, ohne Tests
+expect|SCOPE_CREEP|signal|und außerdem noch Logging einbauen
+expect|OVER_OPT|signal|mach es konfigurierbar für später
+expect|DOMAIN_MODELING|signal|erstelle eine Entität Benutzer
+silent|der Test läuft seit gestern stabil

@@ -1,0 +1,6 @@
+expect|ACCELERATION|signal|快点做完这个，没时间了
+expect|ACCELERATION|signal|馬上做，不用測試
+expect|SCOPE_CREEP|signal|顺便再加一个日志功能
+expect|OVER_OPT|signal|做得通用一点，为将来考虑
+expect|DOMAIN_MODELING|signal|创建实体用户
+silent|这份报告描述了构建流程
