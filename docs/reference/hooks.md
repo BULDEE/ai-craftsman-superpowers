@@ -333,13 +333,21 @@ The InstructionsLoaded agent applies sampling for large codebases:
 
 ## Bias Detection
 
-The `bias-detector.sh` hook (UserPromptSubmit) detects cognitive biases in your prompts:
+The `bias-detector.sh` hook (UserPromptSubmit) detects cognitive biases in your prompts through a two-stage cascade (ADR-0030). Patterns live in `hooks/lib/bias-patterns/<lang>.conf`, one data file per language; adding a language edits no code.
 
-| Bias | Trigger Keywords | Warning |
-|------|-----------------|---------|
-| Acceleration | "vite", "quick", "just do it" | STOP - Design first |
-| Scope Creep | "et aussi", "while we're at it" | STOP - Is this in scope? |
-| Over-Optimization | "abstraire", "generalize" | STOP - YAGNI |
+| Bias | Curated triggers (EN/FR/ES) | Signal lexemes (ten more languages) | Curated warning |
+|------|-----------------------------|-------------------------------------|-----------------|
+| Acceleration | "just do it", "fais vite", "hazlo rápido" | schnell, 快点, 빨리 해, hızlı yap, быстро сделай | "Acceleration bias: You may be rushing" |
+| Scope Creep | "while we're at it, add", "et aussi ajoute", "y además agrega" | ついでに, 顺便, hazır başlamışken | "Scope Creep bias: Adding features beyond scope" |
+| Over-Optimization | "make it generic", "abstraire", "hazlo configurable" | 汎用化, geleceğe dönük, на будущее | "Over-Optimization bias: Premature abstraction" |
+
+**Stage 1, the hook.** Three curated languages (EN, FR, ES) carry context-aware regex whose precision is earned, so a match warns you directly through `systemMessage`, exactly as before. Ten further languages (de, pt, it, tr, ru, vi, zh, ja, ko, th) carry recall-oriented lexeme lists instead: word lists tuned to catch the signal, not to avoid false alarms.
+
+**Stage 2, the model already reading your prompt.** A signal-tier match is not a verdict and never reaches you as a warning. The hook prints a plain-stdout adjudication note naming the matched lexeme, which UserPromptSubmit hands to the main model as conversation context. That model has the whole session, so it decides: real acceleration after no design work becomes a warning phrased in your language, while an incidental match (quoted text, a topic being discussed, descriptive use) is dismissed silently and never mentioned. No second model, no subprocess, no API call, no network access is involved at any point; stage 2 is the model that was going to read the prompt anyway, so the marginal cost is zero.
+
+That is what makes signal-tier recall cheap: a false positive there is invisible, whereas a curated false positive is a warning you see. The two output formats are mutually exclusive, and a curated warning suppresses every signal note in the same run.
+
+Adding a language is two data files and zero code: `hooks/lib/bias-patterns/<lang>.conf` for the lexemes and `tests/fixtures/bias/<lang>.cases` for the behavior cases. No hook, helper or test script changes.
 
 Bias detection is **warning-only** (exit 0) - it never blocks your workflow.
 

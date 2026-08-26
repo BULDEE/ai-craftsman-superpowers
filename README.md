@@ -110,7 +110,7 @@ Opus rates to write a commit message.
 1. **Rules Engine with 3-Level Inheritance** - Global → Project → Directory overrides. Short form (`PHP001: warn`) or long form (custom regex rules). Legacy code coexists with strict new code via directory-level relaxation.
 2. **Structural Ratchet** - a committed baseline records each file's structural high-water mark (complexity, size, longest function, import fan-out, suppression count). A file you touch may improve or stay equal, never regress: the mark tightens automatically on a green pass and only loosens through a documented, counted suppression. Untouched legacy is never punished for debt it already had.
 3. **Adversarial Design Panel** - three contradictors (YAGNI, invariants and boundaries, feasibility) attack a design during `/craftsman:design`, before any code exists. Every objection lands in a retained or dismissed table: silence is not an option. Contradicting a design costs far less than contradicting the code built on it.
-4. **Cognitive Bias Detector** - real-time detection of acceleration bias, scope creep, and over-optimization in your prompts, bilingual FR/EN, context-aware to reduce false positives.
+4. **Cognitive Bias Detector** - real-time detection of acceleration bias, scope creep, and over-optimization in your prompts. Two-stage language cascade: curated EN/FR/ES patterns warn you directly, while recall lexicons for ten more languages (CJK, Cyrillic and Thai included) hand the call to the model already reading your prompt, which surfaces or silently drops it with the whole session as context. No second model and no network call. Adding a language is two data files and zero code.
 5. **Real-Time Quality Gate** - progressive validation on every Write/Edit: regex (<50ms, always on) → LSP semantics (live, via the official LSP plugin for your language) → static analysis and architecture (PHPStan/ESLint/deptrac, opt-in per machine because running a project's analysers runs its code, see [SECURITY.md](SECURITY.md)). Degrades gracefully with zero tools installed.
 6. **Metrics & Trend Analysis** - SQLite-backed tracking of violations, corrections, and sessions, with 7-day/30-day trend views to identify your most-violated rules.
 7. **Security Rules** - SEC001-003 (hardcoded secrets, dynamic eval, SQL by concatenation) verified in hooks and CI, with their doctrine routed to Claude on block. Setup observes the repository and asks at most four plain-language questions.
@@ -266,7 +266,8 @@ auto-commit; commands are explicitly invoked, never auto-triggered; methodology
 is opinionated (DDD/Clean Architecture).
 
 **Current constraints:** PHP/TypeScript get full rule coverage, other languages
-basic support only; bias detection patterns are EN/FR only; metrics are
+basic support only; bias detection warns directly in EN/FR/ES and leaves other
+languages to the model to adjudicate in context; metrics are
 per-machine, not shared across a team; auto-fixing violations and IDE plugins
 are not supported by design.
 
