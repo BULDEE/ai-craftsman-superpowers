@@ -12,7 +12,7 @@ Repository Composition flips this: define **small, focused interfaces** per use 
 
 ## Pattern: Composition Over Inheritance
 
-In Metrikia, `LeadRepository` satisfies 7 distinct interface contracts:
+In one production attribution platform, `LeadRepository` satisfies 7 distinct interface contracts:
 
 ```php
 interface LeadRepositoryInterface extends

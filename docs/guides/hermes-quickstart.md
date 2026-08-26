@@ -66,10 +66,10 @@ plugins:
       inject_trends: "on"     # correction history on each session's first turn
 ```
 
-## Running on a server (Galaxia / Railway pattern)
+## Running on a server (VPS or PaaS)
 
-Clone onto the persistent volume so the plugin and its metrics survive
-redeploys, and keep the clone read-only for the agent user where the platform
+On any host with a persistent volume (a VPS, a PaaS service), clone onto
+that volume so the plugin and its metrics survive redeploys, and keep the clone read-only for the agent user where the platform
 allows it:
 
 ```bash
