@@ -193,6 +193,16 @@ violations = report.get("violations") or []
 blocking = [v for v in violations if v.get("severity") == "critical"]
 advisory = [v for v in violations if v.get("severity") != "critical"]
 attempt = int(sys.argv[1])
+
+# The gate says what is wrong; a craftsman agent also needs which method
+# fixes it. Structural findings call for the refactor discipline, not an
+# inline patch, so the directive routes the skill selector there.
+STRUCTURAL = {"NEST001", "LOC001", "GOD001", "PARAM001", "RATCHET001", "CTRL001"}
+def skill_hint(found):
+    if {v.get("rule") for v in found} & STRUCTURAL:
+        return ("These include structural findings: load the craftsman "
+                "'refactor' skill and apply its method instead of patching inline.")
+    return ""
 if blocking:
     lines = [line(v) for v in blocking[:10]]
     more = len(blocking) - len(lines)
@@ -201,6 +211,9 @@ if blocking:
     if advisory:
         lines.append("Also worth fixing, non-blocking:")
         lines.extend(line(v) for v in advisory[:3])
+    hint = skill_hint(violations)
+    if hint:
+        lines.append(hint)
     print("BLOCK")
     print("The craftsman gate rejects this change, so it is not finished:\n" + "\n".join(lines)
           + "\nFix these and say what you ran to prove it.")
@@ -209,6 +222,9 @@ elif advisory and attempt == 0:
     more = len(advisory) - len(lines)
     if more > 0:
         lines.append("and {} more".format(more))
+    hint = skill_hint(advisory)
+    if hint:
+        lines.append(hint)
     print("NUDGE")
     print("Non-blocking craftsman findings, consider them before concluding:\n" + "\n".join(lines))
 ' "$ATTEMPT" 2>/dev/null)

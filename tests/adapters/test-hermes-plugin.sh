@@ -66,6 +66,11 @@ report("register wires pre_verify, pre_llm_call, /craftsman and the quality skil
        and "craftsman" in ctx.commands and "craftsman-quality" in ctx.skills,
        f"hooks={sorted(ctx.hooks)} cmds={sorted(ctx.commands)} skills={sorted(ctx.skills)}")
 
+report("the six curated coding skills are registered alongside the doctrine",
+       {"craftsman-refactor", "craftsman-legacy", "craftsman-debug",
+        "craftsman-test", "craftsman-spec", "craftsman-design"} <= set(ctx.skills),
+       f"skills={sorted(ctx.skills)}")
+
 pre_verify = ctx.hooks["pre_verify"]
 
 with open(os.path.join(repo, "src", "Bad.ts"), "w") as fh:
@@ -95,6 +100,14 @@ report("first-turn injection carries the correction trends",
        isinstance(inject, dict) and "TS001" in inject.get("context", ""), repr(inject))
 report("later turns inject nothing",
        ctx.hooks["pre_llm_call"](session_id="s1", user_message="hi", is_first_turn=False) is None)
+
+# Gateway reality: the plugin process does not live in the agent's workspace.
+# The trends query filters by project hash, so a workspace-blind cwd used to
+# return nothing at all and the inject verb only worked in CLI mode.
+os.chdir("/")
+inject = ctx.hooks["pre_llm_call"](session_id="s-new", user_message="hi", is_first_turn=True)
+report("injection survives a process cwd outside the workspace (gateway mode)",
+       isinstance(inject, dict) and "TS001" in inject.get("context", ""), repr(inject))
 
 os.chdir(repo)
 report("/craftsman on a clean worktree says so", "clean worktree" in ctx.commands["craftsman"](""))
@@ -128,6 +141,15 @@ if [[ "$ROW" == "TS001|fixed|hermes|hermes attempt 1" ]]; then
     log_pass "the fix between attempts was recorded as a correction"
 else
     log_fail "correction not recorded" "got: ${ROW:-<empty>}"
+fi
+
+# The curated export is committed output: regenerating it must be clean and
+# self-contained (no reference reaching back into knowledge/).
+if bash "$ROOT_DIR/scripts/export-hermes-skills.sh" >/dev/null 2>&1 \
+    && ! grep -rn "knowledge/" "$ROOT_DIR/adapters/hermes/skills" --include=SKILL.md >/dev/null 2>&1; then
+    log_pass "skill export regenerates clean with no dead knowledge link"
+else
+    log_fail "skill export" "generator failed or left a knowledge/ link"
 fi
 
 if python3 -c "import yaml" 2>/dev/null; then
