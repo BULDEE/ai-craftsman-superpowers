@@ -21,5 +21,11 @@ A CLAUDE.md is instructions Claude can choose to follow. This plugin's Level 1/2
 **Can I customize which rules apply to legacy code?**
 Yes - the rules engine supports 3-level inheritance (Global → Project → Directory), so you can relax rules for a legacy directory while keeping strict enforcement on new code. See the Custom Rule Engine section in [README.md](README.md).
 
+**Can I use this with Hermes agents instead of Claude Code?**
+Yes, the repository is itself a native Hermes plugin: `git clone https://github.com/BULDEE/ai-craftsman-superpowers ~/.hermes/plugins/craftsman && hermes plugins enable craftsman`. The agent gets the same gate, the learning loop and seven craftsman skills. See the [Hermes quickstart](docs/guides/hermes-quickstart.md).
+
+**I'm not a developer - what does this actually buy my team?**
+An automatic inspector that refuses badly structured AI-written code before it lands, with the same rules on laptops and in the pipeline, and a learning loop that adapts to your project's real failure modes. Plain-language explanation: [For non-developers](docs/guides/for-non-developers.md).
+
 **Upgrading and something broke - what do I do?**
 Check [MIGRATION.md](MIGRATION.md) for known breaking changes between major versions, then [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common fixes.

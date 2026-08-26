@@ -149,7 +149,7 @@ git clone https://github.com/BULDEE/ai-craftsman-superpowers ~/.hermes/plugins/c
 hermes plugins enable craftsman
 ```
 
-Votre agent autonome reçoit la même porte (impossible de conclure un tour de code qui laisse des violations critiques), la boucle d'apprentissage des corrections, `/craftsman` à la demande et la doctrine craftsman en skill. Détails et modèle de menace : [adapters/hermes/README.md](adapters/hermes/README.md).
+Votre agent autonome reçoit la même porte (impossible de conclure un tour de code qui laisse des violations critiques), la boucle d'apprentissage des corrections, `/craftsman` à la demande et sept skills craftsman sélectionnées selon la situation. Prise en main en cinq minutes : [Hermes quickstart](docs/guides/hermes-quickstart.md) ; un tour complet bloqué-corrigé-appris : [examples/hermes-agent](examples/hermes-agent/01-blocked-turn.md) ; conception et modèle de menace : [adapters/hermes/README.md](adapters/hermes/README.md). Le guide [For non-developers](docs/guides/for-non-developers.md) explique la valeur du plugin sans jargon, pour les profils non techniques.
 
 C'est toute l'installation. `--quick` lit votre dépôt et choisit les défauts ;
 lancez `/craftsman:setup` sans l'option pour répondre à quatre questions en

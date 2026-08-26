@@ -1093,7 +1093,7 @@ reproduces the attack and asserts it fails.
 ## [3.3.3] - 2026-04-05
 
 ### Fixed
-- **Command namespace regression** - Removed explicit `name:` fields from 20 command frontmatter files. Claude Code uses the `name:` value as-is in autocomplete, bypassing automatic `craftsman:` prefix. Without `name:`, Claude Code derives from filename and correctly shows `/craftsman:setup` instead of `/setup`. Aligns with official plugin conventions (vercel, metrikia, stripe all omit `name:`).
+- **Command namespace regression** - Removed explicit `name:` fields from 20 command frontmatter files. Claude Code uses the `name:` value as-is in autocomplete, bypassing automatic `craftsman:` prefix. Without `name:`, Claude Code derives from filename and correctly shows `/craftsman:setup` instead of `/setup`. Aligns with official plugin conventions (vercel, stripe and other official plugins omit `name:`).
 
 ## [3.3.2] - 2026-04-05
 
@@ -1157,7 +1157,7 @@ reproduces the attack and asserts it fails.
 - **Knowledge: Clean Code** (`knowledge/clean-code.md`) - naming, functions, comments, error handling, SOLID reference
 - **Knowledge: Refactoring Techniques** (`knowledge/refactoring-techniques.md`) - code smells catalog, composing methods, moving features, simplifying conditionals. Reference: refactoring.guru
 - **Knowledge: Design Patterns** (`knowledge/design-patterns.md`) - 23 GoF patterns (creational, structural, behavioral) with Python examples and selection guide. Reference: refactoring.guru
-- **Symfony Knowledge Base** - 8 new methodology documents extracted from production projects (Metrikia, Qualia):
+- **Symfony Knowledge Base** - 8 new methodology documents extracted from production projects:
   - `ddd-cqrs-architecture.md` - Full DDD+CQRS layer architecture with Symfony & API Platform
   - `ddd-domain-design.md` - Entities as aggregates, value objects, domain events, bounded contexts
   - `api-platform-patterns.md` - State Providers/Processors, pagination, cache invalidation, serialization groups

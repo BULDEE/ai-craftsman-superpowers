@@ -144,7 +144,7 @@ git clone https://github.com/BULDEE/ai-craftsman-superpowers ~/.hermes/plugins/c
 hermes plugins enable craftsman
 ```
 
-Your autonomous agent gets the same gate (it cannot conclude a coding turn that leaves critical violations), the correction-learning loop, `/craftsman` on demand and the craftsman doctrine as a skill. Details and threat model: [adapters/hermes/README.md](adapters/hermes/README.md).
+Your autonomous agent gets the same gate (it cannot conclude a coding turn that leaves critical violations), the correction-learning loop, `/craftsman` on demand and seven situation-selectable craftsman skills. Five-minute walkthrough: [Hermes quickstart](docs/guides/hermes-quickstart.md); a full blocked-fixed-learned turn: [examples/hermes-agent](examples/hermes-agent/01-blocked-turn.md); design and threat model: [adapters/hermes/README.md](adapters/hermes/README.md).
 
 That is the whole setup. `--quick` reads your repository and picks defaults; run
 `/craftsman:setup` without it to answer four plain-language questions instead.
@@ -279,6 +279,8 @@ More detail in the [FAQ](FAQ.md).
 | [What's new in v4](https://github.com/BULDEE/ai-craftsman-superpowers/releases/latest) | Clean break targeting Claude Code >= 2.1.218: closed learning loop, native-first skills, semantic Level 1.5, context budgets. Breaking changes in [MIGRATION.md](MIGRATION.md). |
 | [Architecture decisions](docs/adr/) | 28 ADRs covering every major design choice. Start with [ADR-0016](docs/adr/0016-v4-clean-break-native-first.md) and [ADR-0005](docs/adr/0005-knowledge-first-architecture.md). |
 | [Knowledge bundle](knowledge/) | The methodology ships as an [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) bundle: plain Markdown, versioned in git, readable by Obsidian or any OKF consumer. Zero embeddings, zero index, zero external service. |
+| [Hermes quickstart](docs/guides/hermes-quickstart.md) | The same plugin inside Nous Research's Hermes agents: two-command install, recommended bot profile, server deployment pattern, troubleshooting. Runnable proof in [examples/hermes-agent](examples/hermes-agent/demo.sh). |
+| [For non-developers](docs/guides/for-non-developers.md) | What this plugin does, in plain language: the radar-in-the-loop explanation, what a refusal looks like, and the three questions worth asking your team. |
 | [CLAUDE.md guidance](docs/guides/claude-md-best-practices.md) | What belongs in your global file, your project file, and what the plugin should own instead. |
 | [Hooks reference](docs/reference/hooks.md) | Every hook, exit code and rule ID, including the Circuit Breaker and the Iron Law Pattern. |
 | [Troubleshooting](TROUBLESHOOTING.md) | When a skill does not appear, a hook does not fire, or a rule fires too often. |
