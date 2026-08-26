@@ -578,6 +578,7 @@ test_bias_detector() {
     echo ""
     log_info "Testing bias detector (functional)"
 
+    run_subtest "Bias registry tests pass" "$SCRIPT_DIR/core/test-bias-registry.sh" || true
     run_subtest "Bias detector tests pass" "$SCRIPT_DIR/core/test-bias-detector.sh" || true
 }
 
