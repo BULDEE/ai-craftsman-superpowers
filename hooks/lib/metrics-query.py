@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """Parameterized SQLite query helper - eliminates SQL injection in metrics-db.sh.
 
-Usage: metrics-query.py <db_path> <query> [param1] [param2] ...
+Usage: metrics-query.py [--script|--raw] <db_path> <query> [param1] [param2] ...
 
 Each positional arg after the query becomes a bind parameter (?).
 For SELECT queries, results are printed to stdout with column headers.
 For INSERT/UPDATE/DELETE queries, changes are committed silently.
+
+--script executes a multi-statement DDL/migration script (no parameters):
+the fallback metrics-db.sh uses when the sqlite3 CLI is absent.
+--raw prints rows the way the sqlite3 CLI does (columns joined with |,
+nothing on an empty result), so shell callers parse both paths identically.
 """
 import sqlite3
 import sys
@@ -26,18 +31,35 @@ def _format_table(headers: list[str], rows: list[tuple]) -> str:
     return "\n".join(lines)
 
 
-def _parse_args() -> tuple[str, str, list[str]]:
-    if len(sys.argv) < 3:
-        print("Usage: metrics-query.py <db_path> <query> [params...]", file=sys.stderr)
+def _parse_args() -> tuple[str, str, str, list[str]]:
+    argv = sys.argv[1:]
+    mode = "default"
+    if argv and argv[0] in ("--script", "--raw"):
+        mode = argv[0][2:]
+        argv = argv[1:]
+    if len(argv) < 2:
+        print("Usage: metrics-query.py [--script|--raw] <db_path> <query> [params...]", file=sys.stderr)
         sys.exit(1)
-    return sys.argv[1], sys.argv[2], sys.argv[3:]
+    if mode == "script" and argv[2:]:
+        print("metrics-query.py: --script takes no bind parameters", file=sys.stderr)
+        sys.exit(1)
+    return mode, argv[0], argv[1], argv[2:]
 
 
-def _execute_query(db_path: str, query: str, params: list[str]) -> None:
+def _execute_query(mode: str, db_path: str, query: str, params: list[str]) -> None:
     conn = sqlite3.connect(db_path)
     try:
         cur = conn.cursor()
+        if mode == "script":
+            cur.executescript(query)
+            conn.commit()
+            return
         cur.execute(query, params)
+        if mode == "raw":
+            for row in cur.fetchall():
+                print("|".join("" if value is None else str(value) for value in row))
+            conn.commit()
+            return
         query_type = query.strip().split()[0].upper() if query.strip() else ""
         if query_type == "SELECT":
             _print_select_results(cur)
@@ -60,8 +82,8 @@ def _print_select_results(cur: sqlite3.Cursor) -> None:
 
 
 def main() -> None:
-    db_path, query, params = _parse_args()
-    _execute_query(db_path, query, params)
+    mode, db_path, query, params = _parse_args()
+    _execute_query(mode, db_path, query, params)
 
 
 if __name__ == "__main__":
