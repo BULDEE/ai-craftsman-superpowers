@@ -1,7 +1,7 @@
 [
 {"complexity":6,"fan_out":0,"file_lines":260,"ignores":0,"max_fn_lines":28,"path":".github/scripts/secrets-scan.sh"},
 {"complexity":16,"fan_out":0,"file_lines":67,"ignores":0,"max_fn_lines":67,"path":"adapters/hermes/claude-craftsman.sh"},
-{"complexity":3,"fan_out":6,"file_lines":188,"ignores":0,"max_fn_lines":16,"path":"adapters/hermes/pre-verify.sh"},
+{"complexity":3,"fan_out":7,"file_lines":227,"ignores":0,"max_fn_lines":16,"path":"adapters/hermes/pre-verify.sh","reason":"ADR-0029: gate self-protection guard and advisory channel (CR-45, CR-46)"},
 {"complexity":4,"fan_out":5,"file_lines":195,"ignores":0,"max_fn_lines":22,"path":"ci/adapters/adapter.sh","reason":"CI annotation delivery: adapter_compute_exit now reads files_scanned, so a run that opened no file fails closed in ci mode as it already did in direct mode, and auto-detection routes through each provider's adapter_detect instead of reimplementing the env-var chain. adapter_format_comment was decomposed into read, header and issue table, so complexity fell 13 to 4 and max_fn_lines 66 to 22; file_lines and fan_out rise for that decomposition and for the recorded ground truth."},
 {"complexity":8,"fan_out":2,"file_lines":229,"ignores":0,"max_fn_lines":52,"path":"ci/adapters/bitbucket.sh","reason":"CI annotation delivery: the report and annotation PUTs no longer discard their status, so an undelivered verdict is visible, and Pipelines uses the documented credential-free proxy on localhost:29418 instead of requiring a Bearer token the template described as an app password. complexity fell 14 to 8; file_lines rises for the transport helper and the recorded ground truth."},
 {"complexity":2,"fan_out":1,"file_lines":60,"ignores":0,"max_fn_lines":17,"path":"ci/adapters/generic.sh"},
@@ -104,7 +104,8 @@
 {"complexity":4,"fan_out":0,"file_lines":131,"ignores":0,"max_fn_lines":24,"path":"scripts/bump-version.sh"},
 {"complexity":5,"fan_out":0,"file_lines":198,"ignores":0,"max_fn_lines":22,"path":"scripts/consolidate-metrics.sh"},
 {"complexity":5,"fan_out":0,"file_lines":214,"ignores":0,"max_fn_lines":19,"path":"scripts/validate-pack.sh"},
-{"complexity":0,"fan_out":2,"file_lines":235,"ignores":0,"max_fn_lines":10,"path":"tests/adapters/test-hermes-pre-verify.sh"},
+{"complexity":0,"fan_out":2,"file_lines":272,"ignores":0,"max_fn_lines":11,"path":"tests/adapters/test-hermes-pre-verify.sh","reason":"ADR-0029: red-first assertions for gate self-edit and advisory findings"},
+{"complexity":1,"fan_out":5,"file_lines":152,"ignores":0,"max_fn_lines":8,"path":"tests/adapters/test-parity.sh"},
 {"complexity":0,"fan_out":0,"file_lines":6,"ignores":0,"max_fn_lines":6,"path":"tests/ci/fixtures/invalid-any.ts"},
 {"complexity":0,"fan_out":1,"file_lines":21,"ignores":0,"max_fn_lines":6,"path":"tests/ci/fixtures/invalid-layer-violation.php"},
 {"complexity":0,"fan_out":0,"file_lines":11,"ignores":0,"max_fn_lines":5,"path":"tests/ci/fixtures/invalid-no-strict.php"},
@@ -180,6 +181,6 @@
 {"complexity":0,"fan_out":3,"file_lines":289,"ignores":3,"max_fn_lines":7,"path":"tests/packs/test-security.sh"},
 {"complexity":0,"fan_out":5,"file_lines":139,"ignores":0,"max_fn_lines":1,"path":"tests/packs/test-structural.sh"},
 {"complexity":0,"fan_out":5,"file_lines":118,"ignores":0,"max_fn_lines":1,"path":"tests/packs/test-symfony.sh"},
-{"complexity":24,"fan_out":1,"file_lines":820,"ignores":1,"max_fn_lines":125,"path":"tests/run-tests.sh","reason":"register tests/core/test-gate-independence.sh"},
+{"complexity":25,"fan_out":1,"file_lines":821,"ignores":1,"max_fn_lines":125,"path":"tests/run-tests.sh","reason":"ADR-0029: wire the host adapter parity suite (one run_subtest line)"},
 {"complexity":0,"fan_out":0,"file_lines":344,"ignores":0,"max_fn_lines":5,"path":"tests/templates/test-templates.sh"}
 ]

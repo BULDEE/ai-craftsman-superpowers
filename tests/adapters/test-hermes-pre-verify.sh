@@ -38,8 +38,9 @@ print(json.dumps({
     "hook_event_name": "pre_verify", "tool_name": None, "tool_input": None,
     "session_id": "s1", "cwd": sys.argv[1],
     "extra": {"changed_paths": sys.argv[2].split(","), "coding": sys.argv[3] == "1",
-              "attempt": 0, "final_response": "done", "model": "m", "platform": "cli"},
-}))' "$WORK" "$1" "$2"
+              "attempt": int(sys.argv[4]), "final_response": "done", "model": "m",
+              "platform": "cli"},
+}))' "$WORK" "$1" "$2" "${3:-0}"
 }
 
 OUT=$(_payload "src/Bad.ts" 1 | bash "$HOOK" 2>/dev/null)
@@ -104,6 +105,42 @@ if [[ -z "$OUT" ]]; then
 else
     log_fail "spurious verdict" "$OUT"
 fi
+
+# The gated party configures the gate: a turn that edits .craft-rules.yml or
+# .craft-config.yml could switch its own violations to `ignore` before the scan
+# reads them, and consent in Hermes survives script edits (the allowlist keys
+# on the command string, not a hash). Such a turn is refused outright.
+printf 'TS001: ignore\n' > .craft-rules.yml
+OUT=$(_payload "" 1 | bash "$HOOK" 2>/dev/null)
+if printf '%s' "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("decision")=="block" else 1)' 2>/dev/null; then
+    log_pass "a turn that edits the gate's own configuration is refused"
+else
+    log_fail "gate self-edit accepted" "expected a block, got: ${OUT:-<empty>}"
+fi
+if printf '%s' "$OUT" | grep -q "craft-rules"; then
+    log_pass "the refusal names the gate file the turn touched"
+else
+    log_fail "unnamed gate file" "$OUT"
+fi
+rm -f .craft-rules.yml
+
+# Non-critical findings surface once, on the first attempt, and never block: a
+# warning repeated on every nudge would burn max_verify_nudges on advice, and a
+# warning dropped entirely would break verdict parity with the other front-ends.
+printf 'export default function f() { return 1 }\n' > src/Warn.ts
+OUT=$(_payload "src/Warn.ts" 1 0 | bash "$HOOK" 2>/dev/null)
+if [[ -n "$OUT" ]] && ! printf '%s' "$OUT" | grep -q '"decision"' && printf '%s' "$OUT" | grep -q "TS002"; then
+    log_pass "advisory findings are surfaced without a block directive"
+else
+    log_fail "warnings dropped or blocking" "attempt 0 on a warn-only turn gave: ${OUT:-<empty>}"
+fi
+OUT=$(_payload "src/Warn.ts" 1 1 | bash "$HOOK" 2>/dev/null)
+if [[ -z "$OUT" ]]; then
+    log_pass "advisory findings stay silent after the first attempt"
+else
+    log_fail "warning loop" "attempt 1 still nudges: $OUT"
+fi
+rm -f src/Warn.ts
 
 # An autonomous agent commits. Scope taken from the worktree alone left a
 # committed violation invisible: clean worktree, silent gate, everything the

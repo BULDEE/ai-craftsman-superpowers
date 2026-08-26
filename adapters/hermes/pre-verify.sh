@@ -94,6 +94,8 @@ elif value is not None:
 HINTED_PATHS=$(_field changed_paths)
 CODING=$(_field coding)
 CWD=$(_field cwd)
+ATTEMPT=$(_field attempt)
+[[ "$ATTEMPT" =~ ^[0-9]+$ ]] || ATTEMPT=0
 
 # Scope like a pre_tool_call hook scopes on tool_name: a non-coding session has
 # nothing for this gate to say.
@@ -147,10 +149,22 @@ target = os.path.realpath(os.path.join(root, sys.argv[2]))
 inside = target == root or target.startswith(root + os.sep)
 print(os.path.relpath(target, root) if inside else "")
 ' "$CWD" "$path" 2>/dev/null)
-    [[ -n "$resolved" && -f "$resolved" ]] || continue
+    [[ -n "$resolved" ]] || continue
+    # The gated party configures the gate: a turn that edits the rule files
+    # could switch its own violations to `ignore` before this scan reads them,
+    # and Hermes consent survives script edits (the allowlist keys on the
+    # command string, not a hash). Deletions count, so this runs before the
+    # existence filter.
+    case "$resolved" in
+        .craft-rules.yml|.craft-config.yml|*/.craft-rules.yml|*/.craft-config.yml|adapters/hermes/*|ci/craftsman-ci.sh)
+            GATE_TOUCHED="$resolved" ;;
+    esac
+    [[ -f "$resolved" ]] || continue
     case " ${SCAN_PATHS[*]:-} " in *" $resolved "*) continue ;; esac
     SCAN_PATHS+=("$resolved")
 done <<< "$(printf '%s\n%s\n' "$(_git_scope)" "$HINTED_PATHS")"
+
+[[ -n "${GATE_TOUCHED:-}" ]] && _verdict "This turn edits the craftsman gate's own configuration (${GATE_TOUCHED}). The gated party does not reconfigure the gate: revert that file and change the rules through a reviewed commit instead."
 
 [[ ${#SCAN_PATHS[@]} -gt 0 ]] || exit 0
 
@@ -162,26 +176,51 @@ REPORT=$(portable_timeout "${CRAFTSMAN_GATE_SECONDS:-45}" \
 [[ "$GATE_STATUS" -eq 124 ]] && _bail "gate exceeded ${CRAFTSMAN_GATE_SECONDS:-45}s on ${#SCAN_PATHS[@]} file(s), verdict unknown"
 [[ -n "$REPORT" ]] || _bail "gate produced no report (exit ${GATE_STATUS}), verdict unknown"
 
+# One verdict, two channels. Criticals block, and carry the advisory findings
+# along so they are read in the same turn. Advisory-only surfaces once, as a
+# continue directive on the first attempt: repeated on every nudge it would
+# burn agent.max_verify_nudges on advice, dropped it would break verdict
+# parity with the hook and CI front-ends.
 SUMMARY=$(printf '%s' "$REPORT" | python3 -c '
 import json, sys
 try:
     report = json.load(sys.stdin)
 except (ValueError, TypeError):
     sys.exit(0)
+def line(v):
+    return "{}:{} {} - {}".format(v.get("file", "?"), v.get("line", 0), v.get("rule", "?"), v.get("message", ""))
 violations = report.get("violations") or []
 blocking = [v for v in violations if v.get("severity") == "critical"]
-if not blocking:
-    sys.exit(0)
-lines = [
-    "{}:{} {} - {}".format(v.get("file", "?"), v.get("line", 0), v.get("rule", "?"), v.get("message", ""))
-    for v in blocking[:10]
-]
-more = len(blocking) - len(lines)
-if more > 0:
-    lines.append("and {} more".format(more))
-print("The craftsman gate rejects this change, so it is not finished:\n" + "\n".join(lines)
-      + "\nFix these and say what you ran to prove it.")
-' 2>/dev/null)
+advisory = [v for v in violations if v.get("severity") != "critical"]
+attempt = int(sys.argv[1])
+if blocking:
+    lines = [line(v) for v in blocking[:10]]
+    more = len(blocking) - len(lines)
+    if more > 0:
+        lines.append("and {} more".format(more))
+    if advisory:
+        lines.append("Also worth fixing, non-blocking:")
+        lines.extend(line(v) for v in advisory[:3])
+    print("BLOCK")
+    print("The craftsman gate rejects this change, so it is not finished:\n" + "\n".join(lines)
+          + "\nFix these and say what you ran to prove it.")
+elif advisory and attempt == 0:
+    lines = [line(v) for v in advisory[:5]]
+    more = len(advisory) - len(lines)
+    if more > 0:
+        lines.append("and {} more".format(more))
+    print("NUDGE")
+    print("Non-blocking craftsman findings, consider them before concluding:\n" + "\n".join(lines))
+' "$ATTEMPT" 2>/dev/null)
 
-[[ -n "$SUMMARY" ]] && _verdict "$SUMMARY"
+[[ -n "$SUMMARY" ]] || exit 0
+MODE="${SUMMARY%%$'\n'*}"
+MESSAGE="${SUMMARY#*$'\n'}"
+[[ "$MODE" == "BLOCK" ]] && _verdict "$MESSAGE"
+if [[ "$MODE" == "NUDGE" ]]; then
+    python3 -c '
+import json, sys
+print(json.dumps({"action": "continue", "message": sys.argv[1]}, ensure_ascii=False))
+' "$MESSAGE"
+fi
 exit 0
