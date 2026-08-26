@@ -1,0 +1,7 @@
+# EN curated cases: migrated one-for-one from the pre-rewrite test file.
+expect|ACCELERATION|curated|just do it quick
+expect|SCOPE_CREEP|curated|let's also add logging
+silent|review this pull request
+silent|the quick brown fox jumps over the lazy dog
+silent|the brown fox jumps over the lazy dog
+silent|summarize the changes

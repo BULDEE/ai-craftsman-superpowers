@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Bias Detector Tests
-# Tests hooks/bias-detector.sh pattern detection accuracy.
+# Bias Detector Tests (data-driven, ADR-0030)
+# Behavior cases live in tests/fixtures/bias/<lang>.cases; adding a language
+# to the detector means adding a conf file and a cases file, no code here.
+# Fixture grammar:
+#   expect|<CATEGORY>|curated|<prompt>   JSON systemMessage carries the label
+#   expect|<CATEGORY>|signal|<prompt>    plain-stdout note carries the slug
+#   silent|<prompt>                      hook prints nothing
+# Prompts must not contain | " or \ (field separator and JSON framing).
 # =============================================================================
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-
-export CLAUDE_PLUGIN_DATA="/tmp/craftsman-bias-tests-$$"
-mkdir -p "$CLAUDE_PLUGIN_DATA"
-
-# Cleanup
-trap 'rm -rf "$CLAUDE_PLUGIN_DATA"' EXIT
+FIXTURES_DIR="$ROOT_DIR/tests/fixtures/bias"
 
 source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
-# Helper to run bias detector
 run_bias() {
     local prompt="$1"
     local output
@@ -25,130 +25,110 @@ run_bias() {
     echo "$exit_code|$output"
 }
 
-# =============================================================================
-# Acceleration Bias Detection
-# =============================================================================
+label_for() {
+    case "$1" in
+        ACCELERATION)    printf 'Acceleration' ;;
+        SCOPE_CREEP)     printf 'Scope Creep' ;;
+        OVER_OPT)        printf 'Over-Optimization' ;;
+        DOMAIN_MODELING) printf 'Domain Modeling' ;;
+        *)               printf 'UNKNOWN' ;;
+    esac
+}
+
+slug_for() {
+    case "$1" in
+        ACCELERATION)    printf 'acceleration' ;;
+        SCOPE_CREEP)     printf 'scope_creep' ;;
+        OVER_OPT)        printf 'over_optimization' ;;
+        DOMAIN_MODELING) printf 'domain_modeling' ;;
+        *)               printf 'unknown' ;;
+    esac
+}
+
+assert_curated_case() {
+    local category="$1" prompt="$2" lang="$3"
+    local result exit_code output label
+    result=$(run_bias "$prompt")
+    exit_code="${result%%|*}"
+    output="${result#*|}"
+    label=$(label_for "$category")
+    if [[ "$exit_code" == "0" ]] \
+        && echo "$output" | jq -e .systemMessage >/dev/null 2>&1 \
+        && echo "$output" | grep -qi "$label"; then
+        log_pass "$lang curated $category: '$prompt'"
+    else
+        log_fail "$lang curated $category: '$prompt'" "exit=$exit_code output=$output"
+    fi
+}
+
+assert_signal_case() {
+    local category="$1" prompt="$2" lang="$3"
+    local result exit_code output slug
+    result=$(run_bias "$prompt")
+    exit_code="${result%%|*}"
+    output="${result#*|}"
+    slug=$(slug_for "$category")
+    if [[ "$exit_code" == "0" ]] \
+        && echo "$output" | grep -q "Bias signal (${slug}" \
+        && ! echo "$output" | jq -e . >/dev/null 2>&1; then
+        log_pass "$lang signal $category: '$prompt'"
+    else
+        log_fail "$lang signal $category: '$prompt'" "exit=$exit_code output=$output"
+    fi
+}
+
+assert_silent_case() {
+    local prompt="$1" lang="$2"
+    local result exit_code output
+    result=$(run_bias "$prompt")
+    exit_code="${result%%|*}"
+    output="${result#*|}"
+    if [[ "$exit_code" == "0" && -z "$output" ]]; then
+        log_pass "$lang silent: '$prompt'"
+    else
+        log_fail "$lang silent: '$prompt'" "exit=$exit_code output=$output"
+    fi
+}
+
+run_case_file() {
+    local cases_file="$1"
+    local lang kind f2 f3 f4
+    lang=$(basename "$cases_file" .cases)
+    while IFS='|' read -r kind f2 f3 f4; do
+        [[ -z "$kind" ]] && continue
+        case "$kind" in
+            \#*) continue ;;
+            expect)
+                case "$f3" in
+                    curated) assert_curated_case "$f2" "$f4" "$lang" ;;
+                    signal)  assert_signal_case "$f2" "$f4" "$lang" ;;
+                    *) log_fail "$lang fixture line" "unknown tier '$f3'" ;;
+                esac
+                ;;
+            silent) assert_silent_case "$f2" "$lang" ;;
+            *) log_fail "$lang fixture line" "unknown kind '$kind'" ;;
+        esac
+    done < "$cases_file"
+}
+
 echo ""
-echo "=== Bias Detector Tests ==="
-echo ""
-echo "--- Acceleration Bias ---"
+echo "=== Bias Detector Tests (data-driven) ==="
 
-result=$(run_bias "fais ça vite")
-exit_code="${result%%|*}"
-output="${result#*|}"
-if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qi "Acceleration"; then
-    log_pass "FR 'fais ça vite' detects acceleration bias"
-else
-    log_fail "FR 'fais ça vite' should detect acceleration" "exit=$exit_code"
-fi
+found_any=false
+for cases_file in "$FIXTURES_DIR"/*.cases; do
+    [[ -f "$cases_file" ]] || continue
+    found_any=true
+    echo ""
+    echo "--- $(basename "$cases_file") ---"
+    run_case_file "$cases_file"
+done
 
-result=$(run_bias "just do it quick")
-exit_code="${result%%|*}"
-output="${result#*|}"
-if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qi "Acceleration"; then
-    log_pass "EN 'just do it quick' detects acceleration bias"
-else
-    log_fail "EN 'just do it quick' should detect acceleration" "exit=$exit_code"
+if [[ "$found_any" == "false" ]]; then
+    log_fail "fixture discovery" "no .cases file under $FIXTURES_DIR; a silent suite proves nothing"
 fi
 
 # =============================================================================
-# Scope Creep Detection
-# =============================================================================
-echo ""
-echo "--- Scope Creep ---"
-
-result=$(run_bias "et aussi ajoutons une feature")
-exit_code="${result%%|*}"
-output="${result#*|}"
-if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qi "Scope Creep"; then
-    log_pass "FR 'et aussi ajoutons' detects scope creep"
-else
-    log_fail "FR 'et aussi ajoutons' should detect scope creep" "exit=$exit_code"
-fi
-
-result=$(run_bias "let's also add logging")
-exit_code="${result%%|*}"
-output="${result#*|}"
-if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qi "Scope Creep"; then
-    log_pass "EN 'let's also add' detects scope creep"
-else
-    log_fail "EN 'let's also add' should detect scope creep" "exit=$exit_code"
-fi
-
-# =============================================================================
-# Over-Optimization Detection
-# =============================================================================
-echo ""
-echo "--- Over-Optimization ---"
-
-result=$(run_bias "il faut abstraire ce pattern")
-exit_code="${result%%|*}"
-output="${result#*|}"
-if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qi "Over-Optimization"; then
-    log_pass "FR 'abstraire ce pattern' detects over-optimization"
-else
-    log_fail "FR 'abstraire ce pattern' should detect over-optimization" "exit=$exit_code"
-fi
-
-# =============================================================================
-# Domain Modeling Suggestion
-# =============================================================================
-echo ""
-echo "--- Domain Modeling ---"
-
-result=$(run_bias "crée une entité User")
-exit_code="${result%%|*}"
-output="${result#*|}"
-if [[ "$exit_code" == "0" ]] && echo "$output" | grep -qi "Domain Modeling"; then
-    log_pass "FR 'crée une entité' detects domain modeling suggestion"
-else
-    log_fail "FR 'crée une entité' should detect domain modeling" "exit=$exit_code"
-fi
-
-# =============================================================================
-# False Positive Tests (should NOT detect any bias)
-# =============================================================================
-echo ""
-echo "--- False Positives ---"
-
-result=$(run_bias "review this pull request")
-exit_code="${result%%|*}"
-output="${result#*|}"
-if [[ "$exit_code" == "0" ]] && [[ -z "$output" || ! "$output" =~ "BIAS DETECTED" ]]; then
-    log_pass "'review this pull request' no false positive"
-else
-    log_fail "'review this pull request' should not detect bias" "got output: $output"
-fi
-
-result=$(run_bias "the quick brown fox jumps over the lazy dog")
-exit_code="${result%%|*}"
-output="${result#*|}"
-if [[ "$exit_code" == "0" ]] && [[ -z "$output" || ! "$output" =~ "Acceleration" ]]; then
-    log_pass "'the quick brown fox' no false positive (context-aware patterns)"
-else
-    log_fail "'the quick brown fox' should NOT detect acceleration" "got output: $output"
-fi
-
-result=$(run_bias "the brown fox jumps over the lazy dog")
-exit_code="${result%%|*}"
-output="${result#*|}"
-if [[ "$exit_code" == "0" ]] && [[ -z "$output" || ! "$output" =~ "Acceleration" ]]; then
-    log_pass "'the brown fox' no false acceleration"
-else
-    log_fail "'the brown fox' should not detect acceleration" "got output: $output"
-fi
-
-result=$(run_bias "summarize the changes")
-exit_code="${result%%|*}"
-output="${result#*|}"
-if [[ "$exit_code" == "0" ]] && [[ -z "$output" || ! "$output" =~ "BIAS DETECTED" ]]; then
-    log_pass "'summarize the changes' no false positive"
-else
-    log_fail "'summarize the changes' should not detect bias" "got output: $output"
-fi
-
-# =============================================================================
-# Exit code must ALWAYS be 0 (non-blocking hook)
+# Exit code must ALWAYS be 0 (non-blocking hook), whatever the prompt
 # =============================================================================
 echo ""
 echo "--- Exit Code Safety ---"

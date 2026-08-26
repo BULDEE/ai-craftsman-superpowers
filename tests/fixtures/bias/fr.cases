@@ -1,0 +1,5 @@
+# FR curated cases: migrated one-for-one from the pre-rewrite test file.
+expect|ACCELERATION|curated|fais ça vite
+expect|SCOPE_CREEP|curated|et aussi ajoutons une feature
+expect|OVER_OPT|curated|il faut abstraire ce pattern
+expect|DOMAIN_MODELING|curated|crée une entité User
