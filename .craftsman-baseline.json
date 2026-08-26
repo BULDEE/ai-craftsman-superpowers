@@ -105,6 +105,7 @@
 {"complexity":5,"fan_out":0,"file_lines":198,"ignores":0,"max_fn_lines":22,"path":"scripts/consolidate-metrics.sh"},
 {"complexity":5,"fan_out":0,"file_lines":214,"ignores":0,"max_fn_lines":19,"path":"scripts/validate-pack.sh"},
 {"complexity":0,"fan_out":2,"file_lines":235,"ignores":0,"max_fn_lines":10,"path":"tests/adapters/test-hermes-pre-verify.sh"},
+{"complexity":1,"fan_out":5,"file_lines":152,"ignores":0,"max_fn_lines":8,"path":"tests/adapters/test-parity.sh"},
 {"complexity":0,"fan_out":0,"file_lines":6,"ignores":0,"max_fn_lines":6,"path":"tests/ci/fixtures/invalid-any.ts"},
 {"complexity":0,"fan_out":1,"file_lines":21,"ignores":0,"max_fn_lines":6,"path":"tests/ci/fixtures/invalid-layer-violation.php"},
 {"complexity":0,"fan_out":0,"file_lines":11,"ignores":0,"max_fn_lines":5,"path":"tests/ci/fixtures/invalid-no-strict.php"},

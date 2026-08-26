@@ -44,6 +44,23 @@ scope from `git diff` plus untracked files and treats the payload as a hint.
 
 A dirty worktree is therefore unverified work, and all of it is scanned.
 
+### One verdict, two channels
+
+Critical violations block the conclusion, and carry the advisory findings
+along so they are read in the same turn. A turn with only advisory findings
+gets them once, as a `continue` directive on the first attempt, and silence on
+every later one: repeated, advice would burn `agent.max_verify_nudges`;
+dropped, it would break verdict parity with the hook and CI front-ends
+(ADR-0029, `tests/adapters/test-parity.sh`).
+
+### The gate refuses its own reconfiguration
+
+A turn whose diff touches `.craft-rules.yml`, `.craft-config.yml`,
+`adapters/hermes/` or `ci/craftsman-ci.sh` is blocked outright, whatever else
+it contains. Hermes consent survives script edits (the allowlist keys on the
+command string, not a hash), so this is the one containment measure that
+lives in this repository rather than in infrastructure.
+
 ## Path 2: Claude Code inside the container
 
 Hermes ships `skills/autonomous-ai-agents/claude-code/SKILL.md`, which tells
@@ -86,10 +103,13 @@ image; only session state belongs on the volume.
 
 Stated plainly, because a control that does not control is worse than none.
 
-**The gated party configures the gate.** A `.craft-rules.yml` next to a
-violating file switches its rule to `ignore` and the gate goes silent.
-`trust_project_tools` in `~/.claude/.craft-config.yml` turns a config toggle
-into execution of a cloned repository's own binaries. Both reproduced.
+**The gated party configures the gate, and the refusal above only covers the
+turn.** A `.craft-rules.yml` that was already in the repository when it was
+cloned, or one edited outside a gated turn, still switches its rule to
+`ignore` with no refusal. `trust_project_tools` in `~/.claude/.craft-config.yml`
+turns a config toggle into execution of a cloned repository's own binaries.
+Both reproduced before the in-turn guard existed, and both remain live outside
+it.
 
 The stock image runs as uid 0, so file permissions contain nobody. Containment
 needs one of:
