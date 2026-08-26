@@ -9,6 +9,11 @@ Every environment claim below was measured on a running
 
 ## Path 0: native Hermes plugin (recommended)
 
+New here? The five-minute version of this page is
+[docs/guides/hermes-quickstart.md](../../docs/guides/hermes-quickstart.md),
+and [examples/hermes-agent/demo.sh](../../examples/hermes-agent/demo.sh)
+replays a blocked-fixed-learned turn on your machine.
+
 Two commands, no Docker, no config file edit:
 
 ```bash
