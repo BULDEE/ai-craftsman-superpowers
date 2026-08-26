@@ -26,26 +26,14 @@ fi
 [[ -z "$PROMPT" ]] && exit 0
 
 # =============================================================================
-# Bias Patterns (case-insensitive, bilingual FR/EN)
+# Bias Patterns - loaded from hooks/lib/bias-patterns/<lang>.conf (ADR-0030).
+# The detector knows the categories; the languages live in data.
 # =============================================================================
 
-# Acceleration bias: rushing without thinking
-# Context-aware: requires imperative verb context or explicit rush indicators
-# Reduced false positives: "quick fix" alone won't trigger, "just do it quick" will
-ACCELERATION_PATTERNS="(fais.{0,10}vite|code direct|pas le temps|no time|just do it|skip the (design|test|review)|hurry up|asap|do it now|juste code|sans (réfléchir|tester|design))"
-
-# Scope creep: adding features beyond scope
-# Context-aware: requires action verb + addition pattern
-SCOPE_CREEP_PATTERNS="(et (aussi|en plus) (ajoute|fais|met|ajoutons)|tant qu'on y est|while we're at it.*(add|change|also)|also add|let's also (add|do|change)|and also (add|do|implement)|ajoutons aussi|rajoute)"
-
-# Over-optimization: premature abstraction
-# Context-aware: requires explicit generalization intent
-OVER_OPT_PATTERNS="(abstraire|généraliser|make it (abstract|configurable|generic|extensible)|future[- ]proof|pour (le futur|plus tard)|rends[- ]?(le )?(configurable|générique|abstrait))"
-
-# Workflow enforcement: domain modeling without /craftsman:design
-# FR: crée une entité|value object|agrégat
-# EN: create entity|value object|aggregate
-DOMAIN_MODELING_PATTERNS="(create (a |an |the )?(entity|value object|aggregate|domain event|domain service)|crée (une |un |l'?)?(entité|value object|agrégat|événement de domaine))"
+LIB_DIR="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/hooks/lib"
+# shellcheck source=/dev/null
+source "$LIB_DIR/bias-registry.sh"
+bias_registry_init "${CRAFTSMAN_BIAS_PATTERNS_DIR:-$LIB_DIR/bias-patterns}"
 
 # =============================================================================
 # Detection & Warnings
@@ -77,16 +65,23 @@ warn_missing_design() {
     add_warning "Workflow: Domain modeling without /craftsman:design. Run /craftsman:design to model the domain properly before creating entities."
 }
 
-# Check each pattern
-echo "$PROMPT" | grep -iEq "$ACCELERATION_PATTERNS" && warn_acceleration || true
-echo "$PROMPT" | grep -iEq "$SCOPE_CREEP_PATTERNS" && warn_scope_creep || true
-echo "$PROMPT" | grep -iEq "$OVER_OPT_PATTERNS" && warn_over_optimization || true
+# Check each curated category. bias_combined_pattern returns non-zero when no
+# language declares a category, and the grep MUST be skipped then: an empty
+# pattern matches every prompt.
+if pat=$(bias_combined_pattern ACCELERATION curated); then
+    echo "$PROMPT" | grep -iEq "$pat" && warn_acceleration || true
+fi
+if pat=$(bias_combined_pattern SCOPE_CREEP curated); then
+    echo "$PROMPT" | grep -iEq "$pat" && warn_scope_creep || true
+fi
+if pat=$(bias_combined_pattern OVER_OPT curated); then
+    echo "$PROMPT" | grep -iEq "$pat" && warn_over_optimization || true
+fi
 
 # Workflow enforcement: warn if domain modeling without /craftsman:design
-if echo "$PROMPT" | grep -iEq "$DOMAIN_MODELING_PATTERNS"; then
+if pat=$(bias_combined_pattern DOMAIN_MODELING curated) && echo "$PROMPT" | grep -iEq "$pat"; then
     design_used=false
     if [[ -f "$SESSION_STATE" ]]; then
-        LIB_DIR="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/hooks/lib"
         design_used=$(python3 "$LIB_DIR/session_state.py" check-flag "$SESSION_STATE" design_used 2>/dev/null) || design_used=false
     fi
     if [[ "$design_used" != "true" ]]; then
