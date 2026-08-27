@@ -7,7 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.9.0] - 2026-08-27
+
 ### Added
+
+- **Actionable verdicts (#30).** Measured on 18748 real violations, twelve
+  rules fired 5624 times in 30 days and produced zero recorded corrections in
+  either direction. Two causes, both fixed. A rule now names what it found:
+  `SH003` reported "line 92: Short variable name" and got 0 corrections on 120
+  fires, while `PY001` names the identifier and is fixed 167 times against 10
+  suppressions, so `SH003` now reports the identifier, taken from the match
+  that already happened rather than a second scan. And both render paths now
+  offer scoping before silencing: the blocking path named `craftsman-ignore`
+  as the only way out, so a rule wrong for a whole directory was suppressed
+  once per file instead of scoped once (151 of PHP002's 153 suppressions came
+  from entity directories one `.craft-rules.yml` entry would have covered),
+  and the advisory path carried no action at all, which is the mechanical
+  reason the advisory family produced outcomes-free fires.
+
+- **`scoped` and `open` outcomes on `corrections` (#30, #31).** Scoping a rule
+  was previously indistinguishable from giving up on it, and a verdict that
+  reached the end of a session with no outcome was invisible. The migration is
+  column-aware: a blind rebuild would have dropped the `source` column added
+  later by ALTER, along with its data.
+
+- **`tests/core/test-authority.sh`.** A user directive outranks every tier and
+  an advisory verdict never raises the exit code, both enforced rather than
+  documented. The fourth tier, a semantic model judgment, deliberately has no
+  implementation until it has a caller; the constraint that it must not be
+  able to promote itself into a blocking verdict is recorded where the next
+  implementer reads it.
+
+- **`knowledge/verifying-the-instrument.md`.** Five instrument failures were
+  observed in one session and none was a defect in the code under test: a
+  check that read a comment instead of the emitted message, a pattern that
+  matched inside the corrected name and reported the fix as the defect, a
+  fixture that never triggered the rule it tested, an all-time aggregate that
+  described a problem solved a month earlier, and a verification whose output
+  was piped away unread. Code is exercised constantly and fails loudly; an
+  instrument is exercised once, silently, and its failure looks like success.
 
 - **Bias detection language cascade (ADR-0030).** Bias patterns moved out of
   `hooks/bias-detector.sh` into one data file per language under

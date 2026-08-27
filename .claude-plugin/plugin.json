@@ -1,7 +1,7 @@
 {
   "name": "craftsman",
   "description": "Refuses any edit that breaks your architecture rules, before it reaches disk. A prompt asks; this enforces. SOLID, Clean Architecture, hexagonal, DDD and legacy rescue, with the same rules in your editor and your CI.",
-  "version": "4.8.1",
+  "version": "4.9.0",
   "author": {
     "name": "Alexandre Mallet",
     "email": "contact@buldee.com",

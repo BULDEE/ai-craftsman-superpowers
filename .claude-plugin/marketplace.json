@@ -1,6 +1,6 @@
 {
   "name": "ai-craftsman-superpowers",
-  "version": "4.8.1",
+  "version": "4.9.0",
   "owner": {
     "name": "Alexandre Mallet",
     "email": "contact@buldee.com"
@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "craftsman",
-      "version": "4.8.1",
+      "version": "4.9.0",
       "description": "A pre-write hook that refuses edits breaking your layer boundaries, plus a structural ratchet so inherited legacy never turns the repository red on day one.",
       "author": {
         "name": "Alexandre Mallet",
