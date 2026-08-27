@@ -90,11 +90,19 @@ _sh_check_function_length() {
 _sh_check_short_names() {
     local file="$1"
     # SH003: Single-char variable names in assignments (excluding conventional and loop vars)
+    # The subject comes from the match that already happened, never from a
+    # second scan. Naming it is the whole difference between a verdict people
+    # act on and one they scroll past: PY001 names the identifier and is fixed
+    # 167 times against 10 suppressions, while this rule named nothing and
+    # produced 120 fires and zero corrections in 30 days.
     local short_var_line
     while IFS= read -r short_var_line; do
         [[ -z "$short_var_line" ]] && continue
         local lineno="${short_var_line%%:*}"
-        add_warning "SH003" "line ${lineno}: Short variable name - use descriptive names"
+        local variable_name="${short_var_line#*:}"
+        variable_name="${variable_name%%=*}"
+        variable_name="${variable_name//[[:space:]]/}"
+        add_warning "SH003" "line ${lineno}: name '${variable_name}' is one or two characters - use a descriptive name"
     done < <(grep -nE '^\s*[a-z]{1,2}=' "$file" 2>/dev/null \
         | grep -vE "^\s*${_SH_ALLOWED_SHORT_VARS}=" \
         | grep -vE '(^\s*#|^\s*if |^\s*for |^\s*while )' \

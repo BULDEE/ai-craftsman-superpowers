@@ -438,7 +438,14 @@ if [[ $CRITICAL_COUNT -gt 0 ]]; then
     while IFS= read -r vline; do
         [[ -n "$vline" ]] && echo "  ✗ $vline" >&2
     done <<< "$(echo -e "$CRITICAL_VIOLATIONS")"
-    echo "Fix these or add: // craftsman-ignore: <RULE_ID>" >&2
+    # Scoping is offered BEFORE silencing, and it is offered at all. This line
+    # used to name craftsman-ignore as the only way out, so a rule that was
+    # wrong for a whole directory got suppressed once per file instead of
+    # scoped once: 151 of PHP002's 153 recorded suppressions came from entity
+    # directories that one .craft-rules.yml line would have covered.
+    echo "Fix these, or scope the rule where it does not apply:" >&2
+    echo "  echo '<RULE_ID>: warn' >> $(dirname "$FILE_PATH")/.craft-rules.yml" >&2
+    echo "Or silence this one case: // craftsman-ignore: <RULE_ID>" >&2
 
     # OKF doctrine pointer (ADR-0024): route the first blocked rule to the
     # concept that explains it - deterministic frontmatter match, no index.
@@ -499,11 +506,26 @@ if [[ $WARNING_COUNT -gt 0 ]]; then
     # went out on systemMessage only, so the model saw every blocking violation
     # and none of the advisory ones - including the whole structural family,
     # which is advisory by design and therefore invisible to it.
+    # An advisory verdict used to carry no action at all: no fix path, no scope
+    # path, no way to silence it. That is why the advisory family produced 5624
+    # fires and zero recorded corrections in 30 days, in either direction. A
+    # warning nobody can act on is not a warning, it is noise that teaches the
+    # gate is optional.
+    # Built as a shell variable and passed through --arg: inlining it in the
+    # jq program would need single quotes, which close the program itself and
+    # turn <RULE_ID> into a shell redirect.
+    WARNING_ACTIONS="Act on each: fix it, or scope the rule where it does not apply"
+    WARNING_ACTIONS="${WARNING_ACTIONS} (add \"<RULE_ID>: ignore\" to $(dirname "$FILE_PATH")/.craft-rules.yml),"
+    WARNING_ACTIONS="${WARNING_ACTIONS} or silence this one case with a craftsman-ignore comment naming the rule."
+    WARNING_ACTIONS="${WARNING_ACTIONS} Leaving it unaddressed is the one outcome that teaches nothing."
+
     jq -n --arg warnings "$(echo -e "$WARNING_VIOLATIONS")" \
            --arg count "$WARNING_COUNT" \
            --arg patterns "$(echo -e "$pattern_msg")" \
+           --arg actions "$WARNING_ACTIONS" \
     '(("WARNINGS: " + $count + " issue(s) detected:\n" + $warnings
-       + (if $patterns != "" then $patterns else "" end))) as $body
+       + (if $patterns != "" then "\n" + $patterns else "" end)
+       + "\n" + $actions)) as $body
      | {
         systemMessage: $body,
         hookSpecificOutput: {
