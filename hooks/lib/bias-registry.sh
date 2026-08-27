@@ -42,11 +42,11 @@ _bias_var_suffix() {
 # stderr the way lang-registry.sh reports a missing python3, and drop the tag
 # so no caller reads a half-registered language as a working one.
 _bias_registry_audit() {
-    local lang suffix mode_var kept=()
+    local lang suffix mode_variable kept=()
     for lang in ${BIAS_REGISTERED_LANGS[@]+"${BIAS_REGISTERED_LANGS[@]}"}; do
         suffix=$(_bias_var_suffix "$lang")
-        mode_var="BIAS_${suffix}_MODE"
-        if [[ -n "${!mode_var:-}" ]]; then
+        mode_variable="BIAS_${suffix}_MODE"
+        if [[ -n "${!mode_variable:-}" ]]; then
             kept+=("$lang")
             continue
         fi
@@ -56,11 +56,11 @@ _bias_registry_audit() {
     return 0
 }
 
-# bias_registry_init <dir> - source every *.conf, deterministically ordered.
+# bias_registry_init <directory> - source every *.conf, deterministically ordered.
 # Re-init resets state: a second call with a different directory must not
 # serve the first directory's patterns.
 bias_registry_init() {
-    local dir="$1" conf lang
+    local directory="$1" pattern_file lang
     # Unset every variable a previous init registered, then the list itself.
     for lang in ${BIAS_REGISTERED_LANGS[@]+"${BIAS_REGISTERED_LANGS[@]}"}; do
         local suffix
@@ -71,11 +71,11 @@ bias_registry_init() {
     done
     BIAS_REGISTERED_LANGS=()
 
-    [[ -d "$dir" ]] || return 0
-    for conf in "$dir"/*.conf; do
-        [[ -f "$conf" ]] || continue
+    [[ -d "$directory" ]] || return 0
+    for pattern_file in "$directory"/*.conf; do
+        [[ -f "$pattern_file" ]] || continue
         # shellcheck source=/dev/null
-        source "$conf"
+        source "$pattern_file"
     done
     _bias_registry_audit
     return 0
@@ -88,18 +88,18 @@ bias_registry_init() {
 # checkable state and never an empty string.
 bias_combined_pattern() {
     local category="$1" mode="$2"
-    local lang suffix mode_var pat_var pat combined=""
+    local lang suffix mode_variable pattern_variable pattern combined=""
     for lang in ${BIAS_REGISTERED_LANGS[@]+"${BIAS_REGISTERED_LANGS[@]}"}; do
         suffix=$(_bias_var_suffix "$lang")
-        mode_var="BIAS_${suffix}_MODE"
-        [[ "${!mode_var:-}" == "$mode" ]] || continue
-        pat_var="BIAS_${suffix}_${category}"
-        pat="${!pat_var:-}"
-        [[ -z "$pat" ]] && continue
+        mode_variable="BIAS_${suffix}_MODE"
+        [[ "${!mode_variable:-}" == "$mode" ]] || continue
+        pattern_variable="BIAS_${suffix}_${category}"
+        pattern="${!pattern_variable:-}"
+        [[ -z "$pattern" ]] && continue
         if [[ -n "$combined" ]]; then
-            combined="${combined}|${pat}"
+            combined="${combined}|${pattern}"
         else
-            combined="$pat"
+            combined="$pattern"
         fi
     done
     [[ -z "$combined" ]] && return 1

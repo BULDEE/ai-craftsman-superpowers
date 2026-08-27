@@ -38,14 +38,14 @@ bias_registry_init "$FIXTURE_DIR"
 
 echo "--- Mode separation and aggregation ---"
 
-pat=$(bias_combined_pattern ACCELERATION curated) \
-    && assert_contains "curated ACCELERATION holds aa's pattern" "$pat" "aa-fast" \
+pattern=$(bias_combined_pattern ACCELERATION curated) \
+    && assert_contains "curated ACCELERATION holds aa's pattern" "$pattern" "aa-fast" \
     || log_fail "curated ACCELERATION should resolve" "returned non-zero"
-pat=$(bias_combined_pattern ACCELERATION curated) || pat=""
-assert_not_contains "curated ACCELERATION excludes signal-mode bb" "$pat" "bb-schnell"
+pattern=$(bias_combined_pattern ACCELERATION curated) || pattern=""
+assert_not_contains "curated ACCELERATION excludes signal-mode bb" "$pattern" "bb-schnell"
 
-pat=$(bias_combined_pattern ACCELERATION signal) \
-    && assert_contains "signal ACCELERATION holds bb's pattern" "$pat" "bb-schnell" \
+pattern=$(bias_combined_pattern ACCELERATION signal) \
+    && assert_contains "signal ACCELERATION holds bb's pattern" "$pattern" "bb-schnell" \
     || log_fail "signal ACCELERATION should resolve" "returned non-zero"
 
 echo ""
@@ -57,16 +57,16 @@ else
     log_fail "precondition" "empty pattern no longer matches all; guard rationale changed"
 fi
 
-if pat=$(bias_combined_pattern OVER_OPT curated); then
-    log_fail "OVER_OPT with no contributor must return non-zero" "got: '$pat'"
+if pattern=$(bias_combined_pattern OVER_OPT curated); then
+    log_fail "OVER_OPT with no contributor must return non-zero" "got: '$pattern'"
 else
     log_pass "unclaimed category returns non-zero (caller skips the grep)"
 fi
 
 grep_ran=false
-if pat=$(bias_combined_pattern OVER_OPT curated); then
+if pattern=$(bias_combined_pattern OVER_OPT curated); then
     grep_ran=true
-    echo "x" | grep -Eq "$pat" || true
+    echo "x" | grep -Eq "$pattern" || true
 fi
 if [[ "$grep_ran" == "false" ]]; then
     log_pass "caller idiom never reaches grep for an unclaimed category"
@@ -84,8 +84,8 @@ BIAS_CC_OVER_OPT="cc-generic"
 EOF
 
 bias_registry_init "$FIXTURE_DIR"
-pat=$(bias_combined_pattern OVER_OPT signal) \
-    && assert_contains "new conf file registers with zero code edits" "$pat" "cc-generic" \
+pattern=$(bias_combined_pattern OVER_OPT signal) \
+    && assert_contains "new conf file registers with zero code edits" "$pattern" "cc-generic" \
     || log_fail "cc.conf should register" "OVER_OPT signal returned non-zero"
 
 echo ""
@@ -129,8 +129,8 @@ BIAS_FR_CA_ACCELERATION="ca-presse|Ca-presse"
 EOF
 
 bias_registry_init "$BCP_DIR"
-pat=$(bias_combined_pattern ACCELERATION signal) \
-    && assert_contains "fr-CA registers under a sanitized suffix" "$pat" "ca-presse" \
+pattern=$(bias_combined_pattern ACCELERATION signal) \
+    && assert_contains "fr-CA registers under a sanitized suffix" "$pattern" "ca-presse" \
     || log_fail "fr-CA should register" "ACCELERATION signal returned non-zero"
 
 if [[ "${BIAS_REGISTERED_LANGS[0]:-}" == "fr-CA" ]]; then
@@ -155,8 +155,8 @@ else
     log_fail "broken conf must be reported" "stderr was: '$audit_err'"
 fi
 
-pat=$(bias_combined_pattern ACCELERATION signal) || pat=""
-assert_not_contains "a broken conf contributes no pattern" "$pat" "never-loaded"
+pattern=$(bias_combined_pattern ACCELERATION signal) || pattern=""
+assert_not_contains "a broken conf contributes no pattern" "$pattern" "never-loaded"
 
 if [[ " ${BIAS_REGISTERED_LANGS[*]} " != *" zz-broken "* ]]; then
     log_pass "the broken tag is dropped, never left half-registered"
