@@ -1,0 +1,6 @@
+expect|ACCELERATION|signal|早くやって、時間がない
+expect|ACCELERATION|signal|テスト抜きでとりあえず実装して
+expect|SCOPE_CREEP|signal|ついでにログ機能も追加して
+expect|OVER_OPT|signal|将来のため汎用化しておいて
+expect|DOMAIN_MODELING|signal|エンティティを作って
+silent|このレポートはビルド手順を説明している

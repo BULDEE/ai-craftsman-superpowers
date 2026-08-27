@@ -1,0 +1,6 @@
+expect|ACCELERATION|signal|làm nhanh lên, không có thời gian
+expect|ACCELERATION|signal|Nhanh lên, khỏi test
+expect|SCOPE_CREEP|signal|tiện thể thêm logging luôn
+expect|OVER_OPT|signal|làm cho tổng quát để dùng cho tương lai
+expect|DOMAIN_MODELING|signal|tạo một thực thể người dùng
+silent|báo cáo mô tả quy trình build

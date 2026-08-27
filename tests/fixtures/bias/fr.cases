@@ -1,0 +1,6 @@
+# FR signal cases: French sits at the same tier as every language but English.
+expect|ACCELERATION|signal|fais ça vite
+expect|SCOPE_CREEP|signal|et aussi ajoutons une feature
+expect|OVER_OPT|signal|il faut abstraire ce pattern
+expect|DOMAIN_MODELING|signal|crée une entité User
+expect|ACCELERATION|signal|Fais ça vite, pas le temps

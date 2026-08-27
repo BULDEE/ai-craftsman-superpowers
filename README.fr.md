@@ -115,7 +115,7 @@ en effort élevé. Vous ne payez jamais le tarif Opus pour un message de commit.
 1. **Moteur de règles à 3 niveaux d'héritage** : Global → Projet → Répertoire. Forme courte (`PHP001: warn`) ou forme longue (règles regex personnalisées). Le code hérité coexiste avec du code strict via une relaxation au niveau répertoire.
 2. **Cliquet structurel** : une baseline committée (`.craftsman-baseline.json`) enregistre le plus haut niveau structurel de chaque fichier (complexité, taille, plus longue fonction, fan-out d'imports, nombre de suppressions). Un fichier que vous touchez peut s'améliorer ou rester égal, jamais régresser : la marque se resserre automatiquement sur un passage vert et ne se desserre que par une suppression documentée et comptée. Le code hérité non touché n'est jamais puni pour une dette qu'il avait déjà.
 3. **Panel de design adverse** : trois contradicteurs (YAGNI, invariants et frontières, faisabilité) attaquent un design pendant `/craftsman:design`, avant qu'une ligne de code existe. Chaque objection atterrit dans un tableau retenue ou écartée : le silence n'est pas une option. Contredire un design coûte bien moins cher que contredire le code bâti dessus.
-4. **Détecteur de biais cognitifs** : détection en temps réel du biais d'accélération, du scope creep et de la sur-optimisation dans vos prompts, bilingue FR/EN, sensible au contexte pour limiter les faux positifs.
+4. **Détecteur de biais cognitifs** : détection en temps réel du biais d'accélération, du scope creep et de la sur-optimisation dans vos prompts. Cascade linguistique à deux étages : les patterns curés en anglais vous avertissent directement, et toutes les autres langues occupent un seul et même étage derrière, avec des lexiques de rappel (CJK, cyrillique et thaï inclus) qui confient la décision au modèle lisant déjà votre prompt, lequel la remonte ou l'écarte en silence avec toute la session en contexte. Aucun second modèle, aucun appel réseau. Les tags de langue suivent BCP 47, donc `fr-CA` ou `zh-Hant` s'enregistrent comme n'importe quel autre. Ajouter une langue, c'est deux fichiers de données et zéro ligne de code. Les lexiques non anglais sont des ébauches orientées rappel qu'aucun locuteur natif n'a encore relues, et c'est le sens de cet étage : un faux positif y devient une note que le modèle écarte en silence, jamais un avertissement que vous voyez.
 5. **Contrôle qualité en temps réel** : validation progressive sur chaque Write/Edit : regex (<50ms, toujours active) → sémantique LSP (via le plugin LSP officiel de votre langage) → analyse statique et architecture (PHPStan/ESLint/deptrac, à activer machine par machine parce que lancer les analyseurs d'un projet exécute son code, voir [SECURITY.md](SECURITY.md)). Se dégrade proprement sans aucun outil installé.
 6. **Métriques et tendances** : suivi SQLite des violations, corrections et sessions, avec des vues 7 jours / 30 jours pour identifier vos règles les plus violées.
 7. **Règles de sécurité** : SEC001-003 (secrets en dur, eval dynamique, SQL par concaténation) vérifiées en hooks et en CI, avec leur doctrine routée vers Claude au blocage. `/craftsman:setup` observe le dépôt et pose au plus quatre questions en langage clair.
@@ -277,8 +277,9 @@ explicitement, jamais déclenchées seules ; la méthodologie assume ses partis
 pris (DDD/Clean Architecture).
 
 **Contraintes actuelles :** PHP et TypeScript ont une couverture de règles
-complète, les autres langages un support de base ; les motifs de détection de
-biais sont EN/FR uniquement ; les métriques sont par machine, pas partagées en
+complète, les autres langages un support de base ; la détection de biais
+avertit directement en anglais et laisse le modèle arbitrer toutes les autres
+langues en contexte ; les métriques sont par machine, pas partagées en
 équipe ; l'auto-correction des violations et les plugins IDE ne sont pas
 supportés, par choix.
 

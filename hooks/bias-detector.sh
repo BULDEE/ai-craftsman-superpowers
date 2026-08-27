@@ -26,26 +26,14 @@ fi
 [[ -z "$PROMPT" ]] && exit 0
 
 # =============================================================================
-# Bias Patterns (case-insensitive, bilingual FR/EN)
+# Bias Patterns - loaded from hooks/lib/bias-patterns/<lang>.conf (ADR-0030).
+# The detector knows the categories; the languages live in data.
 # =============================================================================
 
-# Acceleration bias: rushing without thinking
-# Context-aware: requires imperative verb context or explicit rush indicators
-# Reduced false positives: "quick fix" alone won't trigger, "just do it quick" will
-ACCELERATION_PATTERNS="(fais.{0,10}vite|code direct|pas le temps|no time|just do it|skip the (design|test|review)|hurry up|asap|do it now|juste code|sans (réfléchir|tester|design))"
-
-# Scope creep: adding features beyond scope
-# Context-aware: requires action verb + addition pattern
-SCOPE_CREEP_PATTERNS="(et (aussi|en plus) (ajoute|fais|met|ajoutons)|tant qu'on y est|while we're at it.*(add|change|also)|also add|let's also (add|do|change)|and also (add|do|implement)|ajoutons aussi|rajoute)"
-
-# Over-optimization: premature abstraction
-# Context-aware: requires explicit generalization intent
-OVER_OPT_PATTERNS="(abstraire|généraliser|make it (abstract|configurable|generic|extensible)|future[- ]proof|pour (le futur|plus tard)|rends[- ]?(le )?(configurable|générique|abstrait))"
-
-# Workflow enforcement: domain modeling without /craftsman:design
-# FR: crée une entité|value object|agrégat
-# EN: create entity|value object|aggregate
-DOMAIN_MODELING_PATTERNS="(create (a |an |the )?(entity|value object|aggregate|domain event|domain service)|crée (une |un |l'?)?(entité|value object|agrégat|événement de domaine))"
+LIB_DIR="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/hooks/lib"
+# shellcheck source=/dev/null
+source "$LIB_DIR/bias-registry.sh"
+bias_registry_init "${CRAFTSMAN_BIAS_PATTERNS_DIR:-$LIB_DIR/bias-patterns}"
 
 # =============================================================================
 # Detection & Warnings
@@ -77,28 +65,81 @@ warn_missing_design() {
     add_warning "Workflow: Domain modeling without /craftsman:design. Run /craftsman:design to model the domain properly before creating entities."
 }
 
-# Check each pattern
-echo "$PROMPT" | grep -iEq "$ACCELERATION_PATTERNS" && warn_acceleration || true
-echo "$PROMPT" | grep -iEq "$SCOPE_CREEP_PATTERNS" && warn_scope_creep || true
-echo "$PROMPT" | grep -iEq "$OVER_OPT_PATTERNS" && warn_over_optimization || true
+SIGNAL_NOTES=""
 
-# Workflow enforcement: warn if domain modeling without /craftsman:design
-if echo "$PROMPT" | grep -iEq "$DOMAIN_MODELING_PATTERNS"; then
-    design_used=false
+_signal_intent() {
+    case "$1" in
+        acceleration)     printf 'rushing past design and tests' ;;
+        scope_creep)      printf 'adding work beyond the current scope' ;;
+        over_optimization) printf 'abstracting or generalizing prematurely' ;;
+        domain_modeling)  printf 'modeling the domain without a design session' ;;
+    esac
+}
+
+add_signal_note() {
+    local slug="$1" lexeme="$2"
+    SIGNAL_NOTES="${SIGNAL_NOTES}- Bias signal (${slug}): lexeme \"${lexeme}\" suggests $(_signal_intent "$slug")."$'\n'
+}
+
+# Design-session predicate, shared by the curated and the signal domain-modeling
+# paths: both defer to /craftsman:design having already run.
+_design_was_used() {
+    local design_used=false
     if [[ -f "$SESSION_STATE" ]]; then
-        LIB_DIR="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/hooks/lib"
         design_used=$(python3 "$LIB_DIR/session_state.py" check-flag "$SESSION_STATE" design_used 2>/dev/null) || design_used=false
     fi
-    if [[ "$design_used" != "true" ]]; then
-        warn_missing_design
-    fi
+    [[ "$design_used" == "true" ]]
+}
+
+# Check each curated category. bias_combined_pattern returns non-zero when no
+# language declares a category, and the grep MUST be skipped then: an empty
+# pattern matches every prompt.
+if pat=$(bias_combined_pattern ACCELERATION curated); then
+    echo "$PROMPT" | grep -iEq "$pat" && warn_acceleration || true
+fi
+if pat=$(bias_combined_pattern SCOPE_CREEP curated); then
+    echo "$PROMPT" | grep -iEq "$pat" && warn_scope_creep || true
+fi
+if pat=$(bias_combined_pattern OVER_OPT curated); then
+    echo "$PROMPT" | grep -iEq "$pat" && warn_over_optimization || true
 fi
 
-# Output structured JSON if warnings were collected
+# Workflow enforcement: warn if domain modeling without /craftsman:design
+if pat=$(bias_combined_pattern DOMAIN_MODELING curated) && echo "$PROMPT" | grep -iEq "$pat"; then
+    _design_was_used || warn_missing_design
+fi
+
+# Signal tier (ADR-0030): only when NO curated warning fired. A signal match
+# is not a verdict; the main model adjudicates it in context. Matching is
+# case-sensitive on purpose: signal patterns carry explicit case variants
+# because grep -i case folding is locale-dependent beyond ASCII.
+if [[ -z "$WARNINGS" ]]; then
+    for _cat_pair in "ACCELERATION acceleration" "SCOPE_CREEP scope_creep" \
+                     "OVER_OPT over_optimization" "DOMAIN_MODELING domain_modeling"; do
+        _cat="${_cat_pair%% *}"
+        _slug="${_cat_pair##* }"
+        pat=$(bias_combined_pattern "$_cat" signal) || continue
+        _match=$(echo "$PROMPT" | grep -oE "$pat" 2>/dev/null | head -1) || true
+        [[ -z "$_match" ]] && continue
+        if [[ "$_slug" == "domain_modeling" ]] && _design_was_used; then
+            continue
+        fi
+        add_signal_note "$_slug" "$_match"
+    done
+fi
+
+# Exclusive output formats: stdout is parsed as ONE payload by UserPromptSubmit.
+# Curated verdicts ship as JSON (systemMessage, user-visible, today's behavior).
+# Signal notes ship as plain stdout, the documented context channel the model
+# sees; they are emitted only when no curated warning fired at all.
 if [[ -n "$WARNINGS" ]]; then
     jq -n --arg msg "$WARNINGS" '{
         systemMessage: $msg
     }'
+elif [[ -n "$SIGNAL_NOTES" ]]; then
+    printf '%s\n%s' \
+        "Bias signal from the prompt lexicon. The matcher has no conversation context; you have all of it. For each signal below: if it reflects the user's real intent, surface that discipline warning in their language; if the match is incidental (quoted text, descriptive use, topic discussion), ignore it silently and never mention this note." \
+        "$SIGNAL_NOTES"
 fi
 
 # Always exit 0 (warning only, never block)

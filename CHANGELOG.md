@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Bias detection language cascade (ADR-0030).** Bias patterns moved out of
+  `hooks/bias-detector.sh` into one data file per language under
+  `hooks/lib/bias-patterns/`, compiled by `hooks/lib/bias-registry.sh`.
+  English is the single curated language: it keeps its context-aware regex
+  and its direct `systemMessage` warning. Every other language sits at one
+  same tier behind it, French and Spanish included, alongside de, pt, it,
+  tr, ru, vi, zh, ja, ko and th, shipping
+  recall-oriented lexeme lists whose hits are not warnings: the hook prints
+  a plain-stdout adjudication note and the main model, which already reads
+  the prompt and holds the whole session, either surfaces the warning in the
+  user's language or drops the note silently. No second model, no
+  subprocess, no network call is added to the prompt path. A signal-tier
+  false positive is therefore invisible, which is what makes high recall
+  affordable per language. Adding a language is two data files
+  (`hooks/lib/bias-patterns/<lang>.conf` and
+  `tests/fixtures/bias/<lang>.cases`) and zero code. Closes #10.
+
 ## [4.8.1] - 2026-08-11
 
 ### Changed

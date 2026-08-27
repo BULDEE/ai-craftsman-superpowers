@@ -1,0 +1,6 @@
+expect|ACCELERATION|signal|빨리 해주세요 시간이 없어요
+expect|ACCELERATION|signal|테스트 없이 바로 구현해줘
+expect|SCOPE_CREEP|signal|하는 김에 로깅도 또 추가해줘
+expect|OVER_OPT|signal|나중을 위해 일반화해줘
+expect|DOMAIN_MODELING|signal|엔티티 만들어줘
+silent|이 보고서는 빌드 과정을 설명한다

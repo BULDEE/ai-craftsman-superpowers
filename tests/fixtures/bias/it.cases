@@ -1,0 +1,6 @@
+expect|ACCELERATION|signal|fallo subito, senza testare
+expect|ACCELERATION|signal|Subito, non pensarci troppo
+expect|SCOPE_CREEP|signal|e inoltre aggiungi il logging
+expect|OVER_OPT|signal|rendilo configurabile per il futuro
+expect|DOMAIN_MODELING|signal|crea una entità Utente
+silent|il report descrive la pipeline di build

@@ -1,0 +1,6 @@
+expect|ACCELERATION|signal|сделай это быстро, нет времени
+expect|ACCELERATION|signal|Быстро сделай, без тестов
+expect|SCOPE_CREEP|signal|и еще добавь логирование заодно
+expect|OVER_OPT|signal|сделай настраиваемым на будущее
+expect|DOMAIN_MODELING|signal|создай сущность Пользователь
+silent|отчет описывает процесс сборки

@@ -1,0 +1,6 @@
+expect|ACCELERATION|signal|รีบทำให้เสร็จ ไม่มีเวลาแล้ว
+expect|ACCELERATION|signal|ทำเลย ข้ามเทสไปก่อน
+expect|SCOPE_CREEP|signal|ถือโอกาสเพิ่มอีกฟีเจอร์
+expect|OVER_OPT|signal|ทำให้ยืดหยุ่นเผื่ออนาคต
+expect|DOMAIN_MODELING|signal|สร้าง entity ผู้ใช้
+silent|รายงานอธิบายขั้นตอนการ build
