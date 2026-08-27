@@ -43,34 +43,19 @@ exit_of() {
 echo ""
 echo "=== Authority Hierarchy Tests ==="
 echo ""
-echo "--- add_advice exists and is wired to the advisory collector only ---"
+echo "--- the fourth tier stays unimplemented until it has a caller ---"
 
-# Structural, not behavioural: the function must have no path to the blocking
-# collector. A grep is the right instrument here because the guarantee IS the
-# absence of that wiring, and a behavioural test could pass simply because no
-# advice happened to fire.
-advice_body=$(sed -n '/^add_advice()/,/^}/p' "$HOOK")
-if [[ -n "$advice_body" ]]; then
-    log_pass "add_advice is defined"
+# A first version of this suite asserted on an add_advice function. It had no
+# caller: instincts surface at SessionStart and the model tier waits on the
+# evaluation harness, so the seam was speculative generality and was cut. What
+# survives is the constraint, recorded where the next implementer will read it.
+if grep -q "no wiring to CRITICAL_VIOLATIONS" "$HOOK"; then
+    log_pass "the constraint on a future semantic tier is recorded in the hook"
 else
-    log_fail "add_advice is defined" "function not found in $HOOK"
+    log_fail "the constraint on a future semantic tier is recorded" \
+        "whoever wires the model tier has nothing telling them it cannot block"
 fi
 
-if echo "$advice_body" | grep -q "CRITICAL"; then
-    log_fail "add_advice cannot reach the blocking collector" \
-        "its body mentions CRITICAL, so a semantic judgment could block"
-else
-    log_pass "add_advice cannot reach the blocking collector"
-fi
-
-if echo "$advice_body" | grep -q '_record_violation_output "\$rule" "\$message" "warning"'; then
-    log_pass "add_advice hard-codes the advisory severity, it does not resolve one"
-else
-    log_fail "add_advice hard-codes the advisory severity" \
-        "it appears to resolve severity, which a config could then promote to block"
-fi
-
-echo ""
 echo "--- the deterministic tier CAN still block (the check can fail) ---"
 
 # Liveness: without this, every absence assertion above would also pass against

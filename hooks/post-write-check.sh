@@ -269,32 +269,23 @@ add_warning() {
     add_violation "$@"
 }
 
-# Authority tier: instinct and model, never deterministic.
+# Authority: a user directive outranks a deterministic rule, which outranks a
+# learned instinct, which outranks a model judgment (ADR-0030 follow-up).
 #
-# The owner's rule is that a user directive outranks a deterministic rule,
-# which outranks a learned instinct, which outranks a model judgment. The first
-# three are already enforced: rules_severity_for_file runs before anything is
-# emitted, so a rule the user set to ignore reaches no tier at all.
+# Three of the four tiers are enforced right here and tested in
+# tests/core/test-authority.sh: rules_severity_for_file runs before anything is
+# emitted, so a rule the user set to ignore reaches no tier at all, and an
+# advisory verdict never raises the exit code.
 #
-# The fourth is enforced here, by wiring rather than by configuration. A
-# semantic judgment does not CHOOSE to be advisory: it enters through a
-# function that has no path to CRITICAL_VIOLATIONS, so no manifest,
-# .craft-config.yml or future refactor can promote it into a blocking verdict.
-# An invariant a caller can opt out of is a comment, not an invariant.
-#
-# It still passes the user gate, so `RULE: ignore` silences advice exactly as
-# it silences a violation, and it is still recorded, so the correction loop
-# sees what the model proposed and whether anyone acted on it.
-add_advice() {
-    local rule="$1" message="$2" file_path="${3:-$FILE_PATH}"
-    local severity
-    severity=$(rules_severity_for_file "$file_path" "$rule")
-    [[ "$severity" == "ignore" ]] && return 0
-    file_has_ignore "$rule" && return 0
-
-    _record_violation_output "$rule" "$message" "warning"
-    _record_violation_metric "$rule" "warning" 0
-}
+# The fourth tier has no implementation ON PURPOSE. A semantic judgment must
+# enter through a path with no wiring to CRITICAL_VIOLATIONS, so that no
+# manifest, .craft-config.yml or later refactor can promote it into a blocking
+# verdict. That function was written and then removed: it had no caller, since
+# instincts are surfaced at SessionStart and the model tier waits on the
+# evaluation harness. Shipping the seam before the tier is speculative
+# generality, and doctrine does not rot the way unused code does. Whoever wires
+# the model tier writes that path then, and the constraint is recorded here and
+# in the ADR rather than in a function nobody calls.
 
 # The two callbacks precedence_flush calls at the end of the run.
 #
