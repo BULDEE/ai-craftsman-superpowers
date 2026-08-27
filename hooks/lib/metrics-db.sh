@@ -81,12 +81,72 @@ CREATE TABLE IF NOT EXISTS corrections (
     project_hash TEXT NOT NULL,
     rule TEXT NOT NULL,
     file_pattern TEXT NOT NULL,
-    action TEXT NOT NULL CHECK (action IN ('fixed', 'ignored', 'overridden')),
+    action TEXT NOT NULL CHECK (action IN ('fixed', 'ignored', 'overridden', 'scoped', 'open')),
     context TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_corrections_project ON corrections(project_hash, timestamp);
 SQL
+}
+
+# Two outcomes were unrecordable, and their absence is why the engine could not
+# see its own failure. `scoped` is a rule relaxed for a path in .craft-rules.yml,
+# which is the RIGHT answer for a rule wrong in context and was previously
+# indistinguishable from giving up: 151 of PHP002's 153 suppressions came from
+# entity directories one relaxation would have covered, and nothing could tell
+# the difference. `open` is a verdict that reached the end of a session with no
+# outcome at all, which is the actual shape of the problem: 12 rules fired 5624
+# times in 30 days and produced no correction in either direction, so they read
+# as healthy rules nobody had to fix.
+# `source` arrives later, by ALTER, from _metrics_migrate_source_column.
+# Rebuilding the table without asking would drop that column AND every value in
+# it, and the later ALTER would silently re-add it empty. Rebuild what the table
+# actually has, never what this file assumes it has.
+_metrics_corrections_columns() {
+    local column_list="id, timestamp, project_hash, rule, file_pattern, action, context"
+    if _metrics_sql_read "PRAGMA table_info(corrections);" | grep -q '|source|'; then
+        column_list="${column_list}, source"
+    fi
+    printf '%s' "$column_list"
+}
+
+# Named columns inside a transaction, mirroring the violations migration:
+# SELECT * maps by position, so a drifted schema would shift every value one
+# place instead of failing.
+_metrics_corrections_rebuild_sql() {
+    local column_list="$1" source_ddl="$2"
+    cat <<MIGRATE
+BEGIN IMMEDIATE;
+ALTER TABLE corrections RENAME TO corrections_old;
+CREATE TABLE corrections (
+    id INTEGER PRIMARY KEY,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    project_hash TEXT NOT NULL,
+    rule TEXT NOT NULL,
+    file_pattern TEXT NOT NULL,
+    action TEXT NOT NULL CHECK (action IN ('fixed', 'ignored', 'overridden', 'scoped', 'open')),
+    context TEXT${source_ddl}
+);
+INSERT INTO corrections (${column_list})
+    SELECT ${column_list} FROM corrections_old;
+DROP TABLE corrections_old;
+CREATE INDEX IF NOT EXISTS idx_corrections_project ON corrections(project_hash, timestamp);
+COMMIT;
+MIGRATE
+}
+
+_metrics_migrate_correction_outcomes() {
+    local existing_ddl column_list source_ddl=""
+    existing_ddl=$(_metrics_sql_read "SELECT sql FROM sqlite_master WHERE name='corrections';")
+    [[ -z "$existing_ddl" ]] && return 0
+    echo "$existing_ddl" | grep -q "'scoped'" && return 0
+
+    column_list=$(_metrics_corrections_columns)
+    case "$column_list" in
+        *source*) source_ddl=",
+    source TEXT NOT NULL DEFAULT 'session'" ;;
+    esac
+    _metrics_sql <<< "$(_metrics_corrections_rebuild_sql "$column_list" "$source_ddl")"
 }
 
 _metrics_migrate_severity_info() {
@@ -190,6 +250,7 @@ metrics_init() {
     _metrics_create_corrections_table
     _metrics_migrate_severity_info
     _metrics_migrate_writes_count
+    _metrics_migrate_correction_outcomes
     _metrics_migrate_source_column
 }
 
