@@ -26,6 +26,14 @@ languages:
 rules:
   # Rules this pack owns: the wording and the default severity that the
   # exported doctrine and the rules engine both read from here.
+  #
+  # `decision:` is the adjudication a rule received when its ignore rate was
+  # measured (issue #31). It records the verdict and the reason so the next
+  # maintainer does not relitigate it, and it names the paths where the rule is
+  # structurally wrong WITHOUT hardcoding them here: a framework-specific
+  # exclusion baked into pack data is the same mistake as a language list baked
+  # into a hook. The relaxation belongs in the consuming project's
+  # .craft-rules.yml. The registry does not read this key, a human does.
   owned:
     - id: PY001
       group: Python
@@ -35,6 +43,7 @@ rules:
       group: Python
       text: "a function past 30 lines is extracted"
       default_severity: block
+      decision: "scoped - 96 of the 99 suppressions came from two throwaway generator scripts and the rate outside them is 5.6 percent, level with PY001, so it keeps blocking and a project relaxes its generated and scratchpad paths in .craft-rules.yml"
     - id: PY003
       group: Python
       text: "every public function declares its return type"

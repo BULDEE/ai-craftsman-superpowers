@@ -25,6 +25,14 @@ languages:
 rules:
   # Rules this pack owns: the wording and the default severity that the
   # exported doctrine and the rules engine both read from here.
+  #
+  # `decision:` is the adjudication a rule received when its ignore rate was
+  # measured (issue #31). It records the verdict and the reason so the next
+  # maintainer does not relitigate it, and it names the paths where the rule is
+  # structurally wrong WITHOUT hardcoding them here: a framework-specific
+  # exclusion baked into pack data is the same mistake as a language list baked
+  # into a hook. The relaxation belongs in the consuming project's
+  # .craft-rules.yml. The registry does not read this key, a human does.
   owned:
     - id: TS001
       group: TypeScript
@@ -34,6 +42,7 @@ rules:
       group: TypeScript
       text: "no default export - use named exports"
       default_severity: warn
+      decision: "scoped - a framework resolves route modules, configs and stories by their default export and offers no named alternative, which is where all 22 suppressions landed; the validator already exempts those filenames, and a project relaxes any further convention such as a schema directory in .craft-rules.yml"
     - id: TS003
       group: TypeScript
       text: "no non-null assertion (!) - handle null explicitly"

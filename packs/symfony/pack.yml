@@ -26,6 +26,14 @@ languages:
 rules:
   # Rules this pack owns: the wording and the default severity that the
   # exported doctrine and the rules engine both read from here.
+  #
+  # `decision:` is the adjudication a rule received when its ignore rate was
+  # measured (issue #31). It records the verdict and the reason so the next
+  # maintainer does not relitigate it, and it names the paths where the rule is
+  # structurally wrong WITHOUT hardcoding them here: a framework-specific
+  # exclusion baked into pack data is the same mistake as a language list baked
+  # into a hook. The relaxation belongs in the consuming project's
+  # .craft-rules.yml. The registry does not read this key, a human does.
   owned:
     - id: PHP001
       group: PHP
@@ -35,10 +43,12 @@ rules:
       group: PHP
       text: "every class is final"
       default_severity: block
+      decision: "scoped - an ORM subclasses its entities to build lazy proxies so they cannot be final, and 152 of the 153 recorded suppressions came from Domain entity directories; the validator already exempts a mapped entity, and a project relaxes its own proxy, fixture and test-double paths in .craft-rules.yml"
     - id: PHP003
       group: PHP
       text: "no public setter - use behavioral methods"
       default_severity: warn
+      decision: "scoped - a framework hydrates entities and form DTOs through setters, and inside entity directories 164 of 257 verdicts were suppressed against 3 of 15 everywhere else; it stays advisory and a project relaxes its persistence and input-DTO paths in .craft-rules.yml"
     - id: PHP004
       group: PHP
       text: "no new DateTime() - inject a Clock abstraction"
