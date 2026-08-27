@@ -269,6 +269,33 @@ add_warning() {
     add_violation "$@"
 }
 
+# Authority tier: instinct and model, never deterministic.
+#
+# The owner's rule is that a user directive outranks a deterministic rule,
+# which outranks a learned instinct, which outranks a model judgment. The first
+# three are already enforced: rules_severity_for_file runs before anything is
+# emitted, so a rule the user set to ignore reaches no tier at all.
+#
+# The fourth is enforced here, by wiring rather than by configuration. A
+# semantic judgment does not CHOOSE to be advisory: it enters through a
+# function that has no path to CRITICAL_VIOLATIONS, so no manifest,
+# .craft-config.yml or future refactor can promote it into a blocking verdict.
+# An invariant a caller can opt out of is a comment, not an invariant.
+#
+# It still passes the user gate, so `RULE: ignore` silences advice exactly as
+# it silences a violation, and it is still recorded, so the correction loop
+# sees what the model proposed and whether anyone acted on it.
+add_advice() {
+    local rule="$1" message="$2" file_path="${3:-$FILE_PATH}"
+    local severity
+    severity=$(rules_severity_for_file "$file_path" "$rule")
+    [[ "$severity" == "ignore" ]] && return 0
+    file_has_ignore "$rule" && return 0
+
+    _record_violation_output "$rule" "$message" "warning"
+    _record_violation_metric "$rule" "warning" 0
+}
+
 # The two callbacks precedence_flush calls at the end of the run.
 #
 # A flushed finding re-enters add_violation, so it is resolved, suppressed and
@@ -443,8 +470,9 @@ if [[ $CRITICAL_COUNT -gt 0 ]]; then
     # wrong for a whole directory got suppressed once per file instead of
     # scoped once: 151 of PHP002's 153 recorded suppressions came from entity
     # directories that one .craft-rules.yml line would have covered.
-    echo "Fix these, or scope the rule where it does not apply:" >&2
-    echo "  echo '<RULE_ID>: warn' >> $(dirname "$FILE_PATH")/.craft-rules.yml" >&2
+    echo "Fix these, or scope the rule in $(dirname "$FILE_PATH")/.craft-rules.yml:" >&2
+    echo "  rules:" >&2
+    echo "    <RULE_ID>: warn" >&2
     echo "Or silence this one case: // craftsman-ignore: <RULE_ID>" >&2
 
     # OKF doctrine pointer (ADR-0024): route the first blocked rule to the
@@ -515,7 +543,8 @@ if [[ $WARNING_COUNT -gt 0 ]]; then
     # jq program would need single quotes, which close the program itself and
     # turn <RULE_ID> into a shell redirect.
     WARNING_ACTIONS="Act on each: fix it, or scope the rule where it does not apply"
-    WARNING_ACTIONS="${WARNING_ACTIONS} (add \"<RULE_ID>: ignore\" to $(dirname "$FILE_PATH")/.craft-rules.yml),"
+    WARNING_ACTIONS="${WARNING_ACTIONS} (in $(dirname "$FILE_PATH")/.craft-rules.yml, under a \"rules:\" key,"
+    WARNING_ACTIONS="${WARNING_ACTIONS} indented two spaces: \"<RULE_ID>: ignore\"),"
     WARNING_ACTIONS="${WARNING_ACTIONS} or silence this one case with a craftsman-ignore comment naming the rule."
     WARNING_ACTIONS="${WARNING_ACTIONS} Leaving it unaddressed is the one outcome that teaches nothing."
 
