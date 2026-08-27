@@ -335,17 +335,21 @@ The InstructionsLoaded agent applies sampling for large codebases:
 
 The `bias-detector.sh` hook (UserPromptSubmit) detects cognitive biases in your prompts through a two-stage cascade (ADR-0030). Patterns live in `hooks/lib/bias-patterns/<lang>.conf`, one data file per language; adding a language edits no code.
 
-| Bias | Curated triggers (EN/FR/ES) | Signal lexemes (ten more languages) | Curated warning |
-|------|-----------------------------|-------------------------------------|-----------------|
-| Acceleration | "just do it", "fais vite", "hazlo rápido" | schnell, 快点, 빨리 해, hızlı yap, быстро сделай | "Acceleration bias: You may be rushing" |
-| Scope Creep | "while we're at it, add", "et aussi ajoute", "y además agrega" | ついでに, 顺便, hazır başlamışken | "Scope Creep bias: Adding features beyond scope" |
-| Over-Optimization | "make it generic", "abstraire", "hazlo configurable" | 汎用化, geleceğe dönük, на будущее | "Over-Optimization bias: Premature abstraction" |
+| Bias | Curated English triggers | Signal lexemes (every other language) | Curated warning |
+|------|--------------------------|---------------------------------------|-----------------|
+| Acceleration | "just do it", "skip the tests", "asap" | fais vite, hazlo rápido, schnell, 快点, 빨리 해, hızlı yap, быстро сделай | "Acceleration bias: You may be rushing" |
+| Scope Creep | "while we're at it, add", "let's also add" | et aussi ajoute, y además agrega, ついでに, 顺便, hazır başlamışken | "Scope Creep bias: Adding features beyond scope" |
+| Over-Optimization | "make it generic", "future-proof" | abstraire, hazlo configurable, 汎用化, geleceğe dönük, на будущее | "Over-Optimization bias: Premature abstraction" |
 
-**Stage 1, the hook.** Three curated languages (EN, FR, ES) carry context-aware regex whose precision is earned, so a match warns you directly through `systemMessage`, exactly as before. Ten further languages (de, pt, it, tr, ru, vi, zh, ja, ko, th) carry recall-oriented lexeme lists instead: word lists tuned to catch the signal, not to avoid false alarms.
+**Stage 1, the hook.** English is the one curated language: it carries context-aware regex whose precision is earned and reviewed, so a match warns you directly through `systemMessage`. Every other language sits at the same tier behind it, French and Spanish included, carrying recall-oriented lexeme lists: word lists tuned to catch the signal, not to avoid false alarms. That single dividing line is deliberate. Curating a language means a maintainer who reads it can review its precision, and the alternative, a shifting handful of privileged languages, is an artifact of contribution history rather than a design.
+
+Language tags are BCP 47 (RFC 5646). A bare subtag is a valid tag, so the shipped files are `fr.conf` and `zh.conf`; when a dialect actually diverges, `fr-CA.conf`, `pt-BR.conf` or `zh-Hant.conf` register exactly the same way. That is a question of evidence, not of naming: add the subtag when a lexeme differs, not before.
 
 **Stage 2, the model already reading your prompt.** A signal-tier match is not a verdict and never reaches you as a warning. The hook prints a plain-stdout adjudication note naming the matched lexeme, which UserPromptSubmit hands to the main model as conversation context. That model has the whole session, so it decides: real acceleration after no design work becomes a warning phrased in your language, while an incidental match (quoted text, a topic being discussed, descriptive use) is dismissed silently and never mentioned. No second model, no subprocess, no API call, no network access is involved at any point; stage 2 is the model that was going to read the prompt anyway, so the marginal cost is zero.
 
 That is what makes signal-tier recall cheap: a false positive there is invisible, whereas a curated false positive is a warning you see. The two output formats are mutually exclusive, and a curated warning suppresses every signal note in the same run.
+
+Signal matching is case-sensitive on purpose, so patterns declare their case variants explicitly (`[Ss]chnell`, `(быстро|Быстро)`). `grep -i` folding is locale-dependent beyond ASCII: `RÉFLÉCHIR` matches `réfléchir` under `fr_FR.UTF-8` and does not under `LC_ALL=C`, which a CI runner may well use. Scripts without case, CJK and Thai among them, need no variants and are matched as substrings, because those languages write without spaces and word boundaries do not apply.
 
 Adding a language is two data files and zero code: `hooks/lib/bias-patterns/<lang>.conf` for the lexemes and `tests/fixtures/bias/<lang>.cases` for the behavior cases. No hook, helper or test script changes.
 

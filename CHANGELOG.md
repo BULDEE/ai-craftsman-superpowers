@@ -12,9 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Bias detection language cascade (ADR-0030).** Bias patterns moved out of
   `hooks/bias-detector.sh` into one data file per language under
   `hooks/lib/bias-patterns/`, compiled by `hooks/lib/bias-registry.sh`.
-  Curated languages (EN, FR, and now ES from PR #11) keep today's
-  context-aware regex and their direct `systemMessage` warning, byte for
-  byte. Ten more languages (de, pt, it, tr, ru, vi, zh, ja, ko, th) ship
+  English is the single curated language: it keeps its context-aware regex
+  and its direct `systemMessage` warning. Every other language sits at one
+  same tier behind it, French and Spanish included, alongside de, pt, it,
+  tr, ru, vi, zh, ja, ko and th, shipping
   recall-oriented lexeme lists whose hits are not warnings: the hook prints
   a plain-stdout adjudication note and the main model, which already reads
   the prompt and holds the whole session, either surfaces the warning in the

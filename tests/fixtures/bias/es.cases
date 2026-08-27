@@ -1,9 +1,10 @@
-# ES curated cases: patterns and prompts from PR #11 (author: floze-the-genius).
-expect|ACCELERATION|curated|hazlo rápido, no hay tiempo
-expect|SCOPE_CREEP|curated|y además agrega registros
-expect|OVER_OPT|curated|hazlo configurable para el futuro
-expect|DOMAIN_MODELING|curated|crea una entidad Usuario
+# ES signal cases: patterns and prompts from PR #11 (author: floze-the-genius).
+expect|ACCELERATION|signal|hazlo rápido, no hay tiempo
+expect|SCOPE_CREEP|signal|y además agrega registros
+expect|OVER_OPT|signal|hazlo configurable para el futuro
+expect|DOMAIN_MODELING|signal|crea una entidad Usuario
 silent|el arreglo rápido pasó todas las pruebas
 silent|además, el registro muestra el error
 silent|documenta la configuración para el futuro
 silent|explica qué es una entidad
+expect|ACCELERATION|signal|Hazlo ya, no hay tiempo

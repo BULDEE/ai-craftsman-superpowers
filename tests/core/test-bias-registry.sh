@@ -114,4 +114,55 @@ else
     fi
 fi
 
+echo ""
+echo "--- BCP 47 tags: a region or script subtag must register, not vanish ---"
+
+# fr-CA, pt-BR, zh-Hant are the tags a contributor reaches for the moment a
+# dialect diverges. A tag is not a bash identifier, so the suffix is derived;
+# before that derivation existed, such a conf registered nothing and the hook
+# still exited 0. Silent absence is the failure this feature exists to remove.
+BCP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/bias-registry-bcp47.XXXXXX")
+cat > "$BCP_DIR/fr-CA.conf" <<'EOF'
+BIAS_REGISTERED_LANGS+=("fr-CA")
+BIAS_FR_CA_MODE="signal"
+BIAS_FR_CA_ACCELERATION="ca-presse|Ca-presse"
+EOF
+
+bias_registry_init "$BCP_DIR"
+pat=$(bias_combined_pattern ACCELERATION signal) \
+    && assert_contains "fr-CA registers under a sanitized suffix" "$pat" "ca-presse" \
+    || log_fail "fr-CA should register" "ACCELERATION signal returned non-zero"
+
+if [[ "${BIAS_REGISTERED_LANGS[0]:-}" == "fr-CA" ]]; then
+    log_pass "the tag itself stays BCP 47, only the variable suffix is sanitized"
+else
+    log_fail "tag preservation" "got '${BIAS_REGISTERED_LANGS[0]:-}' instead of fr-CA"
+fi
+
+echo ""
+echo "--- a conf whose variables do not match its tag is reported, not ignored ---"
+
+cat > "$BCP_DIR/zz-broken.conf" <<'EOF'
+BIAS_REGISTERED_LANGS+=("zz-broken")
+BIAS_ZZ-BROKEN_MODE="signal"
+BIAS_ZZ-BROKEN_ACCELERATION="never-loaded"
+EOF
+
+audit_err=$(bias_registry_init "$BCP_DIR" 2>&1 >/dev/null)
+if echo "$audit_err" | grep -q "zz-broken"; then
+    log_pass "a half-registered language is named on stderr"
+else
+    log_fail "broken conf must be reported" "stderr was: '$audit_err'"
+fi
+
+pat=$(bias_combined_pattern ACCELERATION signal) || pat=""
+assert_not_contains "a broken conf contributes no pattern" "$pat" "never-loaded"
+
+if [[ " ${BIAS_REGISTERED_LANGS[*]} " != *" zz-broken "* ]]; then
+    log_pass "the broken tag is dropped, never left half-registered"
+else
+    log_fail "broken tag dropped" "still present: ${BIAS_REGISTERED_LANGS[*]}"
+fi
+rm -rf "$BCP_DIR"
+
 test_summary

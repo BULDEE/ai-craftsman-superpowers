@@ -43,14 +43,34 @@ One pattern file per language under `hooks/lib/bias-patterns/<lang>.conf`,
 loaded by a new `hooks/lib/bias-registry.sh`. Files are shell-sourced (no
 python3, no new process on the prompt path) and declare one mode each:
 
-- **curated**: context-aware regex exactly as today, earning the right to
-  warn directly. EN and FR (moved, byte-identical), ES (PR #11's content,
-  recycled).
+- **curated**: context-aware regex, earning the right to warn directly.
+  **English only.** English is the model's own home language and the
+  highest-volume path, and it is the one language a maintainer here can
+  review for precision. The first draft of this ADR curated EN, FR and ES,
+  which was contribution history wearing the costume of a design: FR was
+  the incumbent and ES arrived with PR #11. A privileged set that grows by
+  accident is the thing this record exists to remove, so there is one
+  curated language and one dividing line.
 - **signal**: a plain alternation of bias lexemes (快点, 빨리, schnell,
   hızlı, быстро, รีบ, nhanh, ...). Recall-oriented; precision is explicitly
   not required of it. Authoring one is translating a word list: minutes of
   work, reviewable without native fluency, the "good first issue" shape
-  issue #10 wanted.
+  issue #10 wanted. **Every language but English lives here**, French and
+  Spanish included. Demoting them is not a loss: a context-aware regex is a
+  context-blind judge, and the model that adjudicates the note holds the
+  whole session. Their patterns carry over as they were, so they behave
+  conservatively at this tier (high precision, lower recall) until someone
+  loosens them.
+
+Language tags are BCP 47 (RFC 5646). A bare language subtag is a valid tag,
+so the shipped files are `fr.conf` and `zh.conf`; `fr-CA.conf`, `pt-BR.conf`
+and `zh-Hant.conf` register identically when a dialect actually diverges,
+which is a question of evidence rather than of naming. A tag is not a bash
+identifier (`BIAS_FR-CA_MODE=x` parses as a command, not an assignment), so
+the registry derives the variable suffix and audits the result: a conf whose
+variables do not match its tag is named on stderr and its tag dropped. It
+used to register nothing and say nothing, which is the silent-absence
+failure this whole feature exists to remove.
 
 ```bash
 # hooks/lib/bias-patterns/de.conf
@@ -118,8 +138,10 @@ not an injection channel for user text.
   latency, zero cost, every language the model reads.
 - The hook stays a hook: no network, no python3, no model call, no new
   failure mode on the prompt path. Its security header stays true.
-- Curated EN/FR/ES behavior is byte-for-byte preserved; the 23 existing
-  bias tests migrate with identical semantics.
+- Curated English behavior is byte-for-byte preserved. French and Spanish
+  prompts stop producing a direct warning and produce an adjudicated one
+  instead, which is a deliberate behavior change and the only one users
+  will notice.
 - Instruction-decay is answered structurally: doctrine is re-injected at the
   exact moment a trigger fires, instead of fading from a SessionStart
   preamble 100k tokens back.

@@ -22,6 +22,40 @@
 
 BIAS_REGISTERED_LANGS=()
 
+# Language tags are BCP 47 (RFC 5646): "fr", and equally "fr-CA", "pt-BR",
+# "zh-Hant". A bare language subtag is a valid tag on its own, so the shipped
+# files stay "fr" and "zh"; a region or script subtag is added only when a
+# dialect actually diverges, which is a question of evidence, not of naming.
+#
+# A tag is not a bash identifier. `BIAS_FR-CA_MODE=x` parses as a command, not
+# an assignment, so a conf named fr-CA.conf registered NOTHING and said nothing
+# about it: the hook still exited 0 and the language was simply absent. Silent
+# absence is the exact failure this feature exists to remove, so the suffix is
+# derived here, and _bias_registry_audit below refuses to let a broken conf
+# pass unnoticed.
+_bias_var_suffix() {
+    printf '%s' "$1" | tr '[:lower:]-' '[:upper:]_'
+}
+
+# A registered tag whose MODE never landed means its conf declared variables
+# under a different suffix than its tag, or failed to parse. Report it on
+# stderr the way lang-registry.sh reports a missing python3, and drop the tag
+# so no caller reads a half-registered language as a working one.
+_bias_registry_audit() {
+    local lang suffix mode_var kept=()
+    for lang in ${BIAS_REGISTERED_LANGS[@]+"${BIAS_REGISTERED_LANGS[@]}"}; do
+        suffix=$(_bias_var_suffix "$lang")
+        mode_var="BIAS_${suffix}_MODE"
+        if [[ -n "${!mode_var:-}" ]]; then
+            kept+=("$lang")
+            continue
+        fi
+        echo "craftsman: bias pattern file for '$lang' declared no BIAS_${suffix}_MODE, so that language is NOT loaded" >&2
+    done
+    BIAS_REGISTERED_LANGS=(${kept[@]+"${kept[@]}"})
+    return 0
+}
+
 # bias_registry_init <dir> - source every *.conf, deterministically ordered.
 # Re-init resets state: a second call with a different directory must not
 # serve the first directory's patterns.
@@ -29,11 +63,11 @@ bias_registry_init() {
     local dir="$1" conf lang
     # Unset every variable a previous init registered, then the list itself.
     for lang in ${BIAS_REGISTERED_LANGS[@]+"${BIAS_REGISTERED_LANGS[@]}"}; do
-        local up
-        up=$(printf '%s' "$lang" | tr '[:lower:]' '[:upper:]')
-        unset "BIAS_${up}_MODE" \
-              "BIAS_${up}_ACCELERATION" "BIAS_${up}_SCOPE_CREEP" \
-              "BIAS_${up}_OVER_OPT" "BIAS_${up}_DOMAIN_MODELING" 2>/dev/null || true
+        local suffix
+        suffix=$(_bias_var_suffix "$lang")
+        unset "BIAS_${suffix}_MODE" \
+              "BIAS_${suffix}_ACCELERATION" "BIAS_${suffix}_SCOPE_CREEP" \
+              "BIAS_${suffix}_OVER_OPT" "BIAS_${suffix}_DOMAIN_MODELING" 2>/dev/null || true
     done
     BIAS_REGISTERED_LANGS=()
 
@@ -43,6 +77,7 @@ bias_registry_init() {
         # shellcheck source=/dev/null
         source "$conf"
     done
+    _bias_registry_audit
     return 0
 }
 
@@ -53,12 +88,12 @@ bias_registry_init() {
 # checkable state and never an empty string.
 bias_combined_pattern() {
     local category="$1" mode="$2"
-    local lang up mode_var pat_var pat combined=""
+    local lang suffix mode_var pat_var pat combined=""
     for lang in ${BIAS_REGISTERED_LANGS[@]+"${BIAS_REGISTERED_LANGS[@]}"}; do
-        up=$(printf '%s' "$lang" | tr '[:lower:]' '[:upper:]')
-        mode_var="BIAS_${up}_MODE"
+        suffix=$(_bias_var_suffix "$lang")
+        mode_var="BIAS_${suffix}_MODE"
         [[ "${!mode_var:-}" == "$mode" ]] || continue
-        pat_var="BIAS_${up}_${category}"
+        pat_var="BIAS_${suffix}_${category}"
         pat="${!pat_var:-}"
         [[ -z "$pat" ]] && continue
         if [[ -n "$combined" ]]; then
