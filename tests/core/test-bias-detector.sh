@@ -90,6 +90,15 @@ assert_silent_case() {
     fi
 }
 
+dispatch_expect_line() {
+    local category="$1" tier="$2" prompt="$3" lang="$4"
+    case "$tier" in
+        curated) assert_curated_case "$category" "$prompt" "$lang" ;;
+        signal)  assert_signal_case "$category" "$prompt" "$lang" ;;
+        *)       log_fail "$lang fixture line" "unknown tier '$tier'" ;;
+    esac
+}
+
 run_case_file() {
     local cases_file="$1"
     local lang kind f2 f3 f4
@@ -97,16 +106,10 @@ run_case_file() {
     while IFS='|' read -r kind f2 f3 f4; do
         [[ -z "$kind" ]] && continue
         case "$kind" in
-            \#*) continue ;;
-            expect)
-                case "$f3" in
-                    curated) assert_curated_case "$f2" "$f4" "$lang" ;;
-                    signal)  assert_signal_case "$f2" "$f4" "$lang" ;;
-                    *) log_fail "$lang fixture line" "unknown tier '$f3'" ;;
-                esac
-                ;;
+            \#*)    continue ;;
+            expect) dispatch_expect_line "$f2" "$f3" "$f4" "$lang" ;;
             silent) assert_silent_case "$f2" "$lang" ;;
-            *) log_fail "$lang fixture line" "unknown kind '$kind'" ;;
+            *)      log_fail "$lang fixture line" "unknown kind '$kind'" ;;
         esac
     done < "$cases_file"
 }
