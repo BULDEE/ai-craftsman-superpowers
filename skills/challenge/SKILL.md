@@ -72,6 +72,24 @@ Fix within the PR:
 | Feature envy | Method uses other object's data more |
 | Missing events | State changes without domain events |
 | Fat use case | UseCase doing >1 responsibility |
+| Unthrottled side effect | Log, metric, config read or lock on a per-call path, repeated identically |
+
+#### Side effects: judge the frequency, not only the content
+
+A side effect is correct or not **relative to how often it fires**. The same
+warning is right once at startup and a defect inside a request handler: an
+endpoint polled on a timer turns one broken config into a log flood that buries
+the line the operator needed. The content passes review; the defect ships.
+
+Ask it of every log line, metric, file read, lock or network call in the diff:
+
+- **Who calls this, at what rate?** A liveness probe, a poller and a retry loop
+  are all multipliers.
+- **Does it repeat identically?** Then it belongs behind a one-shot guard, a
+  cache or a dedup key. The codebase usually already has that pattern; reuse it
+  rather than inventing a second one.
+- **Can an unauthenticated caller trigger it?** I/O on a public path is a cost a
+  stranger controls.
 
 #### Level 3: Improvements (TECH DEBT)
 
