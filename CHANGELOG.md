@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`/craftsman:challenge` now reviews side effects by their frequency, not only
+  their content.** A new Level 2 smell (unthrottled side effect) plus the three
+  questions that expose it: who calls this and at what rate, does it repeat
+  identically, can an unauthenticated caller trigger it. Motivated by a real
+  miss: a fail-open warning was reviewed as correct while sitting on a
+  per-request path of a liveness endpoint, so one unreadable config would emit
+  one warning per probe and bury the line the operator needed.
+
 ## [4.9.0] - 2026-08-27
 
 ### Added
