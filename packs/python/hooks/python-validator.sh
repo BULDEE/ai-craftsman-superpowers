@@ -97,49 +97,28 @@ _check_py005() {
     done < <(grep -nE 'def\s+\w+\(.*=\s*(\[\]|\{\}|set\(\))' "$file" 2>/dev/null | cut -d: -f1)
 }
 
-_check_py006() {
-    local file="$1"
+_PY_AST_CHECKS="${_PY_PACK_DIR}/../../../hooks/lib/python_ast_checks.py"
+
+# PY006 and PY007 run their AST pass from hooks/lib/python_ast_checks.py rather
+# than from a heredoc: inline, they pushed this file past its structural budget
+# and put the logic beyond the reach of ruff and of the test suite.
+# The check name is passed lowercased by the caller rather than derived with
+# ${rule,,}: that expansion needs bash 4, and macOS still ships bash 3.2.
+_check_py_ast() {
+    local rule="$1" check="$2" file="$3" message
     _py_pack_has_python3 || return 0
-    local message
     while IFS= read -r message; do
         [[ -z "$message" ]] && continue
-        add_warning "PY006" "$message"
-    done < <(python3 -c "
-import ast, sys
-try:
-    tree = ast.parse(open(sys.argv[1]).read())
-except SyntaxError:
-    sys.exit(0)
-for node in ast.walk(tree):
-    if not isinstance(node, ast.ExceptHandler):
-        continue
-    if not (isinstance(node.type, ast.Name) and node.type.id == 'Exception'):
-        continue
-    body = node.body
-    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str):
-        body = body[1:]
-    if len(body) == 1 and isinstance(body[0], ast.Pass):
-        print(f'line {node.lineno}: except Exception with an empty body - either handle it or let it propagate')
-" "$file" 2>/dev/null)
+        add_warning "$rule" "$message"
+    done < <(python3 "$_PY_AST_CHECKS" "$check" "$file" 2>/dev/null)
+}
+
+_check_py006() {
+    _check_py_ast "PY006" "py006" "$1"
 }
 
 _check_py007() {
-    local file="$1"
-    _py_pack_has_python3 || return 0
-    local message
-    while IFS= read -r message; do
-        [[ -z "$message" ]] && continue
-        add_warning "PY007" "$message"
-    done < <(python3 -c "
-import ast, sys
-try:
-    tree = ast.parse(open(sys.argv[1]).read())
-except SyntaxError:
-    sys.exit(0)
-for node in tree.body:
-    if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
-        print(f'line {node.lineno}: module-level side effect on import - wrap in a function or an if __name__ == \"__main__\" guard')
-" "$file" 2>/dev/null)
+    _check_py_ast "PY007" "py007" "$1"
 }
 
 _check_warn_py001() {
