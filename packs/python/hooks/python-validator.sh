@@ -3,7 +3,7 @@
 # Python Regex Validator - Python Pack
 # Provides pack_validate_python() for the pack-loader pipeline.
 #
-# Rules: PY001-005, WARN-PY001
+# Rules: PY001-007, WARN-PY001
 # Requires: add_violation(), add_warning(), line_has_ignore(), FILE_PATH
 #   These are provided by the orchestrator (post-write-check.sh) before sourcing.
 #
@@ -22,7 +22,7 @@ _py_pack_has_python3() {
     command -v python3 >/dev/null 2>&1 && return 0
     if [[ -z "${_PY_PACK_PY3_WARNED}" ]]; then
         _PY_PACK_PY3_WARNED=1
-        echo "craftsman: python3 not found, PY001, PY002, GOD001 and NEST001 were not run" >&2
+        echo "craftsman: python3 not found, PY001, PY002, PY006, PY007, GOD001 and NEST001 were not run" >&2
     fi
     return 1
 }
@@ -97,6 +97,30 @@ _check_py005() {
     done < <(grep -nE 'def\s+\w+\(.*=\s*(\[\]|\{\}|set\(\))' "$file" 2>/dev/null | cut -d: -f1)
 }
 
+_PY_AST_CHECKS="${_PY_PACK_DIR}/../../../hooks/lib/python_ast_checks.py"
+
+# PY006 and PY007 run their AST pass from hooks/lib/python_ast_checks.py rather
+# than from a heredoc: inline, they pushed this file past its structural budget
+# and put the logic beyond the reach of ruff and of the test suite.
+# The check name is passed lowercased by the caller rather than derived with
+# ${rule,,}: that expansion needs bash 4, and macOS still ships bash 3.2.
+_check_py_ast() {
+    local rule="$1" check="$2" file="$3" message
+    _py_pack_has_python3 || return 0
+    while IFS= read -r message; do
+        [[ -z "$message" ]] && continue
+        add_warning "$rule" "$message"
+    done < <(python3 "$_PY_AST_CHECKS" "$check" "$file" 2>/dev/null)
+}
+
+_check_py006() {
+    _check_py_ast "PY006" "py006" "$1"
+}
+
+_check_py007() {
+    _check_py_ast "PY007" "py007" "$1"
+}
+
 _check_warn_py001() {
     local file="$1"
     if grep -qE 'def\s+\w+\(([^,]+,){3,}' "$file" 2>/dev/null; then
@@ -160,6 +184,8 @@ pack_validate_python() {
     _check_py003 "$file"
     _check_py004 "$file"
     _check_py005 "$file"
+    _check_py006 "$file"
+    _check_py007 "$file"
     _check_warn_py001 "$file"
     _check_god001 "$file"
     _check_nest001 "$file"

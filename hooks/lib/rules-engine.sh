@@ -349,6 +349,11 @@ _rules_is_advisory() {
         # Declaring them advisory keeps today's behaviour and hands the
         # decision back to .craft-config.yml and .craft-rules.yml.
         DB001|DB002|DB003|PY003|SH001|SH003|SH005) return 0 ;;
+        # PY006/PY007 are emitted through add_warning (see PHP005's own
+        # comment above): a swallowed exception or an import-time side effect
+        # is a smell with legitimate exceptions a regex/AST pass cannot always
+        # rule out, so they stay advisory by default.
+        PY006|PY007) return 0 ;;
     esac
     return 1
 }

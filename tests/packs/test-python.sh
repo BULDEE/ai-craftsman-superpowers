@@ -7,8 +7,9 @@ source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
 echo "=== Python Pack Tests ==="
 
-# Source validator
+# Source validators
 source "$ROOT_DIR/packs/python/hooks/python-validator.sh"
+source "$ROOT_DIR/packs/python/hooks/layer-validator.sh"
 
 # Provide mock helpers
 VIOLATIONS=""
@@ -120,6 +121,72 @@ else
     log_fail "PY005: detects mutable default arguments" "not detected"
 fi
 
+# Test: PY006 detects empty except Exception block
+cat > "$tmpfile" << 'PYTHON'
+try:
+    do_something()
+except Exception:
+    pass
+PYTHON
+VIOLATIONS=""
+pack_validate_python "$tmpfile"
+if echo -e "$VIOLATIONS" | grep -q "PY006"; then
+    log_pass "PY006: detects empty except Exception block"
+else
+    log_fail "PY006: detects empty except Exception block" "not detected"
+fi
+
+# Test: PY006 allows a handled except Exception block
+cat > "$tmpfile" << 'PYTHON'
+try:
+    do_something()
+except Exception as error:
+    logger.error("failed: %s", error)
+    raise
+PYTHON
+VIOLATIONS=""
+pack_validate_python "$tmpfile"
+if echo -e "$VIOLATIONS" | grep -q "PY006"; then
+    log_fail "PY006: allows a handled except Exception block" "false positive on a handled block"
+else
+    log_pass "PY006: allows a handled except Exception block"
+fi
+
+# Test: PY007 detects a module-level side effect on import
+cat > "$tmpfile" << 'PYTHON'
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
+def handler(event):
+    return event
+PYTHON
+VIOLATIONS=""
+pack_validate_python "$tmpfile"
+if echo -e "$VIOLATIONS" | grep -q "PY007"; then
+    log_pass "PY007: detects a module-level side effect on import"
+else
+    log_fail "PY007: detects a module-level side effect on import" "not detected"
+fi
+
+# Test: PY007 allows a call guarded by if __name__ == "__main__"
+cat > "$tmpfile" << 'PYTHON'
+import logging
+
+def main():
+    logging.basicConfig(level=logging.INFO)
+
+if __name__ == "__main__":
+    main()
+PYTHON
+VIOLATIONS=""
+pack_validate_python "$tmpfile"
+if echo -e "$VIOLATIONS" | grep -q "PY007"; then
+    log_fail "PY007: allows a __main__-guarded call" "false positive inside the __main__ guard"
+else
+    log_pass "PY007: allows a __main__-guarded call"
+fi
+
 # Test: WARN-PY001 detects too many parameters
 cat > "$tmpfile" << 'PYTHON'
 def too_many(a, b, c, d, e):
@@ -152,6 +219,42 @@ else
 fi
 
 rm -f "$tmpfile"
+
+echo ""
+echo "=== LAYER001: domain importing infrastructure ==="
+
+# Test: pack_validate_python_layers detects domain -> infrastructure import
+layer_tmpdir="/tmp/test_py_domain_$$"
+layer_tmpfile="$layer_tmpdir/domain/order.py"
+mkdir -p "$(dirname "$layer_tmpfile")"
+cat > "$layer_tmpfile" << 'PYTHON'
+from myapp.infrastructure.db import Client
+PYTHON
+VIOLATIONS=""
+pack_validate_python_layers "$layer_tmpfile"
+if echo -e "$VIOLATIONS" | grep -q "LAYER001"; then
+    log_pass "LAYER001: detects domain -> infrastructure import"
+else
+    log_fail "LAYER001: detects domain -> infrastructure import" "not detected"
+fi
+
+# Test: pack_validate_python_layers allows a domain file with no infra import
+cat > "$layer_tmpfile" << 'PYTHON'
+from myapp.domain.value_objects import Money
+
+class Order:
+    def __init__(self, total: Money) -> None:
+        self.total = total
+PYTHON
+VIOLATIONS=""
+pack_validate_python_layers "$layer_tmpfile"
+if echo -e "$VIOLATIONS" | grep -q "LAYER001"; then
+    log_fail "LAYER001: allows a clean domain file" "false positive with no infrastructure import"
+else
+    log_pass "LAYER001: allows a clean domain file"
+fi
+rm -rf "$layer_tmpdir"
+
 echo ""
 echo "=== A rule that cannot run says so ==="
 
