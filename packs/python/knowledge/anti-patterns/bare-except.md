@@ -1,3 +1,11 @@
+---
+type: anti-pattern
+title: "Anti-Pattern: Bare Except"
+description: "except: catches everything including KeyboardInterrupt, SystemExit, and GeneratorExit, silencing critical errors."
+tags: [python, exceptions]
+rules: [PY004]
+status: stable
+---
 # Anti-Pattern: Bare Except
 
 ## The Problem

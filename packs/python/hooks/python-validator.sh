@@ -3,7 +3,7 @@
 # Python Regex Validator - Python Pack
 # Provides pack_validate_python() for the pack-loader pipeline.
 #
-# Rules: PY001-005, WARN-PY001
+# Rules: PY001-007, WARN-PY001
 # Requires: add_violation(), add_warning(), line_has_ignore(), FILE_PATH
 #   These are provided by the orchestrator (post-write-check.sh) before sourcing.
 #
@@ -22,7 +22,7 @@ _py_pack_has_python3() {
     command -v python3 >/dev/null 2>&1 && return 0
     if [[ -z "${_PY_PACK_PY3_WARNED}" ]]; then
         _PY_PACK_PY3_WARNED=1
-        echo "craftsman: python3 not found, PY001, PY002, GOD001 and NEST001 were not run" >&2
+        echo "craftsman: python3 not found, PY001, PY002, PY006, PY007, GOD001 and NEST001 were not run" >&2
     fi
     return 1
 }
@@ -97,6 +97,51 @@ _check_py005() {
     done < <(grep -nE 'def\s+\w+\(.*=\s*(\[\]|\{\}|set\(\))' "$file" 2>/dev/null | cut -d: -f1)
 }
 
+_check_py006() {
+    local file="$1"
+    _py_pack_has_python3 || return 0
+    local message
+    while IFS= read -r message; do
+        [[ -z "$message" ]] && continue
+        add_warning "PY006" "$message"
+    done < <(python3 -c "
+import ast, sys
+try:
+    tree = ast.parse(open(sys.argv[1]).read())
+except SyntaxError:
+    sys.exit(0)
+for node in ast.walk(tree):
+    if not isinstance(node, ast.ExceptHandler):
+        continue
+    if not (isinstance(node.type, ast.Name) and node.type.id == 'Exception'):
+        continue
+    body = node.body
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str):
+        body = body[1:]
+    if len(body) == 1 and isinstance(body[0], ast.Pass):
+        print(f'line {node.lineno}: except Exception with an empty body - either handle it or let it propagate')
+" "$file" 2>/dev/null)
+}
+
+_check_py007() {
+    local file="$1"
+    _py_pack_has_python3 || return 0
+    local message
+    while IFS= read -r message; do
+        [[ -z "$message" ]] && continue
+        add_warning "PY007" "$message"
+    done < <(python3 -c "
+import ast, sys
+try:
+    tree = ast.parse(open(sys.argv[1]).read())
+except SyntaxError:
+    sys.exit(0)
+for node in tree.body:
+    if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+        print(f'line {node.lineno}: module-level side effect on import - wrap in a function or an if __name__ == \"__main__\" guard')
+" "$file" 2>/dev/null)
+}
+
 _check_warn_py001() {
     local file="$1"
     if grep -qE 'def\s+\w+\(([^,]+,){3,}' "$file" 2>/dev/null; then
@@ -160,6 +205,8 @@ pack_validate_python() {
     _check_py003 "$file"
     _check_py004 "$file"
     _check_py005 "$file"
+    _check_py006 "$file"
+    _check_py007 "$file"
     _check_warn_py001 "$file"
     _check_god001 "$file"
     _check_nest001 "$file"

@@ -1,3 +1,11 @@
+---
+type: anti-pattern
+title: "Anti-Pattern: Mutable Default Arguments"
+description: "Python evaluates default arguments once at function definition time, so mutable defaults are shared across all calls."
+tags: [python, functions]
+rules: [PY005]
+status: stable
+---
 # Anti-Pattern: Mutable Default Arguments
 
 ## The Problem
