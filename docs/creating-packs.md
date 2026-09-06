@@ -252,16 +252,19 @@ stderr rather than a failure. Name the adapter after the pack
 `packs/go/` and `packs/rust/` are the two minimal complete packs: a manifest,
 two validators, a structure scanner, a Level 2 adapter, a canonical example and
 a test file covering one refused and one accepted fixture per rule, plus one
-assertion that drives `craftsman-ci.sh` end to end.
+assertion that drives `craftsman-ci.sh` end to end. Neither ships agents or
+templates, which is what keeps them readable as a starting point.
 
 Read them side by side for the one lesson the comparison carries: `packs/rust/`
 claims GOD001 and `packs/go/` refuses it. Rust's god object is a type whose
 `impl` blocks are brace-delimited, so their spans can be summed and measured.
 Go's is a type whose methods are scattered across a file and whose struct
 declaration is five lines however many responsibilities it carries, so the same
-measurement would report every Go file clean.
+measurement would report every Go file clean. Declaring a rule you cannot
+measure is worse than declaring none, because the structural ratchet then
+guards a signal that is absent.
 
-`packs/symfony/` is the most complete, with agents, templates and static
+`packs/symfony/` is the most complete pack, with agents, templates and static
 analysis wired in.
 
 A skeleton under `examples/` is a starting point for a language with no shipped

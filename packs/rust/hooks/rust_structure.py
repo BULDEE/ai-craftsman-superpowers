@@ -11,9 +11,11 @@ balanced group of a header, which in Rust is a `where` clause or a tuple type.
 
 Emits one `RULE|message` line per finding:
   NEST001, LOC001, GOD001, PARAM001  core-owned structure rules
+  RUST001                            .unwrap() outside tests
   RUST002                            panic!/todo!/unimplemented! in library code
   RUST003                            an unsafe block with no SAFETY comment
   RUST004                            a public item with no doc comment
+  RUST005                            .expect() outside tests
   WARN-RUST001                       an #[allow] with no justification
 
 GOD001 is claimed here, unlike in the Go pack: Rust's god object is an `impl`
@@ -36,8 +38,11 @@ PARAM_MAX = 3
 
 MAX_SOURCE_BYTES = 512 * 1024
 
+# `(?:[^<>]|->)*` rather than `[^>]*`: a bound like `<F: Fn(u32) -> u32>`
+# carries a `>` that is not the end of the list, and stopping there left the
+# function unrecognised, which cost it PARAM001 and LOC001 both.
 FN_RE = re.compile(
-    r"\bfn\s+(\w+)\s*(?:<[^>]*>\s*)?\(")
+    r"\bfn\s+(\w+)\s*(?:<(?:[^<>]|->)*>\s*)?\(")
 IMPL_RE = re.compile(r"\bimpl\b(?:\s*<[^>]*>)?\s+(?:[\w:<>, ]+\s+for\s+)?([\w:]+)")
 CONTROL_RE = re.compile(r"(?:^|[^.\w])(if|for|while|loop|match)\b|\belse\b")
 PANIC_RE = re.compile(r"\b(panic|unreachable|todo|unimplemented)\s*!\s*[\(\[]")
@@ -46,7 +51,11 @@ ALLOW_RE = re.compile(r"^\s*#\s*\[\s*allow\s*\(")
 PUBLIC_ITEM_RE = re.compile(
     r"^\s*pub(?:\s*\([^)]*\))?\s+(?:async\s+|const\s+|unsafe\s+|extern\s+\"[^\"]*\"\s+)*"
     r"(fn|struct|enum|trait|type|mod|const|static|union)\s+(\w+)")
-DOC_RE = re.compile(r"^\s*(///|//!|#\s*\[)")
+# An attribute is not documentation. Accepting `#[` here meant a single
+# `#[derive(Debug)]` above an item satisfied the rule, and `#[derive]`,
+# `#[inline]` and `#[serde(...)]` are everywhere, so the rule went quiet on
+# most real code. `/** */` is accepted by rustdoc and was refused.
+DOC_RE = re.compile(r"^\s*(///|//!|/\*\*)")
 TEST_ATTR_RE = re.compile(r"^\s*#\s*\[\s*(cfg\s*\(\s*test\s*\)|test|tokio::test)")
 
 
@@ -63,16 +72,24 @@ def _char_literal_length(source: str, cursor: int) -> int:
     the scanner was counting. A char literal is `'x'`, `'\\n'`, `'\\u{1F600}'`:
     it always closes, and it closes within a bounded distance.
     """
-    end = source.find("'", cursor + 1)
-    if end == -1:
+    # `find` on the closing quote is wrong for `'\''`: it stops on the escaped
+    # quote, leaves the real one behind, and that residue pairs with the next
+    # quote in the file. One stray `'\''` in a const then blanked everything
+    # after it and the file came back clean.
+    if cursor + 1 >= len(source):
         return 0
-    body = source[cursor + 1:end]
-    if not body:
-        return 0
-    if body.startswith("\\"):
-        return end - cursor + 1
-    if len(body) == 1:
-        return end - cursor + 1
+    if source[cursor + 1] == "\\":
+        index = cursor + 2
+        if index < len(source) and source[index] == "u" and source[index + 1:index + 2] == "{":
+            index = source.find("}", index)
+            if index == -1:
+                return 0
+            index += 1
+        else:
+            index += 1
+        return index - cursor + 1 if source[index:index + 1] == "'" else 0
+    if source[cursor + 2:cursor + 3] == "'":
+        return 3
     return 0
 
 
@@ -104,8 +121,23 @@ def _blank_comment(source: str, cursor: int, out: list) -> int:
         end = source.find("\n", cursor)
         end = length if end == -1 else end
     else:
-        end = source.find("*/", cursor + 2)
-        end = length if end == -1 else end + 2
+        # Rust nests block comments, unlike C. Stopping on the first `*/`
+        # handed the rest of a commented-out block back as live code, and
+        # rules fired on lines rustc never compiles.
+        depth, index = 0, cursor
+        while index < length - 1:
+            if source[index:index + 2] == "/*":
+                depth += 1
+                index += 2
+                continue
+            if source[index:index + 2] == "*/":
+                depth -= 1
+                index += 2
+                if depth == 0:
+                    break
+                continue
+            index += 1
+        end = index if depth == 0 else length
     out.append(_blanked(source[cursor:end]))
     return end
 
@@ -149,7 +181,11 @@ def _blank_plain_string(source: str, cursor: int, out: list) -> int:
     while cursor < length:
         char = source[cursor]
         if char == "\\" and cursor + 1 < length:
-            out.append("  ")
+            # A backslash before a newline is a line continuation. Replacing
+            # both with spaces removes the newline, and every line number after
+            # it is then one too low: findings point at the wrong line, and
+            # drop_ignored reads the wrong line for its marker.
+            out.append(" \n" if source[cursor + 1] == "\n" else "  ")
             cursor += 2
             continue
         if char == '"':
@@ -167,14 +203,20 @@ def line_of(source: str, position: int) -> int:
 
 
 def _param_group(header: str, start: int) -> str:
-    """Text inside the parameter parentheses, angle brackets counted along."""
+    """Text inside the parameter parentheses.
+
+    Only parentheses count toward the depth. Counting `<` and `>` as well looks
+    right until a parameter is `f: impl Fn(u32) -> u32`: the `>` of the arrow
+    took the depth to zero without a `)`, the walk gave up, and the function
+    was reported as having no parameters at all. `[u8; 1 << 4]` did the same.
+    """
     depth = 0
     for index in range(start, len(header)):
-        if header[index] in "(<[":
+        if header[index] == "(":
             depth += 1
-        elif header[index] in ")>]":
+        elif header[index] == ")":
             depth -= 1
-            if depth == 0 and header[index] == ")":
+            if depth == 0:
                 return header[start + 1:index]
     return ""
 
@@ -192,10 +234,14 @@ def parameter_list(header: str) -> list[str]:
     if not inner:
         return []
     parts, depth, current = [], 0, ""
-    for char in inner:
-        if char in "([{<":
+    for index, char in enumerate(inner):
+        if char in "([{":
             depth += 1
-        elif char in ")]}>":
+        elif char in ")]}":
+            depth -= 1
+        elif char == "<" and index and (inner[index - 1].isalnum() or inner[index - 1] == "_"):
+            depth += 1
+        elif char == ">" and index and inner[index - 1] != "-" and depth > 0:
             depth -= 1
         if char == "," and depth == 0:
             parts.append(current.strip())
@@ -219,6 +265,12 @@ class _Scan:
         self.stack: list[dict] = []
         self.control_depth = 0
         self.seen_nest: set[int] = set()
+        # A Rust type spreads its methods over several impl blocks: the
+        # inherent one, then one per trait. Measuring a single block is the
+        # defect packs/go documented when it refused GOD001 outright, so the
+        # spans are summed per type and judged once, at the end.
+        self.impl_span: dict = {}
+        self.impl_first_line: dict = {}
 
     def report(self, rule: str, message: str) -> None:
         self.findings.append((rule, message))
@@ -273,12 +325,10 @@ def _close_brace(scan: _Scan, cursor: int) -> None:
                     "line %d: %s() body is %d lines (max %d): extract a function"
                     % (line_of(scan.source, frame["open"]), frame["name"] or "closure",
                        span, LOC_MAX))
-    elif frame["kind"] == "impl" and span > IMPL_LOC_MAX:
-        scan.report("GOD001",
-                    "line %d: impl %s spans %d lines (max %d): too many "
-                    "responsibilities, split the trait"
-                    % (line_of(scan.source, frame["open"]), frame["name"] or "?",
-                       span, IMPL_LOC_MAX))
+    elif frame["kind"] == "impl":
+        name = frame["name"] or "?"
+        scan.impl_span[name] = scan.impl_span.get(name, 0) + span
+        scan.impl_first_line.setdefault(name, line_of(scan.source, frame["open"]))
 
 
 def scan_braces(source: str) -> list[tuple[str, str]]:
@@ -298,10 +348,40 @@ def scan_braces(source: str) -> list[tuple[str, str]]:
         else:
             continue
         header_start = cursor + 1
+    for name, span in scan.impl_span.items():
+        if span > IMPL_LOC_MAX:
+            scan.report("GOD001",
+                        "line %d: the impl blocks of %s span %d lines in total "
+                        "(max %d): too many responsibilities, split the type"
+                        % (scan.impl_first_line[name], name, span, IMPL_LOC_MAX))
     return scan.findings
 
 
 # --- Line-oriented rules ------------------------------------------------------
+
+UNWRAP_RE = re.compile(r"\.unwrap\s*\(\s*\)")
+EXPECT_RE = re.compile(r"\.expect\s*\(")
+
+
+def _unwrap_and_expect(line, number, in_test, findings):
+    """RUST001 refuses, RUST005 reports, and the difference is the message.
+
+    `.expect("the schema is embedded")` carries the invariant a reviewer
+    checks; `.unwrap()` carries nothing at all. Both are exempt in test code,
+    where a panic is how a failure is reported.
+    """
+    if in_test:
+        return
+    if UNWRAP_RE.search(line):
+        findings.append((
+            "RUST001",
+            "line %d: .unwrap() - propagate with ? or handle the error" % number))
+    elif EXPECT_RE.search(line):
+        findings.append((
+            "RUST005",
+            "line %d: .expect() - the message documents the panic, it does not "
+            "prevent it" % number))
+
 
 def _panic_and_unsafe(line, number, in_test, findings):
     if PANIC_RE.search(line) and not in_test:
@@ -311,7 +391,59 @@ def _panic_and_unsafe(line, number, in_test, findings):
             "caller can decide" % number))
 
 
-def _unsafe_without_reason(line, number, previous_raw, findings):
+def _preamble(raw_lines, index):
+    """The contiguous run of comments and attributes above line `index`.
+
+    Reading a single line above an item is wrong in both directions. A SAFETY
+    note runs to two or three lines, which is the convention in the standard
+    library and what clippy's `undocumented_unsafe_blocks` expects; and a doc
+    comment is routinely separated from its item by `#[derive(...)]`, which
+    rustfmt happily spreads over four lines.
+    """
+    collected = []
+    cursor = index - 1
+    inside_attribute = False
+    inside_block_comment = False
+    while cursor >= 0:
+        stripped = raw_lines[cursor].strip()
+        if not stripped and not inside_block_comment:
+            break
+        if inside_block_comment:
+            # A `/** ... */` doc comment: the middle lines are prose and match
+            # nothing, so the walk stopped on them and the doc was never seen.
+            collected.append(raw_lines[cursor])
+            if stripped.startswith("/*"):
+                inside_block_comment = False
+            cursor -= 1
+            continue
+        if stripped.endswith("*/") and not stripped.startswith("/*"):
+            inside_block_comment = True
+            collected.append(raw_lines[cursor])
+            cursor -= 1
+            continue
+        if inside_attribute:
+            # Everything between `#[derive(` and its `)]` belongs to the
+            # attribute, and rustfmt puts one item per line in there.
+            collected.append(raw_lines[cursor])
+            if stripped.startswith("#["):
+                inside_attribute = False
+            cursor -= 1
+            continue
+        if stripped.endswith(")]") and not stripped.startswith("#["):
+            inside_attribute = True
+            collected.append(raw_lines[cursor])
+            cursor -= 1
+            continue
+        if (stripped.startswith("//") or stripped.startswith("#[")
+                or stripped.startswith("*") or stripped.startswith("/*")):
+            collected.append(raw_lines[cursor])
+            cursor -= 1
+            continue
+        break
+    return "\n".join(reversed(collected))
+
+
+def _unsafe_without_reason(line, number, preamble, findings):
     """RUST003: an unsafe block must carry the invariant it relies on.
 
     This is the standard library's own convention and clippy's
@@ -320,7 +452,7 @@ def _unsafe_without_reason(line, number, previous_raw, findings):
     """
     if not UNSAFE_RE.search(line):
         return
-    if "SAFETY:" in line or "SAFETY:" in previous_raw:
+    if "SAFETY:" in line or "SAFETY:" in preamble:
         return
     findings.append((
         "RUST003",
@@ -328,11 +460,11 @@ def _unsafe_without_reason(line, number, previous_raw, findings):
         % number))
 
 
-def _public_docs(line, number, previous_raw, findings):
+def _public_docs(line, number, preamble, findings):
     match = PUBLIC_ITEM_RE.match(line)
     if not match:
         return
-    if DOC_RE.match(previous_raw):
+    if any(DOC_RE.match(candidate) for candidate in preamble.split("\n")):
         return
     findings.append((
         "RUST004",
@@ -340,15 +472,70 @@ def _public_docs(line, number, previous_raw, findings):
         % (number, match.group(1), match.group(2))))
 
 
-def _allow_without_reason(line, number, previous_raw, findings):
+def _allow_without_reason(line, number, preamble, findings):
+    """WARN-RUST001: an #[allow] says why, or it says nothing.
+
+    The trailing comment is where the reason naturally goes, and a `///` above
+    the item documents the item rather than the suppression. Measuring "are
+    there two slashes above" got both backwards.
+    """
     if not ALLOW_RE.match(line):
         return
-    if "//" in previous_raw or "reason" in line:
+    if "reason" in line:
         return
+    if re.search(r"//(?!/)", line):
+        return
+    for candidate in preamble.split("\n"):
+        stripped = candidate.strip()
+        if stripped.startswith("//") and not stripped.startswith(("///", "//!")):
+            return
     findings.append((
         "WARN-RUST001",
         "line %d: #[allow] with no comment saying why the lint does not apply"
         % number))
+
+
+def _matching_close(source: str, open_index: int) -> int:
+    """Index of the `}` closing the `{` at `open_index`, or the end of file."""
+    depth = 0
+    for index in range(open_index, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+    return len(source) - 1
+
+
+def test_line_range(source: str, raw: str) -> set:
+    """Line numbers inside a `#[cfg(test)]` module or a `#[test]` function.
+
+    A flag that flips to "we are in tests" on the first attribute and never
+    flips back stops validating the file from there on. `#[cfg(test)] mod
+    tests` conventionally sits at the bottom, so the damage is usually
+    invisible; put anything after it, or a single `#[test]` in the middle, and
+    every rule below goes quiet. The block's own braces are what bounds it.
+    """
+    inside: set = set()
+    raw_lines = raw.split("\n")
+    offsets, position = [], 0
+    for line in source.split("\n"):
+        offsets.append(position)
+        position += len(line) + 1
+    for index, raw_line in enumerate(raw_lines):
+        if not TEST_ATTR_RE.match(raw_line):
+            continue
+        if index >= len(offsets):
+            continue
+        opening = source.find("{", offsets[index])
+        if opening == -1:
+            continue
+        closing = _matching_close(source, opening)
+        first = source.count("\n", 0, offsets[index]) + 1
+        last = source.count("\n", 0, closing) + 1
+        inside.update(range(first, last + 1))
+    return inside
 
 
 def scan_lines(source: str, raw: str, is_test_file: bool) -> list[tuple[str, str]]:
@@ -359,31 +546,54 @@ def scan_lines(source: str, raw: str, is_test_file: bool) -> list[tuple[str, str
     """
     findings: list[tuple[str, str]] = []
     raw_lines = raw.split("\n")
-    previous_raw = ""
-    in_test = is_test_file
+    test_lines = set() if is_test_file else test_line_range(source, raw)
     for number, line in enumerate(source.split("\n"), start=1):
         raw_line = raw_lines[number - 1] if number <= len(raw_lines) else ""
-        if TEST_ATTR_RE.match(raw_line):
-            in_test = True
+        preamble = _preamble(raw_lines, number - 1)
+        in_test = is_test_file or number in test_lines
+        _unwrap_and_expect(line, number, in_test, findings)
         _panic_and_unsafe(line, number, in_test, findings)
-        _unsafe_without_reason(line, number, previous_raw, findings)
+        _unsafe_without_reason(line, number, preamble, findings)
         if not in_test:
-            _public_docs(line, number, previous_raw, findings)
-        _allow_without_reason(raw_line, number, previous_raw, findings)
-        previous_raw = raw_line
+            _public_docs(line, number, preamble, findings)
+        _allow_without_reason(raw_line, number, preamble, findings)
     return findings
 
 
+# A clippy lint that says the same thing as one of our rules. Honouring it
+# means a developer writes the exemption once, in the language's own syntax,
+# instead of twice.
+CLIPPY_EQUIVALENT = {
+    "PARAM001": "too_many_arguments",
+    "RUST001": "unwrap_used",
+    "RUST005": "expect_used",
+    "RUST004": "missing_docs_in_private_items",
+}
+
+
 def drop_ignored(findings, raw: str):
-    """Remove any finding whose own line carries `craftsman-ignore: <RULE>`."""
+    """Remove a finding its own line, or its preamble, already exempts.
+
+    Two syntaxes are honoured: `craftsman-ignore: <RULE>` on the line, and the
+    `#[allow(clippy::...)]` attribute above the item when clippy has a lint
+    that means the same thing.
+    """
     lines = raw.split("\n")
     kept = []
     for rule, message in findings:
         match = re.match(r"line (\d+):", message)
-        if match:
-            index = int(match.group(1)) - 1
-            if 0 <= index < len(lines) and ("craftsman-ignore: %s" % rule) in lines[index]:
-                continue
+        if not match:
+            kept.append((rule, message))
+            continue
+        index = int(match.group(1)) - 1
+        if not 0 <= index < len(lines):
+            kept.append((rule, message))
+            continue
+        if ("craftsman-ignore: %s" % rule) in lines[index]:
+            continue
+        lint = CLIPPY_EQUIVALENT.get(rule)
+        if lint and lint in _preamble(lines, index):
+            continue
         kept.append((rule, message))
     return kept
 
@@ -397,7 +607,13 @@ def analyze(path: str) -> list[tuple[str, str]]:
     if len(raw) > MAX_SOURCE_BYTES:
         return []
     source = blank_literals(raw)
-    is_test_file = path.endswith("_test.rs") or "/tests/" in path
+    # The pipeline scans relative paths, so `/tests/` alone missed
+    # `tests/integration.rs` and every one of its unwraps was refused. The
+    # fixture that was supposed to cover this wrote an absolute path, which is
+    # why it passed: a fixture whose shape is not the consumer's proves nothing.
+    normalised = "/" + path.lstrip("./")
+    is_test_file = (path.endswith("_test.rs")
+                    or "/tests/" in normalised or "/benches/" in normalised)
     findings = scan_braces(source) + scan_lines(source, raw, is_test_file)
     return drop_ignored(findings, raw)
 

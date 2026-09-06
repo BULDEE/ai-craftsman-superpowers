@@ -12,18 +12,30 @@
 #   Do NOT add set -euo pipefail - it would affect the sourcing script.
 # =============================================================================
 
+_RUST_LAYER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 pack_validate_rust_layers() {
     local file="$1"
 
     # Rust module paths are lowercase by convention, so the path check matches
-    # /domain/ in kind. A `use` path is a bare token rather than a quoted
-    # string as in Go, so the pattern anchors on the `use` keyword: a comment
-    # or a doc example mentioning infrastructure is not an import of it. Both
-    # `crate::infrastructure::x` and `use crate::infrastructure;` count, which
-    # is why the segment may end on `::` or on the statement terminator.
-    if [[ "$file" == *"/domain/"* ]]; then
-        if grep -qE '^[[:space:]]*(pub[[:space:]]+)?use[[:space:]]+[A-Za-z0-9_:]*\b(infrastructure|infra)\b' "$file" 2>/dev/null; then
-            add_violation "LAYER001" "Domain imports Infrastructure - DDD layer violation"
-        fi
+    # /domain/ in kind. `domain.rs` counts too: the 2018 edition dropped
+    # mod.rs, so a whole domain layer can live in one file beside its
+    # directory.
+    case "$file" in
+        */domain/*|*/domain.rs|domain/*|domain.rs) ;;
+        *) return 0 ;;
+    esac
+
+    # The statement scan lives in rust_imports.py: rustfmt writes the grouped
+    # form by default and spreads it over several lines, so a grep anchored on
+    # the segment right after `use` missed `use crate::{domain::X,
+    # infrastructure::Y};` entirely. Without python3 the check cannot run, and
+    # says so rather than reporting the file clean.
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "craftsman: python3 not found, LAYER001 was not checked on $file" >&2
+        return 0
+    fi
+    if python3 "${_RUST_LAYER_DIR}/rust_imports.py" "$file" infrastructure infra >/dev/null 2>&1; then
+        add_violation "LAYER001" "Domain imports Infrastructure - DDD layer violation"
     fi
 }

@@ -31,29 +31,30 @@ _pack_sa_rust_available() {
     return 0
 }
 
-pack_sa_rust() {
-    local file="$1"
-    [[ -f "$file" ]] || return 0
-    _pack_sa_rust_available || return 0
+# The Cargo.toml that owns this file, walking up from it. Without it clippy
+# runs on whatever crate the hook's working directory happens to sit in, which
+# in a workspace is a different unit of code entirely.
+_pack_sa_rust_manifest() {
+    local directory
+    directory="$(cd "$(dirname "$1")" 2>/dev/null && pwd)" || return 1
+    while [[ -n "$directory" && "$directory" != "/" ]]; do
+        if [[ -f "${directory}/Cargo.toml" ]]; then
+            printf '%s' "${directory}/Cargo.toml"
+            return 0
+        fi
+        directory="$(dirname "$directory")"
+    done
+    return 1
+}
 
-    # Declared past the availability probe, never before it: clippy answers for
-    # RUST001 and RUST005 whether or not it found anything, and a clean run is
-    # a verdict. An absent clippy must not silence the Level 1 rules.
-    if type precedence_declare_covered >/dev/null 2>&1; then
-        precedence_declare_covered "RUST001"
-        precedence_declare_covered "RUST005"
-    fi
+# The JSON filter, kept out of pack_sa_rust so the orchestration reads as the
+# five steps it is: probe, locate the crate, run, declare, filter.
+_pack_sa_rust_filter() {
+    python3 -c '
+import json, os, sys
 
-    local target
-    target="$(basename "$file")"
-
-    # cargo clippy runs on a crate, so it is asked once and its diagnostics are
-    # filtered down to the file under review. --message-format=json is stable;
-    # the human reporter is not.
-    cargo clippy --message-format=json --quiet 2>/dev/null | python3 -c '
-import json, sys
-
-target = sys.argv[1]
+target = os.path.realpath(sys.argv[1])
+root = os.path.dirname(os.path.realpath(sys.argv[2]))
 for raw in sys.stdin:
     raw = raw.strip()
     if not raw or not raw.startswith("{"):
@@ -69,9 +70,48 @@ for raw in sys.stdin:
     primary = next((s for s in spans if s.get("is_primary")), None)
     if not primary:
         continue
-    if not str(primary.get("file_name", "")).endswith(target):
+    # Resolved paths, not basenames: mod.rs, lib.rs and main.rs are the three
+    # most common file names in a Rust workspace, so a suffix match attributes
+    # one crate diagnostics that belong to another.
+    reported = primary.get("file_name") or ""
+    if not os.path.isabs(reported):
+        reported = os.path.join(root, reported)
+    if os.path.realpath(reported) != target:
         continue
     text = (message.get("message") or "clippy lint").replace("\n", " ")
     print("CLIPPY001:%s:%s" % (primary.get("line_start", 0), text))
-' "$target"
+' "$1" "$2"
+}
+
+pack_sa_rust() {
+    local file="$1"
+    [[ -f "$file" ]] || return 0
+    _pack_sa_rust_available || return 0
+
+    local manifest
+    manifest="$(_pack_sa_rust_manifest "$file")" || return 0
+
+    local absolute
+    absolute="$(cd "$(dirname "$file")" && pwd)/$(basename "$file")"
+
+    # `unwrap_used` and `expect_used` are `restriction` lints: clippy ships them
+    # off by default, so a run that did not ask for them says nothing about
+    # RUST001 or RUST005. Declaring those covered anyway deleted the pack's
+    # headline rule on every machine with clippy installed. They are requested
+    # explicitly, and coverage is declared only after the run that asked.
+    local output status=0
+    output=$(sa_timeout "${SA_BUDGET_PROJECT_SECONDS:-30}" \
+        cargo clippy --manifest-path "$manifest" --message-format=json --quiet \
+        -- -W clippy::unwrap_used -W clippy::expect_used 2>/dev/null) || status=$?
+
+    # No verdict is not a clean verdict: a timeout or a failed build leaves the
+    # Level 1 rules to answer, which is what precedence_flush is for.
+    [[ $status -eq 124 ]] && return 0
+
+    if type precedence_declare_covered >/dev/null 2>&1; then
+        precedence_declare_covered "RUST001"
+        precedence_declare_covered "RUST005"
+    fi
+
+    printf '%s' "$output" | _pack_sa_rust_filter "$absolute" "$manifest"
 }
