@@ -107,6 +107,19 @@ def recorded_count(entries: dict, path: str, rule: str) -> int:
     return value if isinstance(value, int) and value >= 0 else 0
 
 
+# Rules a mark must not record, because a mark can never hold them back.
+#
+# The shell twin is `_rule_baseline_never_holds` in rule-baseline.sh, and
+# tests/core/test-rule-baseline.sh fails when the two drift. Recording SEC001
+# was worse than useless: the lookup ignores it, and the committed file became a
+# map of where this repository keeps its credentials, one line per path.
+NEVER_HELD = ("SEC", "RATCHET001")
+
+
+def _never_held(rule: str) -> bool:
+    return rule.startswith("SEC") or rule == "RATCHET001"
+
+
 def counts_from_report(report: dict) -> dict:
     """Per file, how many times each rule fired, from a craftsman-ci JSON report.
 
@@ -121,7 +134,7 @@ def counts_from_report(report: dict) -> dict:
             continue
         path = path[2:] if path.startswith("./") else path
         rule = str(issue.get("rule", ""))
-        if not rule:
+        if not rule or _never_held(rule):
             continue
         counts.setdefault(path, {})
         counts[path][rule] = counts[path].get(rule, 0) + 1

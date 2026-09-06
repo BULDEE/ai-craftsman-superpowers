@@ -340,7 +340,18 @@ def _current_entry(file_path: Path):
     return entry
 
 
+# Dependency and build trees are not the project's code. `ci/craftsman-ci.sh`
+# prunes exactly these, and the two halves of one baseline file disagreed: a
+# `vendor/acme/lib/Junk.php` carried a structural mark and no rule mark, which
+# is a row nobody can act on and a diff nobody can read.
+_NOT_THE_PROJECT = frozenset(
+    {"vendor", "node_modules", ".git", "dist", "build", "var"}
+)
+
+
 def _skipped(file_path: Path) -> bool:
+    if _NOT_THE_PROJECT.intersection(file_path.parts):
+        return True
     if not file_path.is_file() or file_path.suffix not in supported_extensions():
         return True
     # A size cap alone is not enough: os.path.getsize("/dev/zero") is 0, so a

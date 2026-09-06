@@ -35,6 +35,16 @@ _RULE_BASELINE_PY="${_RULE_BASELINE_DIR}/rule_baseline.py"
 # legitimate edit into a re-mark, which is the behaviour this exists to remove.
 # The rules that must never be waved through regardless are listed below.
 #
+# The mark is keyed BY PATH, which has the same shape of consequence: renaming
+# or moving a file loses its mark, and every recorded violation in it blocks
+# again. That hurts most where the feature is needed most, because a legacy
+# campaign (strangler fig, extracting a class out of a god object) moves files
+# constantly. It stays keyed by path anyway: following a rename means guessing,
+# and a mark that follows the wrong guess pardons debt in a file nobody
+# measured. The answer to a planned move is a deliberate re-mark,
+# `craftsman-ci baseline <dir> --re-baseline --reason "moved X to Y"`, which
+# names what it absorbs.
+#
 # Occurrences seen in THIS run, per file and rule. The comparison is ordinal:
 # the Nth occurrence of a rule in a file is pre-existing when the mark recorded
 # at least N. So a file marked with one PHP002 that now has two blocks on the

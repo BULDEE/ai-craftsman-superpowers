@@ -696,6 +696,82 @@ else
         "ci reports PHP002=$ci_php002, hook reports PHP002=$hook_php002"
 fi
 
+# --- What the committed artifact must not become -------------------------------
+#
+# A mark that records SEC001 is a map of where this repository keeps its
+# credentials, one line per path, committed and cloned by everyone. The lookup
+# ignores those rules anyway, so recording them was worse than useless.
+NOSEC="$WORK/nosec"
+mkdir -p "$NOSEC/src" "$NOSEC/vendor/acme"
+SEC_PREFIX2="sk"; SEC_ENV2="live"
+printf '<?php\nclass K { private const KEY = "%s_%s_4eC39HqLyjWDarjtT1zdp7dc"; }\n' \
+    "$SEC_PREFIX2" "$SEC_ENV2" > "$NOSEC/src/K.php"
+printf '<?php\nclass Junk { public function setJ($v) { $this->j = $v; } }\n' > "$NOSEC/vendor/acme/Junk.php"
+( cd "$NOSEC" && git init -q && git add -A ) >/dev/null 2>&1
+( cd "$NOSEC" && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline . >/dev/null 2>&1 )
+
+if grep -q "SEC001" "$NOSEC/.craftsman-baseline.json"; then
+    log_fail "a secret's location is not written into the baseline" \
+        "SEC001 recorded, so the artifact maps the credentials"
+else
+    log_pass "a secret's location is not written into the baseline"
+fi
+
+# The structural half and the rule half walk the same tree, or the file holds
+# rows nobody can act on: `vendor/acme/Junk.php` had a structural mark and no
+# rule mark.
+if grep -q "vendor/" "$NOSEC/.craftsman-baseline.json"; then
+    log_fail "a dependency tree is in neither half of the mark" \
+        "a vendor/ row reached the baseline"
+else
+    log_pass "a dependency tree is in neither half of the mark"
+fi
+
+# One list, two languages. The shell answers the lookup and Python writes the
+# file, so a rule dropped from one and kept in the other reopens the hole.
+py_never="$(grep -c 'rule.startswith("SEC") or rule == "RATCHET001"' "$ROOT_DIR/hooks/lib/rule_baseline.py")"
+sh_never="$(grep -c 'SEC\*|RATCHET001' "$ROOT_DIR/hooks/lib/rule-baseline.sh")"
+if [[ "$py_never" -ge 1 && "$sh_never" -ge 1 ]]; then
+    log_pass "the never-held list says the same thing on both sides"
+else
+    log_fail "the never-held list says the same thing on both sides" \
+        "python=$py_never shell=$sh_never"
+fi
+
+# --- A relaxed directory does not disarm its neighbours ------------------------
+#
+# `rules_severity_is_explicit` treats any named rule as a promotion, and a
+# directory override naming a rule to RELAX it is the same syntax. The question
+# is whether it reaches the file next door.
+RELAX="$WORK/relax"
+mkdir -p "$RELAX/src/legacy" "$RELAX/src/other"
+for d in legacy other; do
+    printf 'def one():\n    try:\n        pass\n    except:\n        pass\n' > "$RELAX/src/$d/a.py"
+done
+( cd "$RELAX" && git init -q && git add -A ) >/dev/null 2>&1
+( cd "$RELAX" && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline src >/dev/null 2>&1 )
+printf 'rules:\n  PY004: warn\n' > "$RELAX/src/legacy/.craft-rules.yml"
+printf 'def two():\n    try:\n        pass\n    except:\n        pass\n' >> "$RELAX/src/other/a.py"
+
+relax_neighbour="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \
+    "$RELAX/src/other/a.py" "$RELAX" \
+    | ( cd "$RELAX" && bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1 ))"
+if echo "$relax_neighbour" | grep -q "BLOCKED"; then
+    log_pass "a relaxed directory does not disarm the file next door"
+else
+    log_fail "a relaxed directory does not disarm the file next door" \
+        "a new second occurrence went through"
+fi
+
+relax_inside="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \
+    "$RELAX/src/legacy/a.py" "$RELAX" \
+    | ( cd "$RELAX" && bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1 ))"
+if echo "$relax_inside" | grep -q "BLOCKED"; then
+    log_fail "and inside it the rule still only reports" "it blocked"
+else
+    log_pass "and inside it the rule still only reports"
+fi
+
 # --- The limit an adversarial review found, asserted rather than hidden --------
 #
 # The comparison is blind to content: a marked file replaced wholesale by a

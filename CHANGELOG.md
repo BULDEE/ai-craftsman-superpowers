@@ -82,27 +82,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whatever the file contains, and `tests/core/test-rule-baseline.sh` asserts
   that limit rather than hiding it.
 
-### Changed
-
-- **An existing project no longer defaults to `strict`.** The setup mapping
-  sent "It is going to production" straight to `strict`, and a codebase with
-  three years of history is in production: the truthful answer selected the
-  setting that refuses most of the repository. Question 1 now outranks question
-  2, `--quick` follows the same rule, and `moderate` keeps every `LAYER*` and
-  `SEC*` rule blocking.
-
-### Fixed
-
-- **`ratchet.py` erased baseline keys it had not measured.** `init` and
-  `update` both rebuilt each row from their own measurement and copied back
-  only the keys they knew about, so the `rules` counts written into the same
-  row disappeared on the next run. The symptom would have been the worst kind:
-  a gate quietly refusing inherited debt again weeks after someone recorded it,
-  with nothing in the diff to explain why. The same shape had already cost
-  `reason` once, so the fix carries forward every unmeasured key rather than
-  naming them one at a time.
-
-### Added
 
 - **Go pack (`packs/go/`).** Seven owned rules plus NEST001, LOC001, PARAM001
   and LAYER001, detected by the pack itself. GO001 refuses `panic()` outside
@@ -152,6 +131,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   space is refused, because it is not a YAML mapping, and a trailing comment is
   not part of the value. All of it is asserted in `tests/core/test-config.sh`.
 
+- **BREAKING: an existing project no longer defaults to `strict`.** This is a
+  gate change at runtime, not a change to what `/craftsman:setup` proposes: an
+  installation that never wrote `strictness:` into `.craft-config.yml` and has
+  no baseline stops blocking PHP001, PHP002, TS001, PY004 and PY005 on upgrade.
+  `LAYER*` and `SEC*` keep blocking under `moderate`, and an explicit
+  `strictness: strict` is unaffected.
+
+  The reasoning: the setup mapping sent "It is going to production" straight to
+  `strict`, and a codebase with three years of history is in production, so the
+  truthful answer selected the setting that refuses most of the repository.
+
+  **Taking the mark buys `strict` back.** A repository with history and no
+  `.craftsman-baseline.json` defaults to `moderate`; once the mark exists the
+  default is `strict` again, because the debt `strict` would refuse is recorded
+  and reported without blocking. Without that coupling the two halves cancelled
+  each other out: under `moderate` only `LAYER*` and `SEC*` block, `SEC*` is
+  exempt from the baseline by design, so on every repository past 20 commits
+  the rule baseline was inert and a brand new file full of violations passed
+  with warnings. To keep 4.8 behaviour on upgrade, write `strictness: strict`
+  in `.craft-config.yml`, or run `craftsman-ci baseline src`.
+
+
 - **`docs/creating-packs.md` documents `languages:` and `rules.owned`.** Their
   absence was the reason the example skeletons taught a manifest the engine
   loads and never dispatches to. `examples/pack-skeleton-go/` and
@@ -163,6 +164,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and semicolons, and the release runner holds the Sigstore signing identity.
 
 ### Fixed
+
+- **`ratchet.py` erased baseline keys it had not measured.** `init` and
+  `update` both rebuilt each row from their own measurement and copied back
+  only the keys they knew about, so the `rules` counts written into the same
+  row disappeared on the next run. The symptom would have been the worst kind:
+  a gate quietly refusing inherited debt again weeks after someone recorded it,
+  with nothing in the diff to explain why. The same shape had already cost
+  `reason` once, so the fix carries forward every unmeasured key rather than
+  naming them one at a time.
+
 
 - **`assert_contains` in `tests/lib/test-helpers.sh`** passed its needle to
   `grep` without `--`, so any assertion on a string starting with `-` failed
