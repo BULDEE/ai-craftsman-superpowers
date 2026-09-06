@@ -26,21 +26,7 @@ adapter_run() {
 }
 
 adapter_annotate() {
-    local report_file="$1"
-
-    [[ ! -f "$report_file" ]] && return 0
-
-    python3 -c "
-import json, sys
-report = json.load(sys.stdin)
-for v in report.get('violations', []):
-    sev = v.get('severity', 'warning').upper()
-    f = v.get('file', '')
-    line = v.get('line', 0)
-    rule = v.get('rule', '')
-    msg = v.get('message', '')
-    print(f'{sev}: {f}:{line} [{rule}] {msg}')
-" < "$report_file" 2>/dev/null
+    adapter_print_findings "$1"
 }
 
 adapter_comment() {

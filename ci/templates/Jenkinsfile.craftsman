@@ -38,6 +38,10 @@ pipeline {
 
         stage('Craftsman Quality Gate') {
             steps {
+                // Jenkins reuses a workspace between builds. A report left by
+                // an earlier one would be published as if it belonged to this
+                // build, which is worse than no report at all.
+                sh 'rm -f craftsman-checkstyle.xml craftsman-comment.md'
                 sh 'chmod +x ci/craftsman-ci.sh'
                 // Runs through the generic adapter, so this stage gets the same
                 // verdict as every other provider: annotations on stdout,
@@ -82,7 +86,9 @@ pipeline {
 
     post {
         always {
-            archiveArtifacts artifacts: 'craftsman-report.json,craftsman-comment.md,craftsman-checkstyle.xml', allowEmptyArchive: true
+            // Not craftsman-report.json: `ci` mode writes it to a temporary
+            // file and removes it, so the workspace never holds one.
+            archiveArtifacts artifacts: 'craftsman-comment.md,craftsman-checkstyle.xml', allowEmptyArchive: true
         }
         failure {
             echo 'Craftsman Quality Gate failed - see the Craftsman issues on this build, or craftsman-comment.md'

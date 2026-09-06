@@ -55,7 +55,13 @@ for v in json.load(sys.stdin).get('violations', []):
     props = 'file=' + esc_prop(path)
     if line >= 1:
         props += ',line=%d' % line
-    cmd = 'error' if v.get('severity') == 'critical' else 'warning'
+    # 'warning' is the only severity that maps below error. Anything else,
+    # including one this renderer has not heard of, is reported at the
+    # blocking rank: the three renderers used to disagree on that fallback,
+    # GitHub and GitLab demoting it while Jenkins promoted it, so one report
+    # produced two verdicts. A finding nobody can see is worse than one ranked
+    # too high.
+    cmd = 'warning' if v.get('severity') == 'warning' else 'error'
     print('::%s %s::[%s] %s' % (cmd, props,
                                 esc_data(v.get('rule', '')),
                                 esc_data(v.get('message', ''))))

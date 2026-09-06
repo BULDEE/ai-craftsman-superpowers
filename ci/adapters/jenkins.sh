@@ -20,9 +20,13 @@
 # =============================================================================
 
 adapter_detect() {
-    # JENKINS_URL is set by the controller for every build, including agents.
-    # BUILD_NUMBER alone is not enough: several other systems export it.
-    [[ -n "${JENKINS_URL:-}" ]]
+    # JENKINS_URL alone is not enough. Jenkins documents it as "only available
+    # if Jenkins URL set in system configuration", so an instance that never
+    # had one set exports nothing and the build falls back to generic.
+    # BUILD_TAG is `jenkins-${JOB_NAME}-${BUILD_NUMBER}`, self-identifying and
+    # not gated on that setting. BUILD_NUMBER on its own is not usable: several
+    # other systems export it too.
+    [[ -n "${JENKINS_URL:-}" || -n "${BUILD_TAG:-}" ]]
 }
 
 adapter_run() {
