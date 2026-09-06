@@ -1,0 +1,102 @@
+name: rust
+version: "1.0.0"
+description: "Rust craftsman pack - error handling, unsafe discipline, layer boundaries, structure"
+compatibility:
+  core: ">=4.9.0"
+  # `*`, not ["rust"]. Dispatch already happens by extension, so filtering a
+  # LANGUAGE pack by the project's declared stack adds a gate that protects
+  # nothing and silently disables it on every polyglot repository: a Symfony
+  # backend with a Rust extension, a Python service with a Rust core. The Go
+  # pack shipped with a stack list first and produced 5 findings under
+  # `stack: go` and 0 under `symfony`, in silence. See issue #35.
+  stack: ["*"]
+
+languages:
+  - id: rust
+    extensions: [rs]
+    entry_markers: [Cargo.toml, Cargo.lock]
+    # Cargo.toml carries dependencies as well as lint settings, so blocking it
+    # wholesale would stop ordinary work to guard a quality gate. Only files
+    # that exist solely to configure a gate belong here.
+    protected_configs: ["clippy.toml", ".clippy.toml", "rustfmt.toml"]
+    validators: ["hooks/rust-validator.sh", "hooks/layer-validator.sh"]
+    static_analysis: ["static-analysis/rust-analysis.sh"]
+    # clippy resolves types and lint configuration, so where it produces a
+    # verdict on an unwrap or an expect it outranks the regex. A claim is a
+    # deferral, never a deletion: with clippy absent, timed out or configured
+    # to allow the lint, precedence_flush re-emits the Level 1 finding with
+    # full severity resolution. The tool name must differ from the adapter file
+    # name, or lang_registry.py drops the entry: a tool may not outrank its own
+    # verdicts.
+    supersedes:
+      - clippy=RUST001,RUST005
+    test_commands: ["cargo test", "cargo nextest run"]
+    lsp: "rust-analyzer"
+    # No metrics_dialect. Measured, not assumed: `c-like` and `php-like` both
+    # return nothing at all on a Rust file with four nested blocks and a
+    # four-parameter function, because the shared extractor keys on the word
+    # `function` and on control heads that open with a parenthesis, and Rust
+    # writes `fn` and `if a > 0 {`. Its parameter counter reads the last
+    # balanced group of a header, which in Rust is a `where` clause or a tuple
+    # return type. A dialect that silently measures nothing is worse than none:
+    # the ratchet would then guard a signal that is absent. NEST001, LOC001,
+    # GOD001 and PARAM001 come from hooks/rust_structure.py instead.
+
+rules:
+  owned:
+    - id: RUST001
+      group: Rust
+      text: "no .unwrap() outside tests - propagate with ? or handle the error"
+      default_severity: block
+    - id: RUST002
+      group: Rust
+      text: "no panic!, todo!, unimplemented! or unreachable! in library code - return a Result"
+      default_severity: block
+    - id: RUST003
+      group: Rust
+      text: "every unsafe block carries a // SAFETY: comment stating its invariant"
+      default_severity: block
+    - id: RUST004
+      group: Rust
+      text: "every public item carries a doc comment"
+      default_severity: warn
+    - id: RUST005
+      group: Rust
+      text: "no .expect() outside tests - the message documents the panic, it does not prevent it"
+      default_severity: warn
+      decision: "advisory where RUST001 blocks - .expect() carries the invariant in its message, which is the difference between an unchecked assumption and a documented one, so it is a smell rather than a defect"
+    - id: WARN-RUST001
+      group: Advisory
+      text: "an #[allow] with no comment saying why the lint does not apply"
+      default_severity: warn
+    - id: CLIPPY001
+      group: Rust
+      text: "clippy reports a lint"
+      default_severity: warn
+      decision: "advisory, like the RUST001 and RUST005 it supersedes at their strictest - installing a tool must not make the gate stricter than the regex it replaces"
+  # LAYER001 and the four Structure rules are core-owned (rules/core.yml carries
+  # their id, text and default_severity); this pack supplies only the Rust
+  # detectors, the same split packs/go, packs/python and packs/react use.
+  #
+  # GOD001 is claimed here and not in packs/go: Rust's god object is an `impl`
+  # block carrying forty methods, and an `impl` block is brace-delimited, so its
+  # span is the measurement. Go's is a type whose methods are scattered across
+  # a file and whose struct is five lines, which cannot be measured that way.
+  builtin: ["RUST001", "RUST002", "RUST003", "RUST004", "RUST005", "WARN-RUST001",
+            "LAYER001", "NEST001", "LOC001", "GOD001", "PARAM001"]
+  static_analysis: ["CLIPPY001"]
+
+hooks:
+  validators: ["hooks/rust-validator.sh", "hooks/layer-validator.sh"]
+
+static_analysis:
+  tools: ["static-analysis/rust-analysis.sh"]
+
+commands:
+  scaffold_types: []
+
+agents: []
+
+knowledge: ["knowledge/"]
+
+templates: []
