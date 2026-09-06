@@ -16,7 +16,16 @@
 #   - run_hook - generic hook runner (stdin JSON → exit_code|output)
 #   - test_summary - print pass/fail summary, exit with correct code
 #   - setup_test_env / cleanup_test_env - temp directory management
+#
+# Strictness is pinned here, once, for every suite that sources this file.
+# The default is no longer a constant: a repository with history seeds
+# `moderate` (see config_default_strictness), and the suites run inside one, so
+# an unpinned assertion measured the ambient default instead of the rule it
+# names. A suite that asserts the DEFAULT itself clears this variable for that
+# one case, which is the only place the default belongs.
 # =============================================================================
+
+export CLAUDE_PLUGIN_OPTION_strictness="${CLAUDE_PLUGIN_OPTION_strictness:-strict}"
 
 # Guard against double-sourcing
 [[ -n "${_TEST_HELPERS_LOADED:-}" ]] && return 0

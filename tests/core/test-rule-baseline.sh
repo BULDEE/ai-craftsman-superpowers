@@ -150,7 +150,11 @@ def one():
         pass
 PY_SRC
 ( cd "$REPO" && git add -A ) >/dev/null 2>&1
-( cd "$REPO" && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline src >/dev/null 2>&1 )
+# A second mark on the same repository is refused unless it is asked for by
+# name, so this one says why: a language was added after the first mark, which
+# is exactly the case --re-baseline exists for.
+( cd "$REPO" && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline src \
+    --re-baseline --reason "python files added after the first mark" >/dev/null 2>&1 )
 
 py_hook() {
     printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \
@@ -381,6 +385,317 @@ else
     log_pass "and without it the same file is pardoned again"
 fi
 
+# --- A path is not a regex, and the suite has to be able to see that ----------
+#
+# The occurrence counter keyed a `grep -c` on the path itself, so `[` opened a
+# character class and `app/[slug]/page.tsx` never matched itself: the count came
+# back 0 for every occurrence and every finding in such a file was pardoned as
+# its own first one. The fix was one flag; it had no guardrail, and a review
+# proved it by putting the defect back and watching the suite stay green. No
+# fixture in the repository used a metacharacter path.
+META="$WORK/meta"
+mkdir -p "$META/src/[slug]"
+printf 'def one():\n    try:\n        pass\n    except:\n        pass\n' > "$META/src/[slug]/page.py"
+( cd "$META" && git init -q && git add -A ) >/dev/null 2>&1
+( cd "$META" && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline src >/dev/null 2>&1 )
+
+meta_hook() {
+    printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \
+        "$META/src/[slug]/page.py" "$META" \
+        | ( cd "$META" && bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1 )
+}
+
+meta_marked="$(meta_hook)"
+if echo "$meta_marked" | grep -q "BLOCKED"; then
+    log_fail "a metacharacter path finds its mark" "$(echo "$meta_marked" | head -2)"
+else
+    log_pass "a metacharacter path finds its mark"
+fi
+
+# The assertion that actually holds the fix. The one above stays green with the
+# defect reintroduced, because pardoning everything looks exactly like
+# pardoning the right thing until a second occurrence arrives.
+printf 'def two():\n    try:\n        pass\n    except:\n        pass\n' >> "$META/src/[slug]/page.py"
+meta_second="$(meta_hook)"
+if echo "$meta_second" | grep -q "BLOCKED"; then
+    log_pass "and a SECOND occurrence under it still blocks"
+else
+    log_fail "and a SECOND occurrence under it still blocks" \
+        "the count came back 0, so every finding in this file is pardoned"
+fi
+
+# --- The default has to reach the gate, not just the banner --------------------
+#
+# `config_default_strictness` was consumed by `config_strictness` alone, which
+# only feeds the session line and the verify command. `rules_init` seeded the
+# literal `strict`, so a repository with history was TOLD `moderate` and still
+# had every write resolved under `strict`. A setting two surfaces disagree
+# about is worse than no setting, and no test caught it because every existing
+# case wrote `strictness:` into `.craft-config.yml` explicitly.
+GATE="$WORK/gate"
+mkdir -p "$GATE/src"
+( cd "$GATE" && git init -q && for i in $(seq 1 25); do git commit -q --allow-empty -m "c$i"; done ) >/dev/null 2>&1
+
+# The one place the ambient default is the subject, so the pin the shared
+# helpers apply is cleared here and nowhere else.
+gate_severity() {
+    ( cd "$1" && CLAUDE_PLUGIN_OPTION_strictness="" bash -c "source '$ROOT_DIR/hooks/lib/rules-engine.sh'; rules_init . ${2:-} >/dev/null 2>&1; rules_severity_for_file src/X.php ${3}" )
+}
+
+aged_php002="$(gate_severity "$GATE" "" PHP002)"
+if [[ "$aged_php002" == "warn" ]]; then
+    log_pass "with history and no config, the gate itself resolves moderate"
+else
+    log_fail "with history and no config, the gate itself resolves moderate" \
+        "PHP002 resolved to '$aged_php002'"
+fi
+
+# Moderate is not a weaker gate for a boundary or for a secret, and this is the
+# path where that carve-out actually has to hold.
+for pair in LAYER001 SEC001; do
+    got="$(gate_severity "$GATE" "" "$pair")"
+    if [[ "$got" == "block" ]]; then
+        log_pass "and $pair still blocks under the seeded moderate"
+    else
+        log_fail "and $pair still blocks under the seeded moderate" "got '$got'"
+    fi
+done
+
+FRESH="$WORK/gate-fresh"
+mkdir -p "$FRESH/src"
+( cd "$FRESH" && git init -q && git commit -q --allow-empty -m one ) >/dev/null 2>&1
+fresh_php002="$(gate_severity "$FRESH" "" PHP002)"
+if [[ "$fresh_php002" == "block" ]]; then
+    log_pass "a new repository still resolves strict at the gate"
+else
+    log_fail "a new repository still resolves strict at the gate" "got '$fresh_php002'"
+fi
+
+# A seed loses to anything declared, wherever it is declared. The merge used to
+# let a global override only the literal `strict`, so a seeded `moderate` would
+# have silently outranked a global `strictness: strict`.
+GLOBAL="$WORK/gate-global"
+mkdir -p "$GLOBAL"
+printf 'strictness: strict\n' > "$GLOBAL/.craft-config.yml"
+global_wins="$(gate_severity "$GATE" "$GLOBAL" PHP002)"
+if [[ "$global_wins" == "block" ]]; then
+    log_pass "a global strictness still outranks the seeded default"
+else
+    log_fail "a global strictness still outranks the seeded default" "got '$global_wins'"
+fi
+
+printf 'strictness: relaxed\n' > "$GATE/.craft-config.yml"
+project_wins="$(gate_severity "$GATE" "$GLOBAL" PHP002)"
+if [[ "$project_wins" == "warn" ]]; then
+    log_pass "and an explicit project strictness outranks both"
+else
+    log_fail "and an explicit project strictness outranks both" "got '$project_wins'"
+fi
+rm -f "$GATE/.craft-config.yml"
+
+# --- The mark is taken once, and never rises on its own ------------------------
+#
+# The subcommand supplies its own reason, "the state this repository arrived
+# in", which is true once and false every time after. Run twice, or wired into
+# CI, it would adopt the current state as inherited and pardon everything
+# written since.
+TWICE="$WORK/twice"
+mkdir -p "$TWICE/src"
+printf 'def one():\n    try:\n        pass\n    except:\n        pass\n' > "$TWICE/src/a.py"
+( cd "$TWICE" && git init -q && git add -A ) >/dev/null 2>&1
+( cd "$TWICE" && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline src >/dev/null 2>&1 )
+
+second_code=0
+second_out="$( cd "$TWICE" && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline src 2>&1 )" || second_code=$?
+if [[ "$second_code" -ne 0 ]]; then
+    log_pass "a second baseline run is refused"
+else
+    log_fail "a second baseline run is refused" "exit 0: $second_out"
+fi
+assert_contains "and it says how to re-mark on purpose" "$second_out" "--re-baseline"
+
+reason_code=0
+( cd "$TWICE" && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline src --re-baseline >/dev/null 2>&1 ) || reason_code=$?
+if [[ "$reason_code" -ne 0 ]]; then
+    log_pass "and a re-mark without a reason is refused too"
+else
+    log_fail "and a re-mark without a reason is refused too" "exit 0"
+fi
+
+# Even asked for by name, an existing count goes down and never up. Two more
+# bare excepts, then a deliberate re-mark: the recorded count stays 1.
+printf 'def two():\n    try:\n        pass\n    except:\n        pass\n    try:\n        pass\n    except:\n        pass\n' >> "$TWICE/src/a.py"
+( cd "$TWICE" && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline src \
+    --re-baseline --reason "deliberate" >/dev/null 2>&1 )
+remarked="$( cd "$TWICE" && python3 "$ROOT_DIR/hooks/lib/rule_baseline.py" get src/a.py PY004 )"
+if [[ "$remarked" == "1" ]]; then
+    log_pass "a deliberate re-mark still does not raise a recorded count"
+else
+    log_fail "a deliberate re-mark still does not raise a recorded count" \
+        "PY004 recorded as '$remarked', so new debt was absorbed as inherited"
+fi
+
+# --- The anchor stops at the repository ----------------------------------------
+#
+# The walk looked for a baseline before looking for the `.git`, so a stray
+# `.craftsman-baseline.json` in a workspace directory or in $HOME outranked the
+# project root: this repository's marks were written into another tree's file,
+# keyed against an anchor outside the project.
+STRAY="$WORK/stray"
+mkdir -p "$STRAY/repo/src"
+printf '[]\n' > "$STRAY/.craftsman-baseline.json"
+( cd "$STRAY/repo" && git init -q ) >/dev/null 2>&1
+anchored="$( cd "$STRAY/repo/src" && python3 -c "import sys; sys.path.insert(0, '$ROOT_DIR/hooks/lib'); import ratchet; print(ratchet.project_root())" )"
+if [[ "$anchored" == *"/repo" ]]; then
+    log_pass "a baseline above the repository does not become the anchor"
+else
+    log_fail "a baseline above the repository does not become the anchor" \
+        "anchored on '$anchored'"
+fi
+
+# --- The two halves must not cancel each other out ----------------------------
+#
+# Measured by an adversarial run: under `moderate` only LAYER* and SEC* block,
+# SEC* is exempt from the baseline by design, so on any repository past 20
+# commits the whole mechanism was inert and a brand new file full of violations
+# passed with warnings. Taking the mark is the measurement that makes `strict`
+# survivable, so taking it is what buys `strict` back.
+BUYS="$WORK/buys"
+mkdir -p "$BUYS/src"
+printf '<?php\nclass Old { public function setX($v) { $this->x = $v; } }\n' > "$BUYS/src/Old.php"
+( cd "$BUYS" && git init -q && for i in $(seq 1 25); do git commit -q --allow-empty -m "c$i"; done ) >/dev/null 2>&1
+( cd "$BUYS" && git add -A ) >/dev/null 2>&1
+
+unmarked_default="$( cd "$BUYS" && CLAUDE_PLUGIN_OPTION_strictness="" bash -c "source '$ROOT_DIR/hooks/lib/config.sh'; config_default_strictness" )"
+if [[ "$unmarked_default" == "moderate" ]]; then
+    log_pass "a repository with history and no mark defaults to moderate"
+else
+    log_fail "a repository with history and no mark defaults to moderate" "got '$unmarked_default'"
+fi
+
+( cd "$BUYS" && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline src >/dev/null 2>&1 )
+marked_default="$( cd "$BUYS" && CLAUDE_PLUGIN_OPTION_strictness="" bash -c "source '$ROOT_DIR/hooks/lib/config.sh'; config_default_strictness" )"
+if [[ "$marked_default" == "strict" ]]; then
+    log_pass "and taking the mark buys strict back"
+else
+    log_fail "and taking the mark buys strict back" \
+        "got '$marked_default', so the baseline is inert under the default"
+fi
+
+printf '<?php\nclass BrandNew { public function setY($v) { $this->y = $v; } }\n' > "$BUYS/src/BrandNew.php"
+new_debt="$( cd "$BUYS" && CLAUDE_PLUGIN_OPTION_strictness="" bash "$ROOT_DIR/ci/craftsman-ci.sh" src 2>&1 )"
+if echo "$new_debt" | grep -qE "^x [1-9]"; then
+    log_pass "so a file written after the mark still blocks under the default"
+else
+    log_fail "so a file written after the mark still blocks under the default" \
+        "$(echo "$new_debt" | tail -1)"
+fi
+
+# --- The guard cannot be walked past, and a mark cannot grow in silence -------
+#
+# `craftsman-ci baseline nope .` made the guard's `cd` fail, left its variable
+# empty, and sailed through: exit 0, the success banner, and every violation
+# written since the first mark adopted as inherited.
+bogus_code=0
+( cd "$BUYS" && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline nope . >/dev/null 2>&1 ) || bogus_code=$?
+if [[ "$bogus_code" -ne 0 ]]; then
+    log_pass "a path that does not exist does not walk past the guard"
+else
+    log_fail "a path that does not exist does not walk past the guard" "exit 0"
+fi
+
+# A file written after the mark has no rule row, and `min()` cannot protect a
+# row that is not there. `ratchet.py init` runs first and gives it a structural
+# row, so the test has to be about the `rules` key and not about the entry.
+remark_out="$( cd "$BUYS" && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline src \
+    --re-baseline --reason "adopting the new file on purpose" 2>&1 )"
+assert_contains "a deliberate re-mark says what it absorbs" \
+    "$remark_out" "written since the mark"
+assert_contains "and names the file" "$remark_out" "BrandNew.php"
+
+# --- Two spellings of one path are one path ------------------------------------
+for form in "src" "./src src" ". src"; do
+    counted="$( cd "$BUYS" && bash "$ROOT_DIR/ci/craftsman-ci.sh" $form 2>&1 | grep -oE "in [0-9]+ file" | tail -1 )"
+    if [[ "$counted" == "in 2 file" ]]; then
+        log_pass "craftsman-ci $form scans each file once"
+    else
+        log_fail "craftsman-ci $form scans each file once" "$counted"
+    fi
+done
+
+# --- A committed artifact carries no machine paths -----------------------------
+OUTSIDE="$WORK/outside"
+mkdir -p "$OUTSIDE"
+printf '<?php\nclass Out { public function setQ($v) { $this->q = $v; } }\n' > "$OUTSIDE/Out.php"
+( cd "$BUYS" && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline src "$OUTSIDE" \
+    --re-baseline --reason "a directory outside the project" >/dev/null 2>&1 )
+if grep -q '"path":"/' "$BUYS/.craftsman-baseline.json"; then
+    log_fail "a file outside the project is not recorded" \
+        "an absolute path reached the committed baseline"
+else
+    log_pass "a file outside the project is not recorded"
+fi
+
+# --- Whose promotion outranks the mark -----------------------------------------
+#
+# A `PHP001: block` in ~/.claude/.craft-config.yml is a preference across every
+# repository on the machine, and it silently turned the mark off in all of them.
+GLOBAL_PROMO="$WORK/global-promo"
+mkdir -p "$GLOBAL_PROMO"
+printf 'rules:\n  PHP001: block\n' > "$GLOBAL_PROMO/.craft-config.yml"
+if ( cd "$BUYS" && bash -c "source '$ROOT_DIR/hooks/lib/rules-engine.sh'; rules_init . '$GLOBAL_PROMO' >/dev/null 2>&1; rules_severity_is_explicit src/Old.php PHP001" ); then
+    log_fail "a global promotion does not outrank the mark" "it did"
+else
+    log_pass "a global promotion does not outrank the mark"
+fi
+printf 'rules:\n  PHP001: block\n' > "$BUYS/.craft-rules.yml"
+if ( cd "$BUYS" && bash -c "source '$ROOT_DIR/hooks/lib/rules-engine.sh'; rules_init . >/dev/null 2>&1; rules_severity_is_explicit src/Old.php PHP001" ); then
+    log_pass "and this repository's own promotion still does"
+else
+    log_fail "and this repository's own promotion still does" "it did not"
+fi
+rm -f "$BUYS/.craft-rules.yml"
+
+# --- The verdict does not depend on where the shell is -------------------------
+#
+# A repository holding another repository with its own mark answered "blocked"
+# from one directory and "clean" from the other, because the anchor was the
+# working directory. It is the file's own directory now.
+NESTED="$WORK/nested"
+mkdir -p "$NESTED/libs/mod/src"
+( cd "$NESTED" && git init -q ) >/dev/null 2>&1
+printf 'def one():\n    try:\n        pass\n    except:\n        pass\n' > "$NESTED/libs/mod/src/m.py"
+( cd "$NESTED/libs/mod" && git init -q && git add -A ) >/dev/null 2>&1
+( cd "$NESTED/libs/mod" && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline src >/dev/null 2>&1 )
+inner="$( cd "$NESTED/libs/mod" && bash "$ROOT_DIR/ci/craftsman-ci.sh" src 2>&1 | grep -cE "^x [1-9]" )"
+outer="$( cd "$NESTED" && bash "$ROOT_DIR/ci/craftsman-ci.sh" libs/mod/src 2>&1 | grep -cE "^x [1-9]" )"
+if [[ "$inner" == "$outer" ]]; then
+    log_pass "a nested repository's mark reads the same from both directories"
+else
+    log_fail "a nested repository's mark reads the same from both directories" \
+        "inner blocked=$inner, outer blocked=$outer"
+fi
+
+# --- The two front-ends agree on a file-level ignore ---------------------------
+#
+# `file_has_ignore` was defined in the pipeline and never called: the hook
+# suppressed the finding at the keyboard while the build went red on it.
+IGN="$WORK/ignore-parity"
+mkdir -p "$IGN/src"
+printf '<?php\n// craftsman-ignore: PHP002\nclass Ign { public function go() { return 1; } }\n' > "$IGN/src/Ign.php"
+( cd "$IGN" && git init -q && git add -A ) >/dev/null 2>&1
+ign_ci="$( cd "$IGN" && bash "$ROOT_DIR/ci/craftsman-ci.sh" src 2>&1 )"
+ign_hook="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \
+    "$IGN/src/Ign.php" "$IGN" | ( cd "$IGN" && bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1 ))"
+ci_php002=no; echo "$ign_ci" | grep -q "PHP002" && ci_php002=yes
+hook_php002=no; echo "$ign_hook" | grep -q "PHP002" && hook_php002=yes
+if [[ "$ci_php002" == "no" && "$hook_php002" == "no" ]]; then
+    log_pass "a file-level craftsman-ignore is honoured by both front-ends"
+else
+    log_fail "a file-level craftsman-ignore is honoured by both front-ends" \
+        "ci reports PHP002=$ci_php002, hook reports PHP002=$hook_php002"
+fi
+
 # --- The limit an adversarial review found, asserted rather than hidden --------
 #
 # The comparison is blind to content: a marked file replaced wholesale by a
@@ -434,7 +749,8 @@ final class Keys {
 }
 PHP
 ( cd "$REPO" && git add -A ) >/dev/null 2>&1
-( cd "$REPO" && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline src >/dev/null 2>&1 )
+( cd "$REPO" && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline src \
+    --re-baseline --reason "a secret fixture added after the first mark" >/dev/null 2>&1 )
 
 sec_out="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \
     "$REPO/src/Sec/Keys.php" "$REPO" \

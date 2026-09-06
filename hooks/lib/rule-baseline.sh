@@ -48,6 +48,38 @@ _RULE_BASELINE_SEEN=""
 # `craftsman-ci src`, for the same repository.
 rule_baseline_reset() {
     _RULE_BASELINE_SEEN=""
+    rm -f "$_RULE_BASELINE_CACHE" 2>/dev/null || true
+}
+
+# One interpreter start per file, not per rule.
+#
+# `get <file> <rule>` reloads and re-parses the whole baseline on every call,
+# and it is called once per finding (post-write-check.sh:260, craftsman-ci.sh:566).
+# Measured, rather than assumed: a validator reports one hit per rule per file,
+# so the bound is rules-per-file and not occurrences. On a 40-method PHP class
+# with a mark the delta was 1 interpreter start (52 -> 51); the case this pays
+# for is a wide file under `strict`, where every rule resolves to block and each
+# one asks the same question of the same JSON.
+# On disk, not in a shell variable.
+#
+# Every caller reads this through `$(...)`, so a variable assignment happens in
+# a subshell and is gone before the next finding: a cache kept in memory here
+# measured exactly zero saved interpreter starts. The file survives the
+# subshell, which is the whole point. First line is the path it answers for.
+_RULE_BASELINE_CACHE="${TMPDIR:-/tmp}/craftsman-rule-baseline-cache.$$"
+
+_rule_baseline_recorded() {
+    local file="$1" rule="$2"
+    if [[ ! -f "$_RULE_BASELINE_CACHE" ]] \
+        || [[ "$(head -1 "$_RULE_BASELINE_CACHE" 2>/dev/null)" != "$file" ]]; then
+        {
+            printf '%s\n' "$file"
+            python3 "$_RULE_BASELINE_PY" counts "$file" 2>/dev/null
+        } > "$_RULE_BASELINE_CACHE" 2>/dev/null || return 0
+    fi
+    # awk with -v, not grep: a rule id must match the whole field, and the key
+    # must never be read as a pattern.
+    awk -F= -v r="$rule" 'NR > 1 && $1 == r { print $2; exit }' "$_RULE_BASELINE_CACHE"
 }
 
 # -cxF, not -c with an anchored pattern. A path is not a regex: `[` opens a
@@ -94,7 +126,7 @@ rule_baseline_is_preexisting() {
     seen=$(_rule_baseline_seen_count "$key")
     _RULE_BASELINE_SEEN="${_RULE_BASELINE_SEEN}${key}"$'\n'
 
-    recorded=$(python3 "$_RULE_BASELINE_PY" get "$file" "$rule" 2>/dev/null)
+    recorded=$(_rule_baseline_recorded "$file" "$rule")
     [[ "$recorded" =~ ^[0-9]+$ ]] || return 1
 
     # seen is the count BEFORE this occurrence, so occurrence number is seen+1.

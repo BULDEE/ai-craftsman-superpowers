@@ -169,31 +169,54 @@ def set_project_root(path: Path) -> None:
     _PROJECT_ROOT = Path(path).resolve()
 
 
-def project_root() -> Path:
-    """The directory the baseline is anchored to, found by walking up from cwd.
+def _repository_of(start: Path):
+    """The nearest `.git` at or above `start`, or None outside any repository."""
+    for candidate in [start] + list(start.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
+def _nearest_baseline(start: Path, repository: Path):
+    """The closest existing baseline between `start` and the repository root.
+
+    Bounded by the repository on purpose. Searching for the baseline before
+    finding the `.git` let a stray `.craftsman-baseline.json` in a workspace
+    directory or in $HOME outrank the project: this repository's marks were
+    written into another tree's file, keyed against an anchor outside it.
+    """
+    for candidate in [start] + list(start.parents):
+        if (candidate / BASELINE_NAME).is_file():
+            return candidate
+        if candidate == repository:
+            break
+    return None
+
+
+def project_root(start=None) -> Path:
+    """The directory the baseline is anchored to.
 
     Not `Path.cwd()`. A pipeline that runs `cd packages/api && craftsman-ci src`,
     or a hook fired while the shell sat in a subdirectory, looked for the
     baseline in that subdirectory, found none, and reported every recorded
     violation as new: the exact failure this file exists to prevent, silently.
 
-    An existing baseline wins over the repository root, so a monorepo package
-    that marked its own state keeps it. `.git` is the fallback anchor, and cwd
-    the last resort, which is what a directory outside any repository gets.
+    A pinned anchor answers for everything; otherwise the walk starts where the
+    caller says, which is the file's own directory when there is a file. An
+    existing baseline wins over the repository root, so a package that marked
+    its own state keeps it, and cwd is the last resort for a directory outside
+    any repository.
     """
     if _PROJECT_ROOT is not None:
         return _PROJECT_ROOT
     override = os.environ.get("CRAFTSMAN_PROJECT_ROOT")
     if override and Path(override).is_dir():
         return Path(override)
-    start = Path.cwd().resolve()
-    for candidate in [start] + list(start.parents):
-        if (candidate / BASELINE_NAME).is_file():
-            return candidate
-    for candidate in [start] + list(start.parents):
-        if (candidate / ".git").exists():
-            return candidate
-    return start
+    start = Path(start).resolve() if start is not None else Path.cwd().resolve()
+    repository = _repository_of(start)
+    if repository is None:
+        return start
+    return _nearest_baseline(start, repository) or repository
 
 
 def _baseline_path(args) -> Path:

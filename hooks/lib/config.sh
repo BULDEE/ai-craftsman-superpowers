@@ -74,15 +74,45 @@ _config_resolve() {
 # step and this function cannot disagree.
 CONFIG_EXISTING_PROJECT_COMMITS=20
 
+# A mark buys back `strict`, and it has to.
+#
+# Without this the two halves of this feature cancel each other out, which an
+# adversarial run measured: under `moderate` only LAYER* and SEC* block, SEC* is
+# exempt from the baseline by design, so on any repository past 20 commits the
+# whole rule baseline is inert. A brand new file full of violations passed with
+# four warnings. "Inherited debt reports, new debt still blocks" was false on
+# exactly the population the feature exists for.
+#
+# So the two settings answer two different questions. `moderate` is for a
+# repository whose debt has never been measured: report everything, block only
+# a boundary or a secret. Taking the mark IS the measurement, and once it is
+# taken `strict` is survivable, because the debt it would refuse is recorded
+# and reported without blocking. `craftsman-ci baseline` is what moves a
+# project from one to the other, and `/craftsman:setup` step D runs it.
+_config_has_baseline() {
+    local dir="${1:-$PWD}"
+    dir="$(cd "$dir" 2>/dev/null && pwd)" || return 1
+    while [[ -n "$dir" && "$dir" != "/" ]]; do
+        [[ -f "$dir/.craftsman-baseline.json" ]] && return 0
+        [[ -e "$dir/.git" ]] && return 1
+        dir="$(dirname "$dir")"
+    done
+    return 1
+}
+
 config_default_strictness() {
     local project_dir="${1:-$PWD}"
     local commits
     commits=$(git -C "$project_dir" rev-list --count HEAD 2>/dev/null) || commits=0
     [[ "$commits" =~ ^[0-9]+$ ]] || commits=0
-    if [[ "$commits" -ge "$CONFIG_EXISTING_PROJECT_COMMITS" ]]; then
-        printf 'moderate'
-    else
+    if [[ "$commits" -lt "$CONFIG_EXISTING_PROJECT_COMMITS" ]]; then
         printf 'strict'
+        return 0
+    fi
+    if _config_has_baseline "$project_dir"; then
+        printf 'strict'
+    else
+        printf 'moderate'
     fi
 }
 

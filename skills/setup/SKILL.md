@@ -143,11 +143,27 @@ The baseline is the other half of the same answer: `craftsman-ci baseline`
 records what the repository already carries, so a recorded violation reports
 without blocking while a new one still refuses the write. Step D runs it.
 
-The mark lives in `.craftsman-baseline.json` at the repository root and is found
-from any subdirectory, so a pipeline that runs from a package directory reads
-the same marks as the hooks. Naming a rule in `.craft-rules.yml` outranks it:
+The mark lives in `.craftsman-baseline.json` at the repository root, and the
+question "which mark answers for this file" is settled by the file's own
+directory, never by where the shell happens to be: a pipeline running from a
+package directory, and a hook fired with whatever working directory the editor
+has, read the same mark. A repository nested inside another (a submodule, a
+package that took its own mark) answers for its own files.
+
+Taking the mark is also what buys `strict` back. An existing repository whose
+debt has never been measured defaults to `moderate`, where only a boundary or a
+secret blocks; once the mark is taken, the default is `strict` again, because
+the debt `strict` would refuse is now recorded and reported without blocking.
+
+Naming a rule in this repository's `.craft-rules.yml` outranks the mark:
 `PHP001: block` blocks a recorded violation too, which is how a project takes
-one rule back out of the debt once it has been cleaned up.
+one rule back out of the debt once it has been cleaned up. The same line in the
+global `~/.claude/.craft-config.yml` does not, because a preference held across
+every repository on the machine is not a statement about this one.
+
+The mark is taken once. A second `craftsman-ci baseline` is refused, and a
+deliberate re-mark needs `--re-baseline --reason "..."` and says out loud which
+files written since the first mark it absorbed.
 
 Raising an existing project to `strict` is a deliberate later step, taken once
 the debt is under a baseline, and it is one line in `.craft-config.yml`.

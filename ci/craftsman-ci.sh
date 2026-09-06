@@ -120,8 +120,45 @@ fi
 # describe a state the gate never sees.
 if [[ "${1:-}" == "baseline" ]]; then
     shift
-    BASELINE_PATHS=("$@")
+    BASELINE_PATHS=()
+    BASELINE_REMARK=false
+    BASELINE_REASON=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --re-baseline) BASELINE_REMARK=true; shift ;;
+            --reason) BASELINE_REASON="${2:-}"; shift 2 ;;
+            *) BASELINE_PATHS+=("$1"); shift ;;
+        esac
+    done
     [[ ${#BASELINE_PATHS[@]} -eq 0 ]] && BASELINE_PATHS=(".")
+
+    # A second run is refused. The command supplies the canonical reason itself
+    # ("the state this repository arrived in"), which is true once and false
+    # every time after: wired into CI, or simply run twice, it would adopt the
+    # current state as inherited and pardon every violation written since the
+    # first run, under a reason that says otherwise. The mark is taken by a
+    # human, once, and re-taken only on purpose.
+    # Resolved from the working directory, not by entering the first target.
+    # `craftsman-ci baseline nope .` made the `cd` fail, left the variable
+    # empty, and walked straight past the guard: exit 0, the success banner,
+    # and every violation written since the first mark adopted as inherited.
+    # A guard whose precondition can silently fail is not a guard.
+    BASELINE_FILE="$(python3 -c \
+        "import sys; sys.path.insert(0, '${PLUGIN_ROOT}/hooks/lib'); import ratchet; print(ratchet.project_root() / ratchet.BASELINE_NAME)" 2>/dev/null)"
+    if [[ -z "$BASELINE_FILE" ]]; then
+        echo "craftsman-ci: could not resolve the project root, refusing to write a baseline" >&2
+        exit 1
+    fi
+    if [[ -f "$BASELINE_FILE" && "$BASELINE_REMARK" != true ]]; then
+        echo "craftsman-ci: $BASELINE_FILE already exists." >&2
+        echo "The mark is taken once. To re-take it on purpose, say why:" >&2
+        echo "  craftsman-ci baseline ${BASELINE_PATHS[*]} --re-baseline --reason \"...\"" >&2
+        exit 1
+    fi
+    if [[ "$BASELINE_REMARK" == true && -z "$BASELINE_REASON" ]]; then
+        echo "craftsman-ci: --re-baseline requires --reason \"why\"" >&2
+        exit 1
+    fi
 
     # A file argument is refused. `ratchet.py init` guards a re-photograph
     # behind an explicit --reason, and this subcommand supplies the canonical
@@ -167,9 +204,19 @@ if [[ "${1:-}" == "baseline" ]]; then
     # symlink when this script is reached through one, so `bin/craftsman-ci ->
     # ci/craftsman-ci.sh` looked for the helpers under bin/ and wrote no
     # baseline at all, silently.
+    BASELINE_WHY="initial baseline: the state this repository arrived in"
+    RECORD_ARGS=()
+    if [[ "$BASELINE_REMARK" == true ]]; then
+        BASELINE_WHY="re-baseline: $BASELINE_REASON"
+        # Only a re-mark the user asked for admits a rule that was not recorded
+        # at the first mark. Without it, `record` lets an existing entry go down
+        # and never up.
+        RECORD_ARGS=(--re-baseline)
+    fi
     python3 "${PLUGIN_ROOT}/hooks/lib/ratchet.py" init "${BASELINE_PATHS[@]}" \
-        --reason "initial baseline: the state this repository arrived in" 2>/dev/null || true
-    python3 "${PLUGIN_ROOT}/hooks/lib/rule_baseline.py" record "$BASELINE_REPORT" || exit 1
+        --reason "$BASELINE_WHY" 2>/dev/null || true
+    python3 "${PLUGIN_ROOT}/hooks/lib/rule_baseline.py" record "$BASELINE_REPORT" \
+        "${RECORD_ARGS[@]+"${RECORD_ARGS[@]}"}" || exit 1
     echo ""
     echo "Done. A violation already recorded here is reported but no longer blocks."
     echo "A new one, or one more of the same rule in the same file, still does."
@@ -509,6 +556,18 @@ _add_violation() {
     # the same or the two disagree on a file the team switched the rule off for.
     [[ "$severity" == "ignore" ]] && return 0
 
+    # A file-level `craftsman-ignore: RULE` is honoured here too.
+    # `file_has_ignore` was defined in this file and never called: the hook
+    # suppressed the finding at the keyboard while the pipeline failed the
+    # build on it, which is the one disagreement these two front-ends are not
+    # allowed to have. The file is passed explicitly rather than read from
+    # _CI_CURRENT_FILE, because a flushed precedence finding arrives after the
+    # scan of its file has moved on.
+    if [[ -f "$file" ]] \
+        && grep -qE "craftsman-ignore:[[:space:]]*[^#]*\b${rule}\b" "$file" 2>/dev/null; then
+        return 0
+    fi
+
     # An empty answer means the resolver failed, not that the finding is minor.
     # Testing only for "block" turned any rules-engine failure into a pipeline
     # of warnings and a green build. Unknown resolves to block.
@@ -524,8 +583,16 @@ _add_violation() {
     # as there, because the first version had it in the hook only: a file then
     # passed at the keyboard and failed in the pipeline, which is the drift the
     # parity tests exist to catch and did not, because neither knew to look.
+    # The same absolute form _severity_for resolves against. Passing the raw
+    # path here made the two halves of one decision walk different trees: the
+    # severity came from a walk up to the project root, and the baseline
+    # question was asked about a path resolved against the working directory.
+    # They coincide while the project root IS the working directory, which is
+    # a coincidence and not a guarantee.
+    local abs_file="$file"
+    [[ "$abs_file" != /* ]] && abs_file="$PWD/$file"
     if type rules_baseline_holds >/dev/null 2>&1 \
-       && rules_baseline_holds "$file" "$rule" "$severity"; then
+       && rules_baseline_holds "$abs_file" "$rule" "$severity"; then
         severity="warn"
         message="${message} (already present at the baseline, not blocking)"
     fi
@@ -768,21 +835,29 @@ _find_name_predicate() {
 # src/sub`) are an ordinary thing to type, and without this the same file is
 # scanned twice: counted twice in "in N file(s)", and, before the counter was
 # reset per file, its recorded debt read as new on the second pass.
-_CI_SCANNED=""
-
-_ci_already_scanned() {
-    case $'\n'"$_CI_SCANNED" in
-        *$'\n'"$1"$'\n'*) return 0 ;;
-    esac
-    _CI_SCANNED="${_CI_SCANNED}${1}"$'\n'
-    return 1
+# Two spellings of one path are one path.
+#
+# The first version of this compared the strings `find` produced, so
+# `craftsman-ci ./src src` scanned every file twice and emitted every finding
+# twice, while the one shape a test covered (`src src/sub`) worked. Pure string
+# work on purpose: this runs once per discovered file, and three subshells per
+# file to call `cd`/`pwd` would cost more than the duplicate scan it prevents.
+_ci_normalise_key() {
+    local key="$1"
+    key="${key#"$PWD"/}"
+    while [[ "$key" == ./* ]]; do key="${key#./}"; done
+    while [[ "$key" == *//* ]]; do key="${key//\/\//\/}"; done
+    key="${key%/}"
+    printf '%s' "$key"
 }
 
 scan_paths() {
-    local path
+    local path file list
+    list=$(mktemp "${TMPDIR:-/tmp}/craftsman-scan-XXXXXX") || return 1
+
     for path in "${SCAN_PATHS[@]}"; do
         if [[ -f "$path" ]]; then
-            _ci_already_scanned "$path" || scan_file "$path"
+            printf '%s\t%s\n' "$(_ci_normalise_key "$path")" "$path" >> "$list"
         elif [[ -d "$path" ]]; then
             _find_name_predicate
             # Dependency and build trees are not the project's code, and the
@@ -794,7 +869,7 @@ scan_paths() {
             # complains has to reach the build log, and a walk that found
             # nothing is caught by the FILES_DISCOVERED guard in main().
             while IFS= read -r file; do
-                _ci_already_scanned "$file" || scan_file "$file"
+                printf '%s\t%s\n' "$(_ci_normalise_key "$file")" "$file" >> "$list"
             done < <(find "$path" \
                 \( -name vendor -o -name node_modules -o -name .git \
                    -o -name dist -o -name build -o -name var \) -prune -o \
@@ -802,6 +877,18 @@ scan_paths() {
                 | sort)
         fi
     done
+
+    # Deduplicated on the normalised key, scanned under the spelling the caller
+    # used, so a reported path still looks like what was typed. Sorting once
+    # also replaces the membership test that grew with every file scanned.
+    #
+    # Process substitution, not a pipe: a pipe puts scan_file in a subshell and
+    # every counter it increments dies there.
+    while IFS= read -r file; do
+        scan_file "$file"
+    done < <(sort -u "$list" | awk -F'\t' '!seen[$1]++ { print $2 }')
+
+    rm -f "$list"
 }
 
 # =============================================================================
