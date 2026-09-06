@@ -330,14 +330,15 @@ def _cmd_update(args) -> int:
     if current is None:
         return 0
     known = entries.get(current["path"], current)
-    tightened = {"path": current["path"]}
+    # Start from what the row already said, then tighten. Rebuilding from
+    # scratch and copying back the keys this function happens to know about is
+    # how `reason` was lost once, and how `rules` was lost the day it was
+    # added: a row carries more than this command owns, and the next key added
+    # by someone else must not need an edit here to survive.
+    tightened = {key: value for key, value in known.items() if key != "path"}
+    tightened["path"] = current["path"]
     for name in RATCHETED_METRICS:
         tightened[name] = min(known.get(name, current[name]), current[name])
-    # The reason a budget was raised outlives the tightening that follows it.
-    # Rebuilding the entry from scratch dropped it, so the next reader saw a
-    # loosened figure with no record of why it had been accepted.
-    if isinstance(known.get("reason"), str) and known["reason"]:
-        tightened["reason"] = known["reason"]
     entries[current["path"]] = tightened
     save_baseline(baseline_file, entries)
     return 0
@@ -374,6 +375,14 @@ def _refuse_silent_loosening(roots) -> None:
 # keep every other row, because scoping a command must narrow what it writes,
 # never widen what it deletes.
 def _photograph_into(entries: dict, roots: list, reason: str) -> int:
+    """Overwrite the metrics of each row, keep everything else it carried.
+
+    `init` re-measures on purpose: that is what taking a mark means. What it
+    must not do is drop the keys it does not measure. `rules`, written by
+    rule_baseline.py into the same row, was silently erased by a later `init`,
+    and the only symptom was a gate that started refusing inherited debt again
+    weeks after someone recorded it.
+    """
     written = 0
     for source in _iter_sources(roots):
         entry = _current_entry(source)
@@ -381,6 +390,11 @@ def _photograph_into(entries: dict, roots: list, reason: str) -> int:
             continue
         if reason:
             entry["reason"] = reason
+        previous = entries.get(entry["path"])
+        if isinstance(previous, dict):
+            for key, value in previous.items():
+                if key not in entry and key != "path":
+                    entry[key] = value
         entries[entry["path"]] = entry
         written += 1
     return written

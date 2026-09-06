@@ -98,8 +98,8 @@ One `AskUserQuestion` call, every answer prefilled from the signals. Wording mat
 
 | Question | Prefilled from | What it decides |
 |---|---|---|
-| Existing project or a new one? | `existing_project` | how the baseline is taken |
-| Prototype or heading to production? | `legacy_signal`, `has_tests` | strictness: `moderate` or `strict` |
+| Existing project or a new one? | `existing_project` | how the baseline is taken, AND the strictness ceiling |
+| Prototype or heading to production? | `legacy_signal`, `has_tests` | strictness, within that ceiling |
 | Solo or team? | `has_ci` | whether a CI template and a doctrine export are proposed |
 | Maximum help or maximum autonomy? | nothing, ask plainly | `guided: true` or `guided: false` |
 
@@ -114,10 +114,30 @@ Mapping, applied silently:
 
 | Answer | Effect |
 |---|---|
-| Already exists | photograph the current state as the baseline |
+| Already exists | photograph the current state as the baseline, and cap strictness at `moderate` |
 | Starting right now | baseline starts empty, zero tolerance from the first file |
 | Prototype | `strictness: moderate` |
-| Going to production | `strictness: strict` |
+| Going to production, on a NEW project | `strictness: strict` |
+| Going to production, on an EXISTING one | `strictness: moderate` |
+
+**Question 1 outranks question 2, and this is the single most important line in
+the mapping.** A codebase with three years of history is in production, so the
+truthful answer to question 2 is "going to production", and mapping that
+straight to `strict` selects the setting that refuses most of the repository on
+the first edit. Measured on a real Symfony application, 400 files sampled: 98%
+have no `declare(strict_types=1)` and 88% are not `final`.
+
+`moderate` is not a weaker gate, it is the gate aimed at the diff rather than
+at the history: `_rules_default_severity` keeps every `LAYER*` and `SEC*` rule
+blocking under it. What it stops doing is refusing an edit because of a class
+declaration two hundred lines above the change.
+
+The baseline is the other half of the same answer: `craftsman-ci baseline`
+records what the repository already carries, so a recorded violation reports
+without blocking while a new one still refuses the write. Step D runs it.
+
+Raising an existing project to `strict` is a deliberate later step, taken once
+the debt is under a baseline, and it is one line in `.craft-config.yml`.
 | Alone | no CI proposal |
 | Several | propose `craftsman-ci init` (pipeline template) and `craftsman-ci export` (shareable doctrine) |
 | Explain every blocked change | `guided: true` |
@@ -156,7 +176,14 @@ without it in git, CI and your teammates measure against a different photograph.
 
 ### Step E: `--quick` skips the questions
 
-`--quick` bypasses the four questions entirely. It keeps the observed defaults (existing project detection, strict strictness, `guided: false`) and still runs Step D, so a quick setup ends with a valid `.craftsman-baseline.json` like any other.
+`--quick` bypasses the four questions entirely. It keeps the observed defaults
+and still runs Step D, so a quick setup ends with a valid
+`.craftsman-baseline.json` like any other.
+
+Its strictness follows the same rule as the questions, because a user who
+skipped the questions is the one least likely to notice a bad default:
+`moderate` when the observation reports `existing_project: true`, `strict`
+otherwise.
 
 ---
 

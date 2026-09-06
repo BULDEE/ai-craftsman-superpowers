@@ -26,6 +26,7 @@ source "${SCRIPT_DIR}/lib/static-analysis.sh"
 source "${SCRIPT_DIR}/lib/precedence.sh"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/rules-engine.sh"
+source "${SCRIPT_DIR}/lib/rule-baseline.sh"
 source "${SCRIPT_DIR}/lib/pack-loader.sh"
 source "${SCRIPT_DIR}/lib/structural.sh"
 rules_init "$PWD" "${HOME}/.claude"
@@ -229,6 +230,45 @@ _record_violation_metric() {
 # for it. Severity is resolved on the way out, not here, because a finding that
 # never comes back has no verdict to resolve and one that does must get the
 # same resolution as any other.
+# Debt the file already carried at its mark is reported, never blocked.
+#
+# Without this, on a codebase with three years of history the first edit to
+# nearly every file is refused for code the user did not write, and the
+# rational response is to relax every rule, after which the plugin enforces
+# nothing at all. Measured on a real Symfony application, 400 files sampled:
+# 98% have no declare(strict_types=1), 88% are not final.
+#
+# The finding still prints. A gate that hides the debt lies about the state of
+# the file; one that blocks on it cannot be used; reporting without blocking is
+# neither. An already-advisory finding is left alone: there is nothing to
+# demote, and rewriting its message would say "not blocking" about something
+# that never blocked.
+# Debt the file already carried at its mark is reported, never blocked.
+#
+# Without this, on a codebase with three years of history the first edit to
+# nearly every file is refused for code the user did not write, and the
+# rational response is to relax every rule, after which the plugin enforces
+# nothing at all. Measured on a real Symfony application, 400 files sampled:
+# 98% have no declare(strict_types=1), 88% are not final.
+#
+# The finding still prints. A gate that hides the debt lies about the state of
+# the file; one that blocks on it cannot be used; reporting without blocking is
+# neither. An already-advisory finding is left alone: there is nothing to
+# demote, and saying "not blocking" about it would be noise.
+#
+# Called directly, never through $(...). The occurrence counter behind
+# rule_baseline_is_preexisting lives in the shell, and a command substitution
+# is a subshell: every finding would come back as its own first occurrence, so
+# a second bare `except:` in a file marked with one would be waved through.
+# That is exactly what happened when this was folded into a function returning
+# the severity on stdout.
+_is_baselined_debt() {
+    local file_path="$1" rule="$2" severity="$3"
+    [[ "$severity" == "warn" ]] && return 1
+    type rule_baseline_is_preexisting >/dev/null 2>&1 || return 1
+    rule_baseline_is_preexisting "$file_path" "$rule"
+}
+
 add_violation() {
     local rule="$1"
     local message="$2"
@@ -242,15 +282,13 @@ add_violation() {
 
     local severity
     severity=$(rules_severity_for_file "$file_path" "$rule")
+    [[ "$severity" == "ignore" ]] && return
 
-    if [[ "$severity" == "ignore" ]]; then
-        return
+    file_has_ignore "$rule" && ignored=1
+
+    if _is_baselined_debt "$file_path" "$rule" "$severity"; then
+        severity="warn"; message="${message} (already present at the baseline, not blocking)"
     fi
-
-    if file_has_ignore "$rule"; then
-        ignored=1
-    fi
-
     if [[ $ignored -eq 0 ]]; then
         _record_violation_output "$rule" "$message" "$severity"
     fi

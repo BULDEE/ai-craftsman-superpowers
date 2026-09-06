@@ -434,4 +434,56 @@ fi
 cd "$PREV_PWD"
 rm -rf "$WORK7"
 
+# --- A row carries more than this command owns ---------------------------------
+#
+# `rules`, written into the same row by rule_baseline.py, was erased by the
+# next `init` and by the next `update`, because both rebuilt the row from their
+# own measurement and copied back only the keys they knew about. The symptom
+# was the worst kind: a gate that quietly started refusing inherited debt again
+# weeks after someone recorded it, with nothing in the diff to explain why.
+#
+# The same shape had already cost `reason` once. So the assertion is not "keep
+# rules", it is "keep whatever you did not measure".
+KEEP_WORK="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-ratchet-keep.XXXXXX")"
+trap 'rm -rf "$KEEP_WORK"' EXIT
+
+cat > "$KEEP_WORK/sample.sh" <<'SRC'
+#!/usr/bin/env bash
+run() {
+    echo one
+}
+SRC
+
+( cd "$KEEP_WORK" && python3 "$ROOT_DIR/hooks/lib/ratchet.py" init sample.sh \
+    --reason "a reason worth keeping" >/dev/null 2>&1 )
+
+python3 - "$KEEP_WORK/.craftsman-baseline.json" <<'PY_SRC'
+import json, sys
+path = sys.argv[1]
+rows = json.loads(open(path).read())
+for row in rows:
+    row["rules"] = {"SH001": 2}
+    row["invented_by_someone_else"] = "still here"
+open(path, "w").write("[\n" + ",\n".join(
+    json.dumps(r, separators=(",", ":"), sort_keys=True) for r in rows) + "\n]\n")
+PY_SRC
+
+( cd "$KEEP_WORK" && python3 "$ROOT_DIR/hooks/lib/ratchet.py" update sample.sh >/dev/null 2>&1 )
+( cd "$KEEP_WORK" && python3 "$ROOT_DIR/hooks/lib/ratchet.py" init sample.sh \
+    --reason "a second mark" >/dev/null 2>&1 )
+
+kept="$(python3 -c "
+import json, sys
+rows = json.loads(open(sys.argv[1]).read())
+row = rows[0]
+print('%s|%s|%s' % (row.get('rules'), row.get('invented_by_someone_else'), row.get('reason')))
+" "$KEEP_WORK/.craftsman-baseline.json" 2>/dev/null)"
+
+assert_contains "update and init keep the rule counts they did not measure" \
+    "$kept" "SH001"
+assert_contains "and any other key a future writer added" \
+    "$kept" "still here"
+assert_contains "and the reason, which cost this lesson once already" \
+    "$kept" "a second mark"
+
 test_summary

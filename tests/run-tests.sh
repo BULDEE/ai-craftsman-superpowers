@@ -461,6 +461,7 @@ test_ratchet() {
     log_info "Testing structural ratchet (functional)"
 
     run_subtest "Structural ratchet tests pass" "$SCRIPT_DIR/core/test-ratchet.sh" || true
+    run_subtest "Rule baseline tests pass" "$SCRIPT_DIR/core/test-rule-baseline.sh" || true
 }
 
 # Last, and after everything that writes to CLAUDE_PLUGIN_DATA: this one

@@ -98,6 +98,52 @@ if [[ "${1:-}" == "export" ]]; then
     exit $?
 fi
 
+# `baseline`: photograph the rule violations this repository already carries, so
+# the gate stops refusing the first edit to a file for debt nobody in this
+# session wrote. The structural ratchet does the same for complexity and size;
+# this is the other half, and the two share one file.
+#
+# It is a scan plus a fold, deliberately: the counts have to come from the same
+# validators and the same severity resolution the hooks use, or the mark would
+# describe a state the gate never sees.
+if [[ "${1:-}" == "baseline" ]]; then
+    shift
+    BASELINE_PATHS=("$@")
+    [[ ${#BASELINE_PATHS[@]} -eq 0 ]] && BASELINE_PATHS=(".")
+
+    BASELINE_REPORT=$(mktemp "${TMPDIR:-/tmp}/craftsman-baseline-XXXXXX") || exit 1
+    trap 'rm -f "$BASELINE_REPORT"' EXIT
+
+    echo "Scanning to record what is already there..."
+    bash "$0" --format json "${BASELINE_PATHS[@]}" > "$BASELINE_REPORT" 2>/dev/null || true
+
+    if [[ ! -s "$BASELINE_REPORT" ]]; then
+        echo "craftsman-ci: the scan produced no report, refusing to write an empty baseline" >&2
+        exit 1
+    fi
+
+    # Structural marks first, rule counts folded in after.
+    #
+    # This order was the first fix: `ratchet.py init` rewrote each row from its
+    # own measurement and overwrote a `rules` key written before it, so the
+    # first version printed both success lines and produced a baseline with no
+    # rules in it at all. Found by running it, not by reading it.
+    #
+    # It is no longer the fix. `_photograph_into` now carries forward every key
+    # it did not measure, which is the real repair, because the same loss
+    # happened on every later `init` and `update`, long after this command had
+    # returned. Verified: swapping these two lines back no longer breaks
+    # anything. The order stays because it states the intent, and because a
+    # command should not depend on a guarantee living in another file.
+    python3 "${SCRIPT_DIR}/../hooks/lib/ratchet.py" init "${BASELINE_PATHS[@]}" \
+        --reason "initial baseline: the state this repository arrived in" 2>/dev/null || true
+    python3 "${SCRIPT_DIR}/../hooks/lib/rule_baseline.py" record "$BASELINE_REPORT" || exit 1
+    echo ""
+    echo "Done. A violation already recorded here is reported but no longer blocks."
+    echo "A new one, or one more of the same rule in the same file, still does."
+    exit 0
+fi
+
 if [[ "${1:-}" == "init" ]]; then
     shift
     INIT_PROVIDER="github"
@@ -159,11 +205,13 @@ Usage:
   craftsman-ci [--format json|text] [--config FILE] [paths...]
   craftsman-ci ci [--provider github|gitlab|bitbucket|jenkins|generic] [--config FILE] [paths...]
   craftsman-ci init [--provider github|gitlab|bitbucket|jenkins]
+  craftsman-ci baseline [paths...]
   craftsman-ci export [--target agents-md|cursor|copilot|all]
 
 Subcommands:
   ci        Run full CI adapter lifecycle (scan, annotate, comment, exit)
   init      Generate CI template for the specified provider
+  baseline  Record what this repository already carries, so inherited debt reports without blocking
   export    Render the active rules as agent instruction files (AGENTS.md and friends)
 
 Options:
