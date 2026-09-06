@@ -1,0 +1,108 @@
+name: go
+version: "1.0.0"
+description: "Go craftsman pack - error handling, context propagation, layer boundaries, structure"
+compatibility:
+  core: ">=4.9.0"
+  # `*`, not ["go", "fullstack"]. Dispatch already happens by extension, so
+  # filtering a LANGUAGE pack by the project's declared stack adds a gate that
+  # protects nothing and silently disables it on every polyglot repository: a
+  # Symfony backend with a Go sidecar, a React front with a Go CLI. Measured
+  # before the change: the same Go file with a library panic, a misplaced
+  # context and an init() produced 5 findings under `stack: go` and 0 under
+  # `stack: symfony`, `python` or `react`, with no message saying why.
+  # packs/bash and packs/ai-ml declare `*` for the same reason.
+  stack: ["*"]
+
+languages:
+  - id: go
+    extensions: [go]
+    entry_markers: [go.mod, go.sum]
+    # go.mod carries dependencies as well as toolchain settings, so blocking it
+    # wholesale would stop ordinary work to guard a quality gate. Only files
+    # that exist solely to configure a gate belong here.
+    protected_configs: [".golangci.yml", ".golangci.yaml"]
+    validators: ["hooks/go-validator.sh", "hooks/layer-validator.sh"]
+    static_analysis: ["static-analysis/go-analysis.sh"]
+    # errcheck resolves types, so where it produces a verdict on an ignored
+    # error it outranks the standard-library call list in go_structure.py. A
+    # claim is a deferral, never a deletion: with errcheck absent, timed out or
+    # configured to skip a package, precedence_flush re-emits the Level 1
+    # finding with full severity resolution.
+    supersedes:
+      - errcheck=GO004,GO006
+    test_commands: ["go test ./...", "gotestsum"]
+    lsp: "gopls"
+    # No metrics_dialect. Measured, not assumed: the shared extractor keys on
+    # `function` and on control heads that open with a parenthesis, and Go has
+    # neither, so `c-like` on a Go file with four nested blocks and a
+    # four-parameter function returns nothing at all. Its parameter counter
+    # reads the LAST balanced group of a header, which in Go is the return
+    # tuple. A dialect that silently measures nothing is worse than none: the
+    # ratchet would then guard a signal that is absent. NEST001, LOC001,
+    # GOD001 and PARAM001 come from this pack's own scanner instead, the same
+    # split packs/python uses.
+
+rules:
+  owned:
+    - id: GO001
+      group: Go
+      text: "no panic outside main and outside a Must-prefixed constructor - return an error"
+      default_severity: block
+    - id: GO002
+      group: Go
+      text: "context.Context is the first parameter, never a later one"
+      default_severity: block
+    - id: GO003
+      group: Go
+      text: "every exported symbol carries a doc comment starting with its name"
+      default_severity: warn
+    - id: GO004
+      group: Go
+      text: "no error discarded into _ - handle it or let it travel"
+      default_severity: warn
+      decision: "scoped - the comma-ok forms (type assertion, channel receive, map index, range) discard a bool or an element and never an error, and firing on them was 4 false positives out of 4 on idiomatic Go, so they are excluded rather than left for the user to relax"
+    - id: GO005
+      group: Go
+      text: "no init() - initialise explicitly from main or from a constructor"
+      default_severity: warn
+    - id: GO006
+      group: Go
+      text: "no error return ignored outright - assign it and handle it"
+      default_severity: warn
+      decision: "bounded at Level 1 - resolving whether a call returns an error needs types, so this is a list of standard-library calls that do. errcheck owns the rule when installed (see supersedes), and the list is what remains when it is not"
+    - id: ERRCHECK001
+      group: Go
+      text: "errcheck reports an unchecked error"
+      default_severity: warn
+      decision: "advisory, like the GO006 it supersedes - installing a tool must not make the gate stricter than the regex it replaces"
+    - id: WARN-GO001
+      group: Advisory
+      text: "naked return in a function with named results - return the values"
+      default_severity: warn
+  # LAYER001 and the four Structure rules are core-owned (rules/core.yml
+  # carries their id, text and default_severity); this pack supplies only the
+  # Go detectors, the same split packs/python and packs/react use.
+  # No GOD001. Go's god object is a type with forty methods spread across a
+  # file, not a long declaration: a `type God struct` is a handful of lines
+  # however many responsibilities it carries, so measuring the declaration
+  # reports every Go file clean. Same reasoning as the metrics_dialect note
+  # above: a rule that cannot fire is worse than an absent one, because the
+  # structural ratchet then guards a signal that is not there.
+  builtin: ["GO001", "GO002", "GO003", "GO004", "GO005", "GO006", "WARN-GO001",
+            "LAYER001", "NEST001", "LOC001", "PARAM001"]
+  static_analysis: ["ERRCHECK001"]
+
+hooks:
+  validators: ["hooks/go-validator.sh", "hooks/layer-validator.sh"]
+
+static_analysis:
+  tools: ["static-analysis/go-analysis.sh"]
+
+commands:
+  scaffold_types: []
+
+agents: []
+
+knowledge: ["knowledge/"]
+
+templates: []
