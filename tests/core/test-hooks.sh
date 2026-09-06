@@ -29,6 +29,13 @@ run_pre_hook() {
     local file_path="$1"
     local content="$2"
     local output
+    # printf '%b', because these fixtures write `\n` and every validator regex
+    # is anchored per line. Passed through verbatim, the whole fixture reached
+    # the hook as ONE line: `use App\Infrastructure` never sat at a line start,
+    # LAYER001 never fired, and the assertion named after it passed on a
+    # different rule blocking for a different reason. It only showed red the day
+    # that other rule stopped blocking.
+    content="$(printf '%b' "$content")"
     output=$(jq -n --arg fp "$file_path" --arg c "$content" '{"tool_input":{"file_path":$fp,"content":$c}}' | bash "$ROOT_DIR/hooks/pre-write-check.sh" 2>/dev/null)
     local exit_code=$?
     echo "$exit_code|$output"
@@ -179,10 +186,13 @@ echo "=== Pre-Write Hook Tests ==="
 # Test: Domain importing Infrastructure should block
 result=$(run_pre_hook "src/Domain/Service/UserService.php" "<?php\nuse App\\\\Infrastructure\\\\Persistence\\\\Repo;\nfinal class UserService {}")
 exit_code="${result%%|*}"
-if [[ "$exit_code" == "2" ]]; then
-    log_pass "Pre-write blocks Domain->Infrastructure import (exit 2)"
+# The rule is named, not just the exit code. This assertion spent its whole life
+# green on PHP001 blocking instead, and an exit code alone cannot tell the two
+# apart.
+if [[ "$exit_code" == "2" ]] && [[ "$result" == *LAYER001* ]]; then
+    log_pass "Pre-write blocks Domain->Infrastructure import (exit 2, LAYER001)"
 else
-    log_fail "Pre-write should block layer violation" "exit=$exit_code"
+    log_fail "Pre-write should block layer violation" "exit=$exit_code, output=${result#*|}"
 fi
 
 # Test: Valid Domain file should pass
@@ -303,7 +313,7 @@ unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 # Test: default still blocks
 result=$(run_pre_hook "src/Domain/Service/UserService.php" "<?php\nuse App\\\\Infrastructure\\\\Persistence\\\\Repo;\nfinal class UserService {}")
 exit_code="${result%%|*}"
-if [[ "$exit_code" == "2" ]]; then
+if [[ "$exit_code" == "2" ]] && [[ "$result" == *LAYER001* ]]; then
     log_pass "Pre-write: default still blocks layer violations (backward compatible)"
 else
     log_fail "Pre-write: default should block" "got exit $exit_code"

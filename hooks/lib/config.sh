@@ -53,8 +53,41 @@ _config_resolve() {
     echo "$default"
 }
 
+# The strictness a project gets when nothing declares one.
+#
+# `strict` for a new project, `moderate` for one that already exists. This is
+# a code path and not a line in a setup guide on purpose: the mapping used to
+# live only in skills/setup/SKILL.md, as prose a model was expected to follow,
+# and a decision that opens or closes the front door of the gate cannot depend
+# on that. It is also the answer `--quick` needs, and `--quick` is used by the
+# people least likely to notice a bad default.
+#
+# Why `moderate` on an existing codebase: measured on a real Symfony
+# application, 400 files sampled, 98% have no declare(strict_types=1) and 88%
+# are not final. Under `strict` the first edit to nearly every file is refused
+# for code the user did not write, and the rational response is to relax every
+# rule, after which the plugin enforces nothing. `moderate` is not a weaker
+# gate, it is the gate aimed at the diff: LAYER* and SEC* still block under it.
+#
+# A repository is "existing" past 20 commits, the same threshold
+# hooks/lib/conventions.py uses for `existing_project`, so the observation
+# step and this function cannot disagree.
+CONFIG_EXISTING_PROJECT_COMMITS=20
+
+config_default_strictness() {
+    local project_dir="${1:-$PWD}"
+    local commits
+    commits=$(git -C "$project_dir" rev-list --count HEAD 2>/dev/null) || commits=0
+    [[ "$commits" =~ ^[0-9]+$ ]] || commits=0
+    if [[ "$commits" -ge "$CONFIG_EXISTING_PROJECT_COMMITS" ]]; then
+        printf 'moderate'
+    else
+        printf 'strict'
+    fi
+}
+
 config_strictness() {
-    _config_resolve "strictness" "strict"
+    _config_resolve "strictness" "$(config_default_strictness)"
 }
 
 config_stack() {

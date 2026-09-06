@@ -40,6 +40,10 @@ _RULES_STRICTNESS="strict"
 # resolution needs the rule registry whether or not the caller loaded the packs.
 # shellcheck source=./rule-registry.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/rule-registry.sh"
+# The rule baseline is part of severity resolution, so the engine owns it and
+# every front-end that sources the engine gets it. Sourcing it here rather than
+# in each front-end is what stopped the hook and CI disagreeing on a file.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/rule-baseline.sh"
 
 _rules_store_dir() {
     local namespace="$1"
@@ -397,9 +401,18 @@ _rules_default_severity() {
     [[ "$declared" == "ignore" ]] && { echo "ignore"; return 0; }
     [[ "$declared" == "warn" ]] && { echo "warn"; return 0; }
 
+    # `moderate` relaxes design and style, never a boundary and never security.
+    #
+    # SEC* was missing from this list, and it mattered the day an existing
+    # project started defaulting to `moderate`: a hardcoded secret silently
+    # became advisory on every repository with history. A gate that stops
+    # refusing a live credential because someone dialled the strictness down is
+    # wrong on its own terms, whatever the default is. `relaxed` is the setting
+    # for "warn me about everything, block nothing", and it is chosen
+    # explicitly.
     case "$_RULES_STRICTNESS" in
         relaxed)  echo "warn" ;;
-        moderate) case "$rule_id" in LAYER*) echo "$declared" ;; *) echo "warn" ;; esac ;;
+        moderate) case "$rule_id" in LAYER*|SEC*) echo "$declared" ;; *) echo "warn" ;; esac ;;
         *)        echo "$declared" ;;
     esac
 }
@@ -611,6 +624,46 @@ _rules_relaxed_in_tests() {
         *" $1 "*) return 0 ;;
     esac
     return 1
+}
+
+# rules_baseline_holds <file> <rule> <severity>
+#
+# Exit 0 when this occurrence of the rule was already in the file at its mark,
+# so the finding must be reported without blocking.
+#
+# It lives in the engine, not in a front-end, for a reason the first version of
+# this feature demonstrated: it was written in post-write-check.sh alone, and a
+# file then passed the hook and failed CI, which is precisely the drift the
+# parity tests exist to prevent. Severity is the engine's decision, and this is
+# a severity decision.
+#
+# It is a separate function rather than a branch inside rules_severity_for_file
+# because both front-ends call that one through $(...). The occurrence counter
+# behind it lives in the shell, and a command substitution is a subshell: every
+# finding would come back as its own first occurrence, and a second bare
+# `except:` in a file marked with one would be waved through. Call this
+# directly.
+# Did a human write this rule id down for this file, rather than inherit it?
+#
+# A `.craft-rules.yml` entry, at project level or in a directory, names the rule
+# explicitly. A pack default plus a strictness level does not.
+rules_severity_is_explicit() {
+    local file_path="$1" rule_id="$2"
+    _rules_find_directory_override "$file_path" "$rule_id" >/dev/null 2>&1 && return 0
+    [[ -n "$(_rules_get "severity" "$rule_id")" ]]
+}
+
+rules_baseline_holds() {
+    local file_path="$1" rule_id="$2" severity="$3"
+    [[ "$severity" != "block" ]] && return 1
+    # An explicit promotion outranks the mark. Writing `PY004: block` in
+    # .craft-rules.yml and watching the finding stay advisory is a setting
+    # silently ignored: the same class of defect as a strictness level that
+    # does nothing. The mark answers for what the engine decided on its own;
+    # it does not answer for what the user asked for by name.
+    rules_severity_is_explicit "$file_path" "$rule_id" && return 1
+    type rule_baseline_is_preexisting >/dev/null 2>&1 || return 1
+    rule_baseline_is_preexisting "$file_path" "$rule_id"
 }
 
 rules_severity_for_file() {

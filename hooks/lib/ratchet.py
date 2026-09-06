@@ -153,10 +153,55 @@ def measure(path: Path) -> dict:
     }
 
 
+_PROJECT_ROOT = None
+
+
+def set_project_root(path: Path) -> None:
+    """Pin the anchor for the rest of this process.
+
+    `--baseline path/to/file` names where the mark lives, so it also names what
+    the keys inside it are relative to. Without this, a caller that passed an
+    explicit baseline wrote keys against one root and read them back against
+    another: `init` recorded `sub/deep/Deep.php`, the check looked up
+    `deep/Deep.php`, and the ratchet reported nothing at all.
+    """
+    global _PROJECT_ROOT
+    _PROJECT_ROOT = Path(path).resolve()
+
+
+def project_root() -> Path:
+    """The directory the baseline is anchored to, found by walking up from cwd.
+
+    Not `Path.cwd()`. A pipeline that runs `cd packages/api && craftsman-ci src`,
+    or a hook fired while the shell sat in a subdirectory, looked for the
+    baseline in that subdirectory, found none, and reported every recorded
+    violation as new: the exact failure this file exists to prevent, silently.
+
+    An existing baseline wins over the repository root, so a monorepo package
+    that marked its own state keeps it. `.git` is the fallback anchor, and cwd
+    the last resort, which is what a directory outside any repository gets.
+    """
+    if _PROJECT_ROOT is not None:
+        return _PROJECT_ROOT
+    override = os.environ.get("CRAFTSMAN_PROJECT_ROOT")
+    if override and Path(override).is_dir():
+        return Path(override)
+    start = Path.cwd().resolve()
+    for candidate in [start] + list(start.parents):
+        if (candidate / BASELINE_NAME).is_file():
+            return candidate
+    for candidate in [start] + list(start.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return start
+
+
 def _baseline_path(args) -> Path:
     if "--baseline" in args:
-        return Path(args[args.index("--baseline") + 1])
-    return Path(BASELINE_NAME)
+        explicit = Path(args[args.index("--baseline") + 1])
+        set_project_root(explicit.resolve().parent)
+        return explicit
+    return project_root() / BASELINE_NAME
 
 
 def _flag_value(args, flag: str) -> str:
@@ -255,7 +300,7 @@ def _relative(path: Path):
     repository, and adds entries no teammate can act on.
     """
     try:
-        return str(path.resolve().relative_to(Path.cwd()))
+        return str(path.resolve().relative_to(project_root()))
     except ValueError:
         return None
 

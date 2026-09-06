@@ -121,20 +121,33 @@ Mapping, applied silently:
 | Going to production, on an EXISTING one | `strictness: moderate` |
 
 **Question 1 outranks question 2, and this is the single most important line in
-the mapping.** A codebase with three years of history is in production, so the
+the mapping.** It is enforced by `config_default_strictness` in
+`hooks/lib/config.sh`, not by this table: a decision that opens or closes the
+front door of the gate cannot depend on a model following prose. A codebase with three years of history is in production, so the
 truthful answer to question 2 is "going to production", and mapping that
 straight to `strict` selects the setting that refuses most of the repository on
 the first edit. Measured on a real Symfony application, 400 files sampled: 98%
 have no `declare(strict_types=1)` and 88% are not `final`.
 
-`moderate` is not a weaker gate, it is the gate aimed at the diff rather than
-at the history: `_rules_default_severity` keeps every `LAYER*` and `SEC*` rule
-blocking under it. What it stops doing is refusing an edit because of a class
-declaration two hundred lines above the change.
+`moderate` relaxes design and style, never a boundary and never security:
+`LAYER*` and `SEC*` keep their declared severity under it, which is asserted in
+`tests/core/test-rules-engine.sh`. What it stops doing is refusing an edit
+because of a class declaration two hundred lines above the change.
+
+That sentence was written here before it was true. `SEC*` was missing from the
+carve-out, so this change would have made a hardcoded secret advisory on every
+repository with history, justified by a claim in a document a model reads to
+decide. It is true now because the engine was fixed and a test holds it.
 
 The baseline is the other half of the same answer: `craftsman-ci baseline`
 records what the repository already carries, so a recorded violation reports
 without blocking while a new one still refuses the write. Step D runs it.
+
+The mark lives in `.craftsman-baseline.json` at the repository root and is found
+from any subdirectory, so a pipeline that runs from a package directory reads
+the same marks as the hooks. Naming a rule in `.craft-rules.yml` outranks it:
+`PHP001: block` blocks a recorded violation too, which is how a project takes
+one rule back out of the debt once it has been cleaned up.
 
 Raising an existing project to `strict` is a deliberate later step, taken once
 the debt is under a baseline, and it is one line in `.craft-config.yml`.
@@ -180,10 +193,10 @@ without it in git, CI and your teammates measure against a different photograph.
 and still runs Step D, so a quick setup ends with a valid
 `.craftsman-baseline.json` like any other.
 
-Its strictness follows the same rule as the questions, because a user who
-skipped the questions is the one least likely to notice a bad default:
-`moderate` when the observation reports `existing_project: true`, `strict`
-otherwise.
+Its strictness follows the same rule as the questions, and it does not need to
+be re-derived: `config_default_strictness` in `hooks/lib/config.sh` is the one
+implementation, and `config_strictness` already falls back to it. The table
+above documents what that function returns; it does not compute it.
 
 ---
 

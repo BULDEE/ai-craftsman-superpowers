@@ -29,16 +29,29 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
-    from ratchet import BASELINE_NAME, load_baseline, save_baseline, _relative
+    from ratchet import (
+        BASELINE_NAME,
+        load_baseline,
+        save_baseline,
+        project_root,
+        set_project_root,
+        _relative,
+    )
 except ImportError:  # pragma: no cover - ratchet.py is a sibling, absence is a bug
     BASELINE_NAME = ".craftsman-baseline.json"
-    load_baseline = save_baseline = _relative = None
+    load_baseline = save_baseline = project_root = _relative = None
+    set_project_root = None
 
 
 def _baseline_path(args) -> Path:
     if "--baseline" in args:
-        return Path(args[args.index("--baseline") + 1])
-    return Path(BASELINE_NAME)
+        explicit = Path(args[args.index("--baseline") + 1])
+        # The mark file names the anchor, see ratchet.set_project_root.
+        set_project_root(explicit.resolve().parent)
+        return explicit
+    # The same anchor the structural ratchet uses, so one row carries both even
+    # when the command runs from a subdirectory.
+    return project_root() / BASELINE_NAME
 
 
 def _key_for(path: str) -> str:
