@@ -662,13 +662,21 @@ jobs:
       # everyone learns to ignore. This job is the blocking half: the baseline
       # only moves when someone updates it in the same pull request.
       - name: Check touched files against the committed baseline
+        # Through env:, not interpolated into the block. These three values are
+        # benign today, but a workflow that interpolates any expression into a
+        # shell block teaches the next author the pattern, and the next value
+        # is a branch name. tests/meta/test-release.sh refuses the shape.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
         run: |
           set -uo pipefail
 
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BASE="${{ github.event.pull_request.base.sha }}"
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            BASE="$PR_BASE_SHA"
           else
-            BASE="${{ github.event.before }}"
+            BASE="$PUSH_BEFORE"
           fi
 
           if [[ -z "$BASE" || "$BASE" == "0000000000000000000000000000000000000000" ]]; then
@@ -722,8 +730,10 @@ jobs:
       # when the adapter, the gate it wraps, or this workflow changed.
       - name: Detect adapter changes
         id: adapter
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          BASE="${{ github.event.pull_request.base.sha || github.event.before }}"
+          BASE="$BASE_REF"
           if [ -z "$BASE" ] || ! git cat-file -e "$BASE" 2>/dev/null; then
             echo "changed=true" >> "$GITHUB_OUTPUT"; exit 0
           fi

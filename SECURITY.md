@@ -208,39 +208,70 @@ grep -rn "claude -p" hooks/lib/haiku-verify.sh   # headless verification
 grep -rln "sentry" hooks/                        # Sentry context hook
 ```
 
+## Pre-installation verification
+
+Two things are worth checking before you install: what the plugin will run on
+your machine (see [Code Verification](#code-verification) above), and whether
+the archive you downloaded is the one this repository built (below).
+
 ## Release Provenance
 
-Every `v<x.y.z>` release publishes `craftsman-<version>.tar.gz` plus
+Every `v<x.y.z>` release publishes `craftsman-<version>.tar.gz` and
 `SHA256SUMS.txt`, and the tarball carries a Sigstore build attestation produced
-by `.github/workflows/release.yml`. The attestation binds the archive to this
-repository, to the commit the tag points at, and to that workflow, so a tarball
-rebuilt elsewhere fails verification even when its contents look identical.
+by `.github/workflows/release.yml`.
 
 ```bash
 VERSION=4.9.0
 gh release download "v${VERSION}" --repo BULDEE/ai-craftsman-superpowers \
   --pattern "craftsman-${VERSION}.tar.gz" --pattern SHA256SUMS.txt
 
-# 1. Provenance: who built it, from which commit, through which workflow
+# 1. Provenance: this repository, and this workflow file, built it
 gh attestation verify "craftsman-${VERSION}.tar.gz" \
-  --repo BULDEE/ai-craftsman-superpowers
+  --repo BULDEE/ai-craftsman-superpowers \
+  --signer-workflow BULDEE/ai-craftsman-superpowers/.github/workflows/release.yml
 
 # 2. Checksum: the published digest matches the file on disk
-sha256sum --check SHA256SUMS.txt
+sha256sum --check SHA256SUMS.txt   # shasum -a 256 -c on macOS
+
+# 3. Optional: which commit it was built from
+gh attestation verify "craftsman-${VERSION}.tar.gz" \
+  --repo BULDEE/ai-craftsman-superpowers --format json \
+  | jq -r '.[].verificationResult.statement.predicate.buildDefinition.resolvedDependencies[].digest.gitCommit'
 ```
 
-`gh attestation verify` needs `gh` 2.49 or newer. It resolves the attestation
-online by default; add `--bundle` with a downloaded bundle for an air-gapped
-check.
+`--signer-workflow` is not optional decoration. With `--repo` alone, any
+workflow in this repository holding `attestations: write` produces an
+attestation that passes, so the check would say "built here" and nothing more.
+`gh attestation verify` needs `gh` 2.49 or newer and resolves the attestation
+online; `--bundle` takes a downloaded bundle for an air-gapped check.
 
-Two limits worth stating plainly:
+### What this proves, and what it does not
 
-- The source tarball GitHub generates for a tag
-  (`/archive/refs/tags/...`) is **not** the attested artifact. Verify the
-  release asset named above.
+It proves the archive came out of this repository through that workflow file,
+and it names the commit. It is meant for the case where you obtained the file
+from somewhere other than the release page: a mirror, a cache, a colleague, an
+internal artifact store.
+
+It does **not** protect against someone who already has write access here. A
+tag push runs the workflow file carried by that tag's own tree, so a writer can
+build and sign content of their choosing. The control for that is the `release`
+environment's required reviewers, and the tag protection ruleset, both
+repository settings rather than anything a file in the repository can assert.
+State of those settings is visible to anyone:
+
+```bash
+gh api repos/BULDEE/ai-craftsman-superpowers/environments
+gh api repos/BULDEE/ai-craftsman-superpowers/rulesets
+```
+
+Two further limits worth stating plainly:
+
+- The source tarball GitHub generates for a tag (`/archive/refs/tags/...`) is
+  **not** the attested artifact. Verify the release asset named above.
 - The marketplace install path is a git checkout of the `craftsman--v<version>`
-  tag, not a tarball download. Its integrity is the commit SHA the tag resolves
-  to, and the release job fails when the two tags of one version disagree.
+  tag, not a tarball download. Its integrity is the commit that tag resolves
+  to. The release job refuses to publish when the two tags of one version
+  disagree, and a tag protection ruleset is what keeps that true afterwards.
 
 ## Supported Versions
 

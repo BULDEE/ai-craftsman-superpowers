@@ -94,7 +94,7 @@ assert_json_contains() {
 # assert_contains "description" "haystack" "needle"
 assert_contains() {
     local desc="$1" haystack="$2" needle="$3"
-    if echo "$haystack" | grep -qi "$needle"; then
+    if echo "$haystack" | grep -qi -- "$needle"; then
         log_pass "$desc"
     else
         log_fail "$desc" "output does not contain '$needle'"
@@ -104,7 +104,7 @@ assert_contains() {
 # assert_not_contains "description" "haystack" "needle"
 assert_not_contains() {
     local desc="$1" haystack="$2" needle="$3"
-    if ! echo "$haystack" | grep -qi "$needle"; then
+    if ! echo "$haystack" | grep -qi -- "$needle"; then
         log_pass "$desc"
     else
         log_fail "$desc" "output should not contain '$needle'"
