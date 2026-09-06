@@ -30,7 +30,11 @@ CI_DIR="$(dirname "$ADAPTER_DIR")"
 #
 # Each provider is sourced in a subshell: the four define the same five function
 # names, and sourcing them into this shell would leave the last one loaded.
-ADAPTER_PROVIDER_PRIORITY=(github gitlab bitbucket)
+# jenkins is asked last: a Jenkins build of a repository hosted on GitHub or
+# GitLab exports neither of their CI variables, but the reverse would be a
+# surprise worth catching, and the forge adapters can post a comment where
+# jenkins can only write a file.
+ADAPTER_PROVIDER_PRIORITY=(github gitlab bitbucket jenkins)
 
 adapter_auto_detect() {
     local provider

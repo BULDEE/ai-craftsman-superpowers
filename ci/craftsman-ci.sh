@@ -157,7 +157,7 @@ craftsman-ci v${VERSION} - Craftsman Quality Gate
 
 Usage:
   craftsman-ci [--format json|text] [--config FILE] [paths...]
-  craftsman-ci ci [--provider github|gitlab|bitbucket|generic] [--config FILE] [paths...]
+  craftsman-ci ci [--provider github|gitlab|bitbucket|jenkins|generic] [--config FILE] [paths...]
   craftsman-ci init [--provider github|gitlab|bitbucket|jenkins]
   craftsman-ci export [--target agents-md|cursor|copilot|all]
 

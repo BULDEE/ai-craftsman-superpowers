@@ -5,8 +5,14 @@
 //   1. Copy this file as 'Jenkinsfile' or load it via shared library
 //   2. Adjust agent/docker image as needed
 //
-// The generic adapter writes annotations to stdout and a markdown comment
-// to craftsman-comment.md for downstream consumption.
+// The jenkins adapter writes craftsman-checkstyle.xml, which the Warnings Next
+// Generation plugin reads natively: each finding lands on its file and line in
+// the Issues view and in the diff of a change request, with the rule id as its
+// category. It also writes craftsman-comment.md and prints the findings to the
+// console, so a build without the plugin loses nothing.
+//
+// Requires: Warnings Next Generation (warnings-ng). Without it, drop the
+// recordIssues step below; the gate still fails the build on violations.
 // =============================================================================
 
 pipeline {
@@ -42,11 +48,29 @@ pipeline {
                 // never produced the comment file it archives below.
                 script {
                     int status = sh(
-                        script: 'bash ci/craftsman-ci.sh ci --provider generic',
+                        script: 'bash ci/craftsman-ci.sh ci --provider jenkins',
                         returnStatus: true
                     )
+
+                    // Published before the verdict is applied. `error` aborts
+                    // the stage, so recording the issues afterwards would lose
+                    // them on exactly the builds that have some.
+                    if (fileExists('craftsman-checkstyle.xml')) {
+                        recordIssues(
+                            tools: [checkStyle(
+                                pattern: 'craftsman-checkstyle.xml',
+                                name: 'Craftsman'
+                            )],
+                            // The gate below owns the verdict. Setting a
+                            // quality gate here as well would give the build
+                            // two masters that can disagree.
+                            enabledForFailure: true,
+                            skipPublishingChecks: false
+                        )
+                    }
+
                     if (status == 2) {
-                        error 'Craftsman quality gate failed. See the annotations above.'
+                        error 'Craftsman quality gate failed. See the Craftsman issues on this build.'
                     }
                     if (status == 1) {
                         unstable 'Craftsman reported warnings.'
@@ -58,10 +82,10 @@ pipeline {
 
     post {
         always {
-            archiveArtifacts artifacts: 'craftsman-report.json,craftsman-comment.md', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'craftsman-report.json,craftsman-comment.md,craftsman-checkstyle.xml', allowEmptyArchive: true
         }
         failure {
-            echo 'Craftsman Quality Gate failed - check violations in the console output or craftsman-comment.md'
+            echo 'Craftsman Quality Gate failed - see the Craftsman issues on this build, or craftsman-comment.md'
         }
     }
 }

@@ -81,6 +81,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `&'a str` is a lifetime and not an unterminated character literal, that
   `where` clauses and tuple return types are not parameter lists, and that
   `self` is not a parameter the caller passes.
+- **Native annotations for Jenkins (`ci/adapters/jenkins.sh`).** Jenkins was
+  the only provider on the generic adapter, so a violation was plain console
+  output and a markdown file. It now emits `craftsman-checkstyle.xml`, which
+  the Warnings Next Generation plugin attaches to the file and line, in the
+  build's Issues view and in the diff of a change request, with the rule id as
+  the category: a `LAYER001` in Jenkins is the `LAYER001` the hook prints
+  locally. `Jenkinsfile.craftsman` records the issues before the verdict is
+  applied, because `error` aborts the stage and would otherwise lose them on
+  exactly the builds that have findings. The console output and
+  `craftsman-comment.md` are still written, so a build without the plugin
+  loses nothing.
 
 - **`/craftsman:challenge` now reviews side effects by their frequency, not only
   their content.** A new Level 2 smell (unthrottled side effect) plus the three

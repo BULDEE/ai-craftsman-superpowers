@@ -613,6 +613,7 @@ test_session_metrics() {
     run_subtest "Pack validation tests pass" "$SCRIPT_DIR/core/test-validate-pack.sh" || true
     run_subtest "CI adapter tests pass" "$SCRIPT_DIR/ci/test-adapters.sh" || true
     run_subtest "CI adapter delivery tests pass" "$SCRIPT_DIR/ci/test-adapter-delivery.sh" || true
+    run_subtest "Jenkins adapter tests pass" "$SCRIPT_DIR/ci/test-jenkins-adapter.sh" || true
     run_subtest "Hermes pre_verify adapter tests pass" "$SCRIPT_DIR/adapters/test-hermes-pre-verify.sh" || true
     run_subtest "Host adapter parity tests pass" "$SCRIPT_DIR/adapters/test-parity.sh" || true
     run_subtest "Hermes native plugin tests pass" "$SCRIPT_DIR/adapters/test-hermes-plugin.sh" || true
