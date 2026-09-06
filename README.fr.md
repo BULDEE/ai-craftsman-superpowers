@@ -276,8 +276,8 @@ contente d'avertir ; pas d'auto-commit ; les commandes sont invoquées
 explicitement, jamais déclenchées seules ; la méthodologie assume ses partis
 pris (DDD/Clean Architecture).
 
-**Contraintes actuelles :** PHP, TypeScript, Python et Go ont une couverture de
-règles complète, les autres langages un support de base ; la détection de biais
+**Contraintes actuelles :** PHP, TypeScript, Python, Go et Rust ont une
+couverture de règles complète, les autres langages un support de base ;
 avertit directement en anglais et laisse le modèle arbitrer toutes les autres
 langues en contexte ; les métriques sont par machine, pas partagées en
 équipe ; l'auto-correction des violations et les plugins IDE ne sont pas

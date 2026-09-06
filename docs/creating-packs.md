@@ -214,6 +214,13 @@ both read, so a pack without a `languages:` entry declaring its extensions is
 loaded, sourced, and never called: no file ever dispatches to its validator.
 That is the single most common reason a new pack appears to do nothing.
 
+`compatibility.stack` is a second gate, and for a language pack it should be
+`["*"]`. Dispatch already happens by extension, so a stack list only means the
+pack goes silent on a repository whose declared stack names another ecosystem:
+a Symfony backend with a Go sidecar, a Python service with a Rust core. See
+issue #35 for the measurement.
+
+
 ### On `metrics_dialect`
 
 Declaring it gives you NEST001, LOC001, GOD001 and PARAM001 for free, from
@@ -221,25 +228,45 @@ Declaring it gives you NEST001, LOC001, GOD001 and PARAM001 for free, from
 nothing else, and both mean brace-delimited with `function` as the keyword and
 parenthesised control heads.
 
-Check before you declare. Go and Rust are brace-delimited yet match neither:
-they write `func`/`fn` and `if x > 0 {`, so the extractor finds no function and
-no control block and reports every file clean. A dialect that silently measures
-nothing is worse than none, because the structural ratchet then guards a signal
-that is absent. Declare none and emit the four rules from your own detector
-instead: `packs/go/hooks/go_structure.py` and `packs/python` both do this.
+Check before you declare, by running the extractor on a file of your language
+and looking at what comes back. Go and Rust are brace-delimited and match
+neither: they write `func` and `fn`, and `if x > 0 {`, so `c-like` returns
+nothing at all on a file with four nested blocks and a four-parameter function,
+and the parameter counter reads the last balanced group of a header, which in
+Go is the return tuple and in Rust a `where` clause. A dialect that silently
+measures nothing is worse than none, because the structural ratchet then guards
+a signal that is absent. Declare none and emit the four rules from your own
+detector: `packs/go/hooks/go_structure.py`,
+`packs/rust/hooks/rust_structure.py` and `packs/python` all do this.
+
+### On `supersedes`
+
+The tool named in a `supersedes:` entry must not share its name with the pack's
+own Level 2 adapter file. `lang_registry.py` drops such an entry, on the ground
+that a tool may not outrank its own verdicts, and it drops it with a message on
+stderr rather than a failure. Name the adapter after the pack
+(`static-analysis/rust-analysis.sh`) and the entry after the tool (`clippy`).
 
 ## Examples
 
-`packs/go/` is the smallest complete pack: one manifest, two validators, a
-Python structure scanner, a canonical example and a test file covering one
-passing and one failing fixture per rule. Copy that.
+`packs/go/` and `packs/rust/` are the two minimal complete packs: a manifest,
+two validators, a structure scanner, a Level 2 adapter, a canonical example and
+a test file covering one refused and one accepted fixture per rule, plus one
+assertion that drives `craftsman-ci.sh` end to end.
+
+Read them side by side for the one lesson the comparison carries: `packs/rust/`
+claims GOD001 and `packs/go/` refuses it. Rust's god object is a type whose
+`impl` blocks are brace-delimited, so their spans can be summed and measured.
+Go's is a type whose methods are scattered across a file and whose struct
+declaration is five lines however many responsibilities it carries, so the same
+measurement would report every Go file clean.
 
 `packs/symfony/` is the most complete, with agents, templates and static
 analysis wired in.
 
-`examples/pack-skeleton-rust/` is the last remaining skeleton, for a language
-with no shipped pack yet. The rule is simple and applies to every skeleton: a
-skeleton exists to be promoted, and it is deleted when its pack ships. Keeping
+A skeleton under `examples/` is a starting point for a language with no shipped
+pack. It exists to be promoted, and is deleted when its pack ships: keeping
 both means maintaining a second manifest that nothing loads, which is how the
-Go and Python skeletons came to teach a `pack.yml` with no `languages:` block
-months after the engine stopped dispatching without one.
+Go, Python and Rust skeletons all came to teach a `pack.yml` with no
+`languages:` block months after the engine stopped dispatching without one.
+There are none left today.

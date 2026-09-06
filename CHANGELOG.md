@@ -60,6 +60,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a usage error instead of reporting a missing string.
 - **`README.md` and `README.fr.md`** both linked
   `SECURITY.md#pre-installation-verification`, a heading that did not exist.
+- **Rust pack (`packs/rust/`).** Six owned rules plus NEST001, LOC001, GOD001,
+  PARAM001 and LAYER001, detected by the pack itself. RUST001 refuses
+  `.unwrap()` outside tests, RUST002 refuses `panic!`, `todo!`,
+  `unimplemented!` and `unreachable!` in library code, RUST003 refuses an
+  `unsafe` block with no `// SAFETY:` comment. RUST004, RUST005 and
+  WARN-RUST001 warn on an undocumented public item, an `.expect()`, and an
+  `#[allow]` with no justification. The pack loads on every stack
+  (`stack: ["*"]`): dispatch is by extension, and a stack list only means the
+  pack goes silent on a polyglot repository.
+- **Level 2 for Rust.** `packs/rust/static-analysis/rust-analysis.sh` runs
+  `cargo clippy --message-format=json` when it is installed, reports
+  `CLIPPY001`, and `supersedes: clippy=RUST001,RUST005` hands it those two
+  codes. Coverage is declared past the availability probe, so an absent clippy
+  never silences the Level 1 rules while a clean run still counts as a verdict.
+- **A Rust structure scanner (`packs/rust/hooks/rust_structure.py`).** The pack
+  declares no `metrics_dialect`, and that is measured rather than assumed:
+  `c-like` and `php-like` both return nothing at all on a Rust file with four
+  nested blocks and a four-parameter function. It also has to know that `'a` in
+  `&'a str` is a lifetime and not an unterminated character literal, that
+  `where` clauses and tuple return types are not parameter lists, and that
+  `self` is not a parameter the caller passes.
 
 - **`/craftsman:challenge` now reviews side effects by their frequency, not only
   their content.** A new Level 2 smell (unthrottled side effect) plus the three

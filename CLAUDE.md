@@ -106,11 +106,12 @@ agents/             → Core agents (11) + pack symlinks
 knowledge/          → Core methodology, language-agnostic (Clean Architecture, Hexagonal, DDD, TDD, testing strategy, Clean Code, Refactoring, legacy techniques, Design Patterns, principles, anti-patterns)
 knowledge/ddd/      → Agnostic DDD tactical/CQRS (Symfony specifics live in packs/symfony/knowledge/ddd-symfony-implementation.md)
 knowledge/legacy/, knowledge/refactoring/ → Legacy rescue and refactoring campaign methodology
-packs/              → Loadable language packs (6 packs)
+packs/              → Loadable language packs (7 packs)
   symfony/          → PHP/Symfony pack (validators, agents, knowledge, templates)
   react/            → React/TypeScript pack (validators, agents, knowledge, templates)
   python/           → Python pack (validators, knowledge, anti-patterns)
   go/               → Go pack (validators, Go structure scanner, canonical example)
+  rust/             → Rust pack (validators, Rust structure scanner, clippy at Level 2)
   bash/             → Bash/Shell pack (validators, knowledge, anti-patterns)
   ai-ml/            → AI/ML pack (agents, knowledge, commands)
 ci/                 → CI pipeline integration; ci/adapters/ = CI providers
