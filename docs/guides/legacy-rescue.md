@@ -188,6 +188,13 @@ For a serious rescue, chain the whole pipeline:
 
 For a large, multi-week effort, hand the campaign to the `legacy-surgeon` agent or the `legacy-takeover` team template, which sequences an architect, the surgeon, a security review, and documentation.
 
+## See it run
+
+[examples/legacy/03-from-arrival-to-safety.md](../../examples/legacy/03-from-arrival-to-safety.md)
+takes one untested class through phases 3 and 4 on a fixture, with the real
+output of every step. `bash examples/legacy/demo.sh` replays it; the only
+requirements are python3, bash and git.
+
 ## Practice
 
 Refactoring is a motor skill; you build it by repetition under constraints. Drill the reflexes on a small, self-contained kata before you need them on production code. The `refactoring-katas` knowledge file curates a progression from tangled-but-simple to production-like chaos. See [refactoring-katas](../../knowledge/refactoring/refactoring-katas.md).
