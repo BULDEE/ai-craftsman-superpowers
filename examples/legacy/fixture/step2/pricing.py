@@ -2,7 +2,7 @@
 
 The only change from step 1 is the constructor: the clock is now something the
 caller hands in, defaulting to the real one so every existing call site keeps
-working. Forty lines of pricing logic are untouched, deliberately. A step that
+working. The twenty-one lines of pricing logic are untouched, deliberately. A step
 introduces a seam AND rearranges the code is a step whose failure you cannot
 attribute.
 
@@ -11,7 +11,7 @@ The original docstring follows, because it still describes the class.
 The class that arrived with the codebase.
 
 Nothing about it is exotic, which is the point: it prices a basket, it is
-forty lines long, it has no tests, and three things make it hard to test.
+forty-eight lines long, it has no tests, and three things make it hard to test.
 
   1. It reads the clock itself (`datetime.now`), so a weekend discount cannot
      be exercised without waiting for Saturday.
@@ -58,7 +58,7 @@ class PricingService:
 
         total = subtotal + (subtotal * VAT_RATE)
 
-        print("priced basket: %s x %s for tier %s = %s"
+        print("priced basket: %s x %s tier %s = %s"
               % (unit_price, quantity, customer_tier, total), file=sys.stdout)
 
         return round(total, 2)

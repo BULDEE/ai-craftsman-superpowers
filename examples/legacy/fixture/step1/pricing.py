@@ -1,7 +1,7 @@
 """The class that arrived with the codebase.
 
 Nothing about it is exotic, which is the point: it prices a basket, it is
-forty lines long, it has no tests, and three things make it hard to test.
+forty-eight lines long, it has no tests, and three things make it hard to test.
 
   1. It reads the clock itself (`datetime.now`), so a weekend discount cannot
      be exercised without waiting for Saturday.
@@ -41,7 +41,7 @@ class PricingService:
 
         total = subtotal + (subtotal * VAT_RATE)
 
-        print("priced basket: %s x %s for tier %s = %s"
+        print("priced basket: %s x %s tier %s = %s"
               % (unit_price, quantity, customer_tier, total), file=sys.stdout)
 
         return round(total, 2)

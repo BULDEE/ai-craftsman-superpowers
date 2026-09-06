@@ -31,7 +31,6 @@ trap 'rm -rf "$WORK"' EXIT
 export PYTHONDONTWRITEBYTECODE=1
 
 RATCHET="$ROOT_DIR/hooks/lib/ratchet.py"
-BASELINE="$WORK/.craftsman-baseline.json"
 
 step() { printf '\n=== %s ===\n\n' "$1"; }
 run() { printf '$ %s\n' "$*"; "$@" 2>&1; }
@@ -70,9 +69,9 @@ cp "$FIXTURE/step1/pricing.py" pricing.py
 step "Step 2: one seam, and nothing else"
 
 printf 'The clock arrives through the constructor, defaulting to the real one so\n'
-printf 'every existing caller keeps working. Forty lines of pricing logic are\n'
-printf 'untouched, deliberately: a step that adds a seam AND rearranges the code\n'
-printf 'is a step whose failure you cannot attribute.\n\n'
+printf 'every existing caller keeps working. The twenty-one lines of pricing\n'
+printf 'logic are untouched, deliberately: a step that adds a seam AND rearranges\n'
+printf 'the code is a step whose failure you cannot attribute.\n\n'
 run diff -u "$FIXTURE/step1/pricing.py" "$FIXTURE/step2/pricing.py"
 
 cp "$FIXTURE/step2/pricing.py" pricing.py
@@ -99,9 +98,13 @@ step "Step 4: the mark the ratchet records"
 
 printf 'The same measurement as at the top, on the refactored class.\n\n'
 run python3 "$RATCHET" measure pricing.py
-printf '\ncomplexity 5 to 1, and the worst function 21 lines to 10. The rescue is\n'
+printf '\ncomplexity 4 to 1, and the worst function 21 lines to 15. The rescue is\n'
 printf 'not a matter of opinion: it is two numbers that moved.\n\n'
-run python3 "$RATCHET" init pricing.py --baseline "$BASELINE" \
+# No --baseline flag: the demo already works inside its own throwaway
+# directory, so ratchet.py's default lands there. That matters more than it
+# looks: the walkthrough quotes these commands, and a quoted command carrying a
+# flag the reader does not have produces silence instead of the payoff.
+run python3 "$RATCHET" init pricing.py \
     --reason "legacy rescue: clock seam and discount table, under a characterization net"
 
 # -----------------------------------------------------------------------------
@@ -113,7 +116,7 @@ cp "$FIXTURE/step2/pricing.py" pricing.py
 run python3 -m unittest test_pricing
 printf '\nGreen. The tests cannot see the difference, because there is no\n'
 printf 'behavioural difference to see. The ratchet can:\n\n'
-run python3 "$RATCHET" check pricing.py --baseline "$BASELINE"
+run python3 "$RATCHET" check pricing.py
 printf '\nExit code above is 1: the file loosened a budget it had already earned.\n'
 printf 'That is the mark doing its job. Raising it on purpose stays possible,\n'
 printf 'with `ratchet.py init --reason`, where a reviewer sees it in the diff.\n'

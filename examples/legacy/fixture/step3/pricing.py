@@ -5,7 +5,8 @@ point of the exercise: if the tests had to be edited to make the refactor pass,
 the refactor changed behaviour and the net was the thing that noticed.
 
 The change is a single move: the four discount rules were an if/elif chain
-inside a forty-line method, and they are now a table the method walks. Nothing
+inside a twenty-one-line method, and they are now a table the method walks.
+Nothing
 about what the code computes changes, including the two defects the
 characterization tests recorded. Fixing those is the next decision, taken on
 purpose, with a net that already proves what changes when they are fixed.
@@ -33,35 +34,36 @@ TIER_DISCOUNT = {
 class PricingService:
     """Prices a basket. Inherited, now under test."""
 
-    def __init__(self, clock=None):
+    def __init__(self, clock=None) -> None:
         self._clock = clock or datetime.now
 
-    def total(self, unit_price, quantity, customer_tier):
+    def total(self, unit_price: float, quantity: int, customer_tier: str) -> float:
         subtotal = unit_price * quantity
         subtotal = self._apply_bulk(subtotal, quantity)
         subtotal = self._apply_weekend(subtotal)
         subtotal = self._apply_tier(subtotal, customer_tier)
 
         total = subtotal + (subtotal * VAT_RATE)
-        self._log(unit_price, quantity, customer_tier, total)
+        # The message is built where its three ingredients already are, rather
+        # than in a method taking five parameters. WARN-PY001 caught that on
+        # the first version of this file, which is the gate reviewing the
+        # example that teaches the gate.
+        print("priced basket: %s x %s tier %s = %s"
+              % (unit_price, quantity, customer_tier, total), file=sys.stdout)
         return round(total, 2)
 
-    def _apply_bulk(self, subtotal, quantity):
+    def _apply_bulk(self, subtotal: float, quantity: int) -> float:
         if quantity < BULK_THRESHOLD:
             return subtotal
         return subtotal - (subtotal * BULK_DISCOUNT)
 
-    def _apply_weekend(self, subtotal):
+    def _apply_weekend(self, subtotal: float) -> float:
         if self._clock().weekday() < 5:
             return subtotal
         return subtotal - (subtotal * WEEKEND_DISCOUNT)
 
-    def _apply_tier(self, subtotal, customer_tier):
+    def _apply_tier(self, subtotal: float, customer_tier: str) -> float:
         # The compounding the net recorded is preserved exactly: this discount
         # applies to a subtotal the earlier ones already reduced.
         rate = TIER_DISCOUNT.get(customer_tier, 0.0)
         return subtotal - (subtotal * rate)
-
-    def _log(self, unit_price, quantity, customer_tier, total):
-        print("priced basket: %s x %s for tier %s = %s"
-              % (unit_price, quantity, customer_tier, total), file=sys.stdout)

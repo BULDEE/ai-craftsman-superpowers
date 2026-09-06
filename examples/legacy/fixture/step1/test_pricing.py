@@ -66,7 +66,7 @@ class CharacterizationTest(unittest.TestCase):
     def test_it_writes_a_line_to_stdout(self):
         _, printed = self.price(10.0, 3, "standard")
         self.assertEqual(
-            "priced basket: 10.0 x 3 for tier standard = 36.0\n", printed)
+            "priced basket: 10.0 x 3 tier standard = 36.0\n", printed)
 
 
 if __name__ == "__main__":
