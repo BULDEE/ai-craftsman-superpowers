@@ -46,7 +46,11 @@ for v in json.load(sys.stdin).get('violations', []):
         'check_name': v.get('rule', 'unknown'),
         'description': v.get('message', ''),
         'categories': ['Style'],
-        'severity': 'critical' if v.get('severity') == 'critical' else 'minor',
+        # 'minor' only for a declared warning. An unrecognised severity is
+        # reported at the blocking rank, the same way github.sh and
+        # checkstyle_report.py do: a shared fallback is what keeps one report
+        # from producing two verdicts.
+        'severity': 'minor' if v.get('severity') == 'warning' else 'critical',
         'fingerprint': hashlib.md5(
             (str(v.get('rule', '')) + path + str(line)).encode()).hexdigest(),
         'location': {'path': path, 'lines': {'begin': line if line >= 1 else 1}},

@@ -91,7 +91,7 @@ Real-time detection of acceleration bias, scope creep, and over-optimization in 
 Graceful degradation: works with zero tools installed (Level 1 only).
 
 ### 5. Multi-Provider CI Pipeline
-CI sources the same pack validators and the same rules engine as the hooks, and resolves severity per file so directory-level `.craft-rules.yml` applies in both. tests/ci/test-craftsman-ci.sh fails when the two disagree. 4 provider templates: GitHub Actions, GitLab CI, Bitbucket Pipelines, Jenkins; the first three get native annotations, Jenkins runs through the generic adapter. Adapter pattern: detect → run → annotate → comment → exit.
+CI sources the same pack validators and the same rules engine as the hooks, and resolves severity per file so directory-level `.craft-rules.yml` applies in both. tests/ci/test-craftsman-ci.sh fails when the two disagree. 4 provider templates, all with native annotations: GitHub Actions (inline annotations and a PR comment), GitLab CI (code-quality report and an MR note), Bitbucket Pipelines (build report), Jenkins (a Checkstyle report that Warnings Next Generation attaches to the file and line). The generic adapter remains the fallback for anything else. Adapter pattern: detect → run → annotate → comment → exit.
 
 ### 6. Metrics & Trend Analysis
 SQLite-backed tracking of violations, corrections, and sessions. 7-day and 30-day trend views. Data-driven quality improvement: identify most-violated rules and adjust strictness. Currently per-machine - team metrics sync planned for v3.

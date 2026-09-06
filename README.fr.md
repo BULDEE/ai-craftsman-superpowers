@@ -91,8 +91,8 @@ avez déjà écrit, et les linters que vous faites déjà tourner.
 
 **Il bloque.** Un seul moteur de règles, appliqué à l'identique en hooks et en CI.
 Aucune dérive entre ce que votre éditeur autorise et ce que votre pipeline
-refuse. GitHub, GitLab et Bitbucket reçoivent des annotations natives ; Jenkins
-passe par l'adaptateur générique.
+refuse. GitHub, GitLab, Bitbucket et Jenkins reçoivent tous des annotations
+natives.
 
 **Il apprend.** Chaque violation corrigée est enregistrée localement. Une
 correction qui revient 3 fois sur 3 fichiers devient un instinct candidat que
@@ -247,7 +247,7 @@ une autre dans le pipeline. Exportez un pipeline avec `/craftsman:ci export`.
 | GitHub Actions | `craftsman-quality-gate.yml` | Natif : annotations inline et commentaire de PR |
 | GitLab CI | `.gitlab-ci.craftsman.yml` | Natif : rapport code-quality et note de MR |
 | Bitbucket Pipelines | `bitbucket-pipelines.craftsman.yml` | Natif : rapport de build |
-| Jenkins | `Jenkinsfile.craftsman` | Générique : log brut et fichier markdown |
+| Jenkins | `Jenkinsfile.craftsman` | Natif : rapport Checkstyle lu par Warnings Next Generation |
 
 ## Coût et confidentialité
 

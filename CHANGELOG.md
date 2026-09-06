@@ -81,6 +81,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `&'a str` is a lifetime and not an unterminated character literal, that
   `where` clauses and tuple return types are not parameter lists, and that
   `self` is not a parameter the caller passes.
+- **A Level 1 finding reaches the report on the line it fired on.** A pack
+  validator that knows its line writes it at the front of the message
+  (`line 4: Bare 'except:'`), but `add_violation` and `add_warning` in
+  `ci/craftsman-ci.sh` both passed a hardcoded `0`, so every finding arrived on
+  line 0 and every provider placed it at the top of the file. The information
+  was in the report all along, in the one field no annotation reads. Fixed in
+  the shared shims, so GitHub's inline annotations, GitLab's code quality
+  report, the Jenkins Checkstyle report and the plain console output all gain
+  it at once.
+- **Native annotations for Jenkins (`ci/adapters/jenkins.sh`).** Jenkins was
+  the only provider on the generic adapter, so a violation was plain console
+  output and a markdown file. It now emits `craftsman-checkstyle.xml`, which
+  the Warnings Next Generation plugin attaches to the file and line, in the
+  build's Issues view and in the diff of a change request, with the rule id as
+  the category: a `LAYER001` in Jenkins is the `LAYER001` the hook prints
+  locally. `Jenkinsfile.craftsman` records the issues before the verdict is
+  applied, because `error` aborts the stage and would otherwise lose them on
+  exactly the builds that have findings. The console output and
+  `craftsman-comment.md` are still written, so a build without the plugin
+  loses nothing.
+
+### Fixed
+
+- **The three CI renderers disagreed on what to do with a severity they did
+  not recognise.** GitHub and GitLab demoted it, Jenkins promoted it, so one
+  report produced two verdicts, which is the drift the parity rule exists to
+  prevent. All three now report it at the blocking rank, and
+  `tests/ci/test-adapters.sh` asserts the rank rather than each provider's
+  vocabulary.
+- **`ci/adapters/checkstyle_report.py` could emit a document no parser
+  accepts.** `quoteattr` escapes `&`, `<`, `>` and quotes; XML 1.0 forbids C0
+  control characters outright and no escape represents them. They reach the
+  message because static analysis stdout is copied into it verbatim and those
+  tools colour their output. The renderer strips them and reads its own output
+  back before claiming success, because an exit code is all `adapter_annotate`
+  has to go on before it publishes the file.
+- **`adapter_detect` for Jenkins relied on `JENKINS_URL` alone**, which Jenkins
+  documents as available "only if Jenkins URL set in system configuration".
+  `BUILD_TAG` is accepted too.
+- **`tests/ci/test-adapters.sh` and `tests/ci/test-adapter-delivery.sh` were
+  not hermetic against `JENKINS_URL`.** With a fourth provider in the
+  detection list, the "no CI environment" assertions failed on a Jenkins
+  agent: the commit adding Jenkins support broke the suite on Jenkins.
 
 - **`/craftsman:challenge` now reviews side effects by their frequency, not only
   their content.** A new Level 2 smell (unthrottled side effect) plus the three

@@ -6,6 +6,7 @@
 #   adapter_auto_detect()     - detect CI provider from env vars
 #   adapter_load()            - source the appropriate provider adapter
 #   adapter_format_comment()  - generate markdown from JSON report
+#   adapter_print_findings()  - one line per finding, on stdout
 #
 # All provider adapters implement the same contract:
 #   adapter_detect()    - return 0 if running in this CI
@@ -30,7 +31,11 @@ CI_DIR="$(dirname "$ADAPTER_DIR")"
 #
 # Each provider is sourced in a subshell: the four define the same five function
 # names, and sourcing them into this shell would leave the last one loaded.
-ADAPTER_PROVIDER_PRIORITY=(github gitlab bitbucket)
+# jenkins is asked last: a Jenkins build of a repository hosted on GitHub or
+# GitLab exports neither of their CI variables, but the reverse would be a
+# surprise worth catching, and the forge adapters can post a comment where
+# jenkins can only write a file.
+ADAPTER_PROVIDER_PRIORITY=(github gitlab bitbucket jenkins)
 
 adapter_auto_detect() {
     local provider
@@ -129,6 +134,31 @@ for v in json.load(sys.stdin).get('violations', []):
         v.get('message', ''), v.get('severity', '')))
 " < "$1" 2>/dev/null
     echo ""
+}
+
+# adapter_print_findings <report> - one line per finding, on stdout.
+#
+# The console form every provider falls back to. It lived in generic.sh, where
+# it was the only console output an unsupported CI got; jenkins.sh needs the
+# same thing next to its Checkstyle report, for a build whose Warnings NG step
+# is absent. One implementation, so the two cannot drift into printing the same
+# findings in two shapes.
+adapter_print_findings() {
+    local report_file="$1"
+
+    [[ ! -f "$report_file" ]] && return 0
+
+    python3 -c "
+import json, sys
+report = json.load(sys.stdin)
+for v in report.get('violations', []):
+    sev = v.get('severity', 'warning').upper()
+    f = v.get('file', '')
+    line = v.get('line', 0)
+    rule = v.get('rule', '')
+    msg = v.get('message', '')
+    print(f'{sev}: {f}:{line} [{rule}] {msg}')
+" < "$report_file" 2>/dev/null
 }
 
 adapter_format_comment() {

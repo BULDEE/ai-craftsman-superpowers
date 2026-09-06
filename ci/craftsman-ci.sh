@@ -157,7 +157,7 @@ craftsman-ci v${VERSION} - Craftsman Quality Gate
 
 Usage:
   craftsman-ci [--format json|text] [--config FILE] [paths...]
-  craftsman-ci ci [--provider github|gitlab|bitbucket|generic] [--config FILE] [paths...]
+  craftsman-ci ci [--provider github|gitlab|bitbucket|jenkins|generic] [--config FILE] [paths...]
   craftsman-ci init [--provider github|gitlab|bitbucket|jenkins]
   craftsman-ci export [--target agents-md|cursor|copilot|all]
 
@@ -465,17 +465,42 @@ _CI_CURRENT_FILE=""
 FILE_PATH=""
 FILE_PATTERN=""
 
+# A pack validator that knows where its rule fired puts the line at the front
+# of the message: `line 12: Bare 'except:' - catch specific exceptions`. That
+# is where it stayed, because both shims below passed a hardcoded "0", so every
+# Level 1 finding reached the adapters on line 0 and every provider placed it
+# at the top of the file. The information was in the report all along, in the
+# one field no annotation reads.
+#
+# Prints "<line>|<message>", the prefix removed from the message when it was
+# found. A validator that does not know its line still says 0, which the
+# adapters read as "the whole file".
+_ci_line_from_message() {
+    local message="$1"
+    if [[ "$message" =~ ^line[[:space:]]+([0-9]+):[[:space:]]*(.*)$ ]]; then
+        printf '%s|%s' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+        return 0
+    fi
+    printf '0|%s' "$message"
+}
+
 add_violation() {
     local rule="$1"
     local message="$2"
     local file="${3:-$_CI_CURRENT_FILE}"
-    _add_violation "$file" "0" "$rule" "$message"
+    local parsed line
+    parsed=$(_ci_line_from_message "$message")
+    line="${parsed%%|*}"
+    _add_violation "$file" "$line" "$rule" "${parsed#*|}"
 }
 
 add_warning() {
     local rule="$1"
     local message="$2"
-    _add_violation "$_CI_CURRENT_FILE" "0" "$rule" "$message"
+    local parsed line
+    parsed=$(_ci_line_from_message "$message")
+    line="${parsed%%|*}"
+    _add_violation "$_CI_CURRENT_FILE" "$line" "$rule" "${parsed#*|}"
 }
 
 line_has_ignore() {

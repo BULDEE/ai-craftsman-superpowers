@@ -143,7 +143,7 @@ else
     log_fail "direct mode empty-scan guard" "expected 2, got $direct_code"
 fi
 
-for provider in generic github gitlab bitbucket; do
+for provider in generic github gitlab bitbucket jenkins; do
     ci_code=0
     (cd "$NOSRC" && bash "$CI" ci --provider "$provider" docs >/dev/null 2>&1) || ci_code=$?
     if [[ "$ci_code" -ne 0 ]]; then
@@ -198,7 +198,7 @@ fi
 echo ""
 echo "=== A real violation blocks the pipeline through every adapter ==="
 
-for provider in generic github gitlab bitbucket; do
+for provider in generic github gitlab bitbucket jenkins; do
     ci_code=0
     (cd "$FIXTURE" && bash "$CI" ci --provider "$provider" src >/dev/null 2>&1) || ci_code=$?
     if [[ "$ci_code" -eq 2 ]]; then
@@ -393,7 +393,7 @@ for pair in "GITHUB_ACTIONS:github" "GITLAB_CI:gitlab" "BITBUCKET_BUILD_NUMBER:b
     var="${pair%%:*}"
     want="${pair##*:}"
     got=$(
-        unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER 2>/dev/null || true
+        unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER JENKINS_URL 2>/dev/null || true
         export "$var=1"
         source "$ADAPTER_BASE"
         adapter_auto_detect

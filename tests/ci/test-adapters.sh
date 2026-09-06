@@ -33,7 +33,7 @@ echo "=== Auto-Detection Tests ==="
 
 # No env vars -> generic
 (
-    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER 2>/dev/null || true
+    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER JENKINS_URL 2>/dev/null || true
     source "$ADAPTER_BASE"
     result=$(adapter_auto_detect)
     if [[ "$result" == "generic" ]]; then
@@ -43,7 +43,7 @@ echo "=== Auto-Detection Tests ==="
     fi
 )
 result_line=$(
-    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER 2>/dev/null || true
+    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER JENKINS_URL 2>/dev/null || true
     source "$ADAPTER_BASE"
     adapter_auto_detect
 )
@@ -114,7 +114,7 @@ echo "=== Adapter Loading Tests ==="
 
 # Load github adapter
 loaded=$(
-    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER 2>/dev/null || true
+    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER JENKINS_URL 2>/dev/null || true
     source "$ADAPTER_BASE"
     adapter_load "github"
 )
@@ -126,7 +126,7 @@ fi
 
 # Load gitlab adapter
 loaded=$(
-    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER 2>/dev/null || true
+    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER JENKINS_URL 2>/dev/null || true
     source "$ADAPTER_BASE"
     adapter_load "gitlab"
 )
@@ -138,7 +138,7 @@ fi
 
 # Load bitbucket adapter
 loaded=$(
-    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER 2>/dev/null || true
+    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER JENKINS_URL 2>/dev/null || true
     source "$ADAPTER_BASE"
     adapter_load "bitbucket"
 )
@@ -150,7 +150,7 @@ fi
 
 # Load generic adapter
 loaded=$(
-    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER 2>/dev/null || true
+    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER JENKINS_URL 2>/dev/null || true
     source "$ADAPTER_BASE"
     adapter_load "generic"
 )
@@ -162,7 +162,7 @@ fi
 
 # Auto-detect load (no arg, no env)
 loaded=$(
-    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER 2>/dev/null || true
+    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER JENKINS_URL 2>/dev/null || true
     source "$ADAPTER_BASE"
     adapter_load
 )
@@ -174,7 +174,7 @@ fi
 
 # Invalid provider falls back to generic
 loaded=$(
-    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER 2>/dev/null || true
+    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER JENKINS_URL 2>/dev/null || true
     source "$ADAPTER_BASE"
     adapter_load "nonexistent"
 )
@@ -188,11 +188,68 @@ fi
 # 3. Required functions exist after loading
 # =============================================================================
 echo ""
+echo "=== Severity parity across the three renderers ==="
+
+# The engine emits `critical` and `warning` today, so the three renderers agree
+# by luck on those two. They used to disagree on everything else: GitHub and
+# GitLab demoted an unrecognised severity, Jenkins promoted it, and one report
+# then produced two verdicts. `craftsman-ci.sh` can emit a third value, so the
+# case is reachable rather than hypothetical.
+SEV_WORK="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-sev.XXXXXX")"
+trap 'rm -rf "$SEV_WORK"' EXIT
+
+_sev_rank_github() {
+    ( cd "$SEV_WORK" && CI_DIR="$ROOT_DIR/ci" bash -c \
+        "source '$ADAPTER_BASE'; source '$ROOT_DIR/ci/adapters/github.sh'; adapter_annotate '$1'" 2>/dev/null ) \
+        | sed -E 's/^::([a-z]+) .*/\1/' | head -1
+}
+
+_sev_rank_gitlab() {
+    ( cd "$SEV_WORK" && CI_DIR="$ROOT_DIR/ci" bash -c \
+        "source '$ADAPTER_BASE'; source '$ROOT_DIR/ci/adapters/gitlab.sh'; adapter_annotate '$1' '$SEV_WORK/gl.json'" >/dev/null 2>&1 )
+    python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[0]['severity'])" "$SEV_WORK/gl.json" 2>/dev/null
+}
+
+_sev_rank_jenkins() {
+    python3 "$ROOT_DIR/ci/adapters/checkstyle_report.py" < "$1" 2>/dev/null \
+        | sed -nE 's/.*severity="([a-z]+)".*/\1/p' | head -1
+}
+
+# Each renderer speaks its provider's vocabulary, so the assertion is on the
+# RANK: does this finding block, or is it advice.
+_sev_blocking() {
+    case "$1" in
+        error|critical) echo "blocking" ;;
+        warning|minor|info) echo "advisory" ;;
+        *) echo "unknown($1)" ;;
+    esac
+}
+
+for severity_case in "critical:blocking" "warning:advisory" "unheard-of:blocking"; do
+    declared="${severity_case%%:*}"
+    expected="${severity_case##*:}"
+    printf '{"violations":[{"file":"a.php","line":1,"rule":"X1","message":"m","severity":"%s"}]}' \
+        "$declared" > "$SEV_WORK/report.json"
+
+    ranks=""
+    for provider in github gitlab jenkins; do
+        raw="$(_sev_rank_${provider} "$SEV_WORK/report.json")"
+        ranks="${ranks}${provider}=$(_sev_blocking "$raw") "
+    done
+
+    if [[ "$ranks" == "github=${expected} gitlab=${expected} jenkins=${expected} " ]]; then
+        log_pass "severity '${declared}' is ${expected} in all three renderers"
+    else
+        log_fail "severity '${declared}' is ${expected} in all three renderers" "$ranks"
+    fi
+done
+
+echo ""
 echo "=== Contract Verification Tests ==="
 
-for provider in github gitlab bitbucket generic; do
+for provider in github gitlab bitbucket jenkins generic; do
     (
-        unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER 2>/dev/null || true
+        unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER JENKINS_URL 2>/dev/null || true
         source "$ADAPTER_BASE"
         adapter_load "$provider" >/dev/null
 
@@ -210,7 +267,7 @@ for provider in github gitlab bitbucket generic; do
         fi
     )
     result=$( (
-        unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER 2>/dev/null || true
+        unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER JENKINS_URL 2>/dev/null || true
         source "$ADAPTER_BASE"
         adapter_load "$provider" >/dev/null
 
@@ -421,7 +478,7 @@ echo ""
 echo "=== GitHub Adapter Annotation Tests ==="
 
 (
-    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER 2>/dev/null || true
+    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER JENKINS_URL 2>/dev/null || true
     source "$ADAPTER_BASE"
     adapter_load "github" >/dev/null
     output=$(adapter_annotate "$TEMP_DIR/violations-report.json")
@@ -449,7 +506,7 @@ echo ""
 echo "=== GitLab Adapter Codequality Tests ==="
 
 (
-    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER 2>/dev/null || true
+    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER JENKINS_URL 2>/dev/null || true
     source "$ADAPTER_BASE"
     adapter_load "gitlab" >/dev/null
     adapter_annotate "$TEMP_DIR/violations-report.json" "$TEMP_DIR/gl-codequality.json" >/dev/null
@@ -484,7 +541,7 @@ echo ""
 echo "=== Generic Adapter Tests ==="
 
 (
-    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER 2>/dev/null || true
+    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER JENKINS_URL 2>/dev/null || true
     source "$ADAPTER_BASE"
     adapter_load "generic" >/dev/null
     adapter_comment "$TEMP_DIR/violations-report.json" "$TEMP_DIR/generic-comment.md" >/dev/null
@@ -504,7 +561,7 @@ fi
 
 # Generic adapter annotate outputs plain text
 (
-    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER 2>/dev/null || true
+    unset GITHUB_ACTIONS GITLAB_CI BITBUCKET_BUILD_NUMBER JENKINS_URL 2>/dev/null || true
     source "$ADAPTER_BASE"
     adapter_load "generic" >/dev/null
     adapter_annotate "$TEMP_DIR/violations-report.json" > "$TEMP_DIR/generic-annotations.txt"
