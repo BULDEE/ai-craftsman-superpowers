@@ -8,6 +8,16 @@
 # another verification.
 # =============================================================================
 
+# The one pinned id in the plugin, and pinned on purpose: this is a machine
+# reading a machine's output, where a model change is a behaviour change nobody
+# asked for. The tiering guide's aliases are for work a human reads.
+#
+# It also carries the nearest retirement date of the current lineup, "not
+# sooner than October 15, 2026"
+# (https://platform.claude.com/docs/en/about-claude/models/overview), so this
+# line is the one to revisit first. `claude-haiku-4-5` is the documented alias
+# and would not move the date: a dateless id from the 4.6 generation on is its
+# own pinned snapshot.
 HAIKU_VERIFY_MODEL="${CRAFTSMAN_VERIFY_MODEL:-claude-haiku-4-5-20251001}"
 
 # haiku_verify <prompt>

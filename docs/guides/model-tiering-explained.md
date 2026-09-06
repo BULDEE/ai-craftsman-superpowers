@@ -297,13 +297,23 @@ statement rather than a change. `xhigh` is genuinely above the default;
 ### Why aliases and not model ids
 
 Every tier is an alias (`haiku`, `sonnet`, `opus`), never a pinned id like
-`claude-opus-5`. Aliases resolve to the newest model in their family, so the
-plugin follows model releases without a version bump. It also makes the tiering
-remappable - see Overriding below.
+`claude-haiku-4-5-20251001`. What that buys is remappability, not automatic
+upgrades: a project overrides a tier in one place, see Overriding below.
 
-Aliases resolve per provider: on the Anthropic API `opus` is Opus 5 and
-`sonnet` is Sonnet 5, but on Microsoft Foundry `opus` is Opus 4.6. The tier is
-a statement about *capability class*, not about a specific model.
+It does **not** mean the plugin follows model releases on its own, and this
+guide used to say it did. The models overview is explicit: *"Every Claude model
+ID is a pinned snapshot, including the dateless IDs used from the 4.6
+generation on"*, and *"For models before the 4.6 generation, the alias is a
+convenience pointer that resolves to the dated ID. Dateless IDs are their own
+pinned snapshot; the alias row repeats them"*
+([models overview](https://platform.claude.com/docs/en/about-claude/models/overview)).
+So `claude-opus-5` will not become the successor to Opus 5 by itself. Moving a
+tier to a newer model is an edit, and it belongs in a release.
+
+What an alias does still buy: the tier is a statement about *capability class*
+rather than a specific model, and it resolves per provider. On the Claude API
+`opus` is Opus 5 and `sonnet` is Sonnet 5; a Microsoft Foundry deployment
+resolves by deployment name, which defaults to the Claude API alias.
 
 ### Where Fable 5 fits
 
