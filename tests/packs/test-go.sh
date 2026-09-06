@@ -621,6 +621,23 @@ else
     log_pass "LAYER001: a comment naming infrastructure is not an import"
 fi
 
+# --- The Level 2 claim compiles ------------------------------------------------
+#
+# `lang_registry.py` refuses a supersedes entry whose tool shares its name with
+# the pack's own adapter, and it refuses it at compile time with a message on
+# stderr rather than by failing. An entry that is silently dropped leaves the
+# Level 1 rule emitting alongside the Level 2 verdict, which is the duplication
+# the mechanism exists to remove: the first version of this pack named the
+# adapter errcheck.sh and claimed `bin/errcheck`, and the claim never survived.
+registry_out="$(cd "$ROOT_DIR" && python3 hooks/lib/lang_registry.py packs/go/pack.yml 2>&1)"
+if echo "$registry_out" | grep -q "cannot supersede"; then
+    log_fail "the errcheck claim compiles" "$(echo "$registry_out" | grep 'cannot supersede' | head -1)"
+elif echo "$registry_out" | grep -q "supersedes.*errcheck=GO004,GO006"; then
+    log_pass "the errcheck claim compiles"
+else
+    log_fail "the errcheck claim compiles" "no supersedes row: $(echo "$registry_out" | tr '\n' ' ')"
+fi
+
 # --- The gate that decides whether the validator runs at all ------------------
 #
 # Every assertion above sources the validator directly, so `_pack_stack_compatible`

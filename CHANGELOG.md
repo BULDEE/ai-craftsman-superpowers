@@ -18,9 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ignored outright. The pack loads on every stack (`stack: ["*"]`): dispatch is
   by extension, and filtering a language pack by the project's declared stack
   silently disabled it on every polyglot repository.
-- **Level 2 for Go.** `packs/go/static-analysis/errcheck.sh` runs errcheck when
-  it is installed, and `supersedes: bin/errcheck=GO004,GO006` hands it those
-  two codes. Resolving whether a call returns an error needs types, so Level 1
+- **Level 2 for Go.** `packs/go/static-analysis/go-analysis.sh` runs errcheck
+  when it is installed, reports `ERRCHECK001`, and `supersedes:
+  errcheck=GO004,GO006` hands it those two codes. Resolving whether a call returns an error needs types, so Level 1
   is a bounded list of standard-library calls; when errcheck is absent, times
   out or skips a package, `precedence_flush` re-emits the Level 1 finding.
 - **A Go structure scanner (`packs/go/hooks/go_structure.py`).** The pack

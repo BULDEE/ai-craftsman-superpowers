@@ -22,14 +22,14 @@ languages:
     # that exist solely to configure a gate belong here.
     protected_configs: [".golangci.yml", ".golangci.yaml"]
     validators: ["hooks/go-validator.sh", "hooks/layer-validator.sh"]
-    static_analysis: ["static-analysis/errcheck.sh"]
+    static_analysis: ["static-analysis/go-analysis.sh"]
     # errcheck resolves types, so where it produces a verdict on an ignored
     # error it outranks the standard-library call list in go_structure.py. A
     # claim is a deferral, never a deletion: with errcheck absent, timed out or
     # configured to skip a package, precedence_flush re-emits the Level 1
     # finding with full severity resolution.
     supersedes:
-      - bin/errcheck=GO004,GO006
+      - errcheck=GO004,GO006
     test_commands: ["go test ./...", "gotestsum"]
     lsp: "gopls"
     # No metrics_dialect. Measured, not assumed: the shared extractor keys on
@@ -70,6 +70,11 @@ rules:
       text: "no error return ignored outright - assign it and handle it"
       default_severity: warn
       decision: "bounded at Level 1 - resolving whether a call returns an error needs types, so this is a list of standard-library calls that do. errcheck owns the rule when installed (see supersedes), and the list is what remains when it is not"
+    - id: ERRCHECK001
+      group: Go
+      text: "errcheck reports an unchecked error"
+      default_severity: warn
+      decision: "advisory, like the GO006 it supersedes - installing a tool must not make the gate stricter than the regex it replaces"
     - id: WARN-GO001
       group: Advisory
       text: "naked return in a function with named results - return the values"
@@ -85,13 +90,13 @@ rules:
   # structural ratchet then guards a signal that is not there.
   builtin: ["GO001", "GO002", "GO003", "GO004", "GO005", "GO006", "WARN-GO001",
             "LAYER001", "NEST001", "LOC001", "PARAM001"]
-  static_analysis: ["GO006"]
+  static_analysis: ["ERRCHECK001"]
 
 hooks:
   validators: ["hooks/go-validator.sh", "hooks/layer-validator.sh"]
 
 static_analysis:
-  tools: ["static-analysis/errcheck.sh"]
+  tools: ["static-analysis/go-analysis.sh"]
 
 commands:
   scaffold_types: []

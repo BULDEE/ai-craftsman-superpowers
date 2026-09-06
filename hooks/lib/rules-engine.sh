@@ -343,7 +343,8 @@ _rules_validate_custom() {
 # work (ADR-0025). Set `RATCHET001: block` in .craft-config.yml to opt in
 # early; the default escalates once a full cycle runs clean.
 #
-# DB001-003, PY003, SH001, SH003, SH005, PY006, PY007 and GO003 to GO006
+# DB001-003, PY003, SH001, SH003, SH005, PY006, PY007, GO003 to GO006 and
+# ERRCHECK001
 # were advisory de facto, by being emitted through add_warning instead of
 # add_violation. That made the choice invisible here and, worse, unreachable:
 # add_warning never consulted this engine, so a project could neither promote
@@ -359,7 +360,7 @@ _rules_is_advisory() {
         RATCHET001) return 0 ;;
         DB001|DB002|DB003|PY003|SH001|SH003|SH005) return 0 ;;
         PY006|PY007) return 0 ;;
-        GO003|GO004|GO005|GO006) return 0 ;;
+        GO003|GO004|GO005|GO006|ERRCHECK001) return 0 ;;
     esac
     return 1
 }
