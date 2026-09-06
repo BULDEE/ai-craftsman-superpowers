@@ -142,3 +142,11 @@ When bumping version, update ALL of these:
 Then tag with `claude plugin tag --push`, which produces the
 `craftsman--v<version>` tag that plugin dependency resolution reads. A plain
 `v<version>` tag is kept alongside it for release continuity.
+
+Pushing the `v<version>` tag runs `.github/workflows/release.yml`: it refuses a
+tag that disagrees with `plugin.json`, refuses a `craftsman--v<version>` tag
+pointing at another commit, builds `craftsman-<version>.tar.gz` reproducibly,
+attests it with Sigstore, uploads it with `SHA256SUMS.txt`, and verifies its own
+attestation before finishing. `craftsman--v*` does not match the `v[0-9]*`
+trigger, so one release produces one run. The verification a user runs is in
+SECURITY.md, and `tests/ci/test-release-provenance.sh` fails when the two drift.

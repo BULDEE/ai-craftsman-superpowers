@@ -1,0 +1,152 @@
+name: Release provenance
+
+# A tag is not a release artifact. Anyone can rebuild a tarball that looks like
+# ours; what nobody else can produce is a signed statement that this exact
+# archive came out of this repository, at this commit, through this workflow.
+# That statement is what `gh attestation verify` checks, and it is the only
+# claim in this file that a user cannot make for themselves.
+#
+# Trigger: the plain `v<x.y.z>` tag only. The marketplace tag `craftsman--v*`
+# does not match `v*` (glob anchors at the start of the ref name), so the two
+# tags pushed by `claude plugin tag --push` produce exactly one release run.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)build provenance for, e.g. v4.9.0'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  provenance:
+    name: Build, attest and publish the release tarball
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write      # create the release and upload its assets
+      id-token: write      # Sigstore OIDC identity for the signature
+      attestations: write  # write the provenance to the attestations store
+    steps:
+      - name: Resolve the tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          TAG="${INPUT_TAG:-$REF_NAME}"
+          case "$TAG" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::Refusing to release from '$TAG': expected v<x.y.z>." ; exit 1 ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          fetch-depth: 0
+
+      # The version lives in four tracked files and scripts/bump-version.sh
+      # keeps them in sync. A tag that disagrees with the manifest would ship a
+      # tarball whose provenance is true and whose contents are mislabelled.
+      - name: Refuse a tag that disagrees with the manifest
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          MANIFEST=$(python3 -c "import json;print(json.load(open('.claude-plugin/plugin.json'))['version'])")
+          if [[ "$MANIFEST" != "$VERSION" ]]; then
+            echo "::error::Tag says $VERSION, .claude-plugin/plugin.json says $MANIFEST."
+            exit 1
+          fi
+          echo "Manifest and tag agree on $VERSION."
+
+      # The marketplace resolves a plugin dependency through the craftsman--v*
+      # tag, so a release whose two tags point at different commits ships two
+      # different plugins under one version number. A tag that has not arrived
+      # yet is a race (both are pushed by the same command); a tag that points
+      # somewhere else is a defect.
+      - name: Check the marketplace tag against the release tag
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          MARKET="craftsman--v${VERSION}"
+          if ! git rev-parse -q --verify "refs/tags/${MARKET}" >/dev/null; then
+            echo "::warning::${MARKET} is not on this checkout yet; skipping the comparison."
+            echo "- Marketplace tag \`${MARKET}\`: not present at build time" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          A=$(git rev-list -n 1 "refs/tags/${TAG}")
+          B=$(git rev-list -n 1 "refs/tags/${MARKET}")
+          if [[ "$A" != "$B" ]]; then
+            echo "::error::${TAG} is $A but ${MARKET} is $B."
+            exit 1
+          fi
+          echo "- Marketplace tag \`${MARKET}\`: same commit ($A)" >> "$GITHUB_STEP_SUMMARY"
+
+      # gzip -n drops the mtime and the original file name from the header, so
+      # two builds of the same commit produce the same bytes and the published
+      # checksum stays meaningful beyond this run.
+      - name: Build the release tarball
+        id: build
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          NAME="craftsman-${VERSION}.tar.gz"
+          git archive --format=tar --prefix="craftsman-${VERSION}/" "refs/tags/${TAG}" \
+            | gzip -9 -n > "dist/${NAME}"
+          ( cd dist && sha256sum "${NAME}" > SHA256SUMS.txt )
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Release artifact"
+            echo
+            echo '```'
+            cat dist/SHA256SUMS.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/${{ steps.build.outputs.name }}
+
+      - name: Publish the artifact on the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "$TAG" --generate-notes
+          fi
+          gh release upload "$TAG" \
+            "dist/${{ steps.build.outputs.name }}" \
+            dist/SHA256SUMS.txt \
+            --clobber
+
+      # An attestation nobody can verify is a badge, not a control. Verifying
+      # the artifact we just signed, from the runner, is the cheapest proof that
+      # the documented command in SECURITY.md actually works.
+      - name: Verify the attestation we just published
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh attestation verify "dist/${{ steps.build.outputs.name }}" \
+            --repo "${{ github.repository }}"

@@ -208,6 +208,40 @@ grep -rn "claude -p" hooks/lib/haiku-verify.sh   # headless verification
 grep -rln "sentry" hooks/                        # Sentry context hook
 ```
 
+## Release Provenance
+
+Every `v<x.y.z>` release publishes `craftsman-<version>.tar.gz` plus
+`SHA256SUMS.txt`, and the tarball carries a Sigstore build attestation produced
+by `.github/workflows/release.yml`. The attestation binds the archive to this
+repository, to the commit the tag points at, and to that workflow, so a tarball
+rebuilt elsewhere fails verification even when its contents look identical.
+
+```bash
+VERSION=4.9.0
+gh release download "v${VERSION}" --repo BULDEE/ai-craftsman-superpowers \
+  --pattern "craftsman-${VERSION}.tar.gz" --pattern SHA256SUMS.txt
+
+# 1. Provenance: who built it, from which commit, through which workflow
+gh attestation verify "craftsman-${VERSION}.tar.gz" \
+  --repo BULDEE/ai-craftsman-superpowers
+
+# 2. Checksum: the published digest matches the file on disk
+sha256sum --check SHA256SUMS.txt
+```
+
+`gh attestation verify` needs `gh` 2.49 or newer. It resolves the attestation
+online by default; add `--bundle` with a downloaded bundle for an air-gapped
+check.
+
+Two limits worth stating plainly:
+
+- The source tarball GitHub generates for a tag
+  (`/archive/refs/tags/...`) is **not** the attested artifact. Verify the
+  release asset named above.
+- The marketplace install path is a git checkout of the `craftsman--v<version>`
+  tag, not a tarball download. Its integrity is the commit SHA the tag resolves
+  to, and the release job fails when the two tags of one version disagree.
+
 ## Supported Versions
 
 | Version | Supported |
