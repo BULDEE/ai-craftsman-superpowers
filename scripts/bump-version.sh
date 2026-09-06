@@ -88,6 +88,21 @@ substitute_in_place() {
     rm -f "${file}.bump.tmp"
 }
 
+# In check mode the two patterns are identical (CURRENT == NEW is enforced
+# before any file is read), so a file either carries the version or it drifted.
+# -F, not -q alone: the CLAUDE.md replacement carries `**`, which a basic regex
+# reads as two quantifiers and never matches, so the check reported drift on a
+# file that was correct.
+check_file() {
+    local file="$1" replacement="$2" label="$3"
+    if grep -qF "$replacement" "$file" 2>/dev/null; then
+        echo "  ✓  $label (at ${NEW_VERSION})"
+        return
+    fi
+    echo "  ✗  $label (does not carry ${NEW_VERSION} - version drift)"
+    DRIFTED=$((DRIFTED + 1))
+}
+
 bump_file() {
     local file="$1"
     local pattern="$2"
@@ -100,17 +115,7 @@ bump_file() {
     fi
 
     if [[ "$CHECK_ONLY" == true ]]; then
-        # In check mode the two patterns are identical (CURRENT == NEW is
-        # enforced above), so a file either carries the version or it drifted.
-        # -F, not -q alone: the CLAUDE.md replacement carries `**`, which a
-        # basic regex reads as two quantifiers and never matches, so the check
-        # reported drift on a file that was correct.
-        if grep -qF "$replacement" "$file" 2>/dev/null; then
-            echo "  ✓  $label (at ${NEW_VERSION})"
-        else
-            echo "  ✗  $label (does not carry ${NEW_VERSION} - version drift)"
-            DRIFTED=$((DRIFTED + 1))
-        fi
+        check_file "$file" "$replacement" "$label"
         return
     fi
 
