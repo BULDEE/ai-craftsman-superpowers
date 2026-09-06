@@ -142,3 +142,22 @@ When bumping version, update ALL of these:
 Then tag with `claude plugin tag --push`, which produces the
 `craftsman--v<version>` tag that plugin dependency resolution reads. A plain
 `v<version>` tag is kept alongside it for release continuity.
+
+Pushing the `v<version>` tag runs `.github/workflows/release.yml`, which
+orchestrates two scripts and nothing else. `scripts/release-guard.sh <tag>`
+refuses a tag that is not `v<x.y.z>`, a tag the four tracked files disagree
+with (through `scripts/bump-version.sh --check`, so there is one list of those
+files and not two), and a `craftsman--v<version>` tag on another commit; the
+marketplace tag is waited for, never skipped. `scripts/release-build.sh` builds
+`craftsman-<version>.tar.gz` reproducibly (`gzip -n`) with its `SHA256SUMS.txt`.
+The workflow then attests, publishes, and re-runs the exact `gh attestation
+verify --signer-workflow` command SECURITY.md documents.
+
+Both scripts run outside GitHub, which is what lets `tests/meta/test-release.sh`
+test the release path without pushing a tag. Two rules hold that job honest:
+every value reaches a shell block through `env:`, never through `${{ }}`, and
+there is no `workflow_dispatch` (it can be aimed at any ref, so it would let
+any writer sign arbitrary content). The remaining exposure is stated in
+SECURITY.md rather than papered over: a tag push runs the workflow file from
+that tag's own tree, so the real control is the `release` environment's
+required reviewers, a repository setting.

@@ -1,0 +1,114 @@
+name: Release provenance
+
+# A tag is not a release artifact. What this workflow adds is a signed
+# statement that one exact archive came out of this repository, at this commit,
+# through this workflow file, which is what `gh attestation verify
+# --signer-workflow` checks.
+#
+# What it does NOT add: protection against someone who can already push here.
+# A tag push runs the workflow file carried by that tag's own tree, so anyone
+# with write access can mint an attestation over content of their choosing.
+# The control for that is the `release` environment's required reviewers, a
+# repository setting; SECURITY.md states this rather than implying otherwise.
+#
+# Trigger: the plain `v<x.y.z>` tag only. `craftsman--v*` does not match `v*`
+# (the glob anchors at the start of the ref name), so the two tags pushed by
+# `claude plugin tag --push` produce exactly one run. There is deliberately no
+# `workflow_dispatch`: it can be aimed at any branch or tag, which turns the
+# signing identity into something any writer can point at arbitrary content.
+# Re-run the failed run from the Actions UI instead; it keeps the same ref.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  provenance:
+    name: Build, attest and publish the release tarball
+    runs-on: ubuntu-latest
+    # Configure this environment with required reviewers. Without them the job
+    # still runs, and the attestation is then only as trustworthy as write
+    # access to this repository.
+    environment: release
+    permissions:
+      contents: write      # create the release and upload its assets
+      id-token: write      # Sigstore OIDC identity for the signature
+      attestations: write  # write the provenance to the attestations store
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      # Tag format, version sync across the four tracked files, and the
+      # marketplace tag pointing at the same commit. All of it in a script so
+      # it is testable without pushing a tag: see tests/meta/test-release.sh.
+      - name: Guard the release
+        run: bash scripts/release-guard.sh "$TAG"
+
+      - name: Build the release tarball
+        id: build
+        run: |
+          set -euo pipefail
+          NAME="$(bash scripts/release-build.sh "$TAG" dist)"
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Release artifact"
+            echo
+            echo '```'
+            cat dist/SHA256SUMS.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/${{ steps.build.outputs.name }}
+
+      # Every value reaches the shell through `env:`, never through `${{ }}`
+      # inline: a tag name may legally contain quotes, `;` and `$`, and git
+      # accepts `v4.9.0";touch$IFS/tmp/x;#` as a ref. Interpolated into a
+      # `run:` block, that executes on a runner holding the signing identity.
+      - name: Publish the artifact on the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAME: ${{ steps.build.outputs.name }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "$TAG" --generate-notes
+          fi
+          gh release upload "$TAG" "dist/${NAME}" dist/SHA256SUMS.txt --clobber
+
+      # An attestation nobody can verify is a badge, not a control. This runs
+      # the exact command SECURITY.md tells a user to run, including
+      # --signer-workflow: without it, `gh attestation verify` accepts an
+      # attestation produced by any workflow in this repository.
+      - name: Verify the attestation with the documented command
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NAME: ${{ steps.build.outputs.name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if gh attestation verify "dist/${NAME}" \
+                 --repo "$REPO" \
+                 --signer-workflow "${REPO}/.github/workflows/release.yml"; then
+              exit 0
+            fi
+            echo "Attestation not resolvable yet (attempt ${attempt}), retrying."
+            sleep 10
+          done
+          echo "::error::The published attestation did not verify."
+          exit 1

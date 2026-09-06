@@ -21,11 +21,22 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
+# --check reads the same four files through the same comparisons and writes
+# nothing. The release workflow needs a verdict on version sync, and a second
+# implementation of "which files carry the version" is how CLAUDE.md drifted to
+# 3.7.0 in the first place: one list, two modes.
+CHECK_ONLY=false
+if [[ "${1:-}" == "--check" ]]; then
+    CHECK_ONLY=true
+    shift
+fi
+
 NEW_VERSION="${1:-}"
 
 if [[ -z "$NEW_VERSION" ]]; then
-    echo "Usage: $0 <new_version>"
+    echo "Usage: $0 [--check] <new_version>"
     echo "Example: $0 2.3.0"
+    echo "         $0 --check 2.3.0   # verify only, exit 1 on drift"
     exit 1
 fi
 
@@ -43,7 +54,18 @@ if [[ -z "$CURRENT_VERSION" ]]; then
     exit 1
 fi
 
-echo "Bumping version: ${CURRENT_VERSION} → ${NEW_VERSION}"
+if [[ "$CHECK_ONLY" == true ]]; then
+    # plugin.json is the source of truth, so a mismatch here is not drift
+    # between files, it is the requested version being wrong. Reported first
+    # because every other comparison below would then be measured against it.
+    if [[ "$CURRENT_VERSION" != "$NEW_VERSION" ]]; then
+        echo "FAILED: .claude-plugin/plugin.json is at ${CURRENT_VERSION}, expected ${NEW_VERSION}."
+        exit 1
+    fi
+    echo "Checking version sync at ${NEW_VERSION}"
+else
+    echo "Bumping version: ${CURRENT_VERSION} → ${NEW_VERSION}"
+fi
 echo ""
 
 # Track files changed and drift
@@ -66,6 +88,21 @@ substitute_in_place() {
     rm -f "${file}.bump.tmp"
 }
 
+# In check mode the two patterns are identical (CURRENT == NEW is enforced
+# before any file is read), so a file either carries the version or it drifted.
+# -F, not -q alone: the CLAUDE.md replacement carries `**`, which a basic regex
+# reads as two quantifiers and never matches, so the check reported drift on a
+# file that was correct.
+check_file() {
+    local file="$1" replacement="$2" label="$3"
+    if grep -qF "$replacement" "$file" 2>/dev/null; then
+        echo "  ✓  $label (at ${NEW_VERSION})"
+        return
+    fi
+    echo "  ✗  $label (does not carry ${NEW_VERSION} - version drift)"
+    DRIFTED=$((DRIFTED + 1))
+}
+
 bump_file() {
     local file="$1"
     local pattern="$2"
@@ -74,6 +111,11 @@ bump_file() {
 
     if [[ ! -f "$file" ]]; then
         echo "  SKIP  $label (file not found)"
+        return
+    fi
+
+    if [[ "$CHECK_ONLY" == true ]]; then
+        check_file "$file" "$replacement" "$label"
         return
     fi
 
@@ -121,10 +163,14 @@ if [[ "$DRIFTED" -gt 0 ]]; then
     echo "Fix them manually to ${NEW_VERSION}, then re-run to verify."
     exit 1
 fi
+if [[ "$CHECK_ONLY" == true ]]; then
+    echo "Done. Every tracked file is at ${NEW_VERSION}."
+    exit 0
+fi
 echo "Done. ${CHANGED} file(s) updated."
 echo ""
 echo "Next steps:"
 echo "  1. Update CHANGELOG.md with new version entry"
 echo "  2. git add -A && git commit -m 'chore: bump version to ${NEW_VERSION}'"
-echo "  3. git tag v${NEW_VERSION}"
-echo "  4. git push origin main && git push origin v${NEW_VERSION}"
+echo "  3. git push origin main"
+echo "  4. claude plugin tag --push   # writes both v${NEW_VERSION} and craftsman--v${NEW_VERSION}"

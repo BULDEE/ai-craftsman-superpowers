@@ -107,9 +107,11 @@
 {"complexity":1,"fan_out":7,"file_lines":107,"ignores":0,"max_fn_lines":18,"path":"packs/symfony/knowledge/canonical/php-usecase.php"},
 {"complexity":1,"fan_out":1,"file_lines":173,"ignores":0,"max_fn_lines":14,"path":"packs/symfony/knowledge/canonical/php-value-object.php"},
 {"complexity":6,"fan_out":0,"file_lines":231,"ignores":0,"max_fn_lines":21,"path":"packs/symfony/static-analysis/phpstan.sh","reason":"deptrac layer mapping: --formatter=compact never existed in deptrac 1.x, 2.x or 4.x, so the adapter had never produced a verdict. Fixing it meant reading github-actions output and mapping the reported layer pair to LAYER001-004 so project configuration can reach the verdict. file_lines rises for the decomposition and for the recorded ground truth on three deptrac majors; complexity fell 19 to 6 and max_fn_lines 68 to 21, because the single 45-line function became eleven named ones."},
-{"complexity":4,"fan_out":0,"file_lines":131,"ignores":0,"max_fn_lines":24,"path":"scripts/bump-version.sh"},
+{"complexity":5,"fan_out":0,"file_lines":177,"ignores":0,"max_fn_lines":29,"path":"scripts/bump-version.sh","reason":"release provenance (CR-52): bump-version.sh gained a --check mode so the release job and the bump share one list of the files that carry the version; tests/meta/test-release.sh is the new suite for the release path, driven against a throwaway git repository"},
 {"complexity":5,"fan_out":0,"file_lines":198,"ignores":0,"max_fn_lines":22,"path":"scripts/consolidate-metrics.sh"},
 {"complexity":12,"fan_out":4,"file_lines":88,"ignores":0,"max_fn_lines":88,"path":"scripts/export-hermes-skills.sh","reason":"agentic-value iteration: gateway inject, skill hints, curated export (CR-51/55/56)"},
+{"complexity":1,"fan_out":0,"file_lines":53,"ignores":0,"max_fn_lines":7,"path":"scripts/release-build.sh"},
+{"complexity":0,"fan_out":0,"file_lines":80,"ignores":0,"max_fn_lines":3,"path":"scripts/release-guard.sh"},
 {"complexity":5,"fan_out":0,"file_lines":214,"ignores":0,"max_fn_lines":19,"path":"scripts/validate-pack.sh"},
 {"complexity":2,"fan_out":4,"file_lines":167,"ignores":0,"max_fn_lines":4,"path":"tests/adapters/test-hermes-plugin.sh","reason":"agentic-value iteration: gateway inject, skill hints, curated export (CR-51/55/56)"},
 {"complexity":0,"fan_out":2,"file_lines":296,"ignores":0,"max_fn_lines":11,"path":"tests/adapters/test-hermes-pre-verify.sh","reason":"agentic-value iteration: gateway inject, skill hints, curated export (CR-51/55/56)"},
@@ -180,6 +182,7 @@
 {"complexity":0,"fan_out":1,"file_lines":130,"ignores":0,"max_fn_lines":6,"path":"tests/core/test-verify-loop.sh"},
 {"complexity":19,"fan_out":1,"file_lines":136,"ignores":0,"max_fn_lines":136,"path":"tests/core/test-workflow-command.sh"},
 {"complexity":2,"fan_out":1,"file_lines":259,"ignores":0,"max_fn_lines":15,"path":"tests/lib/test-helpers.sh","reason":"v4.6.3 instrument repair: PyYAML is absent from the CI runner, so the registry reader gained a fallback path and its parity is now asserted on all five packs; test-helpers.sh isolates CLAUDE_PLUGIN_DATA for the nineteen suites that silently depended on the runner doing it; and the RATCHET001 ignore bypass in the hook is covered. Coverage grew, so these files grew."},
+{"complexity":8,"fan_out":3,"file_lines":367,"ignores":0,"max_fn_lines":29,"path":"tests/meta/test-release.sh","reason":"release provenance (CR-52): bump-version.sh gained a --check mode so the release job and the bump share one list of the files that carry the version; tests/meta/test-release.sh is the new suite for the release path, driven against a throwaway git repository"},
 {"complexity":14,"fan_out":1,"file_lines":67,"ignores":0,"max_fn_lines":67,"path":"tests/packs/test-ai-ml.sh"},
 {"complexity":0,"fan_out":2,"file_lines":156,"ignores":0,"max_fn_lines":34,"path":"tests/packs/test-bash.sh"},
 {"complexity":4,"fan_out":3,"file_lines":461,"ignores":0,"max_fn_lines":19,"path":"tests/packs/test-deptrac-layers.sh","reason":"deptrac layer mapping: initial photograph of the new suite. Each assertion is paired with a control and the deptrac stub refuses a formatter deptrac does not have, which is what makes a regression to compact visible."},
@@ -191,6 +194,6 @@
 {"complexity":0,"fan_out":3,"file_lines":289,"ignores":3,"max_fn_lines":7,"path":"tests/packs/test-security.sh"},
 {"complexity":0,"fan_out":5,"file_lines":139,"ignores":0,"max_fn_lines":1,"path":"tests/packs/test-structural.sh"},
 {"complexity":0,"fan_out":5,"file_lines":118,"ignores":0,"max_fn_lines":1,"path":"tests/packs/test-symfony.sh"},
-{"complexity":26,"fan_out":1,"file_lines":824,"ignores":1,"max_fn_lines":125,"path":"tests/run-tests.sh","reason":"One line registers tests/core/test-authority.sh. Decomposition of this file is tracked as CR-37."},
+{"complexity":27,"fan_out":1,"file_lines":825,"ignores":1,"max_fn_lines":125,"path":"tests/run-tests.sh","reason":"release provenance (CR-52): bump-version.sh gained a --check mode so the release job and the bump share one list of the files that carry the version; tests/meta/test-release.sh is the new suite for the release path, driven against a throwaway git repository"},
 {"complexity":0,"fan_out":0,"file_lines":344,"ignores":0,"max_fn_lines":5,"path":"tests/templates/test-templates.sh"}
 ]
