@@ -374,6 +374,7 @@ _severity_for() {
         TS002|TS003|PHP003) echo "warn"; return 0 ;;
         DB001|DB002|DB003|PY003|SH001|SH003|SH005) echo "warn"; return 0 ;;
         PY006|PY007) echo "warn"; return 0 ;;
+        GO003|GO004|GO005) echo "warn"; return 0 ;;
     esac
     case "$STRICTNESS" in
         strict)   echo "block" ;;

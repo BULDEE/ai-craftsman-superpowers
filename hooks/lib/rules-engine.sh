@@ -354,6 +354,13 @@ _rules_is_advisory() {
         # is a smell with legitimate exceptions a regex/AST pass cannot always
         # rule out, so they stay advisory by default.
         PY006|PY007) return 0 ;;
+        # GO003 mirrors PY003 (a missing doc comment is a lint, not a defect),
+        # GO004 flags a discard the compiler accepts and a reviewer sometimes
+        # should too, and GO005 flags init(), which a generated file or a
+        # driver registration can legitimately need. All three are emitted
+        # through add_warning, so declaring them here is what makes that
+        # choice reachable from .craft-config.yml instead of invisible.
+        GO003|GO004|GO005) return 0 ;;
     esac
     return 1
 }

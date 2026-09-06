@@ -1,0 +1,71 @@
+name: go
+version: "1.0.0"
+description: "Go craftsman pack - error handling, context propagation, layer boundaries, structure"
+compatibility:
+  core: ">=4.9.0"
+  stack: ["go", "fullstack"]
+
+languages:
+  - id: go
+    extensions: [go]
+    entry_markers: [go.mod, go.sum]
+    # go.mod carries dependencies as well as toolchain settings, so blocking it
+    # wholesale would stop ordinary work to guard a quality gate. Only files
+    # that exist solely to configure a gate belong here.
+    protected_configs: [".golangci.yml", ".golangci.yaml"]
+    validators: ["hooks/go-validator.sh", "hooks/layer-validator.sh"]
+    test_commands: ["go test ./...", "gotestsum"]
+    lsp: "gopls"
+    # No metrics_dialect. Measured, not assumed: the shared extractor keys on
+    # `function` and on control heads that open with a parenthesis, and Go has
+    # neither, so `c-like` on a Go file with four nested blocks and a
+    # four-parameter function returns nothing at all. Its parameter counter
+    # reads the LAST balanced group of a header, which in Go is the return
+    # tuple. A dialect that silently measures nothing is worse than none: the
+    # ratchet would then guard a signal that is absent. NEST001, LOC001,
+    # GOD001 and PARAM001 come from this pack's own scanner instead, the same
+    # split packs/python uses.
+
+rules:
+  owned:
+    - id: GO001
+      group: Go
+      text: "no panic outside main and outside a Must-prefixed constructor - return an error"
+      default_severity: block
+    - id: GO002
+      group: Go
+      text: "context.Context is the first parameter, never a later one"
+      default_severity: block
+    - id: GO003
+      group: Go
+      text: "every exported symbol carries a doc comment starting with its name"
+      default_severity: warn
+    - id: GO004
+      group: Go
+      text: "no error discarded into _ - handle it or let it travel"
+      default_severity: warn
+    - id: GO005
+      group: Go
+      text: "no init() - initialise explicitly from main or from a constructor"
+      default_severity: warn
+    - id: WARN-GO001
+      group: Advisory
+      text: "naked return in a function with named results - return the values"
+      default_severity: warn
+  # LAYER001 and the four Structure rules are core-owned (rules/core.yml
+  # carries their id, text and default_severity); this pack supplies only the
+  # Go detectors, the same split packs/python and packs/react use.
+  builtin: ["GO001", "GO002", "GO003", "GO004", "GO005", "WARN-GO001",
+            "LAYER001", "NEST001", "LOC001", "GOD001", "PARAM001"]
+
+hooks:
+  validators: ["hooks/go-validator.sh", "hooks/layer-validator.sh"]
+
+commands:
+  scaffold_types: []
+
+agents: []
+
+knowledge: ["knowledge/"]
+
+templates: []

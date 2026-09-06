@@ -44,8 +44,23 @@ compatibility:
   core: ">=2.6.0"                      # Minimum core version required
   stack: ["my-stack"]                  # Compatible stacks, or ["*"] for universal
 
+languages:                             # REQUIRED for a language pack
+  - id: my-lang                        # registry key
+    extensions: [ml, mli]              # no leading dot
+    entry_markers: [my-lang.toml]      # files that say "this project is my-lang"
+    protected_configs: [".mylint.yml"] # files that exist only to configure a gate
+    validators: ["hooks/my-validator.sh"]
+    test_commands: ["my-lang test"]
+    lsp: "my-lang-langserver"
+    metrics_dialect: c-like            # OPTIONAL, and only c-like or php-like
+
 rules:
-  builtin: ["MYPACK001", "MYPACK002"]  # Rule IDs this pack defines
+  owned:                               # id, wording and default severity
+    - id: MYPACK001
+      group: MyLang
+      text: "what the rule asks for, in one line"
+      default_severity: block          # block | warn
+  builtin: ["MYPACK001", "MYPACK002"]  # every rule this pack detects
   static_analysis: ["MYSA001"]         # SA rule IDs
 
 hooks:
@@ -191,10 +206,38 @@ echo "=== Results: $TESTS_PASSED passed, $TESTS_FAILED failed ==="
 [[ $TESTS_FAILED -eq 0 ]] && exit 0 || exit 1
 ```
 
+## The `languages:` block is not optional
+
+The engine holds no list of languages. `hooks/lib/lang-registry.sh` compiles
+every loaded `pack.yml` into the registry that the hooks and `craftsman-ci.sh`
+both read, so a pack without a `languages:` entry declaring its extensions is
+loaded, sourced, and never called: no file ever dispatches to its validator.
+That is the single most common reason a new pack appears to do nothing.
+
+### On `metrics_dialect`
+
+Declaring it gives you NEST001, LOC001, GOD001 and PARAM001 for free, from
+`hooks/lib/structural_metrics.py`. It accepts `c-like` and `php-like` and
+nothing else, and both mean brace-delimited with `function` as the keyword and
+parenthesised control heads.
+
+Check before you declare. Go and Rust are brace-delimited yet match neither:
+they write `func`/`fn` and `if x > 0 {`, so the extractor finds no function and
+no control block and reports every file clean. A dialect that silently measures
+nothing is worse than none, because the structural ratchet then guards a signal
+that is absent. Declare none and emit the four rules from your own detector
+instead: `packs/go/hooks/go_structure.py` and `packs/python` both do this.
+
 ## Examples
 
-See the community skeletons for complete working examples:
+`packs/go/` is the smallest complete pack: one manifest, two validators, a
+Python structure scanner, a canonical example and a test file covering one
+passing and one failing fixture per rule. Copy that.
 
-- `examples/pack-skeleton-go/` - Go with error checking and init() detection
+`packs/symfony/` is the most complete, with agents, templates and static
+analysis wired in.
+
+The skeletons under `examples/` are starting points rather than shipped packs:
+
 - `examples/pack-skeleton-rust/` - Rust with unwrap/panic detection
 - `examples/pack-skeleton-python/` - Python with bare except, mutable defaults, wildcard imports

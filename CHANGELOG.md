@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Go pack (`packs/go/`).** Six owned rules and the core Structure four,
+  detected by the pack itself. GO001 refuses `panic()` outside `package main`,
+  outside a `Must` prefixed constructor and outside test files; GO002 refuses
+  `context.Context` in any position but the first; GO003, GO004 and GO005 warn
+  on an undocumented exported symbol, an error dropped into `_`, and `init()`.
+  LAYER001 gets a Go detector that reads import paths rather than any line
+  mentioning infrastructure.
+- **A Go structure scanner (`packs/go/hooks/go_structure.py`).** The pack
+  declares no `metrics_dialect`, and that is measured rather than assumed: the
+  shared extractor keys on the word `function` and on parenthesised control
+  heads, so `c-like` on a Go file with four nested blocks and a four-parameter
+  function returns nothing at all, and its parameter counter reads the return
+  tuple. NEST001, LOC001, GOD001 and PARAM001 come from the pack instead, the
+  same split `packs/python` uses.
+- **Release provenance.** `.github/workflows/release.yml` builds
+  `craftsman-<version>.tar.gz` reproducibly from the tag, attests it with
+  Sigstore, publishes it with `SHA256SUMS.txt`, and re-runs the exact
+  `gh attestation verify --signer-workflow` command SECURITY.md documents. The
+  guard and the build live in `scripts/release-guard.sh` and
+  `scripts/release-build.sh` so `tests/meta/test-release.sh` can exercise the
+  release path without pushing a tag.
+- **`scripts/bump-version.sh --check <version>`**: verifies the four tracked
+  files without writing, so the release job and the bump share one list.
+
+### Changed
+
+- **`docs/creating-packs.md` documents `languages:` and `rules.owned`.** Their
+  absence was the reason the example skeletons taught a manifest the engine
+  loads and never dispatches to. `examples/pack-skeleton-go/` is removed:
+  `packs/go/` supersedes it and is now the pack the guide points at.
+- **No GitHub Actions expression reaches a shell block.** Values pass through
+  `env:` in `ci.yml` and `release.yml`; a tag name may legally contain quotes
+  and semicolons, and the release runner holds the Sigstore signing identity.
+
+### Fixed
+
+- **`assert_contains` in `tests/lib/test-helpers.sh`** passed its needle to
+  `grep` without `--`, so any assertion on a string starting with `-` failed
+  with a usage error instead of reporting a missing string.
+- **`README.md` and `README.fr.md`** both linked
+  `SECURITY.md#pre-installation-verification`, a heading that did not exist.
+
 - **`/craftsman:challenge` now reviews side effects by their frequency, not only
   their content.** A new Level 2 smell (unthrottled side effect) plus the three
   questions that expose it: who calls this and at what rate, does it repeat

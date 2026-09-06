@@ -265,8 +265,8 @@ this model covers and asserts it fails. Full breakdown: [SECURITY.md](SECURITY.m
 auto-commit; commands are explicitly invoked, never auto-triggered; methodology
 is opinionated (DDD/Clean Architecture).
 
-**Current constraints:** PHP/TypeScript get full rule coverage, other languages
-basic support only; bias detection warns directly in English and leaves every
+**Current constraints:** PHP, TypeScript, Python and Go get full rule coverage,
+other languages basic support only; bias detection warns directly in English and leaves every
 other language to the model to adjudicate in context; metrics are
 per-machine, not shared across a team; auto-fixing violations and IDE plugins
 are not supported by design.
