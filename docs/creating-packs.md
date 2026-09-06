@@ -237,7 +237,9 @@ passing and one failing fixture per rule. Copy that.
 `packs/symfony/` is the most complete, with agents, templates and static
 analysis wired in.
 
-The skeletons under `examples/` are starting points rather than shipped packs:
-
-- `examples/pack-skeleton-rust/` - Rust with unwrap/panic detection
-- `examples/pack-skeleton-python/` - Python with bare except, mutable defaults, wildcard imports
+`examples/pack-skeleton-rust/` is the last remaining skeleton, for a language
+with no shipped pack yet. The rule is simple and applies to every skeleton: a
+skeleton exists to be promoted, and it is deleted when its pack ships. Keeping
+both means maintaining a second manifest that nothing loads, which is how the
+Go and Python skeletons came to teach a `pack.yml` with no `languages:` block
+months after the engine stopped dispatching without one.

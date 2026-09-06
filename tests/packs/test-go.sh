@@ -19,8 +19,10 @@ source "$ROOT_DIR/packs/go/hooks/go-validator.sh"
 source "$ROOT_DIR/packs/go/hooks/layer-validator.sh"
 
 VIOLATIONS=""
+WARNINGS=""
 add_violation() { VIOLATIONS="${VIOLATIONS}$1:$2"$'\n'; }
-add_warning() { VIOLATIONS="${VIOLATIONS}$1:$2"$'\n'; }
+add_warning() { WARNINGS="${WARNINGS}$1:$2"$'\n'; }
+all_findings() { printf '%s%s' "$VIOLATIONS" "$WARNINGS"; }
 line_has_ignore() { case "$1" in *"craftsman-ignore: $2"*) return 0 ;; *) return 1 ;; esac; }
 metrics_record_violation() { true; }
 
@@ -34,19 +36,20 @@ run_go() {
     local file="$WORK/$name"
     cat > "$file"
     VIOLATIONS=""
+    WARNINGS=""
     pack_validate_go "$file"
     pack_validate_go_layers "$file"
-    if echo "$VIOLATIONS" | grep -q "^${rule}:"; then
+    if all_findings | grep -q "^${rule}:"; then
         if [[ "$expectation" == "raises" ]]; then
             log_pass "$rule: $description"
         else
-            log_fail "$rule: $description" "raised on a clean fixture: $(echo "$VIOLATIONS" | grep "^${rule}:" | head -1)"
+            log_fail "$rule: $description" "raised on a clean fixture: $(all_findings | grep "^${rule}:" | head -1)"
         fi
     else
         if [[ "$expectation" == "clean" ]]; then
             log_pass "$rule: $description"
         else
-            log_fail "$rule: $description" "not detected (got: ${VIOLATIONS//$'\n'/ })"
+            log_fail "$rule: $description" "not detected (got: $(all_findings | tr '\n' ' '))"
         fi
     fi
     rm -f "$file"
@@ -67,6 +70,27 @@ if grep -qE '^\s*metrics_dialect:' "$ROOT_DIR/packs/go/pack.yml"; then
     log_fail "pack.yml declares no metrics_dialect" "the shared extractor cannot read Go"
 else
     log_pass "pack.yml declares no metrics_dialect"
+fi
+
+# GOD001 measures the span of a declaration. A Go god object is a type with
+# forty methods across a file and a five-line struct, so claiming the rule
+# would guard a signal that never fires.
+if grep -q 'GOD001' "$ROOT_DIR/packs/go/pack.yml"; then
+    if grep -qE '^\s*builtin:.*GOD001|^\s*"GOD001"' "$ROOT_DIR/packs/go/pack.yml"; then
+        log_fail "pack.yml does not claim GOD001" "claimed but never emitted on Go"
+    else
+        log_pass "pack.yml does not claim GOD001"
+    fi
+else
+    log_pass "pack.yml does not claim GOD001"
+fi
+
+# A language pack filtered by the project's stack is silently off on every
+# polyglot repository, and dispatch is by extension anyway.
+if grep -qE '^\s*stack: \["\*"\]' "$ROOT_DIR/packs/go/pack.yml"; then
+    log_pass "pack.yml loads on every stack"
+else
+    log_fail "pack.yml loads on every stack" "a Go file in a non-Go stack would be unvalidated"
 fi
 
 # --- GO001: panic outside main and outside Must* -----------------------------
@@ -261,6 +285,247 @@ func Total() (amount int, err error) {
 }
 GO
 
+# --- Cases the review found, kept as regressions -------------------------------
+
+run_go NEST001 raises "the Go error idiom counts as nesting" <<'GO'
+package order
+
+// Run checks everything.
+func Run() error {
+	if err := checkOne(); err != nil {
+		if err := checkTwo(); err != nil {
+			if err := checkThree(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+GO
+
+run_go PARAM001 raises "a generic function is not invisible" <<'GO'
+package order
+
+// Build assembles anything.
+func Build[T any](customer string, items []T, currency string, coupon string) T {
+	var zero T
+	return zero
+}
+GO
+
+run_go GO002 raises "a generic function still checks its context position" <<'GO'
+package order
+
+// Save stores anything.
+func Save[T any](item T, ctx context.Context) error {
+	return nil
+}
+GO
+
+run_go GO001 clean "a generic Must constructor keeps its exemption" <<'GO'
+package order
+
+// MustParse panics at start-up only.
+func MustParse[T any](raw string) T {
+	panic("bad")
+}
+GO
+
+run_go GO001 clean "a closure does not end the enclosing Must exemption" <<'GO'
+package order
+
+// MustBuild panics at start-up only.
+func MustBuild(ok bool) string {
+	if !ok {
+		panic("bad config")
+	}
+	go func() { close(done) }()
+	if !ok {
+		panic("still bad config")
+	}
+	return ""
+}
+GO
+
+run_go GO004 clean "a type assertion discards a bool, not an error" <<'GO'
+package order
+
+// Describe names the value.
+func Describe(v interface{}) string {
+	s, _ := v.(string)
+	return s
+}
+GO
+
+run_go GO004 clean "a channel receive discards a bool, not an error" <<'GO'
+package order
+
+// Drain reads one value.
+func Drain(ch chan int) int {
+	v, _ := <-ch
+	return v
+}
+GO
+
+run_go GO004 clean "a map index discards a bool, not an error" <<'GO'
+package order
+
+// Lookup reads the map.
+func Lookup(m map[string]int, k string) int {
+	n, _ := m[k]
+	return n
+}
+GO
+
+run_go GO004 clean "range discards an element, not an error" <<'GO'
+package order
+
+// Count walks the slice.
+func Count(xs []int) int {
+	total := 0
+	for i, _ := range xs {
+		total += i
+	}
+	return total
+}
+GO
+
+run_go GO006 raises "an error thrown away outright is reported" <<'GO'
+package order
+
+// Dump writes the payload.
+func Dump(f *os.File, payload []byte) {
+	f.Write(payload)
+}
+GO
+
+run_go GO006 raises "a deferred Close discards its error" <<'GO'
+package order
+
+// Read opens and reads.
+func Read(f *os.File) {
+	defer f.Close()
+}
+GO
+
+run_go GO006 clean "an assigned and handled result passes" <<'GO'
+package order
+
+// Dump writes the payload.
+func Dump(f *os.File, payload []byte) error {
+	if _, err := f.Write(payload); err != nil {
+		return err
+	}
+	return nil
+}
+GO
+
+run_go GO003 raises "a grouped exported constant needs a doc comment" <<'GO'
+package order
+
+const (
+	StatusOpen = "open"
+)
+GO
+
+run_go GO003 raises "a doc comment that does not name the symbol is not a doc comment" <<'GO'
+package order
+
+// This does something.
+func Save(order *Order) error {
+	return nil
+}
+GO
+
+run_go GO003 clean "a documented grouped sentinel passes" <<'GO'
+package order
+
+var (
+	// ErrNotFound is returned when the order is absent.
+	ErrNotFound = errors.New("not found")
+)
+GO
+
+run_go LOC001 raises "a function body past fifty lines is reported" <<'GO'
+package order
+
+// Long does far too much.
+func Long() int {
+	total := 0
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	total++
+	return total
+}
+GO
+
+run_go LOC001 clean "a short function passes" <<'GO'
+package order
+
+// Short does one thing.
+func Short() int {
+	return 1
+}
+GO
+
+# A raw string literal is Go's here-doc: its content is not code, and the
+# scanner must not read the braces or the comment markers inside it.
+run_go NEST001 clean "a raw string containing code is not code" <<'GO'
+package order
+
+// Template returns the snippet.
+func Template() string {
+	return `if a { if b { if c { // not real
+	} } }`
+}
+GO
+
 # --- Core structure rules, detected by this pack ------------------------------
 
 run_go NEST001 raises "three nested control blocks are reported" <<'GO'
@@ -356,17 +621,63 @@ else
     log_pass "LAYER001: a comment naming infrastructure is not an import"
 fi
 
+# --- The gate that decides whether the validator runs at all ------------------
+#
+# Every assertion above sources the validator directly, so `_pack_stack_compatible`
+# is never in the path: the pack could be gated off entirely and this file would
+# stay green. That is exactly how the stack filter shipped unnoticed, with the
+# same Go file producing five findings under `stack: go` and none under
+# `stack: symfony`. This case drives the real CLI instead.
+
+E2E="$WORK/e2e"
+mkdir -p "$E2E/internal/domain/order"
+cat > "$E2E/.craft-config.yml" <<'YML'
+stack: symfony
+strictness: strict
+YML
+cat > "$E2E/internal/domain/order/order.go" <<'GO'
+package order
+
+import (
+	"github.com/acme/shop/internal/infrastructure"
+)
+
+func Load(id string) *Order {
+	panic("empty id")
+}
+GO
+
+if command -v git >/dev/null 2>&1; then
+    ( cd "$E2E" && git init -q && git add -A ) >/dev/null 2>&1
+fi
+e2e_out="$(cd "$E2E" && CLAUDE_PLUGIN_ROOT="$ROOT_DIR" bash "$ROOT_DIR/ci/craftsman-ci.sh" internal 2>&1)"
+
+if echo "$e2e_out" | grep -q "GO001"; then
+    log_pass "the pack runs on a Go file in a project whose stack is not Go"
+else
+    log_fail "the pack runs on a Go file in a project whose stack is not Go" \
+        "craftsman-ci found no GO001: $(echo "$e2e_out" | tr '\n' ' ')"
+fi
+
+if echo "$e2e_out" | grep -q "LAYER001"; then
+    log_pass "LAYER001 catches an import ending on the infrastructure segment"
+else
+    log_fail "LAYER001 catches an import ending on the infrastructure segment" \
+        "$(echo "$e2e_out" | tr '\n' ' ')"
+fi
+
 # --- The canonical example must survive its own pack -------------------------
 #
 # The Iron Law loads this file before scaffolding. A canonical example that its
 # own validators reject teaches the opposite of what it is there for.
 VIOLATIONS=""
+WARNINGS=""
 pack_validate_go "$ROOT_DIR/packs/go/knowledge/canonical/go-handler.go"
 pack_validate_go_layers "$ROOT_DIR/packs/go/knowledge/canonical/go-handler.go"
-if [[ -z "$(echo "$VIOLATIONS" | grep -v '^$')" ]]; then
+if [[ -z "$(all_findings | grep -v '^$')" ]]; then
     log_pass "the canonical example raises nothing"
 else
-    log_fail "the canonical example raises nothing" "${VIOLATIONS//$'\n'/ }"
+    log_fail "the canonical example raises nothing" "$(all_findings | tr '\n' ' ')"
 fi
 
 test_summary

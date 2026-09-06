@@ -19,9 +19,11 @@ pack_validate_go_layers() {
     # Domain/Infrastructure namespaces, so the path check matches /domain/ in
     # kind. An import path is a quoted string, which is why the pattern looks
     # for the segment inside quotes rather than anywhere on the line: a comment
-    # mentioning infrastructure is not an import of it.
+    # mentioning infrastructure is not an import of it. The segment may also end
+    # the path, so the terminator is a slash or the closing quote: importing
+    # `.../internal/infrastructure` itself was passing.
     if [[ "$file" == *"/domain/"* ]]; then
-        if grep -qE '^[[:space:]]*(_[[:space:]]+|[A-Za-z0-9_]+[[:space:]]+)?"[^"]*/(infrastructure|infra)/' "$file" 2>/dev/null; then
+        if grep -qE '^[[:space:]]*(_[[:space:]]+|[A-Za-z0-9_]+[[:space:]]+)?"[^"]*/(infrastructure|infra)(/|")' "$file" 2>/dev/null; then
             add_violation "LAYER001" "Domain imports Infrastructure - DDD layer violation"
         fi
     fi

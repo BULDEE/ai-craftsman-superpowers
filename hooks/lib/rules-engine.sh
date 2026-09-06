@@ -322,45 +322,44 @@ _rules_validate_custom() {
 # Compute default severity for a rule based on strictness
 # ---------------------------------------------------------------------------
 # Rules that always warn regardless of strictness.
+# Which rules ship advisory, and why. The reasoning lives above the function
+# rather than inside it: the case arms are a list, and a list that grows a
+# paragraph per entry stops being readable and trips SH002 on its own author.
+#
 # WARN*/PHP005 are advisory by nature. The structural rules
 # (NEST001/LOC001/GOD001/PARAM001/CTRL001) ship advisory-first so teams can
 # measure real noise on an existing codebase before escalating. LOC001 stays
 # advisory permanently; drop NEST001/GOD001/PARAM001/CTRL001 from this list to
 # let strict-mode block them once the codebase is clean.
+#
+# TS002/TS003/PHP003 are design preferences with legitimate exceptions a regex
+# cannot see: a framework contract that hands you a mutable DTO, a third-party
+# type whose nullability is wrong, a barrel a build tool insists on. Blocking a
+# write on those trains the developer to suppress the rule, and a rule that is
+# always suppressed enforces nothing while still costing a round trip. Set them
+# to `block` in .craft-config.yml where the codebase has no such exceptions.
+#
+# RATCHET001 ships advisory while the metric core is validated against real
+# work (ADR-0025). Set `RATCHET001: block` in .craft-config.yml to opt in
+# early; the default escalates once a full cycle runs clean.
+#
+# DB001-003, PY003, SH001, SH003, SH005, PY006, PY007 and GO003 to GO006
+# were advisory de facto, by being emitted through add_warning instead of
+# add_violation. That made the choice invisible here and, worse, unreachable:
+# add_warning never consulted this engine, so a project could neither promote
+# them to block nor set them to ignore. Declaring them keeps today's behaviour
+# and hands the decision back to .craft-config.yml and .craft-rules.yml. Each
+# is a smell with exceptions a regex or AST pass cannot rule out: a swallowed
+# exception, an import-time side effect, a missing doc comment, a discard the
+# compiler accepts, an init() a driver registration needs.
 _rules_is_advisory() {
     case "$1" in
         WARN*|PHP005|NEST001|LOC001|GOD001|PARAM001|CTRL001) return 0 ;;
-        # TS002/TS003/PHP003 are design preferences with legitimate exceptions
-        # a regex cannot see: a framework contract that hands you a mutable
-        # DTO, a third-party type whose nullability is wrong, a barrel a build
-        # tool insists on. Blocking a write on those trains the developer to
-        # suppress the rule, and a rule that is always suppressed enforces
-        # nothing while still costing a round trip. Set them to `block` in
-        # .craft-config.yml where the codebase has no such exceptions.
         TS002|TS003|PHP003) return 0 ;;
-        # RATCHET001 ships advisory while the metric core is validated against
-        # real work (ADR-0025). Set `RATCHET001: block` in .craft-config.yml to
-        # opt in early; the default escalates once a full cycle runs clean.
         RATCHET001) return 0 ;;
-        # These were advisory de facto, by being emitted through add_warning
-        # instead of add_violation. That made the choice invisible here and,
-        # worse, unreachable: add_warning never consulted this engine, so a
-        # project could neither promote them to block nor set them to ignore.
-        # Declaring them advisory keeps today's behaviour and hands the
-        # decision back to .craft-config.yml and .craft-rules.yml.
         DB001|DB002|DB003|PY003|SH001|SH003|SH005) return 0 ;;
-        # PY006/PY007 are emitted through add_warning (see PHP005's own
-        # comment above): a swallowed exception or an import-time side effect
-        # is a smell with legitimate exceptions a regex/AST pass cannot always
-        # rule out, so they stay advisory by default.
         PY006|PY007) return 0 ;;
-        # GO003 mirrors PY003 (a missing doc comment is a lint, not a defect),
-        # GO004 flags a discard the compiler accepts and a reviewer sometimes
-        # should too, and GO005 flags init(), which a generated file or a
-        # driver registration can legitimately need. All three are emitted
-        # through add_warning, so declaring them here is what makes that
-        # choice reachable from .craft-config.yml instead of invisible.
-        GO003|GO004|GO005) return 0 ;;
+        GO003|GO004|GO005|GO006) return 0 ;;
     esac
     return 1
 }
