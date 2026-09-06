@@ -669,6 +669,7 @@ test_legacy_command() {
     log_info "Testing legacy command (content)"
 
     run_subtest "Legacy command tests pass" "$SCRIPT_DIR/core/test-legacy-command.sh" || true
+    run_subtest "Legacy worked example still runs" "$SCRIPT_DIR/core/test-legacy-example.sh" || true
 }
 
 # Test: Hotspot analysis tool (functional)

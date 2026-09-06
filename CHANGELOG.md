@@ -124,6 +124,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not hermetic against `JENKINS_URL`.** With a fourth provider in the
   detection list, the "no CI environment" assertions failed on a Jenkins
   agent: the commit adding Jenkins support broke the suite on Jenkins.
+- **A worked example for `/craftsman:legacy` you can run**
+  (`examples/legacy/03-from-arrival-to-safety.md` and `demo.sh`). One untested
+  48-line class, from arrival to safety, with the real output of every step:
+  the characterization net written before anything is touched, the deliberate
+  break that proves the net catches change, the seam, the refactor under a net
+  copied byte for byte, and the structural mark the ratchet records
+  (`complexity 5 -> 1`, worst function `21 -> 10` lines). It ends by putting
+  the code back the way it was: the tests stay green, because behaviour did not
+  change, and the ratchet refuses it anyway. Requirements are python3, bash and
+  git, the same three the plugin needs.
+  `tests/core/test-legacy-example.sh` runs the demo and asserts the walkthrough
+  quotes output the code still produces, including the step that must go red.
 
 - **`/craftsman:challenge` now reviews side effects by their frequency, not only
   their content.** A new Level 2 smell (unthrottled side effect) plus the three
