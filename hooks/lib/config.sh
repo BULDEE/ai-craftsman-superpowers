@@ -145,8 +145,21 @@ config_packs_dir() {
 config_trust_project_tools() {
     local config_file="${HOME}/.claude/.craft-config.yml"
     [[ -f "$config_file" ]] || return 1
-    local value
-    value=$(grep -E "^trust_project_tools:" "$config_file" 2>/dev/null | head -1 | awk '{print $2}' | tr -d '"' | tr -d "'")
+    # Read in-shell. This was grep | head | awk | tr | tr: five processes to
+    # answer one boolean, on a hook that runs on every write.
+    local line value=""
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        case "$line" in
+            trust_project_tools:*)
+                value="${line#trust_project_tools:}"
+                value="${value#"${value%%[![:space:]]*}"}"
+                value="${value%"${value##*[![:space:]]}"}"
+                value="${value//\"/}"
+                value="${value//\'/}"
+                break
+                ;;
+        esac
+    done < "$config_file"
     [[ "$value" == "true" ]]
 }
 
@@ -154,25 +167,34 @@ config_external_packs() {
     local config_file="${HOME}/.claude/.craft-config.yml"
     [[ ! -f "$config_file" ]] && return
 
-    local in_external=false
-    while IFS= read -r line; do
-        if echo "$line" | grep -qE '^[[:space:]]+external:'; then
+    # Matched in-shell, one process for the whole file.
+    #
+    # This ran `echo "$line" | grep` once per line, and up to three times per
+    # line inside the block. A 50-line ~/.claude/.craft-config.yml therefore
+    # cost 50 to 150 process starts, on a function called by every hook on
+    # every write: measured at half of post-write-check.sh's entire runtime,
+    # to read a key most installations do not even set.
+    local in_external=false path_val
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "$line" =~ ^[[:space:]]+external: ]]; then
             in_external=true
             continue
         fi
-        if [[ "$in_external" == true ]]; then
-            # Exit nested block on non-indented or less-indented key
-            if echo "$line" | grep -qE '^[a-zA-Z]' || echo "$line" | grep -qE '^[[:space:]]{0,3}[a-zA-Z]'; then
-                in_external=false
-                continue
-            fi
-            local path_val
-            path_val=$(echo "$line" | grep -oE 'path:[[:space:]]*.*' | sed -E 's/^path:[[:space:]]*//' | tr -d '"' | tr -d "'")
-            if [[ -n "$path_val" ]]; then
-                path_val="${path_val/#\~/$HOME}"
-                echo "$path_val"
-            fi
+        [[ "$in_external" == true ]] || continue
+
+        # Out of the nested block on any key indented three spaces or less.
+        if [[ "$line" =~ ^[[:space:]]{0,3}[a-zA-Z] ]]; then
+            in_external=false
+            continue
         fi
+        [[ "$line" =~ path:[[:space:]]*(.*)$ ]] || continue
+        path_val="${BASH_REMATCH[1]}"
+        path_val="${path_val%"${path_val##*[![:space:]]}"}"
+        path_val="${path_val//\"/}"
+        path_val="${path_val//\'/}"
+        [[ -z "$path_val" ]] && continue
+        path_val="${path_val/#\~/$HOME}"
+        echo "$path_val"
     done < "$config_file"
 }
 

@@ -463,6 +463,23 @@ test_ratchet() {
     run_subtest "Structural ratchet tests pass" "$SCRIPT_DIR/core/test-ratchet.sh" || true
 }
 
+# Last, and after everything that writes to CLAUDE_PLUGIN_DATA: this one
+# measures wall-clock time, so it wants a machine that is not also compiling a
+# language registry for another suite.
+test_bias_recall() {
+    echo ""
+    log_info "Measuring bias detector recall (functional)"
+
+    run_subtest "Bias detector recall holds on the corpus" "$SCRIPT_DIR/core/test-bias-recall.sh" || true
+}
+
+test_hook_latency() {
+    echo ""
+    log_info "Measuring hook latency (performance)"
+
+    run_subtest "Hook latency stays under its ceilings" "$SCRIPT_DIR/perf/test-hook-latency.sh" || true
+}
+
 test_design_panel() {
     echo ""
     log_info "Testing adversarial design panel (functional)"
@@ -798,6 +815,8 @@ main() {
         test_invocation_policy
         test_team_templates
         test_hotspot_analysis
+        test_bias_recall
+        test_hook_latency
         test_quick_setup
         test_dogfood
     fi

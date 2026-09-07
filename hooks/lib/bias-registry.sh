@@ -33,8 +33,38 @@ BIAS_REGISTERED_LANGS=()
 # absence is the exact failure this feature exists to remove, so the suffix is
 # derived here, and _bias_registry_audit below refuses to let a broken conf
 # pass unnoticed.
+# In-shell, because this is called on the blocking path of every prompt.
+#
+# `printf | tr` is two processes, and the hook asked for a suffix 117 times per
+# run: 117 process starts out of the 139 the whole bias detector made, which
+# was most of the 0.45s it added to every prompt before the model saw it.
+# Bash 3.2 has no ${x^^}, so the table is spelled out. Only [a-z] is mapped;
+# anything else is passed through, which keeps a glob character in a tag from
+# being read as a pattern by the prefix trick below.
+_BIAS_LOWER="abcdefghijklmnopqrstuvwxyz"
+_BIAS_UPPER="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
 _bias_var_suffix() {
-    printf '%s' "$1" | tr '[:lower:]-' '[:upper:]_'
+    local input="$1" out="" char prefix
+    while [[ -n "$input" ]]; do
+        char="${input:0:1}"
+        input="${input:1}"
+        # Not `[a-z]`: a glob range is collation-dependent, and on this
+        # machine it matched `H` as well, whose prefix search then found
+        # nothing and dropped the character. `zh-Hant` came out `ZH_ANT`.
+        # The prefix having actually moved is the only reliable test.
+        if [[ "$char" == "-" ]]; then
+            out="${out}_"
+        else
+            prefix="${_BIAS_LOWER%%"$char"*}"
+            if [[ "$prefix" != "$_BIAS_LOWER" ]]; then
+                out="${out}${_BIAS_UPPER:${#prefix}:1}"
+            else
+                out="${out}${char}"
+            fi
+        fi
+    done
+    printf '%s' "$out"
 }
 
 # A registered tag whose MODE never landed means its conf declared variables

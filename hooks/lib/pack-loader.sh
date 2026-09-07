@@ -40,26 +40,55 @@ _pack_reset() {
 
 # Extract a top-level scalar value from a simple YAML file.
 # e.g. _pack_yml_value "name" pack.yml  →  symfony
+# Read in-shell. This was grep | head | sed | tr | tr | sed: six processes for
+# one scalar, called once per pack per hook invocation.
+_pack_yml_strip() {
+    local value="$1"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    value="${value//\"/}"
+    value="${value//\'/}"
+    printf '%s' "$value"
+}
+
 _pack_yml_value() {
-    local key="$1" file="$2"
-    grep -E "^[[:space:]]*${key}:" "$file" 2>/dev/null | head -1 \
-        | sed -E 's/^[^:]+:[[:space:]]*//' | tr -d '"' | tr -d "'" \
-        | sed -E 's/^[[:space:]]+//;s/[[:space:]]+$//'
+    local key="$1" file="$2" line
+    [[ -f "$file" ]] || return 0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line#"${line%%[![:space:]]*}"}"
+        case "$line" in
+            "${key}:"*)
+                _pack_yml_strip "${line#*:}"
+                printf '\n'
+                return 0
+                ;;
+        esac
+    done < "$file"
+    return 0
 }
 
 # Extract an inline YAML array value from a top-level key.
 # e.g.  stack: ["symfony", "fullstack"]  →  symfony (line 1)  fullstack (line 2)
 _pack_yml_array() {
-    local key="$1" file="$2"
-    local line
-    line=$(grep -E "^[[:space:]]*${key}:" "$file" 2>/dev/null | head -1)
-    [[ -z "$line" ]] && return
-    echo "$line" \
-        | sed -E 's/^[^[]*\[//' \
-        | sed -E 's/\].*//' \
-        | tr ',' '\n' \
-        | sed -E 's/^[[:space:]]*"?//;s/"?[[:space:]]*$//' \
-        | grep -v '^$'
+    local key="$1" file="$2" line found="" item rest
+    [[ -f "$file" ]] || return 0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line#"${line%%[![:space:]]*}"}"
+        case "$line" in
+            "${key}:"*) found="$line"; break ;;
+        esac
+    done < "$file"
+    [[ -z "$found" ]] && return 0
+    rest="${found#*[}"
+    [[ "$rest" == "$found" ]] && return 0
+    rest="${rest%%]*}"
+    while [[ -n "$rest" ]]; do
+        item="${rest%%,*}"
+        if [[ "$item" == "$rest" ]]; then rest=""; else rest="${rest#*,}"; fi
+        item="$(_pack_yml_strip "$item")"
+        [[ -n "$item" ]] && printf '%s\n' "$item"
+    done
+    return 0
 }
 
 # Extract an inline YAML array nested under a parent key.
@@ -72,12 +101,34 @@ _pack_yml_array() {
 # YAML: 2.9s per load, and craftsman-ci pays it twice. Declaring `languages:`
 # lengthened the manifests by roughly 40 percent and made it visible by timing
 # the CI suite out at 300s.
-_pack_yml_nested_array() {
-    local parent="$1" child="$2" file="$3"
-    awk -v parent="$parent" -v child="$child" '
-        index($0, parent ":") == 1 { inside = 1; next }
-        inside && /^[a-zA-Z]/ { inside = 0 }
-        inside && $0 ~ ("^[[:space:]]+" child ":") {
+# Compiled once per manifest, read from the cache after that.
+#
+# Four capabilities are asked for per pack, and every question was its own awk
+# process: seven packs meant 28 process starts to read seven small files, on a
+# hook that runs on every write. The cache holds every nested pair the manifest
+# declares, and `-nt` invalidates it the moment the manifest is edited, so a
+# pack under development still behaves.
+#
+# It lives under CLAUDE_PLUGIN_DATA, never in a world-writable /tmp: this file
+# decides which validators run, and a cache another user can write is a way to
+# choose them.
+_pack_yml_nested_cache() {
+    local file="$1"
+    local cache_dir="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data}/cache/pack-yml"
+    local cache="${cache_dir}/${file//\//_}"
+
+    if [[ -f "$cache" && ! "$file" -nt "$cache" ]]; then
+        printf '%s' "$cache"
+        return 0
+    fi
+    mkdir -p "$cache_dir" 2>/dev/null || return 1
+    chmod 700 "${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data}/cache" 2>/dev/null || true
+    awk '
+        /^[a-zA-Z]/ { parent = $0; sub(/:.*/, "", parent); next }
+        /^[[:space:]]+[a-zA-Z_]+:.*\[/ {
+            child = $0
+            sub(/^[[:space:]]+/, "", child)
+            sub(/:.*/, "", child)
             line = $0
             sub(/^[^[]*\[/, "", line)
             sub(/\].*$/, "", line)
@@ -86,11 +137,25 @@ _pack_yml_nested_array() {
                 value = items[index_]
                 gsub(/^[[:space:]]*"?|"?[[:space:]]*$/, "", value)
                 gsub(/^'"'"'|'"'"'$/, "", value)
-                if (value != "") print value
+                if (value != "" && parent != "") print parent "." child "\t" value
             }
-            exit
         }
-    ' "$file" 2>/dev/null
+    ' "$file" > "$cache" 2>/dev/null || return 1
+    printf '%s' "$cache"
+}
+
+_pack_yml_nested_array() {
+    local parent="$1" child="$2" file="$3"
+    [[ -f "$file" ]] || return 0
+    local cache line key="${parent}.${child}"
+    cache="$(_pack_yml_nested_cache "$file")" || return 0
+    [[ -n "$cache" && -f "$cache" ]] || return 0
+    while IFS= read -r line; do
+        case "$line" in
+            "${key}"$'\t'*) printf '%s\n' "${line#*$'\t'}" ;;
+        esac
+    done < "$cache"
+    return 0
 }
 
 # Return 0 if the pack at pack_dir is compatible with the current stack.

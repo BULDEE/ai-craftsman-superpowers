@@ -85,7 +85,11 @@ Real-time detection of acceleration bias, scope creep, and over-optimization in 
 
 ### 4. Real-Time Quality Gate
 3-level progressive validation on every Write/Edit:
-- Level 1: Regex (<50ms) - strict_types, final, any, setters. Always active.
+- Level 1: Regex - strict_types, final, any, setters. Always active. The cost
+  is measured, not asserted: `bash tests/perf/test-hook-latency.sh --report`
+  prints the median per hook, and the suite fails when a hook crosses its
+  ceiling. The "<50ms" that stood here for four releases was 15 to 60 times
+  under what the hooks actually take, on the smallest input there is.
 - Level 2: Static analysis (<2s) - PHPStan, ESLint. When tools installed.
 - Level 3: Architecture (<2s) - deptrac, dependency-cruiser. When tools installed.
 Graceful degradation: works with zero tools installed (Level 1 only).

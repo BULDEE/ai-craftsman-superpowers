@@ -27,7 +27,7 @@ Levels 2 and 3 are the ones a Docker-only toolchain limits: `vendor/bin/phpstan`
 
 | Level | Mechanism | Catches | Latency |
 |-------|-----------|---------|---------|
-| 1 | Regex hooks | strict_types, final, any, setters | <50ms |
+| 1 | Regex hooks | strict_types, final, any, setters | measured, see `tests/perf/test-hook-latency.sh` |
 | 1.5 | Language server | type errors, undefined symbols, dead references, signature mismatches | live |
 | 2 | PHPStan / ESLint | rule-based static analysis | <2s |
 | 3 | deptrac / dependency-cruiser | layer dependency violations | <2s |
