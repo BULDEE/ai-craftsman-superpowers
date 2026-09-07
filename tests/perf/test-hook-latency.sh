@@ -28,6 +28,21 @@ RUNS="${CRAFTSMAN_PERF_RUNS:-7}"
 REPORT_ONLY=false
 [[ "${1:-}" == "--report" ]] && REPORT_ONLY=true
 
+# The machine's own calibration memory lives OUTSIDE the sandbox this run
+# creates and deletes. Captured before the two overrides below, because both of
+# them point at the temporary directory: written there, the file was destroyed
+# on exit, every run was the first run, and the derivation that reads it was
+# dead code under a comment claiming it worked. The observable behaviour was
+# identical to having no derivation at all, which is why it took executing it
+# twice to see.
+# Deliberately NOT CLAUDE_PLUGIN_DATA. This is a fact about the MACHINE, and
+# every harness in this repository redirects that variable at a temporary
+# directory: pointed there, the memory was written into a sandbox deleted on
+# exit, so every run was the first run and the derivation below was dead code
+# under a comment claiming it worked.
+_PERF_STATE_DIR="${HOME}/.claude"
+mkdir -p "$_PERF_STATE_DIR" 2>/dev/null || true
+
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-perf.XXXXXX")"
 cleanup() { rm -rf "$WORK"; }
 trap cleanup EXIT
@@ -178,7 +193,7 @@ CEILING_MS_BACKSTOP=2500
 # idle calibration above it would suspend the backstop permanently while the
 # output said "busy": a slow machine and a loaded one would be indistinguishable
 # forever.
-CALIBRATION_FLOOR_FILE="${CLAUDE_PLUGIN_DATA}/perf-calibration-floor"
+CALIBRATION_FLOOR_FILE="${_PERF_STATE_DIR}/craftsman-perf-calibration"
 CALIBRATION_QUIET_MS=210
 if [[ -f "$CALIBRATION_FLOOR_FILE" ]]; then
     _seen_floor="$(head -1 "$CALIBRATION_FLOOR_FILE" 2>/dev/null)"
@@ -193,6 +208,16 @@ if [[ ! -f "$CALIBRATION_FLOOR_FILE" ]] \
     printf '%s\n' "$FLOOR_MS" > "$CALIBRATION_FLOOR_FILE" 2>/dev/null || true
 fi
 MACHINE_IS_QUIET=$(python3 -c "print(1 if $FLOOR_MS <= $CALIBRATION_QUIET_MS else 0)" 2>/dev/null || echo 0)
+
+# Did the memory actually survive the run that wrote it? A derivation that
+# silently keeps falling back to the constant is indistinguishable from no
+# derivation at all on a machine where the constant happens to fit, which is
+# exactly how it shipped the first time.
+CALIBRATION_MEMORY="absent"
+if [[ -f "$CALIBRATION_FLOOR_FILE" ]]; then
+    _stored="$(head -1 "$CALIBRATION_FLOOR_FILE" 2>/dev/null)"
+    _is_measurement "${_stored:-}" && CALIBRATION_MEMORY="$_stored"
+fi
 
 measure_hook() {
     local label="$1" ceiling_factor="$2" command="$3"
@@ -249,6 +274,11 @@ measure_hook "post-write, 3 violations" 13 \
     "cd '$PROJECT' && printf '%s' '$DIRTY_PAYLOAD' | bash '$ROOT_DIR/hooks/post-write-check.sh' >/dev/null 2>&1"
 
 echo ""
+if [[ "$CALIBRATION_MEMORY" == "absent" ]]; then
+    echo "calibration memory: none yet, threshold is the ${CALIBRATION_QUIET_MS}ms fallback"
+else
+    echo "calibration memory: ${CALIBRATION_MEMORY}ms fastest ever seen here, quiet threshold ${CALIBRATION_QUIET_MS}ms"
+fi
 if [[ "$MACHINE_IS_QUIET" -eq 1 ]]; then
     echo "wall-clock backstop: ${CEILING_MS_BACKSTOP}ms, applied"
 else
@@ -310,6 +340,15 @@ if _is_measurement "$TIGHTEST_MS" && [[ "$TIGHTEST_MS" != "0" ]]; then
 else
     log_fail "the instrument could be checked against itself" \
         "no measurement to derive a synthetic regression from"
+fi
+
+# The memory is asserted, not assumed. Written into the sandbox, it vanished
+# with the sandbox and nothing said so.
+if [[ "$CALIBRATION_MEMORY" != "absent" ]]; then
+    log_pass "the calibration memory survives a run (${CALIBRATION_MEMORY}ms)"
+else
+    log_fail "the calibration memory survives a run" \
+        "nothing at $CALIBRATION_FLOOR_FILE, so the quiet threshold can only ever be the typed constant"
 fi
 
 # The published figure has to be the measured one, or it drifts again. These

@@ -64,6 +64,7 @@ NEUTRAL_EN=(
     "we micro-optimized this last year and it was a mistake"
     "why does the bias detector flag 'while we are at it'?"
     "the ticket says skip the tests, is that wise?"
+    "our team lead keeps saying just do it - how do I push back?"
 )
 
 # Two output contracts, and a harness that knew only one would report 0% for
@@ -137,6 +138,10 @@ BIASED_FR=(
     "code direct, pas le temps"
     "ajoutons aussi la pagination"
     "généraliser ce composant pour le futur"
+    "on saute les tests pour cette fois"
+    "fais-le maintenant, on verra après"
+    "et aussi, ajoute un cache"
+    "profites-en pour refactorer le reste"
 )
 
 NEUTRAL_FR=(
@@ -146,6 +151,8 @@ NEUTRAL_FR=(
     "explique les règles de couches"
     "écris un test pour le remboursement"
     "extrais cette méthode, elle fait deux choses"
+    "le ticket dit qu'on saute les tests, c'est raisonnable ?"
+    "pourquoi le détecteur signale 'tant qu'on y est' ?"
 )
 
 _measure_language "en" BIASED_EN NEUTRAL_EN

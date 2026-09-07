@@ -103,10 +103,29 @@ _design_was_used() {
 #
 # Deliberately narrow: it fires only on a verb of attribution, so "make it
 # configurable, we might need it later" still warns, question mark or not.
-_BIAS_REPORTED='(says|said|asked for|asks for|recommends?|recommended|suggests?|suggested|flags?|flagged|mentions?|mentioned|quotes?|quoted|according to|used to|last year|is that wise|is that right|why does|why is)'
+# Per language, declared beside that language's patterns, because a verb of
+# attribution is a fact about a language and not about this file. A language
+# that declares none simply has no guard, which is the honest default: the
+# eleven unmeasured languages are not silently claimed to have one.
+_bias_reported_pattern() {
+    local combined="" tier
+    for tier in curated signal; do
+        local pattern
+        pattern=$(bias_combined_pattern REPORTED "$tier") || continue
+        if [[ -n "$combined" ]]; then
+            combined="${combined}|${pattern}"
+        else
+            combined="$pattern"
+        fi
+    done
+    [[ -z "$combined" ]] && return 1
+    printf '%s' "$combined"
+}
 
 _bias_is_reported() {
-    printf '%s' "$PROMPT" | grep -iEq "$_BIAS_REPORTED"
+    local pattern
+    pattern=$(_bias_reported_pattern) || return 1
+    printf '%s' "$PROMPT" | grep -iEq "$pattern"
 }
 
 _bias_matches() {
@@ -136,7 +155,11 @@ fi
 # is not a verdict; the main model adjudicates it in context. Matching is
 # case-sensitive on purpose: signal patterns carry explicit case variants
 # because grep -i case folding is locale-dependent beyond ASCII.
-if [[ -z "$WARNINGS" ]]; then
+# The reported-speech guard applies to BOTH tiers. It sat on the curated path
+# alone, so English was protected and the twelve signal languages were not:
+# "le ticket dit qu'on saute les tests, c'est raisonnable ?" still produced a
+# note, which is the same false positive in another language.
+if [[ -z "$WARNINGS" ]] && ! _bias_is_reported; then
     for _cat_pair in "ACCELERATION acceleration" "SCOPE_CREEP scope_creep" \
                      "OVER_OPT over_optimization" "DOMAIN_MODELING domain_modeling"; do
         _cat="${_cat_pair%% *}"
