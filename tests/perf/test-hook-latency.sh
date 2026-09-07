@@ -102,27 +102,33 @@ _is_measurement() {
     [[ "$1" =~ ^[0-9]+(\.[0-9]+)?$ ]]
 }
 
-# Calibration on a basket, not on `bash -c true` alone. The hooks pay for
-# forks, for python3 starts and for reading files, and those three do not
-# degrade together: on a machine with cheap forks and a slow disk, a `true`
-# baseline makes every ratio explode with no regression behind it, and under a
-# CPU quota python3 slows down faster than `true` does, which shrinks the ratio
-# exactly when the user is suffering most.
-FLOOR_BASH="$(_median_ms "true" 11)"
-FLOOR_PY="$(_median_ms "python3 -c pass" 5)"
-FLOOR_IO="$(_median_ms "cat '$PROJECT/src/A.php' >/dev/null" 11)"
-for sample in "$FLOOR_BASH" "$FLOOR_PY" "$FLOOR_IO"; do
-    if ! _is_measurement "$sample"; then
-        log_fail "the calibration produced a number" "got '$sample'"
-        test_summary
-    fi
-done
-FLOOR_MS="$(python3 -c "print('%.3f' % (($FLOOR_BASH + $FLOOR_PY + $FLOOR_IO) / 3.0))")"
-_is_measurement "$FLOOR_MS" || FLOOR_MS="1.0"
-[[ "$FLOOR_MS" == "0.000" ]] && FLOOR_MS="1.0"
+# The calibration has the SHAPE of a hook, not merely its ingredients.
+#
+# A basket of `bash -c true`, one python3 start and one read was better than
+# `true` alone and still wrong under load, measured: with twelve busy loops on
+# ten cores the basket grew 1.3x while the hooks grew 1.95x, because a
+# post-write run makes about 106 process starts and the basket makes three.
+# The ratio then grew 1.5x on unchanged code, against a 1.4x margin, so the
+# suite went red for a reason that had nothing to do with the change under
+# test: exactly the flake this file's own comment says would get the ceiling
+# deleted.
+#
+# So the baseline is fifty real forks plus one python3 start and one read. It
+# grows the way the hooks grow because it is made of the same thing they are
+# made of, which makes the ratio invariant to load by construction rather than
+# by hope.
+CALIBRATION_FORKS=50
+CALIBRATION_WORKLOAD="for _ in \$(seq 1 $CALIBRATION_FORKS); do /bin/echo x >/dev/null; done; python3 -c pass; cat '$PROJECT/src/A.php' >/dev/null"
+
+FLOOR_MS="$(_median_ms "$CALIBRATION_WORKLOAD" 7)"
+if ! _is_measurement "$FLOOR_MS"; then
+    log_fail "the calibration produced a number" "got '$FLOOR_MS'"
+    test_summary
+fi
+[[ "$FLOOR_MS" == "0.0" ]] && FLOOR_MS="1.0"
 
 echo "=== Hook latency ==="
-echo "calibration: ${FLOOR_MS}ms (bash ${FLOOR_BASH}ms, python3 ${FLOOR_PY}ms, read ${FLOOR_IO}ms)"
+echo "calibration: ${FLOOR_MS}ms (${CALIBRATION_FORKS} forks + one python3 + one read, fastest of 7)"
 echo ""
 printf '%-26s %11s %12s %10s %9s\n' "hook" "fastest" "median" "x baseline" "ceiling"
 
@@ -144,13 +150,16 @@ RESULTS=""
 CEILING_MS_BACKSTOP=2500
 
 # It is applied only on a quiet machine, and that is a statement about what a
-# wall clock can and cannot attribute. Under sustained load every number here
+# wall clock can and cannot attribute. The threshold is well ABOVE this
+# machine's idle calibration, not inside its noise: at 12ms against an idle
+# spread of 11.7 to 12.9ms, the only ceiling a ratio cannot absolve was armed
+# or disarmed by a coin toss, two runs out of six on an idle laptop. Under sustained load every number here
 # grows, including the fastest of N runs, and the growth belongs to the machine
 # rather than to the code: enforcing an absolute figure there would fail this
 # suite for the crime of running after the rest of it, which is how a benchmark
 # gets deleted. The ratio still applies in both cases; only the absolute one is
 # suspended, and the suspension is printed.
-CALIBRATION_QUIET_MS=12
+CALIBRATION_QUIET_MS=210
 MACHINE_IS_QUIET=$(python3 -c "print(1 if $FLOOR_MS <= $CALIBRATION_QUIET_MS else 0)" 2>/dev/null || echo 0)
 
 measure_hook() {
@@ -163,7 +172,7 @@ measure_hook() {
         log_fail "$label was measured" "the timing came back '$pair', so nothing was measured"
         fastest="0"; median="0"; ratio="0"
     else
-        ratio="$(python3 -c "print('%.0f' % ($fastest / $FLOOR_MS))")"
+        ratio="$(python3 -c "print('%.2f' % ($fastest / $FLOOR_MS))")"
     fi
     # Both, because the gap between the fastest run and the median is the
     # signal that the machine was busy while measuring.
@@ -187,18 +196,18 @@ PHPDIRTY
 DIRTY_PAYLOAD="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \
     "$PROJECT/src/Dirty.php" "$PROJECT")"
 
-measure_hook "post-write-check.sh" 70 \
+measure_hook "post-write-check.sh" 5.5 \
     "cd '$PROJECT' && printf '%s' '$POST_PAYLOAD' | bash '$ROOT_DIR/hooks/post-write-check.sh' >/dev/null 2>&1"
-measure_hook "pre-write-check.sh" 34 \
+measure_hook "pre-write-check.sh" 3.2 \
     "cd '$PROJECT' && printf '%s' '$PRE_PAYLOAD' | bash '$ROOT_DIR/hooks/pre-write-check.sh' >/dev/null 2>&1"
-measure_hook "bias-detector.sh" 18 \
+measure_hook "bias-detector.sh" 1.5 \
     "cd '$PROJECT' && printf '%s' '$PROMPT_PAYLOAD' | bash '$ROOT_DIR/hooks/bias-detector.sh' >/dev/null 2>&1"
 
 # A file that violates nothing measures the floor, and the floor is not what a
 # user pays. Every recorded violation starts its own python3 for the metrics
 # insert, so the cost of a real write scales with the findings in it: this is
 # the path where the remaining latency lives, and no ceiling covered it.
-measure_hook "post-write, 3 violations" 150 \
+measure_hook "post-write, 3 violations" 13 \
     "cd '$PROJECT' && printf '%s' '$DIRTY_PAYLOAD' | bash '$ROOT_DIR/hooks/post-write-check.sh' >/dev/null 2>&1"
 
 echo ""
@@ -219,7 +228,11 @@ while IFS='|' read -r label median ratio ceiling; do
     if [[ "$MACHINE_IS_QUIET" -eq 1 ]]; then
         over_backstop=$(python3 -c "print(1 if $median > $CEILING_MS_BACKSTOP else 0)" 2>/dev/null || echo 1)
     fi
-    if [[ "$ratio" -le "$ceiling" && "$over_backstop" -eq 0 ]]; then
+    # Decimal, so bash cannot compare it. The ratios are single digits now that
+    # the baseline has the hooks' shape, and rounding them to whole numbers
+    # threw away most of the resolution the ceiling needs.
+    under_ceiling=$(python3 -c "print(1 if $ratio <= $ceiling else 0)" 2>/dev/null || echo 0)
+    if [[ "$under_ceiling" -eq 1 && "$over_backstop" -eq 0 ]]; then
         log_pass "$label stays under ${ceiling}x the baseline (${median}ms, ${ratio}x)"
     elif [[ "$over_backstop" -eq 1 ]]; then
         log_fail "$label crossed the wall-clock backstop" \
@@ -232,19 +245,33 @@ done <<< "$RESULTS"
 
 # The instrument, seen red on purpose, in the same run that trusts it. A
 # ceiling nobody has watched fail is a ceiling nobody knows is wired up.
-SLOW_HOOK="$WORK/slow-hook.sh"
-printf '#!/usr/bin/env bash\nsleep 0.4\nexit 0\n' > "$SLOW_HOOK"
-chmod +x "$SLOW_HOOK"
-SLOW_MS="$(_median_ms "bash '$SLOW_HOOK'" 3)"
-SLOW_RATIO="$(python3 -c "print('%.0f' % ($SLOW_MS / $FLOOR_MS))" 2>/dev/null || echo 0)"
-# Compared against the TIGHTEST ceiling in this file, not a constant: the
-# calibration basket changed once already, and every ratio moved with it.
-SMALLEST_CEILING=18
-if [[ "$SLOW_RATIO" -gt "$SMALLEST_CEILING" ]]; then
-    log_pass "a hook that sleeps 0.4s does cross the tightest ceiling (${SLOW_MS}ms, ${SLOW_RATIO}x > ${SMALLEST_CEILING}x)"
+#
+# The synthetic regression is PROPORTIONAL to what was just measured, not a
+# fixed 0.4s. A fixed sleep proved the point on an idle laptop and proved
+# nothing under load, where the baseline itself grew past it: the check then
+# reported that the ceilings could not catch a 400ms regression, which was true
+# and useless. Doubling the tightest hook is the regression the tightest ceiling
+# exists to catch, and it is the same regression at any machine speed.
+TIGHTEST="$(printf '%s' "$RESULTS" | awk -F'|' '
+    NF >= 4 && $2 + 0 > 0 { if (best == "" || $2 + 0 < best) { best = $2 + 0; ceiling = $4 } }
+    END { printf "%s %s", (best == "" ? 0 : best), (ceiling == "" ? 0 : ceiling) }')"
+TIGHTEST_MS="${TIGHTEST%% *}"
+SMALLEST_CEILING="${TIGHTEST##* }"
+
+if _is_measurement "$TIGHTEST_MS" && [[ "$TIGHTEST_MS" != "0" ]]; then
+    DOUBLE_SECONDS="$(python3 -c "print('%.3f' % (2 * $TIGHTEST_MS / 1000.0))")"
+    SLOW_MS="$(_median_ms "sleep $DOUBLE_SECONDS" 3)"
+    SLOW_RATIO="$(python3 -c "print('%.2f' % ($SLOW_MS / $FLOOR_MS))" 2>/dev/null || echo 0)"
+    crosses=$(python3 -c "print(1 if $SLOW_RATIO > $SMALLEST_CEILING else 0)" 2>/dev/null || echo 0)
+    if [[ "$crosses" -eq 1 ]]; then
+        log_pass "doubling the tightest hook does cross its ceiling (${SLOW_MS}ms, ${SLOW_RATIO}x > ${SMALLEST_CEILING}x)"
+    else
+        log_fail "doubling the tightest hook does cross its ceiling" \
+            "measured ${SLOW_MS}ms, ${SLOW_RATIO}x, under the ${SMALLEST_CEILING}x ceiling: a doubling would ship unnoticed"
+    fi
 else
-    log_fail "a hook that sleeps 0.4s does cross a ceiling" \
-        "measured ${SLOW_MS}ms, ${SLOW_RATIO}x, under the tightest ceiling (${SMALLEST_CEILING}x): the ceilings are too loose to catch a real regression"
+    log_fail "the instrument could be checked against itself" \
+        "no measurement to derive a synthetic regression from"
 fi
 
 # The published figure has to be the measured one, or it drifts again. These
