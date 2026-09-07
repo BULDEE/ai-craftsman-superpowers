@@ -91,17 +91,40 @@ _design_was_used() {
     [[ "$design_used" == "true" ]]
 }
 
+# Reported speech is not an instruction.
+#
+# A prompt can NAME a bias without exhibiting it: "why does the bias detector
+# flag 'while we are at it'?", "the ticket says skip the tests, is that wise?",
+# "the client asked for maximum performance in the SLA". Each of those warned,
+# and a warning on an ordinary question costs more than a missed bias, because
+# the first teaches the user to ignore the hook. README.md and CLAUDE.md both
+# claim the detector "requires imperative verb context"; this is the part of
+# that claim which was never implemented.
+#
+# Deliberately narrow: it fires only on a verb of attribution, so "make it
+# configurable, we might need it later" still warns, question mark or not.
+_BIAS_REPORTED='(says|said|asked for|asks for|recommends?|recommended|suggests?|suggested|flags?|flagged|mentions?|mentioned|quotes?|quoted|according to|used to|last year|is that wise|is that right|why does|why is)'
+
+_bias_is_reported() {
+    printf '%s' "$PROMPT" | grep -iEq "$_BIAS_REPORTED"
+}
+
+_bias_matches() {
+    _bias_is_reported && return 1
+    printf '%s' "$PROMPT" | grep -iEq "$1"
+}
+
 # Check each curated category. bias_combined_pattern returns non-zero when no
 # language declares a category, and the grep MUST be skipped then: an empty
 # pattern matches every prompt.
 if pat=$(bias_combined_pattern ACCELERATION curated); then
-    echo "$PROMPT" | grep -iEq "$pat" && warn_acceleration || true
+    _bias_matches "$pat" && warn_acceleration || true
 fi
 if pat=$(bias_combined_pattern SCOPE_CREEP curated); then
-    echo "$PROMPT" | grep -iEq "$pat" && warn_scope_creep || true
+    _bias_matches "$pat" && warn_scope_creep || true
 fi
 if pat=$(bias_combined_pattern OVER_OPT curated); then
-    echo "$PROMPT" | grep -iEq "$pat" && warn_over_optimization || true
+    _bias_matches "$pat" && warn_over_optimization || true
 fi
 
 # Workflow enforcement: warn if domain modeling without /craftsman:design

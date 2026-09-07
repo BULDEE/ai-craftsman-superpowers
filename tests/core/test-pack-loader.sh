@@ -508,6 +508,48 @@ else
         "a parser fix would never reach an installed machine"
 fi
 
+# A manifest whose mtime moved BACKWARDS: `git checkout` of an older version,
+# `git stash pop`, `tar -x`, `rsync -t`. `-nt` only answers "is it newer", so
+# the cache stayed frozen on the newer content indefinitely, which is the pack
+# developer's everyday loop, the one the cache comment claims to protect.
+printf 'compatibility:\n  stack: ["NEW"]\n' > "$CACHE_WORK/a/b/pack.yml"
+_cached_stack "$CACHE_WORK/a/b/pack.yml" >/dev/null
+printf 'compatibility:\n  stack: ["RESTORED"]\n' > "$CACHE_WORK/a/b/pack.yml"
+touch -t 202001010000 "$CACHE_WORK/a/b/pack.yml"
+restored=$(_cached_stack "$CACHE_WORK/a/b/pack.yml")
+if [[ "$restored" == "RESTORED" ]]; then
+    log_pass "a manifest restored from an older version is re-read, not served stale"
+else
+    log_fail "a manifest restored from an older version is re-read" "got '$restored'"
+fi
+
+# A path no filesystem will hold as a file name. The escaping triples every
+# underscore and mktemp adds six characters, so a deep checkout crossed
+# NAME_MAX, mktemp failed, and the pack lost every validator with nothing on
+# stderr.
+DEEP="$CACHE_WORK/$(python3 -c "print('/'.join('seg%02d_x' % i for i in range(24)))")"
+mkdir -p "$DEEP"
+printf 'hooks:\n  validators: ["deep.sh"]\n' > "$DEEP/pack.yml"
+deep_result=$(CLAUDE_PLUGIN_DATA="$CACHE_WORK/data" bash -c \
+    "source '$ROOT_DIR/hooks/lib/pack-loader.sh'; _pack_yml_nested_array hooks validators '$DEEP/pack.yml'" 2>/dev/null)
+if [[ "$deep_result" == "deep.sh" ]]; then
+    log_pass "a manifest too deep for a cache file name is still parsed"
+else
+    log_fail "a manifest too deep for a cache file name is still parsed" "got '$deep_result'"
+fi
+
+# A cache is an optimisation. A read-only data directory must change the cost
+# and never the answer.
+chmod 500 "$CACHE_WORK/data" 2>/dev/null || true
+readonly_result=$(CLAUDE_PLUGIN_DATA="$CACHE_WORK/data" bash -c \
+    "source '$ROOT_DIR/hooks/lib/pack-loader.sh'; _pack_yml_nested_array hooks validators '$DEEP/pack.yml'" 2>/dev/null)
+chmod 700 "$CACHE_WORK/data" 2>/dev/null || true
+if [[ "$readonly_result" == "deep.sh" ]]; then
+    log_pass "an unwritable cache directory falls back to parsing the manifest"
+else
+    log_fail "an unwritable cache directory falls back to parsing the manifest" "got '$readonly_result'"
+fi
+
 rm -rf "$CACHE_WORK"
 
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true

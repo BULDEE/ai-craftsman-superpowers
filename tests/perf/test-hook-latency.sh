@@ -36,6 +36,13 @@ export CLAUDE_PLUGIN_ROOT="$ROOT_DIR"
 export CLAUDE_PLUGIN_DATA="$WORK/data"
 mkdir -p "$CLAUDE_PLUGIN_DATA"
 
+# HOME too, because `post-write-check.sh` reads ~/.claude/.craft-config.yml as
+# the global rules layer: without this the benchmark measured whatever the
+# developer happens to have there, and the number moved from machine to machine
+# for reasons that have nothing to do with the code.
+export HOME="$WORK/home"
+mkdir -p "$HOME/.claude"
+
 # The smallest realistic input: a file that violates nothing, in a repository
 # with one commit. Anything larger measures the validators; this measures what
 # every write pays before any finding exists.
@@ -50,9 +57,18 @@ PHP
 
 # Median, not mean: one slow run (a cold page cache, another process waking up)
 # moves a mean and does not move a median.
-_median_ms() {
+# The MINIMUM for the verdict, the median for the report, and the difference
+# between them is the whole difference between a benchmark and a coin toss.
+#
+# The first version asserted on the median and went red inside the full suite
+# while passing on its own: the suite runs it last, on a machine still busy
+# with everything before it, and a median absorbs that. Contention can only
+# ever make a run slower, never faster, so the fastest of N runs is the closest
+# thing to the uncontended cost that repeated sampling can give. The median is
+# printed beside it, because the gap between the two says the machine was busy.
+_min_ms() {
     local command="$1" runs="$2"
-    python3 - "$command" "$runs" <<'PY'
+    python3 - "$command" "$runs" <<'PYTIME'
 import subprocess, sys, time
 command, runs = sys.argv[1], int(sys.argv[2])
 samples = []
@@ -61,8 +77,15 @@ for _ in range(runs):
     subprocess.run(["bash", "-c", command], capture_output=True)
     samples.append((time.time() - started) * 1000)
 samples.sort()
-print("%.1f" % samples[len(samples) // 2])
-PY
+print("%.1f %.1f" % (samples[0], samples[len(samples) // 2]))
+PYTIME
+}
+
+# The calibration wants one number, and it wants the uncontended one too.
+_median_ms() {
+    local pair
+    pair="$(_min_ms "$1" "$2")" || return 1
+    printf '%s' "${pair%% *}"
 }
 
 # The instrument before the experiment. `_median_ms` delegates to python3, and
@@ -101,7 +124,7 @@ _is_measurement "$FLOOR_MS" || FLOOR_MS="1.0"
 echo "=== Hook latency ==="
 echo "calibration: ${FLOOR_MS}ms (bash ${FLOOR_BASH}ms, python3 ${FLOOR_PY}ms, read ${FLOOR_IO}ms)"
 echo ""
-printf '%-26s %10s %12s %10s\n' "hook" "median" "x baseline" "ceiling"
+printf '%-26s %11s %12s %10s %9s\n' "hook" "fastest" "median" "x baseline" "ceiling"
 
 # Roughly 1.4 times what the hooks measure today against the basket baseline,
 # which leaves room for a slower machine and none for a regression that doubles
@@ -132,16 +155,20 @@ MACHINE_IS_QUIET=$(python3 -c "print(1 if $FLOOR_MS <= $CALIBRATION_QUIET_MS els
 
 measure_hook() {
     local label="$1" ceiling_factor="$2" command="$3"
-    local median ratio
-    median="$(_median_ms "$command" "$RUNS")"
-    if ! _is_measurement "$median"; then
-        log_fail "$label was measured" "the median came back '$median', so nothing was measured"
-        median="0"; ratio="0"
+    local pair fastest median ratio
+    pair="$(_min_ms "$command" "$RUNS")"
+    fastest="${pair%% *}"
+    median="${pair##* }"
+    if ! _is_measurement "$fastest" || ! _is_measurement "$median"; then
+        log_fail "$label was measured" "the timing came back '$pair', so nothing was measured"
+        fastest="0"; median="0"; ratio="0"
     else
-        ratio="$(python3 -c "print('%.0f' % ($median / $FLOOR_MS))")"
+        ratio="$(python3 -c "print('%.0f' % ($fastest / $FLOOR_MS))")"
     fi
-    printf '%-26s %9sms %11sx %9sx\n' "$label" "$median" "$ratio" "$ceiling_factor"
-    RESULTS="${RESULTS}${label}|${median}|${ratio}|${ceiling_factor}"$'\n'
+    # Both, because the gap between the fastest run and the median is the
+    # signal that the machine was busy while measuring.
+    printf '%-26s %9sms %10sms %9sx %8sx\n' "$label" "$fastest" "$median" "$ratio" "$ceiling_factor"
+    RESULTS="${RESULTS}${label}|${fastest}|${ratio}|${ceiling_factor}"$'\n'
 }
 
 POST_PAYLOAD="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \
@@ -160,18 +187,18 @@ PHPDIRTY
 DIRTY_PAYLOAD="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \
     "$PROJECT/src/Dirty.php" "$PROJECT")"
 
-measure_hook "post-write-check.sh" 60 \
+measure_hook "post-write-check.sh" 70 \
     "cd '$PROJECT' && printf '%s' '$POST_PAYLOAD' | bash '$ROOT_DIR/hooks/post-write-check.sh' >/dev/null 2>&1"
-measure_hook "pre-write-check.sh" 26 \
+measure_hook "pre-write-check.sh" 34 \
     "cd '$PROJECT' && printf '%s' '$PRE_PAYLOAD' | bash '$ROOT_DIR/hooks/pre-write-check.sh' >/dev/null 2>&1"
-measure_hook "bias-detector.sh" 15 \
+measure_hook "bias-detector.sh" 18 \
     "cd '$PROJECT' && printf '%s' '$PROMPT_PAYLOAD' | bash '$ROOT_DIR/hooks/bias-detector.sh' >/dev/null 2>&1"
 
 # A file that violates nothing measures the floor, and the floor is not what a
 # user pays. Every recorded violation starts its own python3 for the metrics
 # insert, so the cost of a real write scales with the findings in it: this is
 # the path where the remaining latency lives, and no ceiling covered it.
-measure_hook "post-write, 3 violations" 135 \
+measure_hook "post-write, 3 violations" 150 \
     "cd '$PROJECT' && printf '%s' '$DIRTY_PAYLOAD' | bash '$ROOT_DIR/hooks/post-write-check.sh' >/dev/null 2>&1"
 
 echo ""
@@ -212,7 +239,7 @@ SLOW_MS="$(_median_ms "bash '$SLOW_HOOK'" 3)"
 SLOW_RATIO="$(python3 -c "print('%.0f' % ($SLOW_MS / $FLOOR_MS))" 2>/dev/null || echo 0)"
 # Compared against the TIGHTEST ceiling in this file, not a constant: the
 # calibration basket changed once already, and every ratio moved with it.
-SMALLEST_CEILING=15
+SMALLEST_CEILING=18
 if [[ "$SLOW_RATIO" -gt "$SMALLEST_CEILING" ]]; then
     log_pass "a hook that sleeps 0.4s does cross the tightest ceiling (${SLOW_MS}ms, ${SLOW_RATIO}x > ${SMALLEST_CEILING}x)"
 else

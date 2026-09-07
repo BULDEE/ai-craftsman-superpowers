@@ -112,66 +112,56 @@ _pack_yml_array() {
 # It lives under CLAUDE_PLUGIN_DATA, never in a world-writable /tmp: this file
 # decides which validators run, and a cache another user can write is a way to
 # choose them.
-# Bumped whenever the awk below changes. The cache is keyed by manifest mtime,
-# and a manifest does not change when the PARSER does: without this, a release
-# that fixes how `validators:` is extracted would take effect on no installed
-# machine, ever, because every one of them would keep serving the file compiled
-# by the old parser. This file decides which validators run.
-_PACK_YML_CACHE_VERSION="1"
+# Bumped whenever the awk below changes. The cache is keyed by the manifest's
+# identity, and a manifest does not change when the PARSER does: without this, a
+# release that fixes how `validators:` is extracted would take effect on no
+# installed machine, ever, because every one of them would keep serving the file
+# compiled by the old parser. This file decides which validators run.
+_PACK_YML_CACHE_VERSION="2"
 
 # Injective, unlike `${file//\//_}`, which sent `/` and `_` to the same
 # character: `a/b/pack.yml` and `a_b/pack.yml` shared one cache entry, and the
 # second pack silently served the first one's validators. External pack paths
 # come from the user's own config, so both spellings are reachable.
+#
+# Hashed past a threshold, because the escaping triples every `_` and mktemp
+# adds six characters: a deep checkout crossed NAME_MAX, mktemp failed, and the
+# pack lost every validator with nothing on stderr. A hash costs one process on
+# the paths that would otherwise not work at all.
+_PACK_YML_KEY_MAX=180
+
 _pack_yml_cache_key() {
     local key="$1"
     key="${key//%/%25}"
     key="${key//_/%5f}"
     key="${key//\//_}"
+    if [[ "${#key}" -gt "$_PACK_YML_KEY_MAX" ]]; then
+        key="h$(printf '%s' "$1" | cksum | tr -d ' ')-${key: -60}"
+    fi
     printf '%s' "$key"
 }
 
-_pack_yml_nested_cache() {
-    local file="$1"
-    local cache_dir="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data}/cache/pack-yml"
-    local cache="${cache_dir}/v${_PACK_YML_CACHE_VERSION}-$(_pack_yml_cache_key "$file")"
+# The manifest's identity, not its ordering against a file. `-nt` answers "is it
+# newer", which is one-directional and second-granular in bash 3.2: a manifest
+# edited twice in one second was not re-read, and a `git checkout` of an older
+# version, a `git stash pop`, a `tar -x` or an `rsync -t` moved the mtime
+# BACKWARDS and froze the cache on the newer content indefinitely. That is the
+# pack developer's everyday loop, which the cache comment claimed to protect.
+_pack_yml_identity() {
+    stat -f '%m %z' "$1" 2>/dev/null || stat -c '%Y %s' "$1" 2>/dev/null || printf 'unknown'
+}
 
-    # A header line, not just an mtime test. A cache truncated by a crash, a
-    # full disk or a partial write is newer than its manifest and would be
-    # served forever: measured, an emptied cache made post-write-check.sh lose
-    # every validator of every pack, exit 0, no message, and nothing ever
-    # repaired it. An empty COMPILE is legitimate (a manifest with no nested
-    # arrays), so emptiness cannot be the test; the header can be.
-    if [[ -f "$cache" && ! "$file" -nt "$cache" ]] \
-        && IFS= read -r _pack_yml_header < "$cache" 2>/dev/null \
-        && [[ "$_pack_yml_header" == "#craftsman-pack-yml v${_PACK_YML_CACHE_VERSION}" ]]; then
-        printf '%s' "$cache"
-        return 0
-    fi
-    mkdir -p "$cache_dir" 2>/dev/null || return 1
-    chmod 700 "$cache_dir" 2>/dev/null || true
-
-    # Written to a temp file and renamed over the target, the same rule
-    # CLAUDE.md already states for session-state.json, and for the same reason
-    # made worse: a torn read here does not lose a counter, it loses every
-    # validator a pack declares. Measured before this: twelve concurrent
-    # readers on a cold cache, three of them saw zero entries and ran no
-    # validator at all, exit 0 and no message. A failed awk never publishes
-    # either, where the redirection alone had already truncated the file and
-    # left an empty one newer than the manifest, which `-nt` then served
-    # forever.
-    local temp
-    temp=$(mktemp "${cache}.XXXXXX" 2>/dev/null) || return 1
-    printf '#craftsman-pack-yml v%s\n' "$_PACK_YML_CACHE_VERSION" > "$temp" 2>/dev/null || {
-        rm -f "$temp"
-        return 1
-    }
-    if ! awk '
+# The compile itself. Kept as a function because it is also the FALLBACK: a
+# cache is an optimisation, and a read-only CLAUDE_PLUGIN_DATA, a full disk or a
+# path no filesystem will hold must never change the answer, only its cost.
+_pack_yml_nested_compile() {
+    awk '
         /^[a-zA-Z]/ { parent = $0; sub(/:.*/, "", parent); next }
         /^[[:space:]]+[a-zA-Z_]+:.*\[/ {
             child = $0
             sub(/^[[:space:]]+/, "", child)
             sub(/:.*/, "", child)
+            if (seen[parent "." child]++) next
             line = $0
             sub(/^[^[]*\[/, "", line)
             sub(/\].*$/, "", line)
@@ -183,10 +173,41 @@ _pack_yml_nested_cache() {
                 if (value != "" && parent != "") print parent "." child "\t" value
             }
         }
-    ' "$file" >> "$temp" 2>/dev/null; then
-        rm -f "$temp"
-        return 1
+    ' "$1" 2>/dev/null
+}
+
+_pack_yml_nested_cache() {
+    local file="$1"
+    local cache_dir="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data}/cache/pack-yml"
+    local cache="${cache_dir}/v${_PACK_YML_CACHE_VERSION}-$(_pack_yml_cache_key "$file")"
+    local want header temp
+
+    want="#craftsman-pack-yml v${_PACK_YML_CACHE_VERSION} $(_pack_yml_identity "$file")"
+
+    # A header line, not an mtime comparison. It carries the parser version and
+    # the manifest's size and mtime, so a cache truncated by a crash, written by
+    # an older parser, or left behind by a manifest that moved backwards in time
+    # all fail the same equality test. An empty COMPILE is legitimate (a
+    # manifest with no nested arrays), so emptiness cannot be the test.
+    if [[ -f "$cache" ]] && IFS= read -r header < "$cache" 2>/dev/null \
+        && [[ "$header" == "$want" ]]; then
+        printf '%s' "$cache"
+        return 0
     fi
+
+    mkdir -p "$cache_dir" 2>/dev/null || return 1
+    chmod 700 "$cache_dir" 2>/dev/null || true
+
+    # Written to a temp file and renamed over the target, the same rule
+    # CLAUDE.md states for session-state.json, and worse here: a torn read does
+    # not lose a counter, it loses every validator a pack declares. Measured
+    # before this: twelve concurrent readers on a cold cache, three saw zero
+    # entries and ran no validator at all, exit 0 and no message.
+    temp=$(mktemp "${cache_dir}/tmp.XXXXXX" 2>/dev/null) || return 1
+    {
+        printf '%s\n' "$want"
+        _pack_yml_nested_compile "$file"
+    } > "$temp" 2>/dev/null || { rm -f "$temp"; return 1; }
     mv -f "$temp" "$cache" 2>/dev/null || { rm -f "$temp"; return 1; }
     printf '%s' "$cache"
 }
@@ -194,9 +215,21 @@ _pack_yml_nested_cache() {
 _pack_yml_nested_array() {
     local parent="$1" child="$2" file="$3"
     [[ -f "$file" ]] || return 0
-    local cache line key="${parent}.${child}" _pack_yml_header
-    cache="$(_pack_yml_nested_cache "$file")" || return 0
-    [[ -n "$cache" && -f "$cache" ]] || return 0
+    local cache line key="${parent}.${child}"
+
+    cache="$(_pack_yml_nested_cache "$file")"
+    if [[ -z "$cache" || ! -f "$cache" ]]; then
+        # No cache available. Parse the manifest directly rather than answer
+        # "this pack declares nothing", which is what a returning-empty
+        # optimisation would have said on a read-only data directory.
+        _pack_yml_nested_compile "$file" | while IFS= read -r line; do
+            case "$line" in
+                "${key}"$'\t'*) printf '%s\n' "${line#*$'\t'}" ;;
+            esac
+        done
+        return 0
+    fi
+
     while IFS= read -r line; do
         case "$line" in
             "${key}"$'\t'*) printf '%s\n' "${line#*$'\t'}" ;;

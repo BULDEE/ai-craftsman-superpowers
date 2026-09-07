@@ -59,6 +59,11 @@ NEUTRAL_EN=(
     "write a test for the refund path"
     "extract this method, it does two things"
     "update the changelog for 4.9.0"
+    "the docs recommend a HashMap here for best performance, is that right?"
+    "why is this endpoint slow, the client asked for maximum performance in the SLA"
+    "we micro-optimized this last year and it was a mistake"
+    "why does the bias detector flag 'while we are at it'?"
+    "the ticket says skip the tests, is that wise?"
 )
 
 # Two output contracts, and a harness that knew only one would report 0% for
@@ -75,7 +80,7 @@ _warns() {
     # categories this measures are the ones that claim the user is about to
     # make a mistake.
     printf '%s' "$output" \
-        | grep -vE "domain_modeling|Domain Modeling" \
+        | grep -viE "domain_modeling|domain modeling" \
         | grep -qE "bias:|Bias signal \("
 }
 
