@@ -215,8 +215,10 @@ _record_violation_metric() {
     local metric_blocked=0
     [[ "$severity" == "block" && "$ignored" -eq 0 ]] && metric_blocked=1
 
+    # The exact file too, not only its directory bucket: it is the only join
+    # key that can answer "did the other layer see THIS file".
     metrics_record_violation "$rule" "$FILE_PATTERN" "$metric_severity" \
-        "$metric_blocked" "$ignored" 2>/dev/null || true
+        "$metric_blocked" "$ignored" "$FILE_PATH" 2>/dev/null || true
 }
 
 # The single funnel every violation passes through, Level 1 and Level 2/3

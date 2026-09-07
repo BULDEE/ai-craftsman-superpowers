@@ -39,11 +39,28 @@ It prints six lines: runs, findings, the share of findings Level 1 never saw on
 the same file, the Haiku fixed rate, the Level 1 fixed rate for comparison, and
 Haiku seconds per accepted finding.
 
+Two of those lines can legitimately say something other than a percentage, and
+what they say matters:
+
+- `not computable yet` on the unseen share means the findings predate the exact
+  path column. Report it as "no comparison possible yet", never as zero.
+- `n/a` on a fixed rate means no finding has been resolved in the window, which
+  is an empty sample and not a rate of zero. **Never recommend turning the layer
+  off on an `n/a`.**
+
 **Report them, then say what they mean.** The share Level 1 never saw is the
-only thing that justifies a second layer existing. If the Haiku fixed rate comes
-in below Level 1's after 200 verdicts, say so plainly and recommend
-`agent_hooks: false`: that is a measurement, not an opinion. If there are fewer
-than 200 verdicts, say the sample is too small and give the count.
+only thing that justifies a second layer existing. If the Haiku fixed rate is a
+NUMBER and comes in below Level 1's after 200 verdicts, say so plainly and
+recommend `agent_hooks: false`: that is a measurement, not an opinion. If there
+are fewer than 200 verdicts, or either rate is `n/a`, say the sample is too
+small and give the count. A recommendation to switch off a layer on a missing
+number is worse than no recommendation.
+
+One caveat to state whenever you report the fixed rate: a Haiku finding and a
+Level 1 finding are not equally cheap to fix. A missing `declare(strict_types=1)`
+is one line; "this aggregate mutates another aggregate's state" may be a
+redesign. A lower fixed rate is evidence, not proof, and the two rates are
+printed side by side so a reader can weigh that rather than divide.
 
 ### Step 5: Present Report
 

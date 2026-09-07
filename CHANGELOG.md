@@ -37,11 +37,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nothing, and a run that could not happen at all, are the other half of every
   rate, and cost per finding cannot be computed from findings alone.
 
+  Both layers now record the exact project-relative path beside the directory
+  pattern, in a new `file_path` column, because "did the other layer see THIS
+  file" cannot be answered by a bucket that maps every `.php` in a directory to
+  one glob. Rows written before that column exists are excluded from the
+  comparison rather than counted as unseen, and the report says how many it
+  could compare.
+
+  The layer closes its own loop: when a later verification of the same file no
+  longer reports a finding, that is recorded as a correction with
+  `source='haiku'`. The existing correction learning loop cannot do this job,
+  because it keys on the directory bucket and reads "absent from this write" as
+  fixed, which would have marked a Haiku finding resolved on the next write to
+  any neighbouring file.
+
   `/craftsman:metrics` reports three numbers through `metrics_haiku_report`:
   the share of Haiku findings Level 1 never saw on the same file, the Haiku
   fixed rate against Level 1's own, and Haiku seconds per accepted finding.
   With the decision that follows from them written down: below Level 1's fixed
-  rate after 200 verdicts, `agent_hooks` should default to `false`.
+  rate after 200 verdicts, `agent_hooks` should default to `false`. An `n/a` is
+  an empty sample and never a reason to switch the layer off.
+
+  Cost, measured against `main` on the same fixture with a stubbed CLI: +180ms
+  on a run that produces a verdict, against a subprocess that takes seconds in
+  production, and nothing at all when the layer steps aside (low effort, or no
+  CLI installed), where it was +200ms for a row saying the run did not happen.
 
 
 - **Go pack (`packs/go/`).** Seven owned rules plus NEST001, LOC001, PARAM001

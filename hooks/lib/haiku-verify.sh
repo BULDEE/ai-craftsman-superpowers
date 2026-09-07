@@ -20,6 +20,17 @@
 # own pinned snapshot.
 HAIKU_VERIFY_MODEL="${CRAFTSMAN_VERIFY_MODEL:-claude-haiku-4-5-20251001}"
 
+# Can a verification happen at all, before anything is paid for.
+#
+# A hook that loads the metrics database to record an outcome pays ~200ms for
+# it, and at low effort or with no CLI there IS no outcome: the layer stepped
+# aside. Callers ask this first, and skip the whole telemetry path when it
+# answers no, which keeps the cost on the runs that produce something.
+haiku_verify_possible() {
+    [[ "${CLAUDE_EFFORT:-}" == "low" ]] && return 1
+    command -v claude >/dev/null 2>&1
+}
+
 # haiku_verify <prompt>
 # Prints the model's reply on stdout. Returns 1 (silently) when the claude
 # CLI is unavailable or the subprocess fails: callers degrade to no-op.
@@ -62,15 +73,24 @@ haiku_verify() {
 # HAIKU_OTHER rather than dropped, because "the model found something we did
 # not think of" is the finding that would justify this layer most.
 haiku_finding_rule() {
-    local text
-    text=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+    local text="$1"
+    # The message, never the path. The whole line was classified, so
+    # `src/Infrastructure/Doctrine/OrderRepo.php:12 God class` came back
+    # HAIKU_LAYER because the PATH said "Infrastructure": the category was
+    # decided by where the file lives instead of by what the model found.
+    text="${text#*:}"
+    while [[ "$text" == [0-9]* ]]; do text="${text#[0-9]}"; done
+    text=$(printf '%s' "$text" | tr '[:upper:]' '[:lower:]')
+    # Most specific first: a god class finding that happens to mention a
+    # controller is a god class, and only a finding with no other marker falls
+    # through to the layer bucket.
     case "$text" in
-        *layer*|*domain\ imports*|*infrastructure*|*presentation*) printf 'HAIKU_LAYER' ;;
-        *aggregate*)                                               printf 'HAIKU_AGGREGATE' ;;
-        *value\ object*|*primitive\ obsession*|*vo\ *)             printf 'HAIKU_VALUE_OBJECT' ;;
         *god\ class*|*responsibilit*|*cohesion*)                   printf 'HAIKU_GOD_CLASS' ;;
-        *controller*|*business\ logic*|*use\ case*|*usecase*)      printf 'HAIKU_CONTROLLER' ;;
-        *test*)                                                    printf 'HAIKU_MISSING_TEST' ;;
+        *value\ object*|*primitive\ obsession*)                    printf 'HAIKU_VALUE_OBJECT' ;;
+        *aggregate*)                                               printf 'HAIKU_AGGREGATE' ;;
+        *missing\ test*|*no\ test*|*without\ a\ corresponding\ test*) printf 'HAIKU_MISSING_TEST' ;;
+        *business\ logic*|*use\ case*|*usecase*|*in\ a\ controller*|*controller\ instead*) printf 'HAIKU_CONTROLLER' ;;
+        *layer\ violation*|*imports\ infrastructure*|*imports\ presentation*|*layer*) printf 'HAIKU_LAYER' ;;
         *)                                                         printf 'HAIKU_OTHER' ;;
     esac
 }
@@ -79,15 +99,21 @@ haiku_finding_rule() {
 # input: a Stop-time review reads thirty files and its findings are spread
 # across them, so recording them all against one path would make the
 # "did Level 1 see this file too" comparison meaningless.
+# The file a finding names, resolved against the PROJECT ROOT.
+#
+# `git diff --name-only` returns paths relative to the repository root, and the
+# first version prefixed `$PWD`: a Stop-time review run from a subdirectory
+# recorded `app/app/src/...`, a bucket no Level 1 row can ever match, so the
+# headline metric reported 100% novelty on files Level 1 had flagged.
 haiku_finding_file() {
-    local line="$1" path
+    local line="$1" path root
     path="${line#"${line%%[![:space:]-*]*}"}"
     path="${path%%:*}"
-    # Absolute, because metrics_file_pattern compares against the project root
-    # with a prefix test: a relative path failed that test and every finding
-    # was filed under <outside-project>, which is the pattern column every
-    # comparison against Level 1 groups by.
-    [[ -n "$path" && "$path" != /* ]] && path="$PWD/$path"
+    [[ -z "$path" ]] && return 0
+    if [[ "$path" != /* ]]; then
+        root=$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$PWD")
+        path="${root}/${path}"
+    fi
     printf '%s' "$path"
 }
 
@@ -104,15 +130,58 @@ haiku_record_findings() {
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         file=$(haiku_finding_file "$line")
+        # The fallback is checked too: a finding naming a file that does not
+        # exist is a finding about nothing, and the fallback was recorded just
+        # as readily.
         [[ -z "$file" || ! -e "$file" ]] && file="$fallback"
-        [[ -n "$file" && "$file" != /* ]] && file="$PWD/$file"
-        [[ -z "$file" ]] && continue
+        [[ -z "$file" || ! -e "$file" ]] && continue
+        # Outside the project: not recorded. A verdict line naming
+        # `../../../../.ssh/config` wrote that path into a database
+        # consolidate-metrics.sh shares between machines. A model's output
+        # reaching a database is untrusted input, exactly as it is when it
+        # reaches the main model.
+        [[ -z "$(metrics_relative_path "$file")" ]] && continue
         rule=$(haiku_finding_rule "$line")
         CRAFTSMAN_METRICS_SOURCE=haiku \
-            metrics_record_violation "$rule" "$(metrics_file_pattern "$file")" "critical" 1 0
+            metrics_record_violation "$rule" "$(metrics_file_pattern "$file")" "critical" 1 0 "$file"
         count=$((count + 1))
     done <<< "$findings"
     printf '%s' "$count"
+}
+
+# The rule ids a findings block resolves to, one per line: what
+# haiku_close_resolved compares against.
+haiku_finding_rules() {
+    local line
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        haiku_finding_rule "$line"
+        printf '\n'
+    done <<< "$1"
+}
+
+# haiku_close_resolved <file> <current-findings>
+#
+# What this layer said about a file last time, and no longer says, is fixed.
+# Recorded as a correction with source='haiku', which is what makes the fixed
+# rate in haiku_report.py a real number instead of a permanent n/a: nothing
+# else in the tree ever writes a HAIKU_* correction, and a decision report that
+# can only print n/a is worse than no report.
+#
+# A CLEAN verdict resolves everything the file carried, which is the whole
+# point: the same instrument that raised the finding is the one that clears it.
+haiku_close_resolved() {
+    local file="$1" current="$2"
+    local rule
+    type metrics_haiku_previous_rules >/dev/null 2>&1 || return 0
+    [[ -z "$file" || ! -e "$file" ]] && return 0
+    while IFS= read -r rule; do
+        [[ -z "$rule" ]] && continue
+        printf '%s' "$current" | grep -q "$rule" && continue
+        CRAFTSMAN_METRICS_SOURCE=haiku \
+            metrics_record_correction "$rule" "$(metrics_file_pattern "$file")" \
+                "fixed" "no longer reported by the verifier" "$file" 2>/dev/null || true
+    done <<< "$(metrics_haiku_previous_rules "$file")"
 }
 
 haiku_findings() {

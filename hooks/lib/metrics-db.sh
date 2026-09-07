@@ -258,6 +258,24 @@ metrics_source() {
     printf '%s' "${CRAFTSMAN_METRICS_SOURCE:-session}"
 }
 
+# The exact file, beside the pattern, because they answer different questions.
+#
+# `file_pattern` is a DIRECTORY bucket: every .php under src/Domain/ maps to
+# `src/Domain/**/*.php`, which is what a trend wants and is useless as a join
+# key. "Did Level 1 see THIS file" was answered with it anyway, so a Haiku
+# finding on Order.php counted as seen because Level 1 had fired on Customer.php
+# next door, and the same query reported 100% novelty whenever the two layers
+# spelled a path differently. Rows written before this column exists carry NULL,
+# and every query that joins on it says so rather than treating NULL as a match.
+_metrics_migrate_file_path_column() {
+    local table
+    for table in violations corrections; do
+        if ! _metrics_sql_read "PRAGMA table_info(${table});" | grep -q '|file_path|'; then
+            _metrics_sql <<< "ALTER TABLE ${table} ADD COLUMN file_path TEXT;" 2>/dev/null
+        fi
+    done
+}
+
 _metrics_migrate_source_column() {
     local table
     for table in violations corrections; do
@@ -282,6 +300,7 @@ metrics_init() {
     _metrics_migrate_writes_count
     _metrics_migrate_correction_outcomes
     _metrics_migrate_source_column
+    _metrics_migrate_file_path_column
 }
 
 # The identity of a project is its git toplevel, not the directory the session
@@ -343,18 +362,44 @@ _metrics_rule_is_valid() {
     [[ "$1" =~ ^[A-Za-z][A-Za-z0-9_-]{1,39}$ ]]
 }
 
+# The project-relative path of a file, or empty when it is not inside the
+# project. Physical on both sides before comparing, for the same reason
+# metrics_file_pattern resolves: `git rev-parse --show-toplevel` answers with
+# the physical path, and a session started through a symlinked directory hands
+# this the logical one.
+metrics_relative_path() {
+    local file="$1" project_root directory
+    [[ -z "$file" ]] && return 0
+    project_root=$(_metrics_project_root)
+    if [[ "$file" != /* ]]; then
+        file="$PWD/$file"
+    fi
+    directory="${file%/*}"
+    if [[ -d "$directory" ]]; then
+        directory=$(cd "$directory" 2>/dev/null && pwd -P) || directory=""
+        [[ -n "$directory" ]] && file="${directory}/${file##*/}"
+    fi
+    # Containment, not a prefix strip: a verdict naming
+    # `../../../../.ssh/config` must not write a path outside the project into
+    # a database consolidate-metrics.sh shares between machines.
+    [[ "$file" == "$project_root"/* ]] || return 0
+    printf '%s' "${file#"$project_root"/}"
+}
+
 metrics_record_violation() {
     local rule="$1"
     local file_pattern="$2"
     local severity="$3"
     local blocked="${4:-0}"
     local ignored="${5:-0}"
+    local file="${6:-}"
     _metrics_rule_is_valid "$rule" || return 0
-    local project_hash
+    local project_hash relative
     project_hash=$(metrics_project_hash)
+    relative=$(metrics_relative_path "$file")
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
-        "INSERT INTO violations (project_hash, rule, file_pattern, severity, blocked, ignored, source) VALUES (?, ?, ?, ?, ?, ?, ?)" \
-        "$project_hash" "$rule" "$file_pattern" "$severity" "$blocked" "$ignored" "$(metrics_source)"
+        "INSERT INTO violations (project_hash, rule, file_pattern, severity, blocked, ignored, source, file_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)" \
+        "$project_hash" "$rule" "$file_pattern" "$severity" "$blocked" "$ignored" "$(metrics_source)" "$relative"
     _metrics_tally_session "$blocked" "$ignored"
 }
 
@@ -376,7 +421,14 @@ metrics_record_haiku_run() {
     local hook="$1" verdict="$2" findings="${3:-0}" duration_ms="${4:-0}" file="${5:-}"
     case "$verdict" in
         clean|findings|unavailable) ;;
-        *) return 0 ;;
+        *)
+            # Loud, not silent. A verdict this function does not know is a
+            # caller bug, and returning 0 with no row written is the exact
+            # "recorded nothing while reporting success" shape this whole
+            # feature exists to remove.
+            echo "craftsman: metrics_record_haiku_run refused an unknown verdict '${verdict}'" >&2
+            return 0
+            ;;
     esac
     [[ "$findings" =~ ^[0-9]+$ ]] || findings=0
     [[ "$duration_ms" =~ ^[0-9]+$ ]] || duration_ms=0
@@ -386,6 +438,29 @@ metrics_record_haiku_run() {
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
         "INSERT INTO haiku_runs (project_hash, hook, verdict, findings, duration_ms, file_pattern) VALUES (?, ?, ?, ?, ?, ?)" \
         "$project_hash" "$hook" "$verdict" "$findings" "$duration_ms" "$pattern"
+}
+
+# The rules this layer last recorded for one file, from its most recent run.
+#
+# The layer has to close its own loop. The correction learning loop cannot do
+# it: it keys on the DIRECTORY bucket and treats "absent from this write's
+# findings" as fixed, so a HAIKU rule fed into it would be marked fixed by the
+# next write to any file in the same directory, whether or not anything was
+# fixed. A rate built that way would read 100% forever. The verifier runs again
+# on the same file, so the honest comparison is against its own previous
+# verdict.
+metrics_haiku_previous_rules() {
+    local file="$1"
+    local project_hash relative
+    project_hash=$(metrics_project_hash)
+    relative=$(metrics_relative_path "$file")
+    [[ -z "$relative" ]] && return 0
+    python3 "${METRICS_LIB_DIR}/metrics-query.py" --raw "$METRICS_DB" \
+        "SELECT DISTINCT rule FROM violations
+         WHERE project_hash=? AND source='haiku' AND file_path=?
+           AND timestamp=(SELECT MAX(timestamp) FROM violations
+                          WHERE project_hash=? AND source='haiku' AND file_path=?)" \
+        "$project_hash" "$relative" "$project_hash" "$relative" 2>/dev/null || true
 }
 
 metrics_record_session() {
@@ -423,11 +498,13 @@ metrics_record_correction() {
     local file_pattern="$2"
     local action="$3"
     local context="${4:-}"
-    local project_hash
+    local file="${5:-}"
+    local project_hash relative
     project_hash=$(metrics_project_hash)
+    relative=$(metrics_relative_path "$file")
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
-        "INSERT INTO corrections (project_hash, rule, file_pattern, action, context, source) VALUES (?, ?, ?, ?, ?, ?)" \
-        "$project_hash" "$rule" "$file_pattern" "$action" "$context" "$(metrics_source)"
+        "INSERT INTO corrections (project_hash, rule, file_pattern, action, context, source, file_path) VALUES (?, ?, ?, ?, ?, ?, ?)" \
+        "$project_hash" "$rule" "$file_pattern" "$action" "$context" "$(metrics_source)" "$relative"
 }
 
 # The three numbers the semantic layer has to earn its place with.

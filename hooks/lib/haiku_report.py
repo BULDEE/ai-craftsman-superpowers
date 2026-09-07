@@ -15,12 +15,33 @@ Usage: haiku_report.py <metrics.db> <project_hash> <days>
 
 import sqlite3, sys
 
-db_path, project_hash, days = sys.argv[1], sys.argv[2], int(sys.argv[3])
+import os
+
+if len(sys.argv) < 4:
+    sys.stderr.write("usage: haiku_report.py <metrics.db> <project_hash> <days>\n")
+    sys.exit(1)
+
+db_path, project_hash = sys.argv[1], sys.argv[2]
+try:
+    days = int(sys.argv[3])
+except ValueError:
+    sys.stderr.write("haiku_report: days must be a whole number, got %r\n" % sys.argv[3])
+    sys.exit(1)
+if days <= 0:
+    sys.stderr.write("haiku_report: days must be positive, got %d\n" % days)
+    sys.exit(1)
 window = "-%d days" % days
+
+# sqlite3.connect CREATES a missing file, so "no database" and "a database with
+# nothing in it" printed the same sentence and left an empty .db behind on a
+# machine that had never run the layer.
+if not os.path.isfile(db_path):
+    print("haiku: no metrics database at %s" % db_path)
+    sys.exit(0)
 try:
     db = sqlite3.connect(db_path)
 except sqlite3.Error:
-    print("haiku: no database")
+    print("haiku: the metrics database could not be opened")
     sys.exit(0)
 
 def scalar(query, args, default=0):
@@ -49,17 +70,36 @@ findings = scalar("SELECT COUNT(*) FROM violations WHERE project_hash=? AND sour
 # A Haiku finding on a file pattern Level 1 also fired on is not evidence of a
 # second layer: it is the same file seen twice. The share that matters is the
 # one Level 1 never touched.
+# Joined on the EXACT file, not on the directory bucket.
+#
+# `file_pattern` maps every .php in a directory to one glob, so a Haiku finding
+# on Order.php counted as "Level 1 saw it" because Level 1 had fired on
+# Customer.php next door; and whenever the two layers spelled the same path
+# differently, the same query reported 100% novelty. Rows written before the
+# file_path column existed are excluded from BOTH sides rather than counted as
+# unseen, which is why the line says how many rows it could compare.
+comparable = scalar("""
+    SELECT COUNT(*) FROM violations
+    WHERE project_hash=? AND source='haiku' AND file_path IS NOT NULL AND file_path <> ''
+      AND timestamp > datetime('now',?)
+""", (project_hash, window))
+
 unseen = scalar("""
     SELECT COUNT(*) FROM violations v
-    WHERE v.project_hash=? AND v.source='haiku' AND v.timestamp > datetime('now',?)
+    WHERE v.project_hash=? AND v.source='haiku'
+      AND v.file_path IS NOT NULL AND v.file_path <> ''
+      AND v.timestamp > datetime('now',?)
       AND NOT EXISTS (
         SELECT 1 FROM violations l
         WHERE l.project_hash = v.project_hash AND l.source <> 'haiku'
-          AND l.file_pattern = v.file_pattern
+          AND l.file_path = v.file_path
           AND l.timestamp > datetime('now',?)
       )
 """, (project_hash, window, window))
 
+# Written by haiku_close_resolved: what the verifier said last time about a
+# file and no longer says. Nothing else in the tree writes a HAIKU_ correction,
+# which is why these two lines printed a permanent n/a before that existed.
 fixed = scalar("SELECT COUNT(*) FROM corrections WHERE project_hash=? AND rule LIKE 'HAIKU%' AND action='fixed' AND timestamp > datetime('now',?)",
                (project_hash, window))
 resolved = scalar("SELECT COUNT(*) FROM corrections WHERE project_hash=? AND rule LIKE 'HAIKU%' AND action <> 'open' AND timestamp > datetime('now',?)",
@@ -75,7 +115,12 @@ def pct(part, whole):
 print("haiku runs: %d in %d days (%d found something, %d could not run)"
       % (runs, days, with_findings, unavailable))
 print("haiku findings: %d" % findings)
-print("findings Level 1 never saw on the same file: %d (%s)" % (unseen, pct(unseen, findings)))
+if comparable:
+    print("findings Level 1 never saw on the same file: %d of %d comparable (%s)"
+          % (unseen, comparable, pct(unseen, comparable)))
+else:
+    print("findings Level 1 never saw on the same file: not computable yet "
+          "(%d finding(s) recorded before the exact path was stored)" % findings)
 print("haiku fixed rate: %s (%d of %d resolved)" % (pct(fixed, resolved), fixed, resolved))
 print("level 1 fixed rate: %s (%d of %d resolved)" % (pct(level1_fixed, level1_resolved), level1_fixed, level1_resolved))
 print("haiku seconds per accepted finding: %s"
