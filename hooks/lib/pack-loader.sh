@@ -112,18 +112,61 @@ _pack_yml_array() {
 # It lives under CLAUDE_PLUGIN_DATA, never in a world-writable /tmp: this file
 # decides which validators run, and a cache another user can write is a way to
 # choose them.
+# Bumped whenever the awk below changes. The cache is keyed by manifest mtime,
+# and a manifest does not change when the PARSER does: without this, a release
+# that fixes how `validators:` is extracted would take effect on no installed
+# machine, ever, because every one of them would keep serving the file compiled
+# by the old parser. This file decides which validators run.
+_PACK_YML_CACHE_VERSION="1"
+
+# Injective, unlike `${file//\//_}`, which sent `/` and `_` to the same
+# character: `a/b/pack.yml` and `a_b/pack.yml` shared one cache entry, and the
+# second pack silently served the first one's validators. External pack paths
+# come from the user's own config, so both spellings are reachable.
+_pack_yml_cache_key() {
+    local key="$1"
+    key="${key//%/%25}"
+    key="${key//_/%5f}"
+    key="${key//\//_}"
+    printf '%s' "$key"
+}
+
 _pack_yml_nested_cache() {
     local file="$1"
     local cache_dir="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data}/cache/pack-yml"
-    local cache="${cache_dir}/${file//\//_}"
+    local cache="${cache_dir}/v${_PACK_YML_CACHE_VERSION}-$(_pack_yml_cache_key "$file")"
 
-    if [[ -f "$cache" && ! "$file" -nt "$cache" ]]; then
+    # A header line, not just an mtime test. A cache truncated by a crash, a
+    # full disk or a partial write is newer than its manifest and would be
+    # served forever: measured, an emptied cache made post-write-check.sh lose
+    # every validator of every pack, exit 0, no message, and nothing ever
+    # repaired it. An empty COMPILE is legitimate (a manifest with no nested
+    # arrays), so emptiness cannot be the test; the header can be.
+    if [[ -f "$cache" && ! "$file" -nt "$cache" ]] \
+        && IFS= read -r _pack_yml_header < "$cache" 2>/dev/null \
+        && [[ "$_pack_yml_header" == "#craftsman-pack-yml v${_PACK_YML_CACHE_VERSION}" ]]; then
         printf '%s' "$cache"
         return 0
     fi
     mkdir -p "$cache_dir" 2>/dev/null || return 1
-    chmod 700 "${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data}/cache" 2>/dev/null || true
-    awk '
+    chmod 700 "$cache_dir" 2>/dev/null || true
+
+    # Written to a temp file and renamed over the target, the same rule
+    # CLAUDE.md already states for session-state.json, and for the same reason
+    # made worse: a torn read here does not lose a counter, it loses every
+    # validator a pack declares. Measured before this: twelve concurrent
+    # readers on a cold cache, three of them saw zero entries and ran no
+    # validator at all, exit 0 and no message. A failed awk never publishes
+    # either, where the redirection alone had already truncated the file and
+    # left an empty one newer than the manifest, which `-nt` then served
+    # forever.
+    local temp
+    temp=$(mktemp "${cache}.XXXXXX" 2>/dev/null) || return 1
+    printf '#craftsman-pack-yml v%s\n' "$_PACK_YML_CACHE_VERSION" > "$temp" 2>/dev/null || {
+        rm -f "$temp"
+        return 1
+    }
+    if ! awk '
         /^[a-zA-Z]/ { parent = $0; sub(/:.*/, "", parent); next }
         /^[[:space:]]+[a-zA-Z_]+:.*\[/ {
             child = $0
@@ -140,14 +183,18 @@ _pack_yml_nested_cache() {
                 if (value != "" && parent != "") print parent "." child "\t" value
             }
         }
-    ' "$file" > "$cache" 2>/dev/null || return 1
+    ' "$file" >> "$temp" 2>/dev/null; then
+        rm -f "$temp"
+        return 1
+    fi
+    mv -f "$temp" "$cache" 2>/dev/null || { rm -f "$temp"; return 1; }
     printf '%s' "$cache"
 }
 
 _pack_yml_nested_array() {
     local parent="$1" child="$2" file="$3"
     [[ -f "$file" ]] || return 0
-    local cache line key="${parent}.${child}"
+    local cache line key="${parent}.${child}" _pack_yml_header
     cache="$(_pack_yml_nested_cache "$file")" || return 0
     [[ -n "$cache" && -f "$cache" ]] || return 0
     while IFS= read -r line; do

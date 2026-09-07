@@ -147,18 +147,36 @@ config_trust_project_tools() {
     [[ -f "$config_file" ]] || return 1
     # Read in-shell. This was grep | head | awk | tr | tr: five processes to
     # answer one boolean, on a hook that runs on every write.
+    #
+    # Three shapes had to be decided explicitly rather than inherited from what
+    # a pipeline happened to do, because this key is the plugin's ONLY consent
+    # to run a cloned repository's own analysers:
+    #
+    #   trust_project_tools:true          NOT a YAML mapping (no space after
+    #                                     the colon), so not this key. Refused,
+    #                                     as the pipeline refused it.
+    #   trust_project_tools: true # why   a comment is not part of the value.
+    #                                     Honoured, as the pipeline honoured it.
+    #   trust_project_tools: true\r\n      a CRLF file is valid YAML and the
+    #                                     machine owner wrote it. Honoured,
+    #                                     where the pipeline silently ignored
+    #                                     the whole line. This one is a
+    #                                     deliberate change, asserted in
+    #                                     tests/core/test-config.sh.
     local line value=""
     while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%$'\r'}"
         case "$line" in
-            trust_project_tools:*)
-                value="${line#trust_project_tools:}"
-                value="${value#"${value%%[![:space:]]*}"}"
-                value="${value%"${value##*[![:space:]]}"}"
-                value="${value//\"/}"
-                value="${value//\'/}"
-                break
-                ;;
+            "trust_project_tools:"[[:space:]]*) ;;
+            *) continue ;;
         esac
+        value="${line#trust_project_tools:}"
+        value="${value%%#*}"
+        value="${value#"${value%%[![:space:]]*}"}"
+        value="${value%"${value##*[![:space:]]}"}"
+        value="${value//\"/}"
+        value="${value//\'/}"
+        break
     done < "$config_file"
     [[ "$value" == "true" ]]
 }
@@ -176,6 +194,11 @@ config_external_packs() {
     # to read a key most installations do not even set.
     local in_external=false path_val
     while IFS= read -r line || [[ -n "$line" ]]; do
+        # A CRLF file is valid YAML. The pipeline this replaced emitted the
+        # path with the carriage return still attached, so the directory test
+        # downstream failed and the pack was silently not loaded: the machine
+        # owner's own declaration, ignored without a word.
+        line="${line%$'\r'}"
         if [[ "$line" =~ ^[[:space:]]+external: ]]; then
             in_external=true
             continue
@@ -189,6 +212,7 @@ config_external_packs() {
         fi
         [[ "$line" =~ path:[[:space:]]*(.*)$ ]] || continue
         path_val="${BASH_REMATCH[1]}"
+        path_val="${path_val%%#*}"
         path_val="${path_val%"${path_val##*[![:space:]]}"}"
         path_val="${path_val//\"/}"
         path_val="${path_val//\'/}"
