@@ -24,6 +24,27 @@ Use the Bash tool to query the metrics database. Run all 4 queries in a single c
 DB=$(cat ~/.claude/craftsman-metrics-db-path 2>/dev/null || echo ~/.claude/plugins/data/craftsman/metrics.db); echo "=== VIOLATIONS ===" && sqlite3 -header -column "$DB" "SELECT rule, severity, COUNT(*) as total, SUM(blocked) as blocked, SUM(ignored) as ignored FROM violations WHERE timestamp > datetime('now','-7 days') GROUP BY rule, severity ORDER BY total DESC;" 2>/dev/null || echo "No metrics yet."; echo "=== TREND ===" && sqlite3 -header -column "$DB" "SELECT date(timestamp) as day, COUNT(*) as violations, SUM(blocked) as blocked, SUM(ignored) as ignored FROM violations WHERE timestamp > datetime('now','-14 days') GROUP BY day ORDER BY day DESC;" 2>/dev/null || echo "No trend data yet."; echo "=== SESSIONS ===" && sqlite3 -header -column "$DB" "SELECT date(timestamp) as day, COUNT(*) as sessions, SUM(violations_blocked) as blocked, SUM(violations_warned) as warned FROM sessions WHERE timestamp > datetime('now','-14 days') GROUP BY day ORDER BY day DESC;" 2>/dev/null || echo "No session data yet."; echo "=== CORRECTIONS ===" && sqlite3 -header -column "$DB" "SELECT rule, action, COUNT(*) as count FROM corrections WHERE timestamp > datetime('now','-30 days') GROUP BY rule, action ORDER BY count DESC LIMIT 10;" 2>/dev/null || echo "No correction data yet."
 ```
 
+### Step 2: The semantic layer's own numbers
+
+The Level 2 semantic layer (Haiku subprocesses on Write/Edit and at Stop) costs
+real money on every run, and until it recorded anything nobody could say what it
+returned. Read its numbers with the shipped function, never by adding rows up
+yourself:
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/metrics-db.sh" && metrics_haiku_report 30
+```
+
+It prints six lines: runs, findings, the share of findings Level 1 never saw on
+the same file, the Haiku fixed rate, the Level 1 fixed rate for comparison, and
+Haiku seconds per accepted finding.
+
+**Report them, then say what they mean.** The share Level 1 never saw is the
+only thing that justifies a second layer existing. If the Haiku fixed rate comes
+in below Level 1's after 200 verdicts, say so plainly and recommend
+`agent_hooks: false`: that is a measurement, not an opinion. If there are fewer
+than 200 verdicts, say the sample is too small and give the count.
+
 ### Step 5: Present Report
 
 Format the data as a clear report:
@@ -45,6 +66,18 @@ Format the data as a clear report:
 | Day        | Sessions | Blocked | Warned |
 |------------|----------|---------|--------|
 | ...        | ...      | ...     | ...    |
+
+### Semantic Layer (Level 2, Haiku)
+| Metric | Value |
+|--------|-------|
+| Runs (30d) | ... |
+| Findings | ... |
+| Findings Level 1 never saw | ... |
+| Haiku fixed rate | ... |
+| Level 1 fixed rate | ... |
+| Seconds per accepted finding | ... |
+
+Verdict on the layer: [keep / too early to say, N verdicts / turn off, and why]
 
 ### Key Insights
 - Top violation: [rule] ([count] occurrences)

@@ -73,6 +73,35 @@ CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_hash, timest
 SQL
 }
 
+# Every semantic verification, not only the ones that found something.
+#
+# The layer shelled out to a headless Haiku subprocess on every write and at
+# every Stop, and recorded nothing at all: 19303 violations in five months and
+# not one row from it. So "does Haiku catch what Level 1 misses" had no answer,
+# and could not have one, in a plugin whose own doctrine is that a guardrail
+# never seen red proves nothing.
+#
+# Findings go into `violations` with source='haiku', where they can be compared
+# against Level 1 on the same file. This table holds the DENOMINATOR: a run
+# that found nothing is the other half of any rate, and cost per finding cannot
+# be computed from findings alone.
+_metrics_create_haiku_runs_table() {
+    _metrics_sql <<'SQL'
+CREATE TABLE IF NOT EXISTS haiku_runs (
+    id INTEGER PRIMARY KEY,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    project_hash TEXT NOT NULL,
+    hook TEXT NOT NULL,
+    verdict TEXT NOT NULL CHECK (verdict IN ('clean', 'findings', 'unavailable')),
+    findings INTEGER NOT NULL DEFAULT 0,
+    duration_ms INTEGER NOT NULL DEFAULT 0,
+    file_pattern TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_haiku_runs_project ON haiku_runs(project_hash, timestamp);
+SQL
+}
+
 _metrics_create_corrections_table() {
     _metrics_sql <<'SQL'
 CREATE TABLE IF NOT EXISTS corrections (
@@ -248,6 +277,7 @@ metrics_init() {
     _metrics_migrate_legacy_location
     _metrics_create_core_tables
     _metrics_create_corrections_table
+    _metrics_create_haiku_runs_table
     _metrics_migrate_severity_info
     _metrics_migrate_writes_count
     _metrics_migrate_correction_outcomes
@@ -276,8 +306,22 @@ metrics_project_hash() {
 }
 
 metrics_file_pattern() {
-    local file="$1" project_root
+    local file="$1" project_root directory
     project_root=$(_metrics_project_root)
+    # Both sides in the same form before comparing. `git rev-parse
+    # --show-toplevel` answers with the PHYSICAL path, and a session started
+    # through a symlinked directory (/tmp on macOS is /private/tmp, and a
+    # worktree under a symlinked home is the everyday case) hands this function
+    # the logical one: the prefix test then failed for files that are plainly
+    # inside the project, and every one of them was filed under
+    # <outside-project>, which is the column every trend groups by.
+    if [[ "$file" == /* && "$file" != "$project_root"/* ]]; then
+        directory="${file%/*}"
+        if [[ -d "$directory" ]]; then
+            directory=$(cd "$directory" 2>/dev/null && pwd -P) || directory=""
+            [[ -n "$directory" ]] && file="${directory}/${file##*/}"
+        fi
+    fi
     # A prefix strip is not a containment check: an outside file silently kept
     # its absolute path, so the developer's home directory was recorded into a
     # database consolidate-metrics.sh is built to share. An outside file has no
@@ -327,6 +371,23 @@ _metrics_tally_session() {
     echo "$kind" >> "${METRICS_DB_DIR}/session-violations" 2>/dev/null || true
 }
 
+# metrics_record_haiku_run <hook> <verdict> <findings> <duration_ms> [file]
+metrics_record_haiku_run() {
+    local hook="$1" verdict="$2" findings="${3:-0}" duration_ms="${4:-0}" file="${5:-}"
+    case "$verdict" in
+        clean|findings|unavailable) ;;
+        *) return 0 ;;
+    esac
+    [[ "$findings" =~ ^[0-9]+$ ]] || findings=0
+    [[ "$duration_ms" =~ ^[0-9]+$ ]] || duration_ms=0
+    local project_hash pattern=""
+    project_hash=$(metrics_project_hash)
+    [[ -n "$file" ]] && pattern=$(metrics_file_pattern "$file")
+    python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
+        "INSERT INTO haiku_runs (project_hash, hook, verdict, findings, duration_ms, file_pattern) VALUES (?, ?, ?, ?, ?, ?)" \
+        "$project_hash" "$hook" "$verdict" "$findings" "$duration_ms" "$pattern"
+}
+
 metrics_record_session() {
     local duration="$1"
     local skills="$2"
@@ -367,6 +428,23 @@ metrics_record_correction() {
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
         "INSERT INTO corrections (project_hash, rule, file_pattern, action, context, source) VALUES (?, ?, ?, ?, ?, ?)" \
         "$project_hash" "$rule" "$file_pattern" "$action" "$context" "$(metrics_source)"
+}
+
+# The three numbers the semantic layer has to earn its place with.
+#
+# Written as one query script rather than as rows for a model to add up: this
+# decides whether a paid layer stays on by default, and a decision that opens
+# or closes a gate cannot depend on arithmetic done in prose.
+#
+#   1. share of Haiku findings with no Level 1 finding on the same file
+#      pattern in the window. Only that share justifies a second layer.
+#   2. the fixed rate of Haiku findings, comparable to Level 1's own.
+#   3. Haiku seconds spent per accepted finding.
+metrics_haiku_report() {
+    local days="${1:-30}"
+    local project_hash
+    project_hash=$(metrics_project_hash)
+    python3 "${METRICS_LIB_DIR}/haiku_report.py" "$METRICS_DB" "$project_hash" "$days"
 }
 
 metrics_corrections_30d() {

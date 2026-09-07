@@ -21,6 +21,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The semantic layer records what it does.** `hooks/agent-ddd-verifier.sh`
+  and `hooks/agent-final-review.sh` shell out to a headless Haiku subprocess on
+  every Write/Edit and at every Stop, and recorded nothing at all: measured on
+  this repository's own database, 19303 violations over five months and not one
+  row from that layer. So "does Haiku catch what Level 1 misses" had no answer
+  and could not have one, in a plugin whose doctrine is that a guardrail never
+  seen red proves nothing.
+
+  Each finding is now a `violations` row with `source='haiku'` and a bounded
+  rule identifier (`HAIKU_LAYER`, `HAIKU_AGGREGATE`, `HAIKU_VALUE_OBJECT`,
+  `HAIKU_GOD_CLASS`, `HAIKU_CONTROLLER`, `HAIKU_MISSING_TEST`, `HAIKU_OTHER`),
+  filed under the file the finding names rather than the file the hook was
+  handed. A new `haiku_runs` table holds the denominator: a run that found
+  nothing, and a run that could not happen at all, are the other half of every
+  rate, and cost per finding cannot be computed from findings alone.
+
+  `/craftsman:metrics` reports three numbers through `metrics_haiku_report`:
+  the share of Haiku findings Level 1 never saw on the same file, the Haiku
+  fixed rate against Level 1's own, and Haiku seconds per accepted finding.
+  With the decision that follows from them written down: below Level 1's fixed
+  rate after 200 verdicts, `agent_hooks` should default to `false`.
+
+
 - **Go pack (`packs/go/`).** Seven owned rules plus NEST001, LOC001, PARAM001
   and LAYER001, detected by the pack itself. GO001 refuses `panic()` outside
   `package main`, outside a `Must` prefixed constructor and outside test files;

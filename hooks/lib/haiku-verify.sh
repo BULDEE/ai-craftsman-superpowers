@@ -52,6 +52,69 @@ haiku_verify() {
 # the way out: a verdict is a list of findings in a known shape, so anything
 # that is not that shape is dropped. Same principle the plugin's own doctrine
 # states for system boundaries (knowledge/security/secure-by-design.md).
+# The category a finding belongs to, as a bounded identifier.
+#
+# The rule column is grouped by every trend the plugin draws, and
+# `_metrics_rule_is_valid` refuses anything that is not an identifier, so
+# passing a model's free text through would have recorded NOTHING while
+# reporting success: the exact silence this telemetry exists to end. The
+# categories are the ones the two prompts ask for, and anything else is
+# HAIKU_OTHER rather than dropped, because "the model found something we did
+# not think of" is the finding that would justify this layer most.
+haiku_finding_rule() {
+    local text
+    text=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+    case "$text" in
+        *layer*|*domain\ imports*|*infrastructure*|*presentation*) printf 'HAIKU_LAYER' ;;
+        *aggregate*)                                               printf 'HAIKU_AGGREGATE' ;;
+        *value\ object*|*primitive\ obsession*|*vo\ *)             printf 'HAIKU_VALUE_OBJECT' ;;
+        *god\ class*|*responsibilit*|*cohesion*)                   printf 'HAIKU_GOD_CLASS' ;;
+        *controller*|*business\ logic*|*use\ case*|*usecase*)      printf 'HAIKU_CONTROLLER' ;;
+        *test*)                                                    printf 'HAIKU_MISSING_TEST' ;;
+        *)                                                         printf 'HAIKU_OTHER' ;;
+    esac
+}
+
+# The file a finding names, taken from the finding and not from the hook's
+# input: a Stop-time review reads thirty files and its findings are spread
+# across them, so recording them all against one path would make the
+# "did Level 1 see this file too" comparison meaningless.
+haiku_finding_file() {
+    local line="$1" path
+    path="${line#"${line%%[![:space:]-*]*}"}"
+    path="${path%%:*}"
+    # Absolute, because metrics_file_pattern compares against the project root
+    # with a prefix test: a relative path failed that test and every finding
+    # was filed under <outside-project>, which is the pattern column every
+    # comparison against Level 1 groups by.
+    [[ -n "$path" && "$path" != /* ]] && path="$PWD/$path"
+    printf '%s' "$path"
+}
+
+# haiku_record_findings <hook> <findings-block> [fallback-file]
+#
+# One violation row per finding, source='haiku', so
+# `SELECT source, COUNT(*) FROM violations` finally answers the question this
+# layer has been unable to answer since it shipped. Returns the number recorded
+# on stdout, which is the run's finding count.
+haiku_record_findings() {
+    local hook="$1" findings="$2" fallback="${3:-}"
+    local line file rule count=0
+    type metrics_record_violation >/dev/null 2>&1 || { printf '0'; return 0; }
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        file=$(haiku_finding_file "$line")
+        [[ -z "$file" || ! -e "$file" ]] && file="$fallback"
+        [[ -n "$file" && "$file" != /* ]] && file="$PWD/$file"
+        [[ -z "$file" ]] && continue
+        rule=$(haiku_finding_rule "$line")
+        CRAFTSMAN_METRICS_SOURCE=haiku \
+            metrics_record_violation "$rule" "$(metrics_file_pattern "$file")" "critical" 1 0
+        count=$((count + 1))
+    done <<< "$findings"
+    printf '%s' "$count"
+}
+
 haiku_findings() {
     local body="$1"
     # Shape is the control, not character blocklisting: a line that survives
