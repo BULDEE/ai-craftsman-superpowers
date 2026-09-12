@@ -259,20 +259,33 @@ PHPDIRTY
 DIRTY_PAYLOAD="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \
     "$PROJECT/src/Dirty.php" "$PROJECT")"
 
-# The ceilings are per operating system, and that is a measured statement
+# The ceilings are per execution environment, and that is a measured statement
 # about what the ratio does and does not absorb. On one machine under load it
 # absorbs 94% of the slowdown, because the basket grows the way the hooks grow.
 # Across operating systems it absorbs nothing: the same commit measured
 # post-write at 3.9x on macOS and 9.5x on an ubuntu runner, where a fork costs
 # half as much (calibration 63ms against 135ms) while the hooks cost about the
-# same, so the hooks' remaining cost there is not made of forks. Two variances,
-# two mechanisms: the ratio for load, a table for the OS. The doubling check
+# same, so the hooks' remaining cost there is not made of forks.
+#
+# Across MACHINES of one operating system it absorbs only part. The Darwin row
+# was measured on a laptop, with 1.4x of room, and the hosted macOS runner ate
+# all of it: the same commit read post-write at 4.0x here and at 5.4x, 5.4x,
+# then 6.3x on three runner instances, bias-detector at 1.5x here and 1.6x,
+# 1.7x, then 2.5x there. The runner's basket is cheaper than the laptop's
+# while its interpreter starts are not, and how much cheaper moves from one
+# instance to the next. So the hosted runner has its own row, taken from what
+# it measured with 1.3x of room over the slowest instance seen, and the laptop
+# row keeps the tighter figures it can hold. Three variances, two mechanisms:
+# the ratio for load, a table for where the test runs. The doubling check
 # further down is the one assertion that transfers unchanged.
-case "$(uname -s)" in
-    Linux)  C_POST=13.5; C_PRE=10.5; C_BIAS=3.7;  C_DIRTY=23 ;;
-    *)      C_POST=5.5;  C_PRE=3.2;  C_BIAS=1.8;  C_DIRTY=13 ;;
+_PERF_ENV="$(uname -s)"
+[[ -n "${CI:-}" ]] && _PERF_ENV="${_PERF_ENV} runner"
+case "$_PERF_ENV" in
+    Linux*)          C_POST=13.5; C_PRE=10.5; C_BIAS=3.7;  C_DIRTY=23 ;;
+    "Darwin runner") C_POST=8.0;  C_PRE=4.5;  C_BIAS=3.2;  C_DIRTY=16 ;;
+    *)               C_POST=5.5;  C_PRE=3.2;  C_BIAS=1.8;  C_DIRTY=13 ;;
 esac
-echo "ceilings for $(uname -s): post-write ${C_POST}x, pre-write ${C_PRE}x, bias ${C_BIAS}x, dirty ${C_DIRTY}x"
+echo "ceilings for ${_PERF_ENV}: post-write ${C_POST}x, pre-write ${C_PRE}x, bias ${C_BIAS}x, dirty ${C_DIRTY}x"
 
 measure_hook "post-write-check.sh" "$C_POST" \
     "cd '$PROJECT' && printf '%s' '$POST_PAYLOAD' | bash '$ROOT_DIR/hooks/post-write-check.sh' >/dev/null 2>&1"
