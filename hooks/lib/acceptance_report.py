@@ -7,10 +7,11 @@ database over five months: PHP002 fixed 2 times and ignored 153, a 98.7%
 rejection, while still blocking every write it fired on. A rule that is
 always suppressed enforces nothing and still costs a round trip.
 
-The other half is worse and this report states it too: 23 of the 36 rules that
-ever fired there produced no correction at all, 81% of the volume with no
-recorded outcome. Either those findings are never acted on or the loop does
-not observe what happens to them, and the two cannot be told apart from here.
+The other half is stated too, split the way the instrument sees it: an
+advisory finding never enters the correction loop (only blocking findings
+reach the session state the hook reads), so its silence is by construction;
+a blocking finding with no verdict in the window is the one a user can act on.
+On the database above, 99.5% of the silent volume was advisory.
 
 Written as a script rather than as rows for a model to add up, for the same
 reason haiku_report.py is: this proposes a severity change, and a proposal that
@@ -93,13 +94,15 @@ def acceptance_by_rule(db: sqlite3.Connection, project_hash: str, window: str) -
 
     `overridden` and `scoped` are decisions about the rule's scope, not about
     one finding, and `open` is a Haiku finding still waiting; none of the three
-    says whether the developer agreed with the finding.
+    says whether the developer agreed with the finding. HAIKU_* rows are left
+    out: the semantic layer closes its own loop with `fixed` only, so they sit
+    at a structural 100% and haiku_report.py already reports that layer.
     """
     counts = {}
     for rule, action, hits in _rows(db, """
         SELECT rule, action, COUNT(*) FROM corrections
         WHERE project_hash = ? AND timestamp > datetime('now', ?)
-          AND action IN ('fixed', 'ignored')
+          AND action IN ('fixed', 'ignored') AND rule NOT LIKE 'HAIKU%'
         GROUP BY rule, action""", (project_hash, window)):
         fixed, ignored = counts.get(rule, (0, 0))
         if action == "fixed":
@@ -110,20 +113,67 @@ def acceptance_by_rule(db: sqlite3.Connection, project_hash: str, window: str) -
     return counts
 
 
-def no_outcome(db: sqlite3.Connection, project_hash: str, window: str) -> tuple:
-    """Rules that fired and never produced a correction row: count, volume."""
-    fired = _rows(db, """
-        SELECT v.rule, COUNT(*) FROM violations v
+def blocked_by_rule(db: sqlite3.Connection, project_hash: str, window: str) -> dict:
+    """rule -> blocking findings in the window, the most a rule can have been judged on.
+
+    By severity, not by the `blocked` column: rows written before 4.6 carry
+    blocked=1 on advisory findings (the `$((1 - ignored))` defect
+    post-write-check.sh documents), and this count decides whether a proposal
+    is even possible.
+    """
+    return dict(_rows(db, """
+        SELECT rule, COUNT(*) FROM violations
+        WHERE project_hash = ? AND timestamp > datetime('now', ?)
+          AND severity = 'critical' AND ignored = 0
+        GROUP BY rule""", (project_hash, window)))
+
+
+def top_pattern_share(db: sqlite3.Connection, project_hash: str, window: str, rule: str) -> tuple:
+    """(pattern, share) of the rule's rejections held by its most rejecting directory.
+
+    The one relaxation this repository has recorded was a SCOPE, not a
+    relaxation: 96 of PY002's 99 suppressions came from two generator scripts,
+    so the answer was a directory `.craft-rules.yml`, not `PY002: warn`.
+    """
+    rows = _rows(db, """
+        SELECT file_pattern, COUNT(*) FROM corrections
+        WHERE project_hash = ? AND timestamp > datetime('now', ?)
+          AND rule = ? AND action = 'ignored'
+        GROUP BY file_pattern ORDER BY COUNT(*) DESC""", (project_hash, window, rule))
+    total = sum(hits for _, hits in rows)
+    if not rows or not total:
+        return "", None
+    return rows[0][0], 100.0 * rows[0][1] / total
+
+
+# The two halves of this report use one definition of a verdict: a `fixed` or
+# `ignored` row for the rule, in the window. An `overridden` row or a fix from
+# a year ago used to satisfy the old NOT EXISTS and hide a rule from both
+# halves at once.
+#
+# Split by severity because the instrument cannot see an advisory finding:
+# only blocking findings enter the session state the correction loop reads
+# (post-write-check.sh, _blocked_rules_json), so an advisory rule with no
+# verdict is silent by construction, not by anyone's choice. The blocking
+# bucket is the one a user can act on.
+def no_verdict(db: sqlite3.Connection, project_hash: str, window: str) -> tuple:
+    """Findings in the window that no verdict answered: (blocking rows, advisory rows, volume)."""
+    rows = _rows(db, """
+        SELECT v.rule, v.severity, COUNT(*) FROM violations v
         WHERE v.project_hash = ? AND v.timestamp > datetime('now', ?)
           AND NOT EXISTS (
               SELECT 1 FROM corrections c
-              WHERE c.project_hash = v.project_hash AND c.rule = v.rule)
-        GROUP BY v.rule ORDER BY COUNT(*) DESC""", (project_hash, window))
+              WHERE c.project_hash = v.project_hash AND c.rule = v.rule
+                AND c.action IN ('fixed', 'ignored')
+                AND c.timestamp > datetime('now', ?))
+        GROUP BY v.rule, v.severity ORDER BY COUNT(*) DESC""", (project_hash, window, window))
+    blocking = [(rule, hits) for rule, severity, hits in rows if severity == "critical"]
+    advisory = [(rule, hits) for rule, severity, hits in rows if severity != "critical"]
     total = _rows(db, """
         SELECT COUNT(*) FROM violations
         WHERE project_hash = ? AND timestamp > datetime('now', ?)""", (project_hash, window))
     volume = total[0][0] if total else 0
-    return fired, volume
+    return blocking, advisory, volume
 
 
 def pct(part: int, whole: int) -> "float | None":
@@ -144,34 +194,67 @@ def _print_ranked(counts):
     return ranked
 
 
-def _print_proposals(ranked, options):
-    proposals = [
-        (rule, fixed, ignored) for rule, (fixed, ignored) in ranked
-        if fixed + ignored >= options["min"]
-        and (pct(fixed, fixed + ignored) or 0.0) < options["threshold"]
-    ]
+def _proposals(ranked: list, options: dict, blocked: dict) -> tuple:
+    """(proposals, recounted): what to propose, and what the instrument recounted.
+
+    A `fixed` or `ignored` row is not a verdict on ONE finding: the hook
+    records it from a session state keyed by directory glob, so every later
+    write under that glob re-records the same outcome. Measured on a real
+    database: PHP002 with 106 `ignored` rows from one pattern against 56
+    blocking findings. A rule whose outcomes outnumber the findings it could
+    have been judged on is being recounted, and a proposal built on that would
+    hand the user a `warn` for an artefact of the instrument. Refused, and the
+    discrepancy printed, until the loop counts once per finding.
+    """
+    proposals, recounted = [], []
+    for rule, (fixed, ignored) in ranked:
+        if fixed + ignored < options["min"] or (pct(fixed, fixed + ignored) or 0.0) >= options["threshold"]:
+            continue
+        if fixed + ignored > blocked.get(rule, 0):
+            recounted.append((rule, fixed + ignored, blocked.get(rule, 0)))
+            continue
+        proposals.append((rule, fixed, ignored))
+    return proposals, recounted
+
+
+def _print_proposals(db: sqlite3.Connection, project_hash: str, window: str,
+                     ranked: list, options: dict) -> None:
     if not ranked:
         print("proposed relaxations: none, no outcome recorded in the window")
         return
+    proposals, recounted = _proposals(ranked, options, blocked_by_rule(db, project_hash, window))
+    for rule, outcomes, findings in recounted:
+        print("  %s: %d outcomes for %d blocking finding(s), the loop recounts this rule; no proposal"
+              % (rule, outcomes, findings))
     if not proposals:
         print("proposed relaxations: none (no rule under %.0f%% with %d+ outcomes)"
               % (options["threshold"], options["min"]))
         return
-    print("proposed relaxations (acceptance under %.0f%% over %d+ outcomes):"
+    print("proposed relaxations (acceptance under %.0f%% over %d+ outcomes), for .craft-rules.yml:"
           % (options["threshold"], options["min"]))
+    print("  rules:")
     for rule, fixed, ignored in proposals:
-        print("  %s: warn   # .craft-rules.yml, acceptance %s over %d outcomes; "
-              "record the decision: in the owning manifest"
+        print("    %s: warn   # acceptance %s over %d outcomes; record the decision: in the owning manifest"
               % (rule, fmt_pct(pct(fixed, fixed + ignored)), fixed + ignored))
+        pattern, share = top_pattern_share(db, project_hash, window, rule)
+        if share is not None and share >= 50.0:
+            print("    # %s of the rejections come from %s: a directory .craft-rules.yml there may be the "
+                  "scope, not a relaxation" % (fmt_pct(share), pattern))
 
 
-def _print_no_outcome(db, project_hash, window):
-    fired, volume = no_outcome(db, project_hash, window)
-    silent_volume = sum(hits for _, hits in fired)
-    print("rules that fired with no recorded outcome: %d, %d violation(s), %s of the volume"
-          % (len(fired), silent_volume, fmt_pct(pct(silent_volume, volume))))
-    for rule, hits in fired[:6]:
-        print("  %s: %d fired, no correction ever recorded" % (rule, hits))
+def _print_no_verdict(db: sqlite3.Connection, project_hash: str, window: str) -> None:
+    blocking, advisory, volume = no_verdict(db, project_hash, window)
+    blocking_volume = sum(hits for _, hits in blocking)
+    advisory_volume = sum(hits for _, hits in advisory)
+    print("blocking findings with no verdict in the window: %d rule(s), %d finding(s), %s of the volume"
+          % (len(blocking), blocking_volume, fmt_pct(pct(blocking_volume, volume))))
+    for rule, hits in blocking[:6]:
+        print("  %s: %d blocked, never fixed nor ignored in the window" % (rule, hits))
+    print("advisory findings with no verdict: %d rule(s), %d finding(s), %s of the volume; unobservable by "
+          "construction, only a blocking finding enters the correction loop"
+          % (len(advisory), advisory_volume, fmt_pct(pct(advisory_volume, volume))))
+    for rule, hits in advisory[:3]:
+        print("  %s: %d advisory" % (rule, hits))
 
 
 def main() -> int:
@@ -186,8 +269,8 @@ def main() -> int:
     print("acceptance window: %d days, %d outcome(s) recorded (%d fixed, %d ignored)"
           % (days, outcomes, fixed_total, ignored_total))
     print("overall acceptance: %s" % fmt_pct(pct(fixed_total, outcomes)))
-    _print_proposals(_print_ranked(counts), options)
-    _print_no_outcome(db, project_hash, window)
+    _print_proposals(db, project_hash, window, _print_ranked(counts), options)
+    _print_no_verdict(db, project_hash, window)
     return 0
 
 
