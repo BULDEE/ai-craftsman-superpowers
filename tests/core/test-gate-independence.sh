@@ -62,8 +62,11 @@ else
     log_fail "baseline violation" "expected exit 2, got $code"
 fi
 
-# The same verdict must hold under every mode the harness can send.
-for mode in default auto bypassPermissions; do
+# The same verdict must hold under every mode the harness can send. All six,
+# because a review mutated pre-write-check.sh to soften under `acceptEdits`
+# and the three-mode matrix stayed green: a mode the matrix does not name is a
+# mode a patch can hide behind.
+for mode in default plan acceptEdits auto dontAsk bypassPermissions; do
     code=$(pre_hook_exit "$VIOLATION_CONTENT" "$mode")
     if [[ "$code" == "2" ]]; then
         log_pass "layer violation still blocks with permission_mode=$mode"
@@ -81,15 +84,27 @@ else
     log_fail "clean under auto" "expected exit 0, got $code"
 fi
 
-# config-protection answers the same under auto mode.
-code=$(jq -n --arg fp "/tmp/project/phpstan.neon" \
-    '{"tool_input":{"file_path":$fp},"permission_mode":"auto"}' \
-    | bash "$ROOT_DIR/hooks/config-protection.sh" >/dev/null 2>&1; echo $?)
-if [[ "$code" == "2" ]]; then
-    log_pass "config-protection still blocks phpstan.neon with permission_mode=auto"
-else
-    log_fail "config-protection under auto" "expected exit 2, got $code"
-fi
+# config-protection answers the same under every mode.
+for mode in default plan acceptEdits auto dontAsk bypassPermissions; do
+    code=$(jq -n --arg fp "/tmp/project/phpstan.neon" --arg pm "$mode" \
+        '{"tool_input":{"file_path":$fp},"permission_mode":$pm}' \
+        | bash "$ROOT_DIR/hooks/config-protection.sh" >/dev/null 2>&1; echo $?)
+    if [[ "$code" == "2" ]]; then
+        log_pass "config-protection still blocks phpstan.neon with permission_mode=$mode"
+    else
+        log_fail "config-protection under $mode" "expected exit 2, got $code"
+    fi
+done
+
+# And on the real harness, a Write blocked in plan mode never reaches a
+# PostToolUse hook at all: Claude Code refuses the tool call, and PostToolUse
+# runs "after a tool call succeeds". Two independent reviews reproduced that on
+# Claude Code 2.1.269 with logging hooks, so there is no plan-mode phantom
+# violation for post-write-check.sh to record, and a plan-mode guard on a
+# PostToolUse hook only ever skips a write that really happened (a session
+# with bypass available, where the docs say the edit runs). Issue #46 assumed
+# otherwise; the mechanism it asked for was built, measured against the
+# harness, and removed. This comment is here so it is not built again.
 
 # Static guard: no hook script reads permission_mode. The behavioural matrix
 # above proves today's verdicts; this line makes a future "soften when auto"

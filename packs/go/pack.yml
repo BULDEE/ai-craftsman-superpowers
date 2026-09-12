@@ -16,6 +16,13 @@ compatibility:
 languages:
   - id: go
     extensions: [go]
+    # literal_syntax: which comment and string syntax the structural ratchet
+    # blanks before measuring, so a control keyword inside a string or a
+    # comment is not a decision point. A closed name the engine knows, never a
+    # list of characters: `quotes: ["'"]` declared on Rust would reproduce the
+    # lifetime bug and nothing would refuse it, while a name can be refused at
+    # compile time. See KNOWN_LITERAL_SYNTAXES in hooks/lib/lang_registry.py.
+    literal_syntax: slash-raw
     entry_markers: [go.mod, go.sum]
     # go.mod carries dependencies as well as toolchain settings, so blocking it
     # wholesale would stop ordinary work to guard a quality gate. Only files

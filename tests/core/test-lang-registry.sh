@@ -451,4 +451,66 @@ YAML
     fi
 fi
 
+# --- literal_syntax has a consumer, and the engine holds no extension table ---
+#
+# The capability exists so the ratchet blanks comments and strings by the
+# grammar a pack declares, never by an extension list in the core. A pack
+# fixture declaring `literal_syntax: hash` on an invented extension proves the
+# consumer reads it: `# if for while` measures complexity 0 with the
+# declaration and 3 without.
+LS_DIR="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-literal-syntax.XXXXXX")"
+mkdir -p "$LS_DIR/packs/zed" "$LS_DIR/project"
+cat > "$LS_DIR/packs/zed/pack.yml" <<'YML'
+name: zed
+version: 1.0.0
+description: literal syntax fixture
+compatibility:
+  stack: ["*"]
+languages:
+  - id: zed
+    extensions: [zed]
+    literal_syntax: hash
+YML
+printf 'fn go(a) {\n  # if for while\n  return a\n}\n' > "$LS_DIR/project/main.zed"
+
+_measure_zed() {
+    ( cd "$LS_DIR/project" && CLAUDE_PLUGIN_DATA="$LS_DIR/data-$1" bash -c "
+        source '$ROOT_DIR/hooks/lib/lang-registry.sh'
+        lang_registry_init '$LS_DIR/packs/zed/pack.yml' >/dev/null 2>&1
+        python3 '$ROOT_DIR/hooks/lib/ratchet.py' measure main.zed
+    " 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin)["complexity"])' 2>/dev/null )
+}
+with_syntax=$(_measure_zed with)
+sed -i.bak '/literal_syntax/d' "$LS_DIR/packs/zed/pack.yml"
+without_syntax=$(_measure_zed without)
+if [[ "$with_syntax" == "0" && "$without_syntax" == "3" ]]; then
+    log_pass "literal_syntax is read by the ratchet (0 with the declaration, 3 without)"
+else
+    log_fail "literal_syntax is read by the ratchet" "with=$with_syntax without=$without_syntax"
+fi
+
+# An unknown grammar name is refused at compile time, by name, and the entry
+# is dropped rather than passed through. The compiler is asked directly: the
+# shell wrapper discards its stderr on purpose (a repository's manifest must
+# not corrupt a hook's output), so the refusal is read where it is written.
+printf '    literal_syntax: klingon\n' >> "$LS_DIR/packs/zed/pack.yml"
+refusal=$( python3 "$ROOT_DIR/hooks/lib/lang_registry.py" "$LS_DIR/packs/zed/pack.yml" 2>&1 >/dev/null )
+assert_contains "an unknown literal_syntax is refused by name" "$refusal" "klingon"
+compiled=$( python3 "$ROOT_DIR/hooks/lib/lang_registry.py" "$LS_DIR/packs/zed/pack.yml" 2>/dev/null | grep -c "literal_syntax" || true )
+if [[ "${compiled:-0}" -eq 0 ]]; then
+    log_pass "and the refused entry never reaches the registry"
+else
+    log_fail "and the refused entry never reaches the registry" "$compiled row(s) emitted"
+fi
+
+# No Python helper in the core may carry an extension table. The ratchet had
+# one for a single commit; this is the third-recurrence guard.
+literal_tables=$(grep -lE '"\.(py|ts|tsx|js|jsx|php|sh|go|rs)":' "$ROOT_DIR"/hooks/lib/*.py 2>/dev/null || true)
+if [[ -z "$literal_tables" ]]; then
+    log_pass "no core Python helper carries an extension table"
+else
+    log_fail "no core Python helper carries an extension table" "$literal_tables"
+fi
+rm -rf "$LS_DIR"
+
 test_summary

@@ -8,6 +8,13 @@ compatibility:
 languages:
   - id: bash
     extensions: [sh, bash]
+    # literal_syntax: which comment and string syntax the structural ratchet
+    # blanks before measuring, so a control keyword inside a string or a
+    # comment is not a decision point. A closed name the engine knows, never a
+    # list of characters: `quotes: ["'"]` declared on Rust would reproduce the
+    # lifetime bug and nothing would refuse it, while a name can be refused at
+    # compile time. See KNOWN_LITERAL_SYNTAXES in hooks/lib/lang_registry.py.
+    literal_syntax: hash
     entry_markers: []
     protected_configs: [".shellcheckrc"]
     validators: ["hooks/bash-validator.sh"]

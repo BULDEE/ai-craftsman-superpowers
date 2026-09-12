@@ -8,6 +8,13 @@ compatibility:
 languages:
   - id: python
     extensions: [py]
+    # literal_syntax: which comment and string syntax the structural ratchet
+    # blanks before measuring, so a control keyword inside a string or a
+    # comment is not a decision point. A closed name the engine knows, never a
+    # list of characters: `quotes: ["'"]` declared on Rust would reproduce the
+    # lifetime bug and nothing would refuse it, while a name can be refused at
+    # compile time. See KNOWN_LITERAL_SYNTAXES in hooks/lib/lang_registry.py.
+    literal_syntax: hash-triple
     entry_markers: [pyproject.toml, setup.py, requirements.txt]
     # Not pyproject.toml or setup.cfg: they carry dependencies and packaging
     # metadata as well as tool settings, so blocking them wholesale would stop

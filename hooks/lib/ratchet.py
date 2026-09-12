@@ -42,6 +42,27 @@ MAX_BASELINE_BYTES = 8 * 1024 * 1024
 BASELINE_NAME = ".craftsman-baseline.json"
 RATCHETED_METRICS = ["complexity", "file_lines", "max_fn_lines", "fan_out", "ignores"]
 
+# The version of the ruler, written into every mark it takes.
+#
+# Instrument 1 counted control keywords inside strings and comments, and FN_RE
+# matched a `def` inside a docstring, so a function whose docstring held one
+# had its span cut short. Instrument 2 blanks literals first. The two do not
+# agree on an untouched file, and not in one direction: the docstring case
+# measured complexity 0 and max_fn_lines 4 under the old ruler and 5 and 17
+# under the new one. Compared blindly, `check` reported `RATCHET001 complexity
+# 0 -> 5` on a file nobody had edited, and a plugin upgrade put CI in the red
+# with no change in the code.
+#
+# So a mark taken by an older instrument is not a mark. It is re-taken on the
+# next touch, the way a file with no mark is, and `check` says so on stderr
+# rather than judging the present with a ruler that no longer exists. ADR-0025
+# left versioning unaddressed; this is the case that required it.
+RATCHET_INSTRUMENT = 2
+
+
+def _mark_is_current(entry) -> bool:
+    return isinstance(entry, dict) and entry.get("instrument") == RATCHET_INSTRUMENT
+
 CONTROL_WORDS = (
     "if|elif|elseif|else|for|foreach|while|switch|case|catch|do|try|return|match"
 )
@@ -54,12 +75,259 @@ IMPORT_RE = re.compile(
     r"import\s+[\w.]+|from\s+[\w.]+\s+import|require\s+['\"][^'\"]+['\"]|"
     r"source\s+\S+)"
 )
+# `export` and `export default` are prefixes too. Without them a TypeScript
+# module's every function was invisible to the span finder, and the only
+# matches came from the word `function` inside its comments: blanking those
+# comments left the file as one 267-line span and a max_fn_lines that meant
+# nothing in either direction.
 FN_RE = re.compile(
-    r"^\s*(?:public\s+|private\s+|protected\s+|static\s+|async\s+|final\s+|abstract\s+)*"
+    r"^\s*(?:export\s+(?:default\s+)?)?"
+    r"(?:public\s+|private\s+|protected\s+|static\s+|async\s+|final\s+|abstract\s+)*"
     r"(?:function\s+\w+|def\s+\w+|const\s+\w+\s*=[^=]*=>|"
     r"(?!(?:" + CONTROL_WORDS + r")\b)\w+\s*\([^)]*\)\s*\{)"
 )
 IGNORE_RE = re.compile(r"craftsman-ignore:")
+
+# The grammars the blanker knows, keyed by the name a pack declares under
+# `literal_syntax`. The engine holds a table of GRAMMARS, never of languages or
+# extensions: which grammar a file uses is the pack's answer, read through the
+# registry, and a file whose pack declares none is measured raw, exactly the
+# convention `metrics_dialect` already follows. The compiler refuses a name
+# outside this set, so an unknown value is never silently "raw".
+#
+#   (hash comments, slash comments, quotes, triple quotes, multi-line quotes,
+#    raw quotes with no escapes, heredoc, regex literals, jsx text)
+_GRAMMARS = {
+    "hash":           (True,  False, ("'", '"'),      (),                  (),     (),    False, False, False),
+    "hash-triple":    (True,  False, ("'", '"'),      ('"' * 3, "'" * 3),   (),     (),    False, False, False),
+    "slash":          (False, True,  ("'", '"'),      (),                  (),     (),    False, False, False),
+    "slash-template": (False, True,  ("'", '"', "`"), (),                  ("`",), (),    False, True,  True),
+    "slash-raw":      (False, True,  ('"', "'"),      (),                  ("`",), ("`",), False, False, False),
+    "slash-double":   (False, True,  ('"',),          (),                  (),     (),    False, False, False),
+    "both":           (True,  True,  ("'", '"'),      (),                  (),     (),    True,  False, False),
+}
+
+# Characters after which a `/` in a slash grammar opens a regex literal rather
+# than dividing. `x = a / b` divides; `if (/if|for/.test(u))` and
+# `const re = /[/*]/g` do not, and the second used to open a block comment to
+# end of file, making every function below it invisible.
+_REGEX_PRECEDERS = set("(=,:[!&|?{};\n")
+_REGEX_PRECEDING_WORDS = ("return", "typeof", "case", "in", "of", "do", "else")
+
+
+def _blank_span(text):
+    """Same length, same line breaks, no content: offsets and counts survive."""
+    return "".join("\n" if char == "\n" else " " for char in text)
+
+
+def _blank_keep_delimiters(text, opener_length, closer_length):
+    """The content blanked, the delimiters KEPT.
+
+    The first version blanked the quotes with the string, and `IMPORT_RE`
+    needs them: `from\\s+['"]...`, `require\\s+['"]`, `source\\s+\\S+`. Every
+    quoted import on TypeScript, JavaScript and Bash stopped counting, fan_out
+    went to zero on 98 of this repository's 222 marked files, and `update` had
+    already written one of those zeros as a new mark before anyone noticed.
+    """
+    if len(text) <= opener_length + closer_length:
+        return text
+    return (
+        text[:opener_length]
+        + _blank_span(text[opener_length:len(text) - closer_length])
+        + text[len(text) - closer_length:]
+    )
+
+
+def _run_to(source, cursor, closer):
+    """Index just past `closer` from `cursor`, or the end of the source."""
+    end = source.find(closer, cursor)
+    return len(source) if end == -1 else end + len(closer)
+
+
+def _run_to_line_end(source, cursor):
+    end = source.find("\n", cursor)
+    return len(source) if end == -1 else end
+
+
+def _hash_opens_comment(source, cursor):
+    """In a shell, `#` opens a comment only at the start of a word.
+
+    `$#`, `${#arr[@]}` and `${x#prefix}` are not comments, and treating them as
+    one ate the closing brace: the function span then swallowed the rest of
+    the file, and six untouched files in this repository went red against the
+    ratchet's own mark.
+    """
+    if cursor == 0:
+        return True
+    return source[cursor - 1] in " \t\n;(|&"
+
+
+def _slash_opens_regex(source, cursor):
+    """A `/` that starts a regex literal, decided by what comes before it."""
+    index = cursor - 1
+    while index >= 0 and source[index] in " \t":
+        index -= 1
+    if index < 0:
+        return True
+    if source[index] in _REGEX_PRECEDERS:
+        return True
+    word_end = index + 1
+    while index >= 0 and (source[index].isalnum() or source[index] == "_"):
+        index -= 1
+    return source[index + 1:word_end] in _REGEX_PRECEDING_WORDS
+
+
+def _regex_end(source, cursor):
+    """Just past the closing `/` of a regex literal, honouring escapes and
+    character classes, or the end of the line when it never closes."""
+    end = cursor + 1
+    in_class = False
+    while end < len(source):
+        char = source[end]
+        if char == "\\":
+            end += 2
+            continue
+        if char == "\n":
+            return end
+        if in_class:
+            if char == "]":
+                in_class = False
+        elif char == "[":
+            in_class = True
+        elif char == "/":
+            return end + 1
+        end += 1
+    return len(source)
+
+
+def _string_end(source, cursor, quote, multiline, raw):
+    """Just past the closing quote. A raw string has no escapes (Go's
+    backtick: `C:\\` is a complete string). A single-line string that hits
+    end of line unterminated stops there, so one stray quote cannot take a
+    file's every metric to zero."""
+    end = cursor + 1
+    while end < len(source):
+        char = source[end]
+        if char == "\\" and not raw:
+            end += 2
+            continue
+        if char == quote:
+            return end + 1
+        if char == "\n" and not multiline:
+            return end
+        end += 1
+    return len(source)
+
+
+def _heredoc_end(source, cursor):
+    """PHP `<<<TAG` or `<<<'TAG'` through the line holding the closing tag."""
+    line_end = _run_to_line_end(source, cursor)
+    tag = source[cursor + 3:line_end].strip().strip("'\"")
+    if not tag or not tag.replace("_", "").isalnum():
+        return None
+    position = line_end
+    while position < len(source):
+        next_end = _run_to_line_end(source, position + 1)
+        line = source[position + 1:next_end].strip()
+        if line.rstrip(";") == tag:
+            return next_end
+        position = next_end
+    return len(source)
+
+# Where the literal or comment starting at `cursor` ends, and how many
+# characters at each end are delimiters to keep. None when `cursor` is code.
+def _literal_run(source, cursor, grammar):
+    hash_c, slash_c, quotes, triples, multiline, raw, heredoc, regex, jsx = grammar
+    char = source[cursor]
+    peek = source[cursor + 1] if cursor + 1 < len(source) else ""
+
+    if slash_c and char == "/" and peek == "/":
+        return _run_to_line_end(source, cursor), 0, 0
+    if slash_c and char == "/" and peek == "*":
+        return _run_to(source, cursor + 2, "*/"), 0, 0
+    if hash_c and char == "#" and _hash_opens_comment(source, cursor):
+        return _run_to_line_end(source, cursor), 0, 0
+    if heredoc and source.startswith("<<<", cursor):
+        end = _heredoc_end(source, cursor)
+        if end is not None:
+            return end, 0, 0
+    for triple in triples:
+        if source.startswith(triple, cursor):
+            return _run_to(source, cursor + len(triple), triple), len(triple), len(triple)
+    if regex and char == "/" and _slash_opens_regex(source, cursor):
+        return _regex_end(source, cursor), 1, 1
+    if char in quotes:
+        end = _string_end(source, cursor, char, char in multiline, char in raw)
+        closer = 1 if end <= len(source) and source[end - 1] == char and end > cursor + 1 else 0
+        return end, 1, closer
+    return None
+
+
+# JSX text between `>` and `<` is prose, and an apostrophe in it opened a
+# string that ate the `&&` and the ternary on the same line: a very common
+# React shape measured as having no decisions at all.
+def _jsx_text_end(source, cursor):
+    end = source.find("<", cursor)
+    brace = source.find("{", cursor)
+    if brace != -1 and (end == -1 or brace < end):
+        end = brace
+    return len(source) if end == -1 else end
+
+
+def _jsx_text_starts(source, cursor, grammar):
+    if not grammar[8] or source[cursor] != ">":
+        return False
+    # A `>` closing a tag: preceded by a tag-like run, not by a comparison.
+    index = cursor - 1
+    while index >= 0 and source[index] in " \t\"'/":
+        index -= 1
+    return index >= 0 and (source[index].isalnum() or source[index] in "}_")
+
+
+# Comments and string literals blanked, delimiters and everything else kept.
+#
+# The point is not tidiness. `BRANCH_RE` matched `for` anywhere on a line, so
+# `logger.info("retrying if the lock is free")` carried two decision points and
+# rewording a log message moved a file's complexity. RATCHET001 refuses a file
+# whose complexity rose above its mark, so prose could fail a build. The other
+# direction is worse: a reworded message could LOWER the number, `update` would
+# write that as the new mark, and a real branch added later would fit under a
+# budget nobody earned.
+def _blank_literals(source, grammar_name):
+    grammar = _GRAMMARS.get(grammar_name)
+    if grammar is None:
+        return source
+    out = []
+    cursor, length = 0, len(source)
+    while cursor < length:
+        if _jsx_text_starts(source, cursor, grammar):
+            end = _jsx_text_end(source, cursor + 1)
+            out.append(">" + _blank_span(source[cursor + 1:end]))
+            cursor = end
+            continue
+        run = _literal_run(source, cursor, grammar)
+        if run is None:
+            out.append(source[cursor])
+            cursor += 1
+            continue
+        end, keep_open, keep_close = run
+        out.append(_blank_keep_delimiters(source[cursor:end], keep_open, keep_close))
+        cursor = end
+    return "".join(out)
+
+# Which grammar a file uses is the pack's answer too, through the registry. An
+# extension table lived here for one commit and was refused on review: it is
+# the rule in CLAUDE.md that the engine holds no list of languages, and the
+# second time this file had broken it.
+def _literal_syntax_of(path: Path) -> str:
+    try:
+        from lang_registry_read import literal_syntax_for_path
+    except ImportError:
+        return ""
+    try:
+        return literal_syntax_for_path(str(path))
+    except Exception:
+        return ""
 
 
 # Which files are ratcheted is the loaded packs' answer. The literal set this
@@ -140,8 +408,18 @@ def _decision_points(lines) -> int:
 
 
 def measure(path: Path) -> dict:
-    """Structural fingerprint of one file: the five ratcheted metrics."""
-    lines = path.read_text(errors="ignore").split("\n")
+    """Structural fingerprint of one file: the five ratcheted metrics.
+
+    Four of the five are measured on the source with comments and string
+    literals blanked, so a rename or a reworded message cannot move them.
+    `ignores` is measured on the RAW source, because a craftsman-ignore marker
+    lives in a comment by definition: blanking it first would count zero, every
+    time, on every file, and the ratchet would stop noticing suppressions
+    piling up.
+    """
+    raw = path.read_text(errors="ignore")
+    code = _blank_literals(raw, _literal_syntax_of(path))
+    lines = code.split("\n")
     spans = _function_spans(lines)
     return {
         "path": str(path),
@@ -149,7 +427,7 @@ def measure(path: Path) -> dict:
         "file_lines": len(lines),
         "max_fn_lines": max(end - start for start, end in spans),
         "fan_out": sum(1 for line in lines if IMPORT_RE.match(line)),
-        "ignores": sum(1 for line in lines if IGNORE_RE.search(line)),
+        "ignores": sum(1 for line in raw.split("\n") if IGNORE_RE.search(line)),
     }
 
 
@@ -337,6 +615,7 @@ def _current_entry(file_path: Path):
         return None
     entry = measure(file_path)
     entry["path"] = relative
+    entry["instrument"] = RATCHET_INSTRUMENT
     return entry
 
 
@@ -349,8 +628,21 @@ _NOT_THE_PROJECT = frozenset(
 )
 
 
+# The prune applies to the path INSIDE the project, never to the absolute one.
+# Matched against every segment of the absolute path, `var` skipped every file
+# under /var/www, which is where a deployed PHP application lives, and every
+# fixture under macOS's /var/folders temp directory: the ratchet measured
+# nothing there and said nothing about it.
+def _pruned(file_path: Path) -> bool:
+    try:
+        relative = file_path.resolve().relative_to(project_root(file_path.parent))
+    except (ValueError, OSError):
+        return False
+    return bool(_NOT_THE_PROJECT.intersection(relative.parts[:-1]))
+
+
 def _skipped(file_path: Path) -> bool:
-    if _NOT_THE_PROJECT.intersection(file_path.parts):
+    if _pruned(file_path):
         return True
     if not file_path.is_file() or file_path.suffix not in supported_extensions():
         return True
@@ -375,6 +667,22 @@ def _cmd_measure(args) -> int:
     return 0
 
 
+# The mark for a path, or None when there is none worth comparing against: a
+# mark taken by an older instrument is re-taken, and says so on stderr rather
+# than judging the present with a ruler that no longer exists.
+def _current_mark_for(entries: dict, path: str):
+    known = entries.get(path)
+    if known is None:
+        return None
+    if _mark_is_current(known):
+        return known
+    print(
+        "ratchet: mark for %s was taken by an older instrument, re-marked" % path,
+        file=sys.stderr,
+    )
+    return None
+
+
 def _cmd_check(args) -> int:
     file_path = Path(args[0])
     if _skipped(file_path):
@@ -384,7 +692,7 @@ def _cmd_check(args) -> int:
     current = _current_entry(file_path)
     if current is None:
         return 0
-    known = entries.get(current["path"])
+    known = _current_mark_for(entries, current["path"])
     if known is None:
         entries[current["path"]] = current
         save_baseline(baseline_file, entries)
@@ -399,6 +707,24 @@ def _cmd_check(args) -> int:
     return 1 if regressions else 0
 
 
+# The tightened row. A mark from an older instrument is replaced, never
+# tightened against: a min() between two rulers is a number neither of them
+# measured. And the row starts from what it already said, then tightens:
+# rebuilding from scratch and copying back the keys this function happens to
+# know about is how `reason` was lost once, and how `rules` was lost the day
+# it was added. A row carries more than this command owns, and the next key
+# added by someone else must not need an edit here to survive.
+def _tightened(known: dict, current: dict) -> dict:
+    if not _mark_is_current(known):
+        known = current
+    tightened = {key: value for key, value in known.items() if key != "path"}
+    tightened["path"] = current["path"]
+    tightened["instrument"] = RATCHET_INSTRUMENT
+    for name in RATCHETED_METRICS:
+        tightened[name] = min(known.get(name, current[name]), current[name])
+    return tightened
+
+
 def _cmd_update(args) -> int:
     file_path = Path(args[0])
     if _skipped(file_path):
@@ -409,16 +735,7 @@ def _cmd_update(args) -> int:
     if current is None:
         return 0
     known = entries.get(current["path"], current)
-    # Start from what the row already said, then tighten. Rebuilding from
-    # scratch and copying back the keys this function happens to know about is
-    # how `reason` was lost once, and how `rules` was lost the day it was
-    # added: a row carries more than this command owns, and the next key added
-    # by someone else must not need an edit here to survive.
-    tightened = {key: value for key, value in known.items() if key != "path"}
-    tightened["path"] = current["path"]
-    for name in RATCHETED_METRICS:
-        tightened[name] = min(known.get(name, current[name]), current[name])
-    entries[current["path"]] = tightened
+    entries[current["path"]] = _tightened(known, current)
     save_baseline(baseline_file, entries)
     return 0
 

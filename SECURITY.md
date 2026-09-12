@@ -33,7 +33,7 @@ than inheriting the full tool pool:
 - ✅ Follow domain-specific best practices
 - ✅ Operate within Claude Code's permission system
 
-### Hooks (19 scripts, 13 events)
+### Hooks (17 scripts, 12 events)
 
 Every hook is a `command` hook: a shell script this repository ships. There
 are no native `agent` or `prompt` hooks (see

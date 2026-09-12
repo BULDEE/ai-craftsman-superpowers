@@ -486,4 +486,280 @@ assert_contains "and any other key a future writer added" \
 assert_contains "and the reason, which cost this lesson once already" \
     "$kept" "a second mark"
 
+# --- A metric must not move when prose moves -----------------------------------
+#
+# BRANCH_RE matched a control keyword anywhere on a line, so
+# `logger.info("retrying if the lock is free")` carried two decision points.
+# RATCHET001 refuses a file whose complexity rose above its mark, which made
+# rewording a log message able to fail a build; and the other direction is
+# worse, because a reworded message could LOWER the number, `update` would
+# write that as the new mark, and a real branch added later would fit under a
+# budget nobody earned.
+LITERALS="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-literals.XXXXXX")"
+
+_complexity_of() {
+    python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure "$1" \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin)["complexity"])' 2>/dev/null
+}
+
+cat > "$LITERALS/pricing.py" <<'PYSRC'
+def price(tier, qty):
+    if tier == "a":
+        return qty
+    logger.info("%s x %s for tier %s")
+    return 0
+PYSRC
+before_reword=$(_complexity_of "$LITERALS/pricing.py")
+
+cat > "$LITERALS/pricing.py" <<'PYSRC'
+def price(tier, qty):
+    if tier == "a":
+        return qty
+    logger.info("%s x %s tier %s")
+    return 0
+PYSRC
+after_reword=$(_complexity_of "$LITERALS/pricing.py")
+
+if [[ "$before_reword" == "$after_reword" && "$before_reword" == "1" ]]; then
+    log_pass "rewording a log message does not move complexity (both $before_reword)"
+else
+    log_fail "rewording a log message does not move complexity" \
+        "was $before_reword, became $after_reword"
+fi
+
+# The other direction, which is the one that corrupts a mark: a keyword ADDED
+# inside a string must not raise the number either.
+cat > "$LITERALS/prose.py" <<'PYSRC'
+def send(message):
+    logger.info("retrying")
+    return message
+PYSRC
+quiet=$(_complexity_of "$LITERALS/prose.py")
+cat > "$LITERALS/prose.py" <<'PYSRC'
+def send(message):
+    logger.info("retrying if the lock is free, for each waiter, while idle")
+    return message
+PYSRC
+wordy=$(_complexity_of "$LITERALS/prose.py")
+if [[ "$quiet" == "$wordy" ]]; then
+    log_pass "keywords added inside a string do not raise complexity (both $quiet)"
+else
+    log_fail "keywords added inside a string do not raise complexity" \
+        "$quiet became $wordy, so prose can fail a RATCHET001 build"
+fi
+
+# A real branch still counts, or the blanker would have bought silence instead
+# of truth.
+cat > "$LITERALS/real.py" <<'PYSRC'
+def send(message):
+    logger.info("retrying")
+    if message:
+        return 1
+    return 0
+PYSRC
+real=$(_complexity_of "$LITERALS/real.py")
+if [[ "$real" -gt "$quiet" ]]; then
+    log_pass "a real branch still counts ($quiet without, $real with)"
+else
+    log_fail "a real branch still counts" "$quiet without, $real with"
+fi
+
+# Each dialect has a shape the C-like blanker alone would get wrong: a Python
+# docstring, a TypeScript private field, a Rust lifetime, a PHP hash comment.
+cat > "$LITERALS/doc.py" <<'PYSRC'
+def g():
+    """if for while in a docstring"""
+    return 1
+PYSRC
+cat > "$LITERALS/priv.ts" <<'TSSRC'
+class A {
+  // if for while
+  private label = `if for ${y} while`;
+  #secret = 1;
+  go(a: number) { if (a) { return 1 } return 0 }
+}
+TSSRC
+printf 'fn pick<%s>(s: &%s str) -> usize {\n    if s.is_empty() { 0 } else { 1 }\n}\n' "'a" "'a" > "$LITERALS/life.rs"
+cat > "$LITERALS/hash.php" <<'PHPSRC'
+<?php
+# if for while
+class A {
+  public function go($a) { if ($a) { return 1; } return 0; }
+}
+PHPSRC
+for pair in "doc.py 0" "priv.ts 1" "life.rs 1" "hash.php 1"; do
+    fixture="${pair%% *}"
+    expected="${pair##* }"
+    got=$(_complexity_of "$LITERALS/$fixture")
+    if [[ "$got" == "$expected" ]]; then
+        log_pass "literals blanked correctly in $fixture (complexity $got)"
+    else
+        log_fail "literals blanked correctly in $fixture" "expected $expected, got $got"
+    fi
+done
+
+# The shapes two reviews found the first blanker getting wrong, one fixture
+# each. `human` is a hand count. fan_out is asserted too, because the first
+# version blanked the quotes with the string and IMPORT_RE needs them: every
+# quoted import on TypeScript and Bash stopped counting, and 98 of this
+# repository's marks lost their fan_out with nobody looking.
+_metric_of() {
+    python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure "$1" \
+        | python3 -c "import json,sys; print(json.load(sys.stdin)['$2'])" 2>/dev/null
+}
+printf "import { a } from './a';\nimport { b } from './b';\nimport React from 'react';\nexport const f = () => 1;\n" > "$LITERALS/imp.ts"
+printf 'source "./lib/a.sh"\nsource ./lib/b.sh\nsource "${DIR}/c.sh"\nf() { :; }\n' > "$LITERALS/src.sh"
+printf 'f() {\n  [[ ${#args[@]} -gt 0 ]] && return 1\n  if [[ $# -eq 0 ]]; then return 2; fi\n  return 0\n}\ng() { :; }\n' > "$LITERALS/hash.sh"
+printf 'const re = /[/*]/g;\nfunction g(a) { if (a) { return 1 } return 0 }\n' > "$LITERALS/regex.js"
+printf 'function f(a,b) {\n  return <p>Don'"'"'t panic {a && <span/>} {b ? "x" : "y"}</p>;\n}\n' > "$LITERALS/jsx.tsx"
+printf 'func f(a int) int {\n\ts := `C:\\`\n\tif a > 0 && s != "" { return 1 }\n\tif r := '"'"'"'"'"'; r == '"'"'"'"'"' && a > 1 { return 2 }\n\treturn 0\n}\n' > "$LITERALS/raw.go"
+printf 'const q = `\n  if (x) for while\n  && ||\n`;\nfunction g(a) { if (a) return 1; return 0 }\n' > "$LITERALS/template.ts"
+printf '<?php\nfunction f($a) {\n  $sql = <<<SQL\n  SELECT CASE WHEN x THEN 1 ELSE 0 END\n  SQL;\n  $t = <<<'"'"'TXT'"'"'\n  if for while case catch\n  TXT;\n  if ($a) { return 1; }\n  return 0;\n}\n' > "$LITERALS/heredoc.php"
+printf 'export function a(x) {\n  if (x) { return 1 }\n  return 0\n}\nexport default function b() { return 2 }\n' > "$LITERALS/exported.ts"
+
+for spec in \
+    "imp.ts|fan_out|3|quoted imports still count as fan_out" \
+    "src.sh|fan_out|3|sourced libraries still count as fan_out" \
+    "hash.sh|complexity|2|\$# and \${#arr[@]} are not comments" \
+    "hash.sh|max_fn_lines|5|and the function span is not swallowed after them" \
+    "regex.js|complexity|1|a /[/*]/ regex does not open a block comment to end of file" \
+    "jsx.tsx|complexity|2|an apostrophe in JSX text does not eat the && and the ternary" \
+    "raw.go|complexity|4|a Go raw string has no escapes and a rune is not a string" \
+    "template.ts|complexity|1|a multi-line template literal is blanked whole" \
+    "heredoc.php|complexity|1|PHP heredoc and nowdoc are blanked" \
+    "exported.ts|max_fn_lines|4|exported functions are seen by the span finder"
+do
+    IFS='|' read -r fixture metric expected why <<< "$spec"
+    got=$(_metric_of "$LITERALS/$fixture" "$metric")
+    if [[ "$got" == "$expected" ]]; then
+        log_pass "$why ($fixture $metric=$got)"
+    else
+        log_fail "$why" "$fixture $metric expected $expected, got $got"
+    fi
+done
+
+# `ignores` is the one metric measured on the RAW source: a craftsman-ignore
+# marker lives in a comment by definition, so blanking comments first would
+# count zero on every file and the ratchet would stop noticing suppressions
+# piling up.
+cat > "$LITERALS/suppressed.py" <<'PYSRC'
+# craftsman-ignore: PY002
+def g():
+    return 1
+PYSRC
+ignores=$(python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure "$LITERALS/suppressed.py" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["ignores"])' 2>/dev/null)
+if [[ "$ignores" == "1" ]]; then
+    log_pass "a craftsman-ignore marker is still counted after comments are blanked"
+else
+    log_fail "a craftsman-ignore marker is still counted" "got '$ignores'"
+fi
+
+# The prune must read the path inside the project, not the absolute one. It
+# matched every segment, so `var` skipped every file under /var/www, which is
+# where a deployed PHP application lives, and every fixture under macOS's
+# /var/folders: the ratchet measured nothing there and said nothing.
+VARWWW="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-var.XXXXXX")/var/www/app"
+mkdir -p "$VARWWW/src" "$VARWWW/vendor/acme"
+( cd "$VARWWW" && git init -q ) >/dev/null 2>&1
+printf 'def f(a):\n    if a:\n        return 1\n    return 0\n' > "$VARWWW/src/p.py"
+cp "$VARWWW/src/p.py" "$VARWWW/vendor/acme/p.py"
+under_var=$(cd "$VARWWW" && python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure src/p.py 2>/dev/null | grep -c complexity)
+vendored=$(cd "$VARWWW" && python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure vendor/acme/p.py 2>/dev/null | grep -c complexity)
+if [[ "${under_var:-0}" -eq 1 && "${vendored:-0}" -eq 0 ]]; then
+    log_pass "a project under /var/www is measured, and its vendor/ is still pruned"
+else
+    log_fail "a project under /var/www is measured, and its vendor/ is still pruned" \
+        "src measured=$under_var vendor measured=$vendored"
+fi
+rm -rf "${VARWWW%/var/www/app}"
+
+rm -rf "$LITERALS"
+
+# --- A mark from an older instrument is not a mark -----------------------------
+#
+# The blanker above changes what an untouched file measures, and not in one
+# direction: a function whose docstring holds `def example():` measured
+# complexity 0 and max_fn_lines 4 under the old ruler (FN_RE cut the span at
+# the fake def) and measures 5 and 17 under the new one. Compared blindly,
+# `check` reported RATCHET001 on a file nobody edited, and a plugin upgrade put
+# CI in the red. So every mark carries the instrument that took it, and an
+# older one is re-taken rather than judged.
+INSTR="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-instrument.XXXXXX")"
+mkdir -p "$INSTR/src"
+( cd "$INSTR" && git init -q ) >/dev/null 2>&1
+cat > "$INSTR/src/inner.py" <<'PYSRC'
+def outer(a):
+    """Example:
+    def example():
+        pass
+    """
+    if a:
+        return 1
+    if a > 1:
+        return 2
+    return 0
+PYSRC
+# What instrument 1 wrote for this file, deliberately low, with no
+# `instrument` key at all, which is what every baseline in the wild carries.
+printf '[{"path":"src/inner.py","complexity":0,"file_lines":10,"max_fn_lines":4,"fan_out":0,"ignores":0}]\n' \
+    > "$INSTR/.craftsman-baseline.json"
+old_mark_code=0
+old_mark_err=$( cd "$INSTR" && python3 "$ROOT_DIR/hooks/lib/ratchet.py" check src/inner.py 2>&1 >/dev/null ) || old_mark_code=$?
+if [[ "$old_mark_code" -eq 0 ]]; then
+    log_pass "a mark taken by an older instrument does not fail an untouched file"
+else
+    log_fail "a mark taken by an older instrument does not fail an untouched file" \
+        "exit $old_mark_code: the plugin upgrade alone turned the build red"
+fi
+assert_contains "and the re-mark is said on stderr, not done in silence" \
+    "$old_mark_err" "older instrument"
+
+remarked=$( cd "$INSTR" && python3 -c "
+import json
+entry = json.load(open('.craftsman-baseline.json'))[0]
+print('%s %s' % (entry.get('instrument'), entry.get('complexity')))")
+if [[ "$remarked" == "2 2" ]]; then
+    log_pass "the re-taken mark carries the current instrument and the current number"
+else
+    log_fail "the re-taken mark carries the current instrument and the current number" "got '$remarked'"
+fi
+
+# The ratchet still ratchets. Against the re-taken mark, a real third branch is
+# a regression, or the versioning would have bought silence instead of truth.
+cat > "$INSTR/src/inner.py" <<'PYSRC'
+def outer(a):
+    if a:
+        return 1
+    if a > 1:
+        return 2
+    if a > 2:
+        return 3
+    return 0
+PYSRC
+real_code=0
+( cd "$INSTR" && python3 "$ROOT_DIR/hooks/lib/ratchet.py" check src/inner.py >/dev/null 2>&1 ) || real_code=$?
+if [[ "$real_code" -eq 1 ]]; then
+    log_pass "a real regression against the current instrument still fires"
+else
+    log_fail "a real regression against the current instrument still fires" "exit $real_code"
+fi
+
+# `update` replaces an old mark rather than tightening against it: a min()
+# between two rulers is a number neither of them measured.
+printf '[{"path":"src/inner.py","complexity":0,"file_lines":10,"max_fn_lines":4,"fan_out":0,"ignores":0}]\n' \
+    > "$INSTR/.craftsman-baseline.json"
+( cd "$INSTR" && python3 "$ROOT_DIR/hooks/lib/ratchet.py" update src/inner.py >/dev/null 2>&1 )
+updated=$( cd "$INSTR" && python3 -c "
+import json
+entry = json.load(open('.craftsman-baseline.json'))[0]
+print('%s %s' % (entry.get('instrument'), entry.get('complexity')))")
+if [[ "$updated" == "2 3" ]]; then
+    log_pass "update replaces an older mark instead of taking min() across instruments"
+else
+    log_fail "update replaces an older mark instead of taking min() across instruments" "got '$updated'"
+fi
+
+rm -rf "$INSTR"
+
 test_summary
