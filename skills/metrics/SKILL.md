@@ -10,8 +10,8 @@ disable-model-invocation: true
 ## Outcome Contract
 
 - **Outcome**: a data-grounded picture of code quality trends, and a decision about pending learned instincts.
-- **Done when**: trends are read from the metrics database, not estimated; every pending instinct candidate got an explicit approve or reject from the user.
-- **Evidence**: the SQLite query output, the hotspot ranking, and the instinct candidate list.
+- **Done when**: trends are read from the metrics database, not estimated; the acceptance report's proposals are reported and not applied, with the share of blocking findings that got no verdict stated with its count; every pending instinct candidate got an explicit approve or reject from the user.
+- **Evidence**: the SQLite query output, the acceptance report's stdout, the hotspot ranking, and the instinct candidate list.
 
 You are a **metrics analyst** reporting on code quality trends.
 
@@ -65,31 +65,32 @@ printed side by side so a reader can weigh that rather than divide.
 ### Step 3: Does each rule earn its severity
 
 The correction loop records whether a user fixed a finding or suppressed it,
-and until #44 nothing read that number back. Measured on one real database
-over five months: PHP002 fixed 2 times and ignored 153, a 98.7% rejection,
-still blocking every write it fired on. Read the shipped report, never rows
-you add up yourself, because it proposes relaxing a gate:
+and until #44 nothing read that number back. Read the shipped report, never
+rows you add up yourself, because it proposes relaxing a gate, and the only
+legitimate source of every number in this section is its stdout:
 
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/metrics-db.sh" && metrics_acceptance_report 90
 ```
 
-It prints acceptance per rule (`fixed / (fixed + ignored)`, lowest first), the
-rules proposed for relaxation (under 30% acceptance over 20 or more outcomes,
-`--threshold` and `--min-occurrences` to move the bar), each with the
-`.craft-rules.yml` line to write, and the share of violations that never
-produced any outcome at all.
+It prints, in order: acceptance per rule (`fixed / (fixed + ignored)`, lowest
+first); the rules the loop RECOUNTS (more outcomes than blocking findings,
+because the hook records an outcome per write under a directory glob rather
+than once per finding), which get no proposal; the proposals, already under
+the `rules:` key a `.craft-rules.yml` needs, under 30% acceptance over 20 or
+more outcomes (`--threshold` and `--min-occurrences` to move the bar, the day
+count optional before them), each with a note when one directory holds most of
+the rejections, since that is a scope and not a relaxation; then the blocking
+findings with no verdict in the window, and apart from them the advisory
+findings, which the loop cannot observe at all (only a blocking finding enters
+the session state the hook reads).
 
 **Report the proposals; do not apply them.** A relaxation is a decision the
 user records as a `decision:` line in the owning manifest (see
 `packs/python/pack.yml` for the vocabulary), with the measured rate and the
 reason, so the next maintainer does not relitigate it. `n/a` means no outcome
-in the window, an empty sample and not a rate of zero.
-
-The no-outcome share is the other half of the picture. A rule that fires
-thousands of times with no correction ever recorded is either never acted on
-or never observed, and this report cannot tell which: say so, with the count,
-rather than reading silence as acceptance.
+in the window, an empty sample and not a rate of zero. A recounted rule is not
+a rule to relax: say that its number is the instrument's, not the users'.
 
 ### Step 4: Present Report
 
@@ -118,8 +119,10 @@ Format the data as a clear report:
 |------|-------|---------|------------|
 | ...  | ...   | ...     | ...        |
 
-Proposed relaxations: [rule: warn, with the measured rate, or none]
-Violations with no recorded outcome: [N rules, X% of the volume]
+Recounted by the loop (no proposal): [rule: N outcomes for M blocking findings, or none]
+Proposed relaxations: [rule: warn, with the measured rate and the scope note, or none]
+Blocking findings with no verdict: [N rules, X% of the volume, top rule]
+Advisory findings with no verdict: [N rules, X% of the volume; unobservable by construction]
 
 ### Semantic Layer (Level 2, Haiku)
 | Metric | Value |

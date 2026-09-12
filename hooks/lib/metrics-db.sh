@@ -571,8 +571,10 @@ metrics_haiku_report() {
 # with no recorded outcome (#44). A script, not rows for a model to add up:
 # it proposes relaxing a gate.
 metrics_acceptance_report() {
-    local days="${1:-90}"
-    shift 2>/dev/null || true
+    # The day count is optional and comes first; `--threshold 40` alone must
+    # not read 40 as the day count.
+    local days=90
+    [[ $# -gt 0 && "$1" != --* ]] && { days="$1"; shift; }
     local project_hash
     project_hash=$(metrics_project_hash)
     python3 "${METRICS_LIB_DIR}/acceptance_report.py" "$METRICS_DB" "$project_hash" "$days" "$@"
