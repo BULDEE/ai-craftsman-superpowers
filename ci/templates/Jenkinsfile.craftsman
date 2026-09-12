@@ -54,8 +54,13 @@ pipeline {
                     int status = sh(
                         // A pull request (CHANGE_TARGET is set on multibranch PR
                         // builds) validates only the files it changes; a branch
-                        // build still scans everything.
-                        script: 'if [ -n "${CHANGE_TARGET:-}" ]; then git fetch origin "$CHANGE_TARGET"; fi; bash ci/craftsman-ci.sh ci --provider jenkins ${CHANGE_TARGET:+--changed-only}',
+                        // build still scans everything. The fetch uses the refspec
+                        // form on purpose: a GitHub Branch Source PR job clones with
+                        // a refspec covering pull refs only, and a bare
+                        // `git fetch origin develop` then lands in FETCH_HEAD
+                        // without creating origin/develop, which is the ref the
+                        // resolver looks for.
+                        script: 'if [ -n "${CHANGE_TARGET:-}" ]; then git fetch origin "+refs/heads/$CHANGE_TARGET:refs/remotes/origin/$CHANGE_TARGET"; fi; bash ci/craftsman-ci.sh ci --provider jenkins ${CHANGE_TARGET:+--changed-only}',
                         returnStatus: true
                     )
 

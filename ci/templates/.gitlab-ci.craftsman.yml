@@ -27,7 +27,10 @@ craftsman-quality-gate:
     - chmod +x "$CRAFTSMAN_PATH"
     # A merge request validates only the files it changes; the default branch
     # still scans everything. See --changed-only in the craftsman-ci usage.
-    - if [ -n "$CI_MERGE_REQUEST_IID" ]; then git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"; SCOPE="--changed-only"; else SCOPE=""; fi
+    # The refspec form, not a bare branch name: a bare fetch lands in FETCH_HEAD
+    # and creates no origin/<branch> for the resolver to find under a
+    # restricted refspec.
+    - if [ -n "$CI_MERGE_REQUEST_IID" ]; then git fetch origin "+refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME:refs/remotes/origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"; SCOPE="--changed-only"; else SCOPE=""; fi
     - bash "$CRAFTSMAN_PATH" ci --provider gitlab $SCOPE
   artifacts:
     reports:

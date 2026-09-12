@@ -24,8 +24,8 @@ SCAN_PATHS=()
 CHANGED_ONLY=false
 CHANGED_BASE=""
 CHANGED_BASE_RESOLVED=""
+CHANGED_BASE_SOURCE=""
 CHANGED_NONE=false
-CHANGED_SCOPE_GIVEN=false
 STRICTNESS="strict"
 STACK="fullstack"
 
@@ -56,10 +56,16 @@ if [[ "${1:-}" == "ci" ]]; then
     CI_PASSTHROUGH=()
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --provider) CI_PROVIDER="$2"; shift 2 ;;
-            --config)   CI_CONFIG="$2"; shift 2 ;;
+            --provider)
+                [[ $# -ge 2 ]] || { echo "craftsman-ci: --provider needs a name." >&2; exit 2; }
+                CI_PROVIDER="$2"; shift 2 ;;
+            --config)
+                [[ $# -ge 2 ]] || { echo "craftsman-ci: --config needs a file." >&2; exit 2; }
+                CI_CONFIG="$2"; shift 2 ;;
             --changed-only) CI_PASSTHROUGH+=("$1"); shift ;;
-            --base)     CI_PASSTHROUGH+=("$1" "$2"); shift 2 ;;
+            --base)
+                [[ $# -ge 2 ]] || { echo "craftsman-ci: --base needs a ref." >&2; exit 2; }
+                CI_PASSTHROUGH+=("$1" "$2"); shift 2 ;;
             *)          CI_SCAN_PATHS+=("$1"); shift ;;
         esac
     done
@@ -81,7 +87,7 @@ if [[ "${1:-}" == "ci" ]]; then
     # mktemp, not PID: a predictable name in shared /tmp lets a co-tenant on a
     # CI runner pre-create or race the file that decides the gate result.
     local_report=$(mktemp "${TMPDIR:-/tmp}/craftsman-report-XXXXXX") || local_report="/tmp/craftsman-report-$$.json"
-    adapter_run "$local_report" "${CI_RUN_ARGS[@]}"
+    adapter_run "$local_report" "${CI_RUN_ARGS[@]+"${CI_RUN_ARGS[@]}"}"
 
     adapter_annotate "$local_report"
     adapter_comment "$local_report"
@@ -278,10 +284,12 @@ fi
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --format)
+            [[ $# -ge 2 ]] || { echo "craftsman-ci: --format needs a value." >&2; exit 2; }
             FORMAT="$2"
             shift 2
             ;;
         --config)
+            [[ $# -ge 2 ]] || { echo "craftsman-ci: --config needs a file." >&2; exit 2; }
             CONFIG_FILE="$2"
             shift 2
             ;;
@@ -290,6 +298,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --base)
+            [[ $# -ge 2 ]] || { echo "craftsman-ci: --base needs a ref." >&2; exit 2; }
             CHANGED_BASE="$2"
             shift 2
             ;;
@@ -392,7 +401,6 @@ fi
 # pipeline then reported clean having opened no file at all. Every common
 # source root that actually exists is scanned; main() refuses to pass on an
 # empty scan, so a layout not listed here fails loudly instead of silently.
-[[ ${#SCAN_PATHS[@]} -gt 0 ]] && CHANGED_SCOPE_GIVEN=true
 if [[ ${#SCAN_PATHS[@]} -eq 0 ]]; then
     DEFAULT_SCAN_USED=true
     for _candidate in src app lib libs packages apps; do
@@ -908,23 +916,44 @@ _changed_base_ref() {
     # is a diff against the wrong branch reported with full confidence.
     if [[ -n "${CHANGED_BASE:-}" ]]; then
         if git rev-parse --verify --quiet "${CHANGED_BASE}^{commit}" >/dev/null 2>&1; then
-            printf '%s' "$CHANGED_BASE"
+            printf 'explicit %s' "$CHANGED_BASE"
             return 0
         fi
         echo "craftsman-ci: --base ${CHANGED_BASE} is not a ref this repository knows." >&2
         return 1
     fi
+    # A ref NAMED by the environment or by the provider is as explicit as
+    # --base, and gets the same treatment: an error when it does not resolve.
+    # The first version let `GITHUB_BASE_REF=develop` with `origin/develop`
+    # unfetched slide to a stale `origin/main`, and reported other people's
+    # commits as this pull request's violations with full confidence. The
+    # provider named the base; ignoring it is fail-wrong, not fail-closed.
     for candidate in \
         "${CRAFTSMAN_BASE_REF:-}" \
         "${GITHUB_BASE_REF:+origin/${GITHUB_BASE_REF}}" \
         "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:+origin/${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}}" \
         "${BITBUCKET_PR_DESTINATION_BRANCH:+origin/${BITBUCKET_PR_DESTINATION_BRANCH}}" \
-        "${CHANGE_TARGET:+origin/${CHANGE_TARGET}}" \
-        origin/main origin/master main master
+        "${CHANGE_TARGET:+origin/${CHANGE_TARGET}}"
     do
         [[ -z "$candidate" ]] && continue
         if git rev-parse --verify --quiet "${candidate}^{commit}" >/dev/null 2>&1; then
-            printf '%s' "$candidate"
+            if [[ "$candidate" == "${CRAFTSMAN_BASE_REF:-}" ]]; then
+                printf 'env %s' "$candidate"
+            else
+                printf 'provider %s' "$candidate"
+            fi
+            return 0
+        fi
+        echo "craftsman-ci: the base ref named by the environment, ${candidate}, is not a ref this repository knows (fetch it, or pass --base)." >&2
+        return 1
+    done
+    # No ref was named anywhere. The default branches are a GUESS, said so on
+    # stderr and in the report, because a repository integrated on `develop`
+    # has an `origin/main` that exists and is months behind.
+    for candidate in origin/main origin/master main master; do
+        if git rev-parse --verify --quiet "${candidate}^{commit}" >/dev/null 2>&1; then
+            echo "craftsman-ci: base guessed as ${candidate}; pass --base or set CRAFTSMAN_BASE_REF if your integration branch differs." >&2
+            printf 'guess %s' "$candidate"
             return 0
         fi
     done
@@ -938,27 +967,85 @@ _changed_base_ref() {
 # excluded (they cannot be validated), renames are kept under the new name.
 _changed_files() {
     local base="$1"
+    # --relative: git diff prints paths from the repository root, ls-files
+    # prints them from the current directory, and scan_file opens them from
+    # the current directory. Without it a run from a subdirectory (a monorepo
+    # package) dropped every committed change as "not a file" and validated
+    # nothing, with exit 0.
+    #
+    # NUL-delimited, with core.quotePath off. git quotes any path with a byte
+    # above 127 (`"src/Domain/Soci\303\251t\303\251.php"`, quotes included), the
+    # `-f` test downstream then failed on the quoted string, and a file with an
+    # accent in its name dropped out of the diff: a violation in it passed
+    # green. A tab or a newline in the name did the same.
     {
-        git diff --name-only --diff-filter=ACMR "${base}...HEAD" 2>/dev/null
-        git diff --name-only --diff-filter=ACMR HEAD 2>/dev/null
-        git ls-files --others --exclude-standard 2>/dev/null
-    } | sort -u
+        git -c core.quotePath=false diff -z --relative --name-only --diff-filter=ACMR "${base}...HEAD" 2>/dev/null
+        git -c core.quotePath=false diff -z --relative --name-only --diff-filter=ACMR HEAD 2>/dev/null
+        git -c core.quotePath=false ls-files -z --others --exclude-standard 2>/dev/null
+    } | tr '\0' '\n' | sort -u
 }
 
-# The changed files that fall under the requested scan paths, when any were
-# given. The paths are the SCOPE and the diff is the FILTER: `--changed-only
-# src` means "changed files under src/", never "src/ plus the changed files".
+# A scan path as the user typed it, in the form git prints: no leading ./,
+# no trailing /, and an absolute path under $PWD made relative. "./src" and
+# "$PWD/src" used to match nothing and report Nothing to validate, exit 0.
+_changed_normalise_path() {
+    local path="$1" resolved
+    # Through the filesystem when it exists, so `src/../src`, `../repo/src` and
+    # a symlinked spelling all land on the same string git prints. A path that
+    # does not exist keeps the string treatment below and matches nothing,
+    # which is the right answer for a scope that is not there.
+    if [[ -d "$path" ]]; then
+        resolved=$(cd "$path" 2>/dev/null && pwd -P) && path="$resolved"
+    elif [[ -f "$path" ]]; then
+        resolved=$(cd "${path%/*}" 2>/dev/null && pwd -P) && path="${resolved}/${path##*/}"
+    fi
+    local here
+    here=$(pwd -P)
+    case "$path" in
+        "$here") path="." ;;
+        "$here"/*) path="${path#"$here"/}" ;;
+    esac
+    while [[ "$path" == ./* ]]; do path="${path#./}"; done
+    path="${path%/}"
+    printf '%s' "${path:-.}"
+}
+
+# The same exclusions the directory walk applies, on the same names: a file
+# under vendor/ or dist/ is not the project's code whichever way it was found.
+_changed_is_pruned() {
+    local file="$1" segment
+    local IFS=/
+    for segment in $file; do
+        case "$segment" in
+            vendor|node_modules|.git|dist|build|var) return 0 ;;
+        esac
+    done
+    return 1
+}
+
+# The changed files under the requested scan paths, default roots included:
+# the paths are the SCOPE and the diff is the FILTER. Only files some pack
+# declares an extension for count, which is what the walk's -name predicate
+# does: a pull request that changes README.md alone has nothing to validate,
+# and must say so rather than fail as "no source file was found".
 _changed_in_scope() {
     local file path in_scope
+    local -a scope=()
+    for path in "${SCAN_PATHS[@]}"; do
+        scope+=("$(_changed_normalise_path "$path")")
+    done
     while IFS= read -r file; do
         [[ -z "$file" || ! -f "$file" ]] && continue
-        if [[ "$CHANGED_SCOPE_GIVEN" != true ]]; then
-            printf '%s\n' "$file"
+        # The comment file the generic and Jenkins adapters write into the
+        # working tree is untracked, so the second consecutive run found it in
+        # the diff and failed as "no source file was found".
+        [[ "${file##*/}" == "craftsman-comment.md" ]] && continue
+        _changed_is_pruned "$file" && continue
+        if [[ "$PACKS_AVAILABLE" == true ]] && ! lang_extension_is_known "$file"; then
             continue
         fi
         in_scope=false
-        for path in "${SCAN_PATHS[@]}"; do
-            path="${path%/}"
+        for path in "${scope[@]}"; do
             [[ "$path" == "." || "$file" == "$path" || "$file" == "$path"/* ]] && in_scope=true
         done
         [[ "$in_scope" == true ]] && printf '%s\n' "$file"
@@ -972,8 +1059,10 @@ apply_changed_only() {
         echo "craftsman-ci: --changed-only needs a git repository, and this is not one." >&2
         exit 2
     fi
-    local base
-    if ! base=$(_changed_base_ref); then
+    # Two words on stdout, because this runs in a subshell and a variable set
+    # inside `_changed_base_ref` would be gone before the report could read it.
+    local base resolved
+    if ! resolved=$(_changed_base_ref); then
         {
             echo "craftsman-ci: --changed-only could not resolve a base ref."
             echo "  Pass --base <ref>, set CRAFTSMAN_BASE_REF, or fetch the target branch"
@@ -981,6 +1070,8 @@ apply_changed_only() {
         } >&2
         exit 2
     fi
+    CHANGED_BASE_SOURCE="${resolved%% *}"
+    base="${resolved#* }"
     if ! git merge-base "$base" HEAD >/dev/null 2>&1; then
         {
             echo "craftsman-ci: --changed-only found no merge base between ${base} and HEAD."
@@ -1165,7 +1256,8 @@ output_json() {
   },
   "scope": {
     "changed_only": ${CHANGED_ONLY},
-    "base": "${CHANGED_BASE_RESOLVED}"
+    "base": "${CHANGED_BASE_RESOLVED}",
+    "base_source": "${CHANGED_BASE_SOURCE}"
   },
   "summary": {
     "files_scanned": ${FILES_SCANNED},

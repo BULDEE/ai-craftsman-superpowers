@@ -184,6 +184,154 @@ else
     log_fail "craftsman-ci ci forwards --changed-only" "$(printf '%s' "$ci_out" | tail -2)"
 fi
 
+# --- The silent greens two reviews found, each one a violation IN the diff that
+# reported "Nothing to validate", exit 0 ---------------------------------------
+#
+# Every case below is the exact failure this file's header says the feature
+# must not become, and the first version of this file went red on none of them:
+# its empty-scan JSON was checked by parsing it, never by handing it to the
+# adapter that decides the exit code.
+git checkout -q feature
+
+# The spelling tab-completion produces, an absolute path, a path through `..`,
+# and a run from inside the tree: git prints root-relative paths and the scope
+# compare was a literal string prefix.
+for spelling in "./src" "$REPO/src" "src/../src" "./src/Domain/Bad.php"; do
+    spelled_code=0
+    bash "$CI" --changed-only --base main "$spelling" >/dev/null 2>&1 || spelled_code=$?
+    if [[ "$spelled_code" -eq 2 ]]; then
+        log_pass "scope spelled '$spelling' still sees the violation (exit 2)"
+    else
+        log_fail "scope spelled '$spelling' still sees the violation" \
+            "exit $spelled_code: a path spelling turned the gate green"
+    fi
+done
+
+sub_code=0
+( cd "$REPO/src" && bash "$CI" --changed-only --base main Domain >/dev/null 2>&1 ) || sub_code=$?
+if [[ "$sub_code" -eq 2 ]]; then
+    log_pass "run from a subdirectory, the violation is still seen (exit 2)"
+else
+    log_fail "run from a subdirectory, the violation is still seen" \
+        "exit $sub_code: the monorepo layout turned the gate green"
+fi
+
+# A file name with an accent. git quotes it (core.quotePath), the quoted string
+# is not a file, and the violation in it passed.
+git checkout -qb accent feature
+printf '<?php\nclass Societe { public function setN($v) { $this->n = $v; } }\n' > "src/Domain/Société.php"
+_commit "accented name"
+accent_code=0
+accent_out=$(bash "$CI" --changed-only --base main src 2>&1) || accent_code=$?
+if [[ "$accent_code" -eq 2 ]] && printf '%s' "$accent_out" | grep -q "Société"; then
+    log_pass "a file whose name has an accent is in the diff and still fails"
+else
+    log_fail "a file whose name has an accent is in the diff and still fails" \
+        "exit $accent_code, name reported: $(printf '%s' "$accent_out" | grep -c 'Société')"
+fi
+git checkout -q feature
+
+# --- The false reds every shipped template hit -----------------------------------
+#
+# A pull request that changes README.md alone went red as "no source file was
+# found", through all four adapters, because the changed set was non-empty and
+# no file in it had an extension a pack claims. And through the `ci`
+# subcommand, an empty diff went red because adapter_compute_exit read
+# files_scanned=0 and never the scope block this PR claimed it would read.
+git checkout -qb docs main
+printf '\n# more docs\n' >> README.md 2>/dev/null || printf '# docs\n' > README.md
+_commit "docs only"
+docs_code=0
+docs_out=$(bash "$CI" --changed-only --base main 2>&1) || docs_code=$?
+if [[ "$docs_code" -eq 0 ]] && printf '%s' "$docs_out" | grep -q "Nothing to validate"; then
+    log_pass "a docs-only pull request is nothing to validate, exit 0"
+else
+    log_fail "a docs-only pull request is nothing to validate" "exit $docs_code: $(printf '%s' "$docs_out" | tail -1)"
+fi
+
+ci_empty_code=0
+( GITHUB_BASE_REF=main bash "$CI" ci --provider generic --changed-only >/dev/null 2>&1 ) || ci_empty_code=$?
+if [[ "$ci_empty_code" -eq 0 ]]; then
+    log_pass "through the ci subcommand, an empty diff is exit 0 (the adapter reads the scope)"
+else
+    log_fail "through the ci subcommand, an empty diff is exit 0" \
+        "exit $ci_empty_code: the shipped templates fail every docs-only pull request"
+fi
+rm -f craftsman-comment.md
+git checkout -q feature
+
+# A non-source file UNDER a source root is the case the scope alone does not
+# cover: `src/Domain/services.yaml` is inside src/, no pack claims .yaml, and
+# without the extension filter it entered the scan as a file that discovered
+# nothing, which the misconfiguration guard reads as a failed run. Every
+# Symfony pull request that touches only src/Resources/config/*.yaml went red.
+git checkout -qb config-only main
+mkdir -p src/Resources/config
+printf 'services:\n  _defaults:\n    autowire: true\n' > src/Resources/config/services.yaml
+_commit "config only, under src"
+config_code=0
+config_out=$(bash "$CI" --changed-only --base main src 2>&1) || config_code=$?
+if [[ "$config_code" -eq 0 ]] && printf '%s' "$config_out" | grep -q "Nothing to validate"; then
+    log_pass "a config-only change under src/ is nothing to validate, exit 0"
+else
+    log_fail "a config-only change under src/ is nothing to validate" \
+        "exit $config_code: $(printf '%s' "$config_out" | tail -1)"
+fi
+git checkout -q feature
+
+# --- The filter must not WIDEN what the full scan validates --------------------
+#
+# With no path given the full scan walks the default roots and prunes vendor/,
+# dist/, build/, var/, node_modules/. The first version validated every changed
+# file in the repository instead, so a changed vendor/ file failed the pull
+# request and a tests/ file was validated on pull requests and never on main.
+git checkout -qb widen feature
+mkdir -p vendor/acme dist tests/Unit
+printf '<?php\nclass V { public function setA($a) { $this->a = $a; } }\n' > vendor/acme/V.php
+cp vendor/acme/V.php dist/D.php
+printf '<?php\nclass T { public function setB($b) { $this->b = $b; } }\n' > tests/Unit/T.php
+_commit "files outside the default roots"
+widen_out=$(bash "$CI" --changed-only --base main 2>&1)
+for outside in vendor/acme/V.php dist/D.php tests/Unit/T.php; do
+    if printf '%s' "$widen_out" | grep -q "$outside"; then
+        log_fail "$outside stays outside the scope the full scan uses" "it was validated on the pull request only"
+    else
+        log_pass "$outside stays outside the scope the full scan uses"
+    fi
+done
+git checkout -q feature
+
+# --- A base named by the provider that does not resolve is an error ------------
+#
+# GITHUB_BASE_REF=develop with origin/develop unfetched slid to a stale
+# origin/main and reported other people's commits as this pull request's.
+named_code=0
+named_out=$(env -u CRAFTSMAN_BASE_REF GITHUB_BASE_REF=develop bash "$CI" --changed-only src 2>&1) || named_code=$?
+if [[ "$named_code" -eq 2 ]] && printf '%s' "$named_out" | grep -q "named by the environment"; then
+    log_pass "a provider-named base that does not resolve is an error, not a stale fallback"
+else
+    log_fail "a provider-named base that does not resolve is an error" "exit $named_code"
+fi
+
+guessed=$(env -u CRAFTSMAN_BASE_REF -u GITHUB_BASE_REF bash "$CI" --changed-only --format json src 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["scope"]["base_source"])' 2>/dev/null)
+if [[ "$guessed" == "guess" ]]; then
+    log_pass "a base nobody named is reported as a guess in the JSON scope"
+else
+    log_fail "a base nobody named is reported as a guess" "base_source='$guessed'"
+fi
+
+# --- An option missing its value must not hang a runner for six hours -------------
+for option in --base --config --format; do
+    hang_code=0
+    ( timeout 5 bash "$CI" --changed-only "$option" >/dev/null 2>&1 ) || hang_code=$?
+    if [[ "$hang_code" -eq 2 ]]; then
+        log_pass "$option with no value exits 2 at once"
+    else
+        log_fail "$option with no value exits 2 at once" "exit $hang_code (124 is the timeout: it hung)"
+    fi
+done
+
 # --- The templates opt in on pull requests only ----------------------------------
 for template in craftsman-quality-gate.yml .gitlab-ci.craftsman.yml bitbucket-pipelines.craftsman.yml Jenkinsfile.craftsman; do
     if grep -q -- "--changed-only" "$ROOT_DIR/ci/templates/$template"; then

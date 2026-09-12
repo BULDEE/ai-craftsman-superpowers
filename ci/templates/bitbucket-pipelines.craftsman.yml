@@ -32,7 +32,7 @@ pipelines:
             - chmod +x ci/craftsman-ci.sh
             # A pull request validates only the files it changes. The clone
             # below is full-depth for the same reason: a diff needs a base.
-            - git fetch origin "$BITBUCKET_PR_DESTINATION_BRANCH"
+            - git fetch origin "+refs/heads/$BITBUCKET_PR_DESTINATION_BRANCH:refs/remotes/origin/$BITBUCKET_PR_DESTINATION_BRANCH"
             - bash ci/craftsman-ci.sh ci --provider bitbucket --changed-only
 
   branches:

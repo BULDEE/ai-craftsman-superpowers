@@ -189,8 +189,10 @@ adapter_format_comment() {
 _adapter_summary_counts() {
     python3 -c "
 import json, sys
-d = json.load(sys.stdin)['summary']
-print(int(d['violations']), int(d['warnings']), int(d['files_scanned']))
+d = json.load(sys.stdin)
+s = d['summary']
+changed = 1 if d.get('scope', {}).get('changed_only') is True else 0
+print(int(s['violations']), int(s['warnings']), int(s['files_scanned']), changed)
 " < "$1" 2>/dev/null
 }
 
@@ -210,9 +212,16 @@ adapter_compute_exit() {
         return 2
     fi
 
-    local violations warnings files_scanned
-    read -r violations warnings files_scanned <<< "$summary"
+    local violations warnings files_scanned changed_only
+    read -r violations warnings files_scanned changed_only <<< "$summary"
 
+    # Under --changed-only an empty scan is a statement, not a failure: the
+    # diff holds no file a pack recognises. craftsman-ci.sh already exits 0
+    # on it in direct mode; this is the mode the templates run.
+    if [[ "$files_scanned" -eq 0 && "${changed_only:-0}" -eq 1 ]]; then
+        echo "craftsman-ci: --changed-only found no source file in the diff. Nothing to validate." >&2
+        return 0
+    fi
     if [[ "$files_scanned" -eq 0 ]]; then
         echo "craftsman-ci: no file was scanned, so this is not a pass: $report_file" >&2
         return 2
