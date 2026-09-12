@@ -51,6 +51,22 @@ Implement a structural ratchet as a committed `.craftsman-baseline.json` that ac
 
 - ADR-0019 (established tooling first) holds: duplication metrics depend on jscpd or phpcpd being declared, not bundled. When those tools are absent, duplication remains null and does not block.
 - Baseline history is not tracked in this ADR; versioning or rollback lives in CHANGELOG and release notes only.
+- **The instrument is versioned, the history still is not.** Every mark
+  carries `"instrument": N`, the version of the measurement that took it
+  (`RATCHET_INSTRUMENT` in `ratchet.py`). The case that required it: the
+  first instrument counted control keywords inside strings and comments, and
+  a function whose docstring held `def example():` had its span cut short by
+  FN_RE, so it measured complexity 0 and max_fn_lines 4. Instrument 2 blanks
+  literals first and measures the same untouched file at 5 and 17. Compared
+  blindly, `check` reported `RATCHET001 complexity 0 -> 5` on a file nobody
+  had edited, and a plugin upgrade put CI in the red with no change in the
+  code. A mark taken by an older instrument is therefore not a mark: `check`
+  re-takes it on the next touch and says so on stderr, `update` replaces it
+  rather than tightening against it (a `min()` between two rulers is a number
+  neither measured), and a repository with a year of marks needs no manual
+  step, since every file re-marks itself when next written. Bump the
+  constant whenever a change to `measure()` can move a number on an
+  unchanged file, in either direction.
 
 ## Alternatives Considered
 

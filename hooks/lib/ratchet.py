@@ -42,6 +42,27 @@ MAX_BASELINE_BYTES = 8 * 1024 * 1024
 BASELINE_NAME = ".craftsman-baseline.json"
 RATCHETED_METRICS = ["complexity", "file_lines", "max_fn_lines", "fan_out", "ignores"]
 
+# The version of the ruler, written into every mark it takes.
+#
+# Instrument 1 counted control keywords inside strings and comments, and FN_RE
+# matched a `def` inside a docstring, so a function whose docstring held one
+# had its span cut short. Instrument 2 blanks literals first. The two do not
+# agree on an untouched file, and not in one direction: the docstring case
+# measured complexity 0 and max_fn_lines 4 under the old ruler and 5 and 17
+# under the new one. Compared blindly, `check` reported `RATCHET001 complexity
+# 0 -> 5` on a file nobody had edited, and a plugin upgrade put CI in the red
+# with no change in the code.
+#
+# So a mark taken by an older instrument is not a mark. It is re-taken on the
+# next touch, the way a file with no mark is, and `check` says so on stderr
+# rather than judging the present with a ruler that no longer exists. ADR-0025
+# left versioning unaddressed; this is the case that required it.
+RATCHET_INSTRUMENT = 2
+
+
+def _mark_is_current(entry) -> bool:
+    return isinstance(entry, dict) and entry.get("instrument") == RATCHET_INSTRUMENT
+
 CONTROL_WORDS = (
     "if|elif|elseif|else|for|foreach|while|switch|case|catch|do|try|return|match"
 )
@@ -462,6 +483,7 @@ def _current_entry(file_path: Path):
         return None
     entry = measure(file_path)
     entry["path"] = relative
+    entry["instrument"] = RATCHET_INSTRUMENT
     return entry
 
 
@@ -500,6 +522,22 @@ def _cmd_measure(args) -> int:
     return 0
 
 
+# The mark for a path, or None when there is none worth comparing against: a
+# mark taken by an older instrument is re-taken, and says so on stderr rather
+# than judging the present with a ruler that no longer exists.
+def _current_mark_for(entries: dict, path: str):
+    known = entries.get(path)
+    if known is None:
+        return None
+    if _mark_is_current(known):
+        return known
+    print(
+        "ratchet: mark for %s was taken by an older instrument, re-marked" % path,
+        file=sys.stderr,
+    )
+    return None
+
+
 def _cmd_check(args) -> int:
     file_path = Path(args[0])
     if _skipped(file_path):
@@ -509,7 +547,7 @@ def _cmd_check(args) -> int:
     current = _current_entry(file_path)
     if current is None:
         return 0
-    known = entries.get(current["path"])
+    known = _current_mark_for(entries, current["path"])
     if known is None:
         entries[current["path"]] = current
         save_baseline(baseline_file, entries)
@@ -534,6 +572,10 @@ def _cmd_update(args) -> int:
     if current is None:
         return 0
     known = entries.get(current["path"], current)
+    # A mark from an older instrument is replaced, never tightened against: a
+    # min() between two rulers is a number neither of them measured.
+    if not _mark_is_current(known):
+        known = current
     # Start from what the row already said, then tighten. Rebuilding from
     # scratch and copying back the keys this function happens to know about is
     # how `reason` was lost once, and how `rules` was lost the day it was
@@ -541,6 +583,7 @@ def _cmd_update(args) -> int:
     # by someone else must not need an edit here to survive.
     tightened = {key: value for key, value in known.items() if key != "path"}
     tightened["path"] = current["path"]
+    tightened["instrument"] = RATCHET_INSTRUMENT
     for name in RATCHETED_METRICS:
         tightened[name] = min(known.get(name, current[name]), current[name])
     entries[current["path"]] = tightened

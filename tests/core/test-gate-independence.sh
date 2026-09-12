@@ -91,30 +91,86 @@ else
     log_fail "config-protection under auto" "expected exit 2, got $code"
 fi
 
-# Static guard: only the enumerated readers touch permission_mode, and none of
-# them may reach a VERDICT with it.
+# --- The one hook that DOES behave differently by mode, and why that is not a
+# gate softened by a dial.
 #
-# The original line forbade reading the field at all, and said a legitimate
-# reader must update this test in the same change. That happened: plan mode is
-# a mode where the harness does not execute the Write, so recording a violation
-# there files a finding against a file that was never written, and spending a
-# Haiku subprocess there buys a verdict on a file that will not exist. Both are
-# cost and bookkeeping, never a verdict, and the matrix above still proves the
-# verdict is identical in every mode.
+# agent-ddd-verifier.sh is a PostToolUse hook. Its exit 2 cannot block a write,
+# because the tool has already run; it shows the finding to the model. So it is
+# advisory by construction, and skipping its paid subprocess in plan mode, where
+# the harness will not create the file, is a decision about cost on an advisory
+# layer. It is NOT the premise of this file, which is a PreToolUse deny being
+# evaluated before the permission system.
 #
-# The door this pins shut is the one that matters: a hook softening a GATE
-# because of a dial. Adding a reader here is deliberate; adding one that
-# changes an exit code makes the matrix above go red.
-PERMISSION_MODE_READERS="hooks/lib/permission-mode.sh hooks/post-write-check.sh hooks/agent-ddd-verifier.sh"
+# The difference is pinned here rather than argued: with a stubbed verifier
+# returning a violation, `default` must exit 2 and `plan` must exit 0 having
+# made zero subprocess calls. If someone later makes the verifier a PreToolUse
+# gate, the first assertion is the one that has to change, on purpose.
+VERIFY_STUB_DIR="$CLAUDE_PLUGIN_DATA/stub-bin"
+mkdir -p "$VERIFY_STUB_DIR" "$CLAUDE_PLUGIN_DATA/repo/src/Domain"
+cat > "$VERIFY_STUB_DIR/claude" <<'STUB'
+#!/bin/sh
+echo "called" >> "$CLAUDE_STUB_LOG"
+echo "DDD_VIOLATIONS
+src/Domain/Order.php:3 Layer violation - Domain imports Infrastructure"
+STUB
+chmod +x "$VERIFY_STUB_DIR/claude"
+printf '%s\n' "$VIOLATION_CONTENT" > "$CLAUDE_PLUGIN_DATA/repo/src/Domain/Order.php"
+( cd "$CLAUDE_PLUGIN_DATA/repo" && git init -q && git add -A ) >/dev/null 2>&1
+
+verifier_exit() {
+    local mode="$1"
+    export CLAUDE_STUB_LOG="$CLAUDE_PLUGIN_DATA/stub-calls-$mode"
+    : > "$CLAUDE_STUB_LOG"
+    ( cd "$CLAUDE_PLUGIN_DATA/repo" && jq -n --arg fp "src/Domain/Order.php" --arg pm "$mode" \
+        '{"tool_name":"Write","tool_input":{"file_path":$fp},"permission_mode":$pm}' \
+        | env -u CLAUDE_EFFORT -u CRAFTSMAN_HEADLESS_VERIFY PATH="$VERIFY_STUB_DIR:$PATH" \
+              HOME="$CLAUDE_PLUGIN_DATA/home" \
+          bash "$ROOT_DIR/hooks/agent-ddd-verifier.sh" >/dev/null 2>&1 )
+    echo $?
+}
+mkdir -p "$CLAUDE_PLUGIN_DATA/home/.claude"
+
+code=$(verifier_exit default)
+calls=$(awk 'END { print NR }' "$CLAUDE_PLUGIN_DATA/stub-calls-default")
+if [[ "$code" == "2" && "${calls:-0}" -ge 1 ]]; then
+    log_pass "verifier in default: reports the violation (exit 2, $calls call)"
+else
+    log_fail "verifier in default reports the violation" "exit $code, $calls call(s)"
+fi
+
+code=$(verifier_exit plan)
+calls=$(awk 'END { print NR }' "$CLAUDE_PLUGIN_DATA/stub-calls-plan")
+if [[ "$code" == "0" && "${calls:-0}" -eq 0 ]]; then
+    log_pass "verifier in plan: advisory layer steps aside (exit 0, zero calls), by decision"
+else
+    log_fail "verifier in plan steps aside by decision" "exit $code, $calls call(s)"
+fi
+
+# --- Static guard: only the enumerated readers touch permission_mode, and no
+# reader branches an exit code near it.
+#
+# The original line forbade reading the field at all and said a legitimate
+# reader must update this test in the same change. That happened: plan mode
+# is a mode where the harness does not execute the Write, so recording a
+# violation there files a finding against a file that was never written. The
+# matrix above still proves the PreToolUse verdict is identical in every mode.
+#
+# The first version of this guard grepped for `exit 2` on the same line as the
+# mode reference, and was blind to the shape actually present in the change
+# it guarded: `|| exit 0` two lines under the read. It looks at a window now,
+# and any exit code inside it is a finding, because the behavioural assertions
+# above are what decide whether that exit is legitimate, never this grep.
+PERMISSION_MODE_READERS="hooks/lib/permission-mode.sh hooks/post-write-check.sh hooks/agent-ddd-verifier.sh hooks/agent-final-review.sh"
 
 unexpected=""
 while IFS= read -r hook; do
+    [[ -z "$hook" ]] && continue
     relative="${hook#"$ROOT_DIR"/}"
     case " $PERMISSION_MODE_READERS " in
         *" $relative "*) continue ;;
     esac
     unexpected="${unexpected}${relative} "
-done <<< "$(grep -l 'permission_mode' "$ROOT_DIR"/hooks/*.sh "$ROOT_DIR"/hooks/lib/*.sh 2>/dev/null || true)"
+done <<< "$(grep -l 'permission_mode\|PERMISSION_MODE' "$ROOT_DIR"/hooks/*.sh "$ROOT_DIR"/hooks/lib/*.sh 2>/dev/null || true)"
 
 if [[ -z "${unexpected// /}" ]]; then
     log_pass "only the enumerated hooks read permission_mode"
@@ -123,15 +179,34 @@ else
         "undeclared reader(s): $unexpected"
 fi
 
-# And no reader may branch an exit code on it. `exit 2` near a permission_mode
-# test is the shape of the patch this guard exists to stop.
+# The window: the line that mentions the mode and its immediate neighbours. An
+# exit inside it is reported by file and line, so a reviewer sees the shape
+# and decides, rather than a grep deciding for them. Wider than one line and
+# the guard fired on `$HAS_PYTHON3 || return 0` three lines away, which is the
+# other way a static guard dies: crying wolf until somebody deletes it. The
+# behavioural assertions above are the real guard; this one only makes a new
+# shape visible.
+EXPECTED_MODE_EXITS="hooks/agent-ddd-verifier.sh:hook_mode_runs_verification"
 for reader in $PERMISSION_MODE_READERS; do
-    if grep -n 'permission_mode\|PERMISSION_MODE' "$ROOT_DIR/$reader" 2>/dev/null \
-        | grep -qE 'exit[[:space:]]+2'; then
-        log_fail "$reader decides a verdict from the mode" \
-            "an exit 2 is branched on permission_mode"
+    hits=$(awk '
+        /permission_mode|PERMISSION_MODE|hook_mode_/ { for (i = NR - 1; i <= NR + 1; i++) window[i] = 1 }
+        { line[NR] = $0 }
+        END {
+            for (n = 1; n <= NR; n++)
+                if (window[n] && line[n] ~ /(^|[^a-zA-Z_])(exit|return)[[:space:]]+[0-9]/)
+                    print n ": " line[n]
+        }' "$ROOT_DIR/$reader")
+    if [[ -z "$hits" ]]; then
+        log_pass "$reader: no exit code beside a mode reference"
+        continue
+    fi
+    # An expected one carries the helper name on the same line, which is the
+    # shape of a decision taken through the helper rather than around it.
+    unexpected_hits=$(printf '%s\n' "$hits" | grep -v 'hook_mode_runs_verification\|hook_mode_records_metrics' || true)
+    if [[ -z "$unexpected_hits" ]]; then
+        log_pass "$reader: the only exit near the mode goes through the helper (pinned above)"
     else
-        log_pass "$reader reads the mode without deciding a verdict from it"
+        log_fail "$reader branches an exit code on the mode" "$unexpected_hits"
     fi
 done
 

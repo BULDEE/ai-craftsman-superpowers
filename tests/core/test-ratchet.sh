@@ -617,4 +617,90 @@ fi
 
 rm -rf "$LITERALS"
 
+# --- A mark from an older instrument is not a mark -----------------------------
+#
+# The blanker above changes what an untouched file measures, and not in one
+# direction: a function whose docstring holds `def example():` measured
+# complexity 0 and max_fn_lines 4 under the old ruler (FN_RE cut the span at
+# the fake def) and measures 5 and 17 under the new one. Compared blindly,
+# `check` reported RATCHET001 on a file nobody edited, and a plugin upgrade put
+# CI in the red. So every mark carries the instrument that took it, and an
+# older one is re-taken rather than judged.
+INSTR="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-instrument.XXXXXX")"
+mkdir -p "$INSTR/src"
+( cd "$INSTR" && git init -q ) >/dev/null 2>&1
+cat > "$INSTR/src/inner.py" <<'PYSRC'
+def outer(a):
+    """Example:
+    def example():
+        pass
+    """
+    if a:
+        return 1
+    if a > 1:
+        return 2
+    return 0
+PYSRC
+# What instrument 1 wrote for this file, deliberately low, with no
+# `instrument` key at all, which is what every baseline in the wild carries.
+printf '[{"path":"src/inner.py","complexity":0,"file_lines":10,"max_fn_lines":4,"fan_out":0,"ignores":0}]\n' \
+    > "$INSTR/.craftsman-baseline.json"
+old_mark_code=0
+old_mark_err=$( cd "$INSTR" && python3 "$ROOT_DIR/hooks/lib/ratchet.py" check src/inner.py 2>&1 >/dev/null ) || old_mark_code=$?
+if [[ "$old_mark_code" -eq 0 ]]; then
+    log_pass "a mark taken by an older instrument does not fail an untouched file"
+else
+    log_fail "a mark taken by an older instrument does not fail an untouched file" \
+        "exit $old_mark_code: the plugin upgrade alone turned the build red"
+fi
+assert_contains "and the re-mark is said on stderr, not done in silence" \
+    "$old_mark_err" "older instrument"
+
+remarked=$( cd "$INSTR" && python3 -c "
+import json
+entry = json.load(open('.craftsman-baseline.json'))[0]
+print('%s %s' % (entry.get('instrument'), entry.get('complexity')))")
+if [[ "$remarked" == "2 2" ]]; then
+    log_pass "the re-taken mark carries the current instrument and the current number"
+else
+    log_fail "the re-taken mark carries the current instrument and the current number" "got '$remarked'"
+fi
+
+# The ratchet still ratchets. Against the re-taken mark, a real third branch is
+# a regression, or the versioning would have bought silence instead of truth.
+cat > "$INSTR/src/inner.py" <<'PYSRC'
+def outer(a):
+    if a:
+        return 1
+    if a > 1:
+        return 2
+    if a > 2:
+        return 3
+    return 0
+PYSRC
+real_code=0
+( cd "$INSTR" && python3 "$ROOT_DIR/hooks/lib/ratchet.py" check src/inner.py >/dev/null 2>&1 ) || real_code=$?
+if [[ "$real_code" -eq 1 ]]; then
+    log_pass "a real regression against the current instrument still fires"
+else
+    log_fail "a real regression against the current instrument still fires" "exit $real_code"
+fi
+
+# `update` replaces an old mark rather than tightening against it: a min()
+# between two rulers is a number neither of them measured.
+printf '[{"path":"src/inner.py","complexity":0,"file_lines":10,"max_fn_lines":4,"fan_out":0,"ignores":0}]\n' \
+    > "$INSTR/.craftsman-baseline.json"
+( cd "$INSTR" && python3 "$ROOT_DIR/hooks/lib/ratchet.py" update src/inner.py >/dev/null 2>&1 )
+updated=$( cd "$INSTR" && python3 -c "
+import json
+entry = json.load(open('.craftsman-baseline.json'))[0]
+print('%s %s' % (entry.get('instrument'), entry.get('complexity')))")
+if [[ "$updated" == "2 3" ]]; then
+    log_pass "update replaces an older mark instead of taking min() across instruments"
+else
+    log_fail "update replaces an older mark instead of taking min() across instruments" "got '$updated'"
+fi
+
+rm -rf "$INSTR"
+
 test_summary
