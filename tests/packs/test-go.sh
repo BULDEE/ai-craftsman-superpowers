@@ -566,6 +566,41 @@ func Build(customer string, items []Item, currency string, coupon string) *Order
 }
 GO
 
+# gofmt writes a multi-line signature with a trailing comma. The comma is
+# not a parameter: the old split kept the empty part after it and PARAM001
+# fired on three parameters, a false positive on a blocking rule.
+run_go PARAM001 clean "a trailing comma on a multi-line signature is not a parameter" <<'GO'
+package order
+
+// Build assembles three things.
+func Build(
+	customer string,
+	items []string,
+	currency string,
+) error {
+	return nil
+}
+GO
+
+run_go PARAM001 raises "and four real parameters on such a signature are four" <<'GO'
+package order
+
+// Build assembles four things.
+func Build(
+	customer string,
+	items []string,
+	currency string,
+	coupon string,
+) error {
+	return nil
+}
+GO
+if all_findings | grep -q "has 4 parameters"; then
+    log_pass "counted as 4, not 5"
+else
+    log_fail "counted as 4, not 5" "$(all_findings | grep PARAM001 | head -1)"
+fi
+
 run_go PARAM001 clean "the return tuple is not counted as parameters" <<'GO'
 package order
 
