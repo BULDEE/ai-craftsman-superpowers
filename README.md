@@ -144,7 +144,7 @@ git clone https://github.com/BULDEE/ai-craftsman-superpowers ~/.hermes/plugins/c
 hermes plugins enable craftsman
 ```
 
-Your autonomous agent gets the same gate (it cannot conclude a coding turn that leaves critical violations), the correction-learning loop, `/craftsman` on demand and seven situation-selectable craftsman skills. Five-minute walkthrough: [Hermes quickstart](docs/guides/hermes-quickstart.md); a full blocked-fixed-learned turn: [examples/hermes-agent](examples/hermes-agent/01-blocked-turn.md); design and threat model: [adapters/hermes/README.md](adapters/hermes/README.md).
+Your autonomous agent gets the same gate, applied at the conclusion rather than at the write: it cannot conclude a coding turn that leaves critical violations, and Hermes bounds the retries itself. The write-time refusal, for LAYER001 and hardcoded secrets, SQL concatenation and eval only, is an opt-in (`write_gate: on`). Plus the correction-learning loop, `/craftsman` on demand and seven situation-selectable craftsman skills. Five-minute walkthrough: [Hermes quickstart](docs/guides/hermes-quickstart.md); a full blocked-fixed-learned turn: [examples/hermes-agent](examples/hermes-agent/01-blocked-turn.md); design and threat model: [adapters/hermes/README.md](adapters/hermes/README.md).
 
 That is the whole setup. `--quick` reads your repository and picks defaults; run
 `/craftsman:setup` without it to answer four plain-language questions instead.

@@ -43,7 +43,8 @@ What it registers (the three ADR-0029 verbs):
   `craftsman-quality` skill so the agent knows the doctrine it is gated by.
 
 Config (`~/.hermes/config.yaml`, `plugins.entries.craftsman`): `gate_seconds`
-(default 45), `inject_trends` (`on`/`off`).
+(default 45), `inject_trends` (`on`/`off`), `write_gate` (`off`/`on`, see
+"the write-time promise" below).
 
 ### The skills an agent selects from
 
@@ -104,6 +105,38 @@ creates, and an autonomous agent has nobody: with a human present, this plugin
 records 530 suppressed violations against 436 fixed. Refusing a conclusion
 traps nothing, and Hermes bounds the retries itself through
 `agent.max_verify_nudges`.
+
+### The write-time promise, opt-in
+
+The README headline is "refuses the write before it reaches disk", and on
+Hermes the default gate refuses the conclusion, for the reason above. One
+class of finding is the exception: a live credential, SQL built by
+concatenation, data executed as code, a Domain class importing
+Infrastructure. Those are not debt an agent pays down on its own schedule,
+and no retry budget should let them reach disk. `write_gate: on` registers
+`pre_tool_call` (`adapters/hermes/pre-tool-call.sh`) for `write_file` and
+`patch` only, judging the content as the file WOULD be (a patch is applied in
+memory first) on LAYER001 and SEC001 to SEC003, and nothing else: PHP001,
+TS001 and every other rule still wait for the conclusion, with the skill that
+fixes them. The gate's own failure refuses the write, because an operator who
+opted in asked for fail-closed on exactly these rules. Measured in
+`tests/adapters/test-hermes-plugin.sh`: off by default, LAYER001 and SEC001
+refused before the file exists, PHP001 let through, a harmless patch let
+through, a missing script refusing rather than passing.
+
+Path 1 users declare it as a shell hook instead:
+
+```yaml
+hooks:
+  pre_tool_call:
+    - matcher: "write_file|patch"
+      command: "/opt/craftsman/adapters/hermes/pre-tool-call.sh"
+      timeout: 20
+      fail_closed: true
+```
+
+`hermes hooks test pre_tool_call` shows the block directive the dispatcher
+would receive.
 
 ### Scope comes from git, not from the payload
 
