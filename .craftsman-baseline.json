@@ -226,7 +226,7 @@
 {"complexity":0,"fan_out":3,"file_lines":289,"ignores":3,"max_fn_lines":7,"path":"tests/packs/test-security.sh"},
 {"complexity":0,"fan_out":5,"file_lines":139,"ignores":0,"max_fn_lines":1,"path":"tests/packs/test-structural.sh"},
 {"complexity":0,"fan_out":5,"file_lines":118,"ignores":0,"max_fn_lines":1,"path":"tests/packs/test-symfony.sh"},
-{"complexity":4,"fan_out":2,"file_lines":383,"ignores":0,"max_fn_lines":23,"path":"tests/perf/test-hook-latency.sh","reason":"the latency benchmark (#49)"},
+{"complexity":2,"fan_out":2,"file_lines":396,"ignores":0,"instrument":2,"max_fn_lines":23,"path":"tests/perf/test-hook-latency.sh","reason":"ceilings per execution environment: the hosted macOS runner has its own row"},
 {"complexity":28,"fan_out":1,"file_lines":863,"ignores":1,"instrument":2,"max_fn_lines":129,"path":"tests/run-tests.sh","reason":"tests/ci/test-changed-only.sh registered (#50)"},
 {"complexity":0,"fan_out":0,"file_lines":344,"ignores":0,"max_fn_lines":5,"path":"tests/templates/test-templates.sh"}
 ]

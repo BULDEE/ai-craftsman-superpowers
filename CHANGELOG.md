@@ -186,6 +186,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The latency ceilings are per execution environment, not only per
+  operating system.** The Darwin row of `tests/perf/test-hook-latency.sh` was
+  measured on a laptop with 1.4x of room, and the hosted macOS runner ate all
+  of it: the same commit read post-write at 4.0x on the laptop and 5.4x, 5.4x,
+  then 6.3x on three runner instances, bias-detector at 1.5x against 1.6x,
+  1.7x, then 2.5x. The runner's fork basket is cheaper while its interpreter
+  starts are not, by an amount that moves between instances. A `Darwin
+  runner` row (`CI` set) now carries what the runner measured with 1.3x of
+  room over its slowest instance; the laptop row keeps its tighter figures.
+
 - **A write with findings costs one interpreter start for its metrics, not one
   per finding.** `metrics_record_violation` queues its rows while
   `post-write-check.sh` runs and inserts them together on exit through
