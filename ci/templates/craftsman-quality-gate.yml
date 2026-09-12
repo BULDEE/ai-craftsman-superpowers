@@ -17,7 +17,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Full history, because a pull request is validated against its base:
+      # `--changed-only` diffs the branch against the merge base, and a shallow
+      # checkout has no merge base to diff against.
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
 
       - name: Setup PHP (if composer.json exists)
         if: ${{ hashFiles('composer.json') != '' }}
@@ -45,6 +50,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+          # On a pull request only the files that differ from the base branch
+          # are validated. Measured before this: 0.42s a file, so a one-file
+          # pull request on a 3000-file repository paid 22 minutes and reported
+          # every pre-existing finding, which is how a gate ends up on
+          # allow_failure. A push to main still scans everything.
+          CRAFTSMAN_SCOPE: ${{ github.event_name == 'pull_request' && '--changed-only' || '' }}
         run: |
           chmod +x ci/craftsman-ci.sh
-          bash ci/craftsman-ci.sh ci --provider github
+          bash ci/craftsman-ci.sh ci --provider github $CRAFTSMAN_SCOPE

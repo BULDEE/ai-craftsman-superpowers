@@ -132,6 +132,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whatever the file contains, and `tests/core/test-rule-baseline.sh` asserts
   that limit rather than hiding it.
 
+- **`craftsman-ci --changed-only [--base REF]` (#50).** Measured on this
+  repository: 83.2s for 197 files, 0.42s a file. A real Symfony application
+  with 3119 PHP files under `src/` therefore paid roughly 22 minutes of CI per
+  pull request and reported on the order of 3000 pre-existing findings on a
+  one-file change, which is how a gate ends up on `allow_failure` within the
+  week. The filter is on the input, never on the engine: a file in the diff
+  (committed since the merge base, uncommitted, or untracked) is validated
+  exactly as before, a file outside it is validated the next time it is
+  touched, and a violation introduced in a changed file still fails the job.
+  Paths narrow the set and never widen it. A base ref that cannot be resolved,
+  or a repository with no merge base (a shallow clone), is an error and never a
+  silent full scan. The four CI templates opt in on pull requests and keep the
+  full scan on the default branch; each resolves the base from what its
+  provider already exposes (`GITHUB_BASE_REF`,
+  `CI_MERGE_REQUEST_TARGET_BRANCH_NAME`, `BITBUCKET_PR_DESTINATION_BRANCH`,
+  `CHANGE_TARGET`). A run that matches no file says so and exits 0, in text and
+  in the JSON report's new `scope` block.
+
+### Added
 
 - **Go pack (`packs/go/`).** Seven owned rules plus NEST001, LOC001, PARAM001
   and LAYER001, detected by the pack itself. GO001 refuses `panic()` outside

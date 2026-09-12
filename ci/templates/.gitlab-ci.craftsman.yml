@@ -17,12 +17,21 @@ craftsman-quality-gate:
   image: python:3.12-slim
   variables:
     CRAFTSMAN_PATH: "ci/craftsman-ci.sh"
+    # Full history: `--changed-only` diffs a merge request against its target
+    # branch, and GitLab's default shallow clone has nothing to diff against.
+    GIT_DEPTH: 0
   rules:
     - if: $CI_MERGE_REQUEST_IID
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
     - chmod +x "$CRAFTSMAN_PATH"
-    - bash "$CRAFTSMAN_PATH" ci --provider gitlab
+    # A merge request validates only the files it changes; the default branch
+    # still scans everything. See --changed-only in the craftsman-ci usage.
+    # The refspec form, not a bare branch name: a bare fetch lands in FETCH_HEAD
+    # and creates no origin/<branch> for the resolver to find under a
+    # restricted refspec.
+    - if [ -n "$CI_MERGE_REQUEST_IID" ]; then git fetch origin "+refs/heads/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME:refs/remotes/origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"; SCOPE="--changed-only"; else SCOPE=""; fi
+    - bash "$CRAFTSMAN_PATH" ci --provider gitlab $SCOPE
   artifacts:
     reports:
       codequality: gl-code-quality-report.json
