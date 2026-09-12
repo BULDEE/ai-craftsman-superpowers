@@ -184,6 +184,28 @@ hc_check_lsp() {
     fi
 }
 
+# How many skills a model can actually start (#48). Fifteen of twenty-two are
+# locked with `disable-model-invocation: true` and start only when the user
+# types them; a healthcheck that counted "22 skills" hid that the model can
+# reach seven. Read from the frontmatter, the same authority the routing table
+# reads, so the two numbers cannot disagree.
+hc_check_skills() {
+    local root skill total=0 invocable=0
+    root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+    for skill in "$root"/skills/*/SKILL.md; do
+        [[ -f "$skill" ]] || continue
+        total=$((total + 1))
+        awk 'NR==1 && $0=="---"{inside=1;next} inside && $0=="---"{exit} inside' "$skill" \
+            | grep -q '^disable-model-invocation:[[:space:]]*true' && continue
+        invocable=$((invocable + 1))
+    done
+    if [[ "$total" -eq 0 ]]; then
+        _hc_record "skills" "warn" "none found"
+        return
+    fi
+    _hc_record "skills" "ok" "${invocable} of ${total} model-invocable, $((total - invocable)) user-typed"
+}
+
 hc_run_all() {
     _HC_NAMES=()
     _HC_STATUSES=()
@@ -195,6 +217,7 @@ hc_run_all() {
     hc_check_node
     hc_check_config
     hc_check_packs
+    hc_check_skills
     hc_check_metrics_db
     hc_check_channels
     hc_check_lsp

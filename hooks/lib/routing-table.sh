@@ -88,13 +88,67 @@ SYNERGY: Superpowers plugin detected. Craftsman quality gates activate automatic
     fi
 }
 
+# Which table a route belongs to (#48).
+#
+# A skill with `disable-model-invocation: true` starts only when the user types
+# `/craftsman:<name>` first in a prompt; the Skill tool refuses it. Fifteen of
+# the twenty-two skills are locked that way, and the table used to print all of
+# them as one flat list "to suggest", as though it were a dispatch table: a
+# model reading fifteen commands it cannot call either tries and fails or learns
+# to ignore the block. The frontmatter is the authority, read here rather than
+# copied, so a skill that changes its policy moves table on its own.
+_route_skill_file() {
+    local name="$1" root candidate
+    root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+    if [[ -f "$root/skills/$name/SKILL.md" ]]; then
+        printf '%s' "$root/skills/$name/SKILL.md"
+        return 0
+    fi
+    # A pack command before pack_sync_symlinks has linked it into skills/.
+    for candidate in "$root"/packs/*/commands/"$name".md; do
+        [[ -f "$candidate" ]] || continue
+        printf '%s' "$candidate"
+        return 0
+    done
+    return 1
+}
+
+_route_is_model_invocable() {
+    local file
+    # No skill file at all: not something the model can call.
+    file=$(_route_skill_file "$1") || return 1
+    ! awk 'NR==1 && $0=="---"{inside=1;next} inside && $0=="---"{exit} inside' "$file" \
+        | grep -q '^disable-model-invocation:[[:space:]]*true'
+}
+
+_route_command_name() {
+    local line="$1"
+    line="${line##*/craftsman:}"
+    line="${line%% *}"
+    printf '%s' "${line%%(*}"
+}
+
 routing_table() {
     local packs
     packs=$(pack_loaded 2>/dev/null || echo "")
     local routes=""
     routes="${routes}$(_register_core_routes)"
     routes="${routes}$(_register_pack_routes "$packs")"
+    local invocable="" typed="" line name
+    while IFS= read -r line; do
+        [[ "$line" == "- "* ]] || continue
+        name=$(_route_command_name "$line")
+        if _route_is_model_invocable "$name"; then
+            invocable="${invocable}
+${line}"
+        else
+            typed="${typed}
+${line}"
+        fi
+    done <<< "$routes"
     local sp_note=""
     sp_note=$(_detect_superpowers_synergy)
-    echo "CRAFTSMAN COMMANDS - Suggest these when context matches (do NOT auto-execute, propose to user):${routes}${sp_note}"
+    echo "CRAFTSMAN COMMANDS - two tables, because the Skill tool refuses a skill locked with disable-model-invocation.
+Invoke yourself (Skill tool) when the context matches:${invocable}
+Suggest to the user, who types it (do NOT auto-execute, propose to user; the Skill tool refuses these):${typed}${sp_note}"
 }

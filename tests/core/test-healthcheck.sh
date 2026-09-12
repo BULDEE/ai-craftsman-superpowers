@@ -137,6 +137,29 @@ else
     log_fail "hc_check_agent_teams set: ${_HC_STATUSES[0]} / ${_HC_MESSAGES[0]}"
 fi
 
+# Test: hc_check_skills reports how many skills the model can reach (#48),
+# against the frontmatter counted here independently.
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+hc_check_skills
+expected_total=0; expected_locked=0
+for _skill in "$ROOT_DIR"/skills/*/SKILL.md; do
+    [[ -f "$_skill" ]] || continue
+    expected_total=$((expected_total + 1))
+    awk 'NR==1 && $0=="---"{inside=1;next} inside && $0=="---"{exit} inside' "$_skill" \
+        | grep -q '^disable-model-invocation:[[:space:]]*true' && expected_locked=$((expected_locked + 1))
+done
+expected_msg="$((expected_total - expected_locked)) of ${expected_total} model-invocable, ${expected_locked} user-typed"
+if [[ "${_HC_NAMES[0]}" == "skills" && "${_HC_MESSAGES[0]}" == "$expected_msg" ]]; then
+    log_pass "hc_check_skills: ${_HC_MESSAGES[0]}"
+else
+    log_fail "hc_check_skills should say '${expected_msg}'" "got '${_HC_NAMES[0]}: ${_HC_MESSAGES[0]}'"
+fi
+if [[ "$expected_locked" -gt 0 && "$expected_locked" -lt "$expected_total" ]]; then
+    log_pass "the count is about something: ${expected_locked} locked of ${expected_total}"
+else
+    log_fail "the count is about something" "locked=${expected_locked} total=${expected_total}"
+fi
+
 echo ""
 echo "Results: ${TESTS_PASSED} passed, ${TESTS_FAILED} failed"
 [[ $TESTS_FAILED -eq 0 ]] && exit 0 || exit 1

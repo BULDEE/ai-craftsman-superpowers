@@ -60,6 +60,62 @@ else
     log_fail "routing should instruct not to auto-execute"
 fi
 
+# Test: the table says which of its commands the model can call (#48).
+#
+# Fifteen of the twenty-two skills are locked with disable-model-invocation,
+# and a flat list of commands "to suggest" read as a dispatch table for the
+# model. Two tables now, partitioned from the frontmatter itself: every route
+# is checked against the SKILL.md it names, so a skill that changes policy
+# cannot end up in the wrong table.
+skill_locked() {
+    local file="$ROOT_DIR/skills/$1/SKILL.md" candidate
+    if [[ ! -f "$file" ]]; then
+        for candidate in "$ROOT_DIR"/packs/*/commands/"$1".md; do
+            [[ -f "$candidate" ]] && { file="$candidate"; break; }
+        done
+    fi
+    [[ -f "$file" ]] || return 0
+    awk 'NR==1 && $0=="---"{inside=1;next} inside && $0=="---"{exit} inside' "$file" \
+        | grep -q '^disable-model-invocation:[[:space:]]*true'
+}
+
+if echo "$output" | grep -q "^Invoke yourself (Skill tool)" \
+    && echo "$output" | grep -q "^Suggest to the user, who types it"; then
+    log_pass "the table is two tables: invoke yourself, suggest to the user"
+else
+    log_fail "the table is two tables: invoke yourself, suggest to the user"
+fi
+
+INVOCABLE_SECTION="$(echo "$output" | awk '/^Invoke yourself/{f=1;next} /^Suggest to the user/{f=0} f')"
+TYPED_SECTION="$(echo "$output" | awk '/^Suggest to the user/{f=1;next} /^SYNERGY/{f=0} f')"
+MISPLACED=""
+while IFS= read -r line; do
+    [[ "$line" == "- "* ]] || continue
+    name="${line##*/craftsman:}"; name="${name%% *}"; name="${name%%(*}"
+    skill_locked "$name" && MISPLACED="${MISPLACED} ${name}"
+done <<< "$INVOCABLE_SECTION"
+if [[ -z "${MISPLACED// /}" ]]; then
+    log_pass "no locked skill is listed as something the model can invoke"
+else
+    log_fail "no locked skill is listed as something the model can invoke" "locked but listed:${MISPLACED}"
+fi
+MISPLACED=""
+while IFS= read -r line; do
+    [[ "$line" == "- "* ]] || continue
+    name="${line##*/craftsman:}"; name="${name%% *}"; name="${name%%(*}"
+    skill_locked "$name" || MISPLACED="${MISPLACED} ${name}"
+done <<< "$TYPED_SECTION"
+if [[ -z "${MISPLACED// /}" ]]; then
+    log_pass "no model-invocable skill is hidden in the user-typed table"
+else
+    log_fail "no model-invocable skill is hidden in the user-typed table" "invocable but listed:${MISPLACED}"
+fi
+if echo "$INVOCABLE_SECTION" | grep -q "/craftsman:debug" && echo "$TYPED_SECTION" | grep -q "/craftsman:refactor"; then
+    log_pass "debug is invocable and refactor is user-typed, as their frontmatter says"
+else
+    log_fail "debug is invocable and refactor is user-typed, as their frontmatter says"
+fi
+
 echo ""
 echo "Results: ${TESTS_PASSED} passed, ${TESTS_FAILED} failed"
 [[ $TESTS_FAILED -eq 0 ]] && exit 0 || exit 1

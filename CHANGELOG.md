@@ -228,6 +228,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   alone is enough by declaring a rule the engine has never heard of. The
   reasoning the engine's comments held moved beside the defaults it explains,
   in `rules/core.yml` and the packs' `decision:` lines.
+- **The SessionStart routing table says which of its commands the model can
+  call (#48).** Fifteen of the twenty-two skills are locked with
+  `disable-model-invocation: true` and start only when the user types them,
+  and the table printed all of them as one flat list "to suggest", as though
+  it were a dispatch table. It is two tables now, "Invoke yourself (Skill
+  tool)" and "Suggest to the user, who types it", partitioned from each
+  skill's own frontmatter so a policy change moves a command on its own; and
+  `/craftsman:healthcheck` reports how many skills a model can reach
+  (`7 of 22 model-invocable, 15 user-typed`). `tests/core/test-routing-table.sh`
+  checks every route against the SKILL.md it names, in both directions. The
+  routing accuracy eval the issue also asks for is not in this change.
 
 - **A write with findings costs one interpreter start for its metrics, not one
   per finding.** `metrics_record_violation` queues its rows while
