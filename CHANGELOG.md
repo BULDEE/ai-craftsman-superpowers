@@ -186,15 +186,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **The latency ceilings are per execution environment, not only per
-  operating system.** The Darwin row of `tests/perf/test-hook-latency.sh` was
-  measured on a laptop with 1.4x of room, and the hosted macOS runner ate all
-  of it: the same commit read post-write at 4.0x on the laptop and 5.4x, 5.4x,
-  then 6.3x on three runner instances, bias-detector at 1.5x against 1.6x,
-  1.7x, then 2.5x. The runner's fork basket is cheaper while its interpreter
-  starts are not, by an amount that moves between instances. A `Darwin
-  runner` row (`CI` set) now carries what the runner measured with 1.3x of
-  room over its slowest instance; the laptop row keeps its tighter figures.
+- **The latency basket has the hooks' mix: fifty forks and three interpreter
+  starts.** With one start it read the same commit at 1.37x and 2.46x for
+  bias-detector on two hosted macOS runner instances whose fork cost differed
+  2.2x while an interpreter start cost about the same, and no ceiling can sit
+  above 2.46 and below twice 1.37, which the doubling self-check demands.
+  Solving the two runs for the hooks' composition (bias-detector about 44
+  forks plus 3 starts, post-write about 168 plus 8) and giving the basket
+  that mix projects the spread at 0.92x to 0.94x. The rows are per operating
+  system again, each about 1.35x over the slowest instance measured, and the
+  calibration memory is named after the basket's shape so an old memory
+  cannot declare an idle machine busy. CI prints the latency table on every
+  run, not only on a red one, so the rows are tuned from numbers rather than
+  from failures.
 
 - **A write with findings costs one interpreter start for its metrics, not one
   per finding.** `metrics_record_violation` queues its rows while
