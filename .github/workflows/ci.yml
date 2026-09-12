@@ -582,6 +582,14 @@ jobs:
           chmod +x tests/run-tests.sh
           ./tests/run-tests.sh
 
+      # The latency table, on every run and not only on a red one. The suite
+      # prints a subtest's output on failure alone, so the numbers the ceilings
+      # are set from were only ever readable from a failed job: a row cannot be
+      # tuned from runs that pass.
+      - name: Hook latency report
+        if: always()
+        run: bash tests/perf/test-hook-latency.sh --report
+
   check-agents:
     name: Validate Agent Definitions
     runs-on: ubuntu-latest

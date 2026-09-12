@@ -132,8 +132,19 @@ _is_measurement() {
 # grows the way the hooks grow because it is made of the same thing they are
 # made of, which makes the ratio invariant to load by construction rather than
 # by hope.
+# Fifty forks and THREE interpreter starts, not one. Measured on two hosted
+# macOS runner instances whose fork cost differed 2.2x (basket 98ms against
+# 165ms) while an interpreter start cost about the same on both: solving the
+# two runs for the hooks' composition put bias-detector.sh at about 44 forks
+# plus 3 python3 starts and post-write-check.sh at about 168 plus 8. With one
+# start in the basket the same commit read bias at 1.37x on one instance and
+# 2.46x on the other, and no ceiling can be both above 2.46 and below twice
+# 1.37, which is what the doubling check demands. With three, the projected
+# spread is 0.92x to 0.94x: the basket has the hooks' mix, so what moves the
+# hooks moves it too.
 CALIBRATION_FORKS=50
-CALIBRATION_WORKLOAD="for _ in \$(seq 1 $CALIBRATION_FORKS); do /bin/echo x >/dev/null; done; python3 -c pass; cat '$PROJECT/src/A.php' >/dev/null"
+CALIBRATION_PYTHON_STARTS=3
+CALIBRATION_WORKLOAD="for _ in \$(seq 1 $CALIBRATION_FORKS); do /bin/echo x >/dev/null; done; for _ in \$(seq 1 $CALIBRATION_PYTHON_STARTS); do python3 -c pass; done; cat '$PROJECT/src/A.php' >/dev/null"
 
 FLOOR_MS="$(_median_ms "$CALIBRATION_WORKLOAD" 7)"
 if ! _is_measurement "$FLOOR_MS"; then
@@ -143,7 +154,7 @@ fi
 [[ "$FLOOR_MS" == "0.0" ]] && FLOOR_MS="1.0"
 
 echo "=== Hook latency ==="
-echo "calibration: ${FLOOR_MS}ms (${CALIBRATION_FORKS} forks + one python3 + one read, fastest of 7)"
+echo "calibration: ${FLOOR_MS}ms (${CALIBRATION_FORKS} forks + ${CALIBRATION_PYTHON_STARTS} python3 starts + one read, fastest of 7)"
 echo ""
 printf '%-26s %11s %12s %10s %9s\n' "hook" "fastest" "median" "x baseline" "ceiling"
 
@@ -189,12 +200,16 @@ CEILING_MS_BACKSTOP=2500
 # suspended, and the suspension is printed.
 # Derived from this machine's own fastest calibration ever recorded, not from a
 # number typed into a file whose thesis is that typed numbers do not travel.
-# 210ms is right for this laptop and wrong for a slow CI container, where an
+# 300ms is right for this laptop and wrong for a slow CI container, where an
 # idle calibration above it would suspend the backstop permanently while the
 # output said "busy": a slow machine and a loaded one would be indistinguishable
 # forever.
-CALIBRATION_FLOOR_FILE="${_PERF_STATE_DIR}/craftsman-perf-calibration"
-CALIBRATION_QUIET_MS=210
+# Named after the basket's shape. A memory taken with the one-start basket
+# (126ms on this laptop) read against the three-start one (200ms) says "busy"
+# on an idle machine forever, and the backstop it arms would never apply
+# again. A new shape starts a new memory.
+CALIBRATION_FLOOR_FILE="${_PERF_STATE_DIR}/craftsman-perf-calibration-${CALIBRATION_FORKS}f${CALIBRATION_PYTHON_STARTS}p"
+CALIBRATION_QUIET_MS=300
 if [[ -f "$CALIBRATION_FLOOR_FILE" ]]; then
     _seen_floor="$(head -1 "$CALIBRATION_FLOOR_FILE" 2>/dev/null)"
     if _is_measurement "${_seen_floor:-}"; then
@@ -259,31 +274,31 @@ PHPDIRTY
 DIRTY_PAYLOAD="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \
     "$PROJECT/src/Dirty.php" "$PROJECT")"
 
-# The ceilings are per execution environment, and that is a measured statement
+# The ceilings are per operating system, and that is a measured statement
 # about what the ratio does and does not absorb. On one machine under load it
 # absorbs 94% of the slowdown, because the basket grows the way the hooks grow.
-# Across operating systems it absorbs nothing: the same commit measured
-# post-write at 3.9x on macOS and 9.5x on an ubuntu runner, where a fork costs
-# half as much (calibration 63ms against 135ms) while the hooks cost about the
-# same, so the hooks' remaining cost there is not made of forks.
+# Across operating systems it absorbs less: a fork costs half as much on an
+# ubuntu runner as on a Mac while an interpreter start costs about the same,
+# and the basket carries both in a fixed mix. Across machines of one operating
+# system the three-start basket absorbs the rest: the same commit projected at
+# 0.92x and 0.94x for bias-detector on two macOS runner instances whose fork
+# cost differed 2.2x, where the one-start basket read 1.37x and 2.46x. Two
+# variances, two mechanisms: the ratio for load and for machine, a table for
+# the OS. The doubling check further down is the one assertion that transfers
+# unchanged.
 #
-# Across MACHINES of one operating system it absorbs only part. The Darwin row
-# was measured on a laptop, with 1.4x of room, and the hosted macOS runner ate
-# all of it: the same commit read post-write at 4.0x here and at 5.4x, 5.4x,
-# then 6.3x on three runner instances, bias-detector at 1.5x here and 1.6x,
-# 1.7x, then 2.5x there. The runner's basket is cheaper than the laptop's
-# while its interpreter starts are not, and how much cheaper moves from one
-# instance to the next. So the hosted runner has its own row, taken from what
-# it measured with 1.3x of room over the slowest instance seen, and the laptop
-# row keeps the tighter figures it can hold. Three variances, two mechanisms:
-# the ratio for load, a table for where the test runs. The doubling check
-# further down is the one assertion that transfers unchanged.
+# The rows carry about 1.35x of room over what was measured with this basket
+# (ubuntu runner, two runs: 7.11x, 5.38x, 1.96x, 10.39x then 7.11x, 5.22x,
+# 1.88x, 10.37x; macOS runner, two instances: 4.04x, 1.83x, 1.12x, 10.08x
+# then 3.87x, 1.85x, 1.32x, 8.62x; this laptop: 3.02x, 1.60x, 1.11x, 6.68x),
+# and each is below
+# twice the fastest measurement of its tightest hook, which is what lets the
+# doubling check hold on every instance. CI prints the table on every run:
+# tune a row from those numbers, never from a failure alone.
 _PERF_ENV="$(uname -s)"
-[[ -n "${CI:-}" ]] && _PERF_ENV="${_PERF_ENV} runner"
 case "$_PERF_ENV" in
-    Linux*)          C_POST=13.5; C_PRE=10.5; C_BIAS=3.7;  C_DIRTY=23 ;;
-    "Darwin runner") C_POST=8.0;  C_PRE=4.5;  C_BIAS=3.2;  C_DIRTY=16 ;;
-    *)               C_POST=5.5;  C_PRE=3.2;  C_BIAS=1.8;  C_DIRTY=13 ;;
+    Linux)  C_POST=9.5;  C_PRE=7.3;  C_BIAS=2.65; C_DIRTY=14 ;;
+    *)      C_POST=5.5;  C_PRE=2.5;  C_BIAS=1.8;  C_DIRTY=13.5 ;;
 esac
 echo "ceilings for ${_PERF_ENV}: post-write ${C_POST}x, pre-write ${C_PRE}x, bias ${C_BIAS}x, dirty ${C_DIRTY}x"
 
