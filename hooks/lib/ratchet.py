@@ -707,6 +707,24 @@ def _cmd_check(args) -> int:
     return 1 if regressions else 0
 
 
+# The tightened row. A mark from an older instrument is replaced, never
+# tightened against: a min() between two rulers is a number neither of them
+# measured. And the row starts from what it already said, then tightens:
+# rebuilding from scratch and copying back the keys this function happens to
+# know about is how `reason` was lost once, and how `rules` was lost the day
+# it was added. A row carries more than this command owns, and the next key
+# added by someone else must not need an edit here to survive.
+def _tightened(known: dict, current: dict) -> dict:
+    if not _mark_is_current(known):
+        known = current
+    tightened = {key: value for key, value in known.items() if key != "path"}
+    tightened["path"] = current["path"]
+    tightened["instrument"] = RATCHET_INSTRUMENT
+    for name in RATCHETED_METRICS:
+        tightened[name] = min(known.get(name, current[name]), current[name])
+    return tightened
+
+
 def _cmd_update(args) -> int:
     file_path = Path(args[0])
     if _skipped(file_path):
@@ -717,21 +735,7 @@ def _cmd_update(args) -> int:
     if current is None:
         return 0
     known = entries.get(current["path"], current)
-    # A mark from an older instrument is replaced, never tightened against: a
-    # min() between two rulers is a number neither of them measured.
-    if not _mark_is_current(known):
-        known = current
-    # Start from what the row already said, then tighten. Rebuilding from
-    # scratch and copying back the keys this function happens to know about is
-    # how `reason` was lost once, and how `rules` was lost the day it was
-    # added: a row carries more than this command owns, and the next key added
-    # by someone else must not need an edit here to survive.
-    tightened = {key: value for key, value in known.items() if key != "path"}
-    tightened["path"] = current["path"]
-    tightened["instrument"] = RATCHET_INSTRUMENT
-    for name in RATCHETED_METRICS:
-        tightened[name] = min(known.get(name, current[name]), current[name])
-    entries[current["path"]] = tightened
+    entries[current["path"]] = _tightened(known, current)
     save_baseline(baseline_file, entries)
     return 0
 
