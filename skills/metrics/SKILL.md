@@ -197,7 +197,7 @@ The correction learning loop promotes recurring corrections into learned skills,
 bash ~/.claude/craftsman-instincts.sh candidates
 ```
 
-For each candidate, show the user the rule, confidence, occurrence count, and evidence, then ask what to do:
+For each candidate, show the user the rule, confidence, occurrence count, ignored count, and evidence, then ask what to do. The confidence is the lower bound of the rule's acceptance rate given the evidence (Wilson, 95%): more corrections rank higher, a rule suppressed as often as it is fixed cannot appear at all (#45), and nothing saturates, so the first candidate listed is the one best supported by the data.
 
 - **Approve** (generates `.claude/skills/craftsman-learned/learned-<rule>/SKILL.md` with provenance, loaded automatically as background knowledge):
   ```bash

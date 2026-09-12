@@ -19,7 +19,7 @@ The ECC project's continuous-learning pipeline demonstrates the missing stages: 
 v4.0.0 closes the learning loop with a human gate at the promotion step:
 
 1. **Detection** (existing): violations and corrections recorded in SQLite via `metrics-query.py`.
-2. **Candidate extraction** (new): when 3+ corrections share a pattern (same rule, same fix shape, across files), the pattern becomes a *candidate instinct* with a confidence score derived from occurrence count and consistency.
+2. **Candidate extraction** (new): when 3+ corrections share a pattern (same rule, same fix shape, across files) and the rule is fixed at least as often as it is suppressed, the pattern becomes a *candidate instinct*. Its confidence is the lower bound of the acceptance rate given the evidence (Wilson, 95%), so it ranks: the first formula, `0.5 + 0.05 x occurrences + 0.03 x files` capped at 0.95, saturated at nine occurrences and left seven of eight candidates at exactly 0.95 (#45).
 3. **Review** (new, human): `/craftsman:metrics` lists candidate instincts with evidence (the corrections that produced them). The user approves, edits, or rejects each candidate. Nothing activates without approval.
 4. **Codification** (new): an approved instinct is generated as a skill in `.claude/skills/craftsman-learned/<slug>/SKILL.md` with `user-invocable: false`, so it loads as background knowledge when relevant. The generated file records its provenance (source corrections, approval date).
 5. **Retirement**: learned skills are listed by `/craftsman:metrics` and can be deleted at any time; a rejected candidate is not re-proposed unless new evidence accumulates.

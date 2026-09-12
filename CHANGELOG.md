@@ -239,6 +239,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`7 of 22 model-invocable, 15 user-typed`). `tests/core/test-routing-table.sh`
   checks every route against the SKILL.md it names, in both directions. The
   routing accuracy eval the issue also asks for is not in this change.
+- **The instinct gate reads suppressions, and its confidence ranks (#45).**
+  `CANDIDATE_QUERY` counted fixes alone, so a rule could become a candidate
+  on its fixes while being suppressed far more often: PHP003 was one, on 105
+  fixes against 167 ignores, and promoting it would have taught the model a
+  pattern users reject two times out of three. A rule now needs an acceptance
+  of at least 50% to be a candidate. The confidence formula saturated at nine
+  occurrences and left seven of eight candidates at exactly 0.95, one with
+  101 corrections and one with 18; it is now the Wilson lower bound of the
+  acceptance rate, so more evidence ranks higher and nothing reaches a cap.
+  The `instincts` table gains an `ignored` column (migrated in place) and the
+  listing shows it. The batch review surface the issue also asks for is not
+  in this change.
 
 - **A write with findings costs one interpreter start for its metrics, not one
   per finding.** `metrics_record_violation` queues its rows while

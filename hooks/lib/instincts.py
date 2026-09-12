@@ -29,6 +29,12 @@ from pathlib import Path
 MIN_OCCURRENCES = 3
 MIN_DISTINCT_FILES = 3
 REPROPOSE_EVIDENCE_STEP = 3
+# A rule suppressed as often as it is applied is not a lesson to teach, it is
+# a rule to relax (#44). Measured before this gate existed: PHP003 was a
+# candidate on 105 fixes while being ignored 167 times, PY002 on 54 against
+# 99. Promoting either would have taught the model a pattern users reject two
+# times out of three.
+MIN_ACCEPTANCE = 0.5
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS instincts (
@@ -47,31 +53,72 @@ CREATE TABLE IF NOT EXISTS instincts (
 )
 """
 
+# Fixes AND suppressions, per rule. The first version counted fixes alone, so
+# a rule could become a candidate on its fixes while being suppressed far more
+# often (#45).
 CANDIDATE_QUERY = """
-SELECT rule, COUNT(*) AS occurrences,
-       COUNT(DISTINCT file_pattern) AS distinct_files,
-       MAX(COALESCE(context, '')) AS sample_context
+SELECT rule,
+       SUM(CASE WHEN action = 'fixed' THEN 1 ELSE 0 END) AS occurrences,
+       COUNT(DISTINCT CASE WHEN action = 'fixed' THEN file_pattern END) AS distinct_files,
+       SUM(CASE WHEN action = 'ignored' THEN 1 ELSE 0 END) AS ignored,
+       MAX(CASE WHEN action = 'fixed' THEN COALESCE(context, '') END) AS sample_context
 FROM corrections
-WHERE project_hash = ? AND action = 'fixed'
+WHERE project_hash = ? AND action IN ('fixed', 'ignored')
 GROUP BY rule
 HAVING occurrences >= ? AND distinct_files >= ?
+   AND occurrences * 1.0 / (occurrences + ignored) >= ?
 """
+
+# The column the gate needs and the first schema did not have. ALTER TABLE has
+# no IF NOT EXISTS in SQLite, so the duplicate-column error is the signal that
+# the migration already ran.
+MIGRATIONS = (
+    "ALTER TABLE instincts ADD COLUMN ignored INTEGER NOT NULL DEFAULT 0",
+)
+
+
+def _migrate(conn: sqlite3.Connection, statement: str) -> None:
+    try:
+        conn.execute(statement)
+    except sqlite3.OperationalError as error:
+        if "duplicate column" not in str(error):
+            raise
 
 
 def _connect(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.execute(SCHEMA)
+    for statement in MIGRATIONS:
+        _migrate(conn, statement)
     conn.commit()
     return conn
 
 
-def _confidence(occurrences: int, distinct_files: int) -> float:
-    return round(min(0.5 + 0.05 * occurrences + 0.03 * distinct_files, 0.95), 2)
+def _confidence(occurrences: int, ignored: int) -> float:
+    """A score that ranks: the lower bound of the acceptance rate, given the evidence.
+
+    The first formula was 0.5 + 0.05 x occurrences + 0.03 x files, capped at
+    0.95. It saturated at nine occurrences, so seven of eight candidates sat at
+    exactly 0.95, one with 101 corrections and one with 18, and a reviewer
+    opening the list had no order to work with (#45). This is the Wilson
+    lower bound at 95% on fixed / (fixed + ignored): a rule fixed 101 times and
+    never ignored scores 0.96, fixed 18 times 0.82, fixed 3 times 0.44, and a
+    rule ignored as often as it is fixed cannot reach 0.5 however many rows it
+    has. Nothing caps it and nothing reaches the cap.
+    """
+    total = occurrences + ignored
+    if total == 0:
+        return 0.0
+    z = 1.96
+    rate = occurrences / total
+    centre = rate + z * z / (2 * total)
+    spread = z * ((rate * (1 - rate) + z * z / (4 * total)) / total) ** 0.5
+    return round((centre - spread) / (1 + z * z / total), 2)
 
 
 def _upsert_candidate(conn: sqlite3.Connection, project_hash: str, row: tuple) -> None:
-    rule, occurrences, distinct_files, sample_context = row
-    confidence = _confidence(occurrences, distinct_files)
+    rule, occurrences, distinct_files, ignored, sample_context = row
+    confidence = _confidence(occurrences, ignored)
     summary = (sample_context or "").strip()[:200]
     existing = conn.execute(
         "SELECT id, status, occurrences FROM instincts WHERE project_hash = ? AND rule = ?",
@@ -81,8 +128,8 @@ def _upsert_candidate(conn: sqlite3.Connection, project_hash: str, row: tuple) -
     if existing is None:
         conn.execute(
             "INSERT INTO instincts (project_hash, rule, pattern_summary, occurrences,"
-            " distinct_files, confidence) VALUES (?, ?, ?, ?, ?, ?)",
-            (project_hash, rule, summary, occurrences, distinct_files, confidence),
+            " distinct_files, ignored, confidence) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (project_hash, rule, summary, occurrences, distinct_files, ignored, confidence),
         )
         return
 
@@ -91,14 +138,14 @@ def _upsert_candidate(conn: sqlite3.Connection, project_hash: str, row: tuple) -
     if status == "candidate" or revive:
         conn.execute(
             "UPDATE instincts SET status = 'candidate', occurrences = ?, distinct_files = ?,"
-            " confidence = ?, pattern_summary = ?, reviewed_at = NULL WHERE id = ?",
-            (occurrences, distinct_files, confidence, summary, instinct_id),
+            " ignored = ?, confidence = ?, pattern_summary = ?, reviewed_at = NULL WHERE id = ?",
+            (occurrences, distinct_files, ignored, confidence, summary, instinct_id),
         )
 
 
 def refresh_candidates(conn: sqlite3.Connection, project_hash: str) -> None:
     rows = conn.execute(
-        CANDIDATE_QUERY, (project_hash, MIN_OCCURRENCES, MIN_DISTINCT_FILES)
+        CANDIDATE_QUERY, (project_hash, MIN_OCCURRENCES, MIN_DISTINCT_FILES, MIN_ACCEPTANCE)
     ).fetchall()
     for row in rows:
         _upsert_candidate(conn, project_hash, row)
@@ -107,7 +154,7 @@ def refresh_candidates(conn: sqlite3.Connection, project_hash: str) -> None:
 
 def list_instincts(conn: sqlite3.Connection, project_hash: str, status: str | None) -> None:
     query = (
-        "SELECT id, rule, occurrences, distinct_files, confidence, status, pattern_summary "
+        "SELECT id, rule, occurrences, distinct_files, ignored, confidence, status, pattern_summary "
         "FROM instincts WHERE project_hash = ?"
     )
     params: list[str] = [project_hash]
@@ -118,8 +165,9 @@ def list_instincts(conn: sqlite3.Connection, project_hash: str, status: str | No
     if not rows:
         print("no instincts")
         return
-    for iid, rule, occ, files, conf, st, summary in rows:
-        line = f"#{iid} {rule} [{st}] confidence={conf} corrections={occ} files={files}"
+    for iid, rule, occ, files, ignored, conf, st, summary in rows:
+        line = (f"#{iid} {rule} [{st}] confidence={conf} corrections={occ} "
+                f"ignored={ignored} files={files}")
         print(line + (f" context={summary[:80]}" if summary else ""))
 
 

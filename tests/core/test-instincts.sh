@@ -58,6 +58,67 @@ else
     log_fail "candidate threshold" "TS001 should not qualify: $OUTPUT"
 fi
 
+# --- The gate reads suppressions too (#45) -------------------------------------
+#
+# A rule fixed 105 times and ignored 167 was a candidate, because the query
+# counted fixes alone. It is a rule to relax, not a lesson to teach: the
+# candidate list is filtered on acceptance, and the score is the lower bound of
+# the acceptance rate given the evidence, so more evidence ranks higher and
+# nothing saturates at 0.95 the way seven of eight candidates did.
+echo ""
+echo "=== The gate reads suppressions (#45) ==="
+sqlite3 "$DB" <<'SQL'
+INSERT INTO corrections (project_hash, rule, file_pattern, action, context)
+SELECT 'testhash', 'PHP003', 'src/' || (abs(random()) % 12) || '/**/*.php', 'fixed', 'setter removed'
+FROM (SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6);
+INSERT INTO corrections (project_hash, rule, file_pattern, action, context)
+SELECT 'testhash', 'PHP003', 'src/A/**/*.php', 'ignored', 'setter kept'
+FROM (SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5
+      UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10);
+INSERT INTO corrections (project_hash, rule, file_pattern, action, context) VALUES
+  ('testhash', 'TS003', 'src/a/**/*.ts', 'fixed', 'null handled'),
+  ('testhash', 'TS003', 'src/b/**/*.ts', 'fixed', 'null handled'),
+  ('testhash', 'TS003', 'src/c/**/*.ts', 'fixed', 'null handled'),
+  ('testhash', 'TS003', 'src/d/**/*.ts', 'fixed', 'null handled'),
+  ('testhash', 'TS003', 'src/e/**/*.ts', 'fixed', 'null handled'),
+  ('testhash', 'TS003', 'src/f/**/*.ts', 'fixed', 'null handled'),
+  ('testhash', 'TS003', 'src/g/**/*.ts', 'fixed', 'null handled'),
+  ('testhash', 'TS003', 'src/h/**/*.ts', 'fixed', 'null handled'),
+  ('testhash', 'TS003', 'src/i/**/*.ts', 'fixed', 'null handled'),
+  ('testhash', 'TS003', 'src/j/**/*.ts', 'fixed', 'null handled'),
+  ('testhash', 'TS003', 'src/k/**/*.ts', 'fixed', 'null handled'),
+  ('testhash', 'TS003', 'src/l/**/*.ts', 'fixed', 'null handled'),
+  ('testhash', 'TS003', 'src/a/**/*.ts', 'ignored', 'library type');
+SQL
+OUTPUT=$(python3 "$INSTINCTS" candidates "$DB" "$PH" 2>&1)
+if ! echo "$OUTPUT" | grep -q "PHP003"; then
+    log_pass "a rule ignored more than it is fixed is not a candidate (PHP003, 6 fixed, 10 ignored)"
+else
+    log_fail "a rule ignored more than it is fixed is not a candidate" "$(echo "$OUTPUT" | grep PHP003)"
+fi
+assert_contains "a rule fixed far more than it is ignored is a candidate, and its suppressions are shown" \
+    "$OUTPUT" "TS003 \\[candidate\\]"
+assert_contains "with the ignored count beside the fixes" "$OUTPUT" "corrections=12 ignored=1"
+
+# Ranking: 12 fixes and 1 ignore outranks 3 fixes and none, and neither is 0.95.
+TS003_CONF=$(echo "$OUTPUT" | grep "TS003" | grep -oE "confidence=[0-9.]+" | cut -d= -f2)
+PHP001_CONF=$(echo "$OUTPUT" | grep "PHP001" | grep -oE "confidence=[0-9.]+" | cut -d= -f2)
+if python3 -c "import sys; sys.exit(0 if ${TS003_CONF:-0} > ${PHP001_CONF:-1} else 1)"; then
+    log_pass "more evidence ranks higher (TS003 ${TS003_CONF} over PHP001 ${PHP001_CONF})"
+else
+    log_fail "more evidence ranks higher" "TS003 ${TS003_CONF} vs PHP001 ${PHP001_CONF}"
+fi
+if [[ "$TS003_CONF" != "0.95" && "$PHP001_CONF" != "0.95" ]]; then
+    log_pass "no candidate sits at the old 0.95 cap"
+else
+    log_fail "no candidate sits at the old 0.95 cap" "TS003 ${TS003_CONF} PHP001 ${PHP001_CONF}"
+fi
+if [[ "$(echo "$OUTPUT" | grep "\[candidate\]" | head -1)" == *TS003* ]]; then
+    log_pass "the best-supported candidate is listed first"
+else
+    log_fail "the best-supported candidate is listed first" "$(echo "$OUTPUT" | head -1)"
+fi
+
 if ! echo "$OUTPUT" | grep -q "PHP005"; then
     log_pass "PHP005 not a candidate (action=ignored, not fixed)"
 else
@@ -65,10 +126,10 @@ else
 fi
 
 COUNT=$(python3 "$INSTINCTS" pending-count "$DB" "$PH" 2>/dev/null)
-if [[ "$COUNT" == "1" ]]; then
-    log_pass "pending-count reports 1 candidate"
+if [[ "$COUNT" == "2" ]]; then
+    log_pass "pending-count reports 2 candidates (PHP001, TS003)"
 else
-    log_fail "pending-count" "expected 1, got $COUNT"
+    log_fail "pending-count" "expected 2, got $COUNT"
 fi
 
 echo ""
