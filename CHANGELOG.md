@@ -193,8 +193,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   above 2.46 and below twice 1.37, which the doubling self-check demands.
   Solving the two runs for the hooks' composition (bias-detector about 44
   forks plus 3 starts, post-write about 168 plus 8) and giving the basket
-  that mix projects the spread at 0.92x to 0.94x. The rows are per operating
-  system again, each about 1.35x over the slowest instance measured, and the
+  that mix read bias-detector at 1.12x on the runner and 1.11x on a laptop.
+  The rows are per operating system again, each about 1.35x over what the
+  basket measured on the runners and the laptop, and the
   calibration memory is named after the basket's shape so an old memory
   cannot declare an idle machine busy. CI prints the latency table on every
   run, not only on a red one, so the rows are tuned from numbers rather than

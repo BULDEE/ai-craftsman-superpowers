@@ -287,13 +287,16 @@ DIRTY_PAYLOAD="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"c
 # the OS. The doubling check further down is the one assertion that transfers
 # unchanged.
 #
-# The rows carry about 1.35x of room over the slowest instance measured, and
-# each is below twice the fastest measurement of its tightest hook, which is
-# what lets the doubling check hold on every instance.
+# The rows carry about 1.35x of room over what was measured with this basket
+# (ubuntu runner: 7.11x, 5.38x, 1.96x, 10.39x; macOS runner: 4.04x, 1.83x,
+# 1.12x, 10.08x; this laptop: 3.02x, 1.60x, 1.11x, 6.68x), and each is below
+# twice the fastest measurement of its tightest hook, which is what lets the
+# doubling check hold on every instance. CI prints the table on every run:
+# tune a row from those numbers, never from a failure alone.
 _PERF_ENV="$(uname -s)"
 case "$_PERF_ENV" in
-    Linux)  C_POST=6.5;  C_PRE=4.0;  C_BIAS=1.9;  C_DIRTY=14 ;;
-    *)      C_POST=4.2;  C_PRE=2.2;  C_BIAS=1.5;  C_DIRTY=9.5 ;;
+    Linux)  C_POST=9.5;  C_PRE=7.3;  C_BIAS=2.65; C_DIRTY=14 ;;
+    *)      C_POST=5.5;  C_PRE=2.5;  C_BIAS=1.5;  C_DIRTY=13.5 ;;
 esac
 echo "ceilings for ${_PERF_ENV}: post-write ${C_POST}x, pre-write ${C_PRE}x, bias ${C_BIAS}x, dirty ${C_DIRTY}x"
 
