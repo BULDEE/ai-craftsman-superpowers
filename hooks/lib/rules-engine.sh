@@ -353,54 +353,24 @@ _rules_validate_custom() {
 # ---------------------------------------------------------------------------
 # Compute default severity for a rule based on strictness
 # ---------------------------------------------------------------------------
-# Rules that always warn regardless of strictness. The reasoning lives above
-# the function rather than inside it: the case arms are a list, and a list that
-# grows a paragraph per entry stops being readable and trips SH002 on its own
-# author.
+# A rule's advisory default is declared ONCE, in the manifest that owns it:
+# `default_severity: warn` under `rules.owned` in rules/core.yml or in the
+# pack's pack.yml, with a `decision:` line when the choice was adjudicated on
+# measured data. There is no list here.
 #
-# WARN*/PHP005 are advisory by nature. The structural rules
-# (NEST001/LOC001/GOD001/PARAM001/CTRL001) ship advisory-first so teams can
-# measure real noise on an existing codebase before escalating. LOC001 stays
-# advisory permanently; drop NEST001/GOD001/PARAM001/CTRL001 from this list to
-# let strict-mode block them once the codebase is clean.
+# There used to be one, mirrored a second time in ci/craftsman-ci.sh, and both
+# were unreachable for every rule a manifest declares: `_rules_declared_severity`
+# reads the registry first, and the registry is compiled from those manifests
+# whenever python3 exists. Without python3 no language is registered, no
+# validator dispatches and no rule fires, so the lists answered for nobody and
+# were maintained by hand from the same information the manifests carry (#37).
 #
-# TS002/TS003/PHP003 are design preferences with legitimate exceptions a regex
-# cannot see: a framework contract that hands you a mutable DTO, a third-party
-# type whose nullability is wrong, a barrel a build tool insists on. Blocking a
-# write on those trains the developer to suppress the rule, and a rule that is
-# always suppressed enforces nothing while still costing a round trip. Set them
-# to `block` in .craft-config.yml where the codebase has no such exceptions.
-#
-# RATCHET001 ships advisory while the metric core is validated against real
-# work (ADR-0025). Set `RATCHET001: block` in .craft-config.yml to opt in
-# early; the default escalates once a full cycle runs clean.
-#
-# DB001-003, PY003, SH001, SH003, SH005, PY006, PY007, GO003 to GO006,
-# ERRCHECK001, RUST004, RUST005 and CLIPPY001 were advisory de facto, by being
-# emitted through add_warning instead of add_violation. That made the choice
-# invisible here and, worse, unreachable: add_warning never consulted this
-# engine, so a project could neither promote them to block nor set them to
-# ignore. Declaring them keeps today's behaviour and hands the decision back to
-# .craft-config.yml and .craft-rules.yml. Each is a smell with exceptions a
-# regex or AST pass cannot rule out: a swallowed exception, an import-time side
-# effect, an undocumented public item, a discard the compiler accepts, an
-# init() a driver registration needs, an .expect() whose message carries the
-# invariant.
-#
-# ERRCHECK001 and CLIPPY001 are advisory because the Level 1 rules they
-# supersede are: installing a tool must not make the gate stricter than the
-# regex it replaces.
+# The one convention kept is the name: a WARN- prefix states the intent, and a
+# pack may emit one before its manifest declares it. Anything else nobody
+# declared blocks under strict, which is the visible direction: a rule that
+# blocks because its owner forgot to declare it gets declared the same day.
 _rules_is_advisory() {
-    case "$1" in
-        WARN*|PHP005|NEST001|LOC001|GOD001|PARAM001|CTRL001) return 0 ;;
-        TS002|TS003|PHP003) return 0 ;;
-        RATCHET001) return 0 ;;
-        DB001|DB002|DB003|PY003|SH001|SH003|SH005) return 0 ;;
-        PY006|PY007) return 0 ;;
-        GO003|GO004|GO005|GO006|ERRCHECK001) return 0 ;;
-        RUST004|RUST005|CLIPPY001) return 0 ;;
-    esac
-    return 1
+    [[ "$1" == WARN* ]]
 }
 
 # What a rule defaults to when no configuration names it.
@@ -416,8 +386,7 @@ _rules_declared_severity() {
         declared=$(rule_default_severity "$rule_id" 2>/dev/null)
     fi
     if [[ -z "$declared" ]]; then
-        # No declaration: a rule a validator emits without owning it, or a
-        # caller that never loaded the packs.
+        # No declaration: a rule a validator emits without owning it.
         _rules_is_advisory "$rule_id" && declared="warn" || declared="block"
     fi
     printf '%s' "$declared"
@@ -830,8 +799,9 @@ rules_explain() {
 
     # An advisory rule warns whatever the strictness is, so naming the
     # strictness as the source would send the reader to change a setting that
-    # has no effect on it.
-    if _rules_is_advisory "$rule_id"; then
+    # has no effect on it. Advisory means declared so by the owning manifest
+    # (#37), which is also where the reasoning behind the default lives.
+    if [[ "$(_rules_declared_severity "$rule_id")" == "warn" ]]; then
         echo "$rule_id: warn (source: advisory by default, set '$rule_id: block' to enforce)"
         return 0
     fi

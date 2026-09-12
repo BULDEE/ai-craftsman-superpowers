@@ -38,9 +38,11 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
   `tests/core/test-precedence.sh` covers both directions.
 - Severity is the rules engine's decision, never the validator's. Emit through
   `add_violation` or `add_warning` (both resolve `rules_severity_for_file`), and
-  declare a rule's advisory default in `_rules_is_advisory` plus its mirror in
-  `ci/craftsman-ci.sh`. `tests/ci/test-craftsman-ci.sh` fails when the two lists
-  drift.
+  declare a rule's advisory default ONCE, as `default_severity: warn` in the
+  manifest that owns it (`rules/core.yml` or the pack's `pack.yml`). Neither
+  the engine nor `ci/craftsman-ci.sh` holds a list of advisory rules;
+  `tests/ci/test-craftsman-ci.sh` fails when one comes back, and checks that
+  every declared default reaches both front-ends.
 - All commands MUST have `description`, `effort` in frontmatter. `effort` is Claude Code's own frontmatter key, not project metadata: it overrides the session effort level, so only `low`, `medium`, `high`, `xhigh`, `max` are valid.
 - Templates MUST have: top-level heading, `## Mission` section, `## Context Files` section.
 - An agent that declares `maxTurns` MUST carry a `## Turn Budget` section ending

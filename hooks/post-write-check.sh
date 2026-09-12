@@ -292,8 +292,9 @@ add_violation() {
 
 # A validator calling add_warning is stating an intent, not a verdict. The
 # verdict is the rules engine's, exactly as it is for add_violation: the rule's
-# advisory default lives in _rules_is_advisory, and .craft-config.yml or a
-# directory .craft-rules.yml can promote it to block or silence it.
+# advisory default is its `default_severity` in the manifest that owns it, and
+# .craft-config.yml or a directory .craft-rules.yml can promote it to block or
+# silence it.
 #
 # This used to write straight to WARNING_VIOLATIONS, bypassing severity
 # resolution and craftsman-ignore alike. SH001 was declared a blocking rule in

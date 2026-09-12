@@ -96,9 +96,9 @@ python_total=0
 python_pass=0
 
 # Advisory (warn-first) rules do not gate self-validation, mirroring the SH001
-# exemption for sourced libs: they ship as warnings by design (see
-# rules-engine.sh _rules_is_advisory). A file-level craftsman-ignore is honored
-# too, matching the production gate.
+# exemption for sourced libs: they ship as warnings by design (their
+# `default_severity: warn` in rules/core.yml and packs/symfony/pack.yml). A
+# file-level craftsman-ignore is honored too, matching the production gate.
 ADVISORY_RULES="NEST001 LOC001 GOD001 PARAM001 CTRL001"
 
 for file in "$ROOT_DIR"/hooks/lib/*.py; do
