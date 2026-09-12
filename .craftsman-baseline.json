@@ -28,6 +28,7 @@
 {"complexity":0,"fan_out":3,"file_lines":54,"ignores":2,"instrument":2,"max_fn_lines":3,"path":"hooks/config-protection.sh"},
 {"complexity":2,"fan_out":1,"file_lines":41,"ignores":0,"instrument":2,"max_fn_lines":8,"path":"hooks/design-panel.sh"},
 {"complexity":2,"fan_out":4,"file_lines":72,"ignores":0,"instrument":2,"max_fn_lines":7,"path":"hooks/file-changed.sh"},
+{"complexity":5,"fan_out":3,"file_lines":279,"ignores":0,"instrument":2,"max_fn_lines":28,"path":"hooks/lib/acceptance_report.py","reason":"recount guard, one verdict definition, advisory apart, scope note (#44 review)"},
 {"complexity":5,"fan_out":1,"file_lines":139,"ignores":0,"instrument":2,"max_fn_lines":22,"path":"hooks/lib/bias-registry.sh"},
 {"complexity":3,"fan_out":0,"file_lines":113,"ignores":0,"instrument":2,"max_fn_lines":21,"path":"hooks/lib/channel-cache.sh"},
 {"complexity":7,"fan_out":3,"file_lines":313,"ignores":0,"instrument":2,"max_fn_lines":27,"path":"hooks/lib/channels.sh"},
@@ -48,7 +49,7 @@
 {"complexity":4,"fan_out":0,"file_lines":252,"ignores":0,"instrument":2,"max_fn_lines":23,"path":"hooks/lib/lang-registry.sh"},
 {"complexity":6,"fan_out":5,"file_lines":361,"ignores":1,"instrument":2,"max_fn_lines":21,"path":"hooks/lib/lang_registry.py"},
 {"complexity":3,"fan_out":5,"file_lines":163,"ignores":0,"instrument":2,"max_fn_lines":23,"path":"hooks/lib/lang_registry_read.py"},
-{"complexity":7,"fan_out":3,"file_lines":633,"ignores":0,"instrument":2,"max_fn_lines":30,"path":"hooks/lib/metrics-db.sh"},
+{"complexity":7,"fan_out":3,"file_lines":646,"ignores":0,"instrument":2,"max_fn_lines":30,"path":"hooks/lib/metrics-db.sh","reason":"day count optional before the flags (#44 review)"},
 {"complexity":9,"fan_out":2,"file_lines":118,"ignores":0,"instrument":2,"max_fn_lines":27,"path":"hooks/lib/metrics-query.py"},
 {"complexity":9,"fan_out":4,"file_lines":554,"ignores":0,"instrument":2,"max_fn_lines":35,"path":"hooks/lib/pack-loader.sh"},
 {"complexity":2,"fan_out":0,"file_lines":105,"ignores":0,"instrument":2,"max_fn_lines":19,"path":"hooks/lib/portable-timeout.sh"},
@@ -154,6 +155,7 @@
 {"complexity":0,"fan_out":0,"file_lines":30,"ignores":0,"instrument":2,"max_fn_lines":3,"path":"tests/core/fixtures/valid-entity.php"},
 {"complexity":0,"fan_out":0,"file_lines":23,"ignores":2,"instrument":2,"max_fn_lines":1,"path":"tests/core/fixtures/with-craftsman-ignore-multi.php"},
 {"complexity":0,"fan_out":0,"file_lines":16,"ignores":1,"instrument":2,"max_fn_lines":1,"path":"tests/core/fixtures/with-craftsman-ignore.php"},
+{"complexity":2,"fan_out":1,"file_lines":160,"ignores":0,"instrument":2,"max_fn_lines":14,"path":"tests/core/test-acceptance-report.sh","reason":"recount, overridden, out-of-window, advisory, HAIKU, flags (#44 review)"},
 {"complexity":1,"fan_out":6,"file_lines":482,"ignores":0,"instrument":2,"max_fn_lines":7,"path":"tests/core/test-agent-hooks.sh"},
 {"complexity":0,"fan_out":1,"file_lines":129,"ignores":1,"instrument":2,"max_fn_lines":5,"path":"tests/core/test-authority.sh"},
 {"complexity":3,"fan_out":1,"file_lines":214,"ignores":0,"instrument":2,"max_fn_lines":15,"path":"tests/core/test-bias-detector.sh"},
@@ -220,6 +222,6 @@
 {"complexity":0,"fan_out":5,"file_lines":139,"ignores":0,"instrument":2,"max_fn_lines":1,"path":"tests/packs/test-structural.sh"},
 {"complexity":0,"fan_out":5,"file_lines":118,"ignores":0,"instrument":2,"max_fn_lines":1,"path":"tests/packs/test-symfony.sh"},
 {"complexity":2,"fan_out":2,"file_lines":411,"ignores":0,"instrument":2,"max_fn_lines":23,"path":"tests/perf/test-hook-latency.sh","reason":"Darwin bias row from the second runner instance"},
-{"complexity":28,"fan_out":1,"file_lines":863,"ignores":1,"instrument":2,"max_fn_lines":129,"path":"tests/run-tests.sh","reason":"tests/ci/test-changed-only.sh registered (#50)"},
+{"complexity":29,"fan_out":1,"file_lines":864,"ignores":1,"instrument":2,"max_fn_lines":129,"path":"tests/run-tests.sh","reason":"tests/core/test-acceptance-report.sh registered (#44)"},
 {"complexity":0,"fan_out":0,"file_lines":344,"ignores":0,"instrument":2,"max_fn_lines":5,"path":"tests/templates/test-templates.sh"}
 ]

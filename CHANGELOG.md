@@ -86,6 +86,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`/craftsman:metrics` reports whether each rule earns its severity (#44).**
+  The correction loop recorded whether a user fixed a finding or suppressed
+  it, and nothing read the number back: on one real database PHP002 was
+  fixed 2 times and ignored 153, a 98.7% rejection, still blocking every
+  write. `hooks/lib/acceptance_report.py`, reached through
+  `metrics_acceptance_report [days] [--threshold PCT] [--min-occurrences N]`,
+  prints acceptance per rule (`fixed / (fixed + ignored)`, lowest first,
+  HAIKU rows left to their own report), the rules proposed for relaxation
+  under the threshold once enough outcomes exist, under the `rules:` key a
+  `.craft-rules.yml` needs and with a note when one directory holds most of
+  the rejections (a scope, not a relaxation: the one decision this
+  repository recorded was of that kind), and the findings with no verdict in
+  the window, blocking apart from advisory. Two things the review of this
+  change measured on the real database and the report now states rather
+  than hides: the hook records an outcome per WRITE under a directory glob,
+  not once per finding, so a rule with more outcomes than blocking findings
+  is being recounted and gets no proposal (PHP002 there: 106 `ignored` from
+  one pattern against 56 blocking findings); and 99.5% of the silent volume
+  was advisory, which the loop cannot observe by construction. A verdict is
+  a `fixed` or `ignored` row in the window on both halves of the report; an
+  `overridden` row or a fix from a year ago answers nothing. A script rather
+  than rows for a model to add up, because it proposes relaxing a gate; the
+  skill reports the proposals and leaves the decision to the user.
+  `tests/core/test-acceptance-report.sh` asserts the values on a database
+  whose arithmetic is known, each guard seen red.
+
 - **The semantic layer records what it does.** `hooks/agent-ddd-verifier.sh`
   and `hooks/agent-final-review.sh` shell out to a headless Haiku subprocess on
   every Write/Edit and at every Stop, and recorded nothing at all: measured on
