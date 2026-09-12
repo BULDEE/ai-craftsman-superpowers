@@ -13,6 +13,9 @@
 #                      will not authenticate).
 # =============================================================================
 
+clone:
+  depth: full
+
 pipelines:
   pull-requests:
     '**':
@@ -27,7 +30,10 @@ pipelines:
             - if [ -f "composer.json" ]; then composer install --no-interaction --prefer-dist; fi
             - if [ -f "package.json" ]; then npm ci; fi
             - chmod +x ci/craftsman-ci.sh
-            - bash ci/craftsman-ci.sh ci --provider bitbucket
+            # A pull request validates only the files it changes. The clone
+            # below is full-depth for the same reason: a diff needs a base.
+            - git fetch origin "$BITBUCKET_PR_DESTINATION_BRANCH"
+            - bash ci/craftsman-ci.sh ci --provider bitbucket --changed-only
 
   branches:
     main:

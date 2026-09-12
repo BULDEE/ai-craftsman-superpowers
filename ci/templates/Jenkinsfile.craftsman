@@ -52,7 +52,10 @@ pipeline {
                 // never produced the comment file it archives below.
                 script {
                     int status = sh(
-                        script: 'bash ci/craftsman-ci.sh ci --provider jenkins',
+                        // A pull request (CHANGE_TARGET is set on multibranch PR
+                        // builds) validates only the files it changes; a branch
+                        // build still scans everything.
+                        script: 'if [ -n "${CHANGE_TARGET:-}" ]; then git fetch origin "$CHANGE_TARGET"; fi; bash ci/craftsman-ci.sh ci --provider jenkins ${CHANGE_TARGET:+--changed-only}',
                         returnStatus: true
                     )
 

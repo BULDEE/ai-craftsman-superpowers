@@ -21,6 +21,11 @@ VERSION="4.9.0"
 FORMAT="text"
 CONFIG_FILE=""
 SCAN_PATHS=()
+CHANGED_ONLY=false
+CHANGED_BASE=""
+CHANGED_BASE_RESOLVED=""
+CHANGED_NONE=false
+CHANGED_SCOPE_GIVEN=false
 STRICTNESS="strict"
 STACK="fullstack"
 
@@ -48,10 +53,13 @@ if [[ "${1:-}" == "ci" ]]; then
     CI_PROVIDER=""
     CI_CONFIG=""
     CI_SCAN_PATHS=()
+    CI_PASSTHROUGH=()
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --provider) CI_PROVIDER="$2"; shift 2 ;;
             --config)   CI_CONFIG="$2"; shift 2 ;;
+            --changed-only) CI_PASSTHROUGH+=("$1"); shift ;;
+            --base)     CI_PASSTHROUGH+=("$1" "$2"); shift 2 ;;
             *)          CI_SCAN_PATHS+=("$1"); shift ;;
         esac
     done
@@ -67,7 +75,8 @@ if [[ "${1:-}" == "ci" ]]; then
     # Build args for adapter_run
     CI_RUN_ARGS=()
     [[ -n "$CI_CONFIG" ]] && CI_RUN_ARGS+=(--config "$CI_CONFIG")
-    CI_RUN_ARGS+=("${CI_SCAN_PATHS[@]}")
+    CI_RUN_ARGS+=("${CI_PASSTHROUGH[@]+"${CI_PASSTHROUGH[@]}"}")
+    CI_RUN_ARGS+=("${CI_SCAN_PATHS[@]+"${CI_SCAN_PATHS[@]}"}")
 
     # mktemp, not PID: a predictable name in shared /tmp lets a co-tenant on a
     # CI runner pre-create or race the file that decides the gate result.
@@ -276,13 +285,21 @@ while [[ $# -gt 0 ]]; do
             CONFIG_FILE="$2"
             shift 2
             ;;
+        --changed-only)
+            CHANGED_ONLY=true
+            shift
+            ;;
+        --base)
+            CHANGED_BASE="$2"
+            shift 2
+            ;;
         --help|-h)
             cat <<EOF
 craftsman-ci v${VERSION} - Craftsman Quality Gate
 
 Usage:
-  craftsman-ci [--format json|text] [--config FILE] [paths...]
-  craftsman-ci ci [--provider github|gitlab|bitbucket|jenkins|generic] [--config FILE] [paths...]
+  craftsman-ci [--format json|text] [--config FILE] [--changed-only [--base REF]] [paths...]
+  craftsman-ci ci [--provider github|gitlab|bitbucket|jenkins|generic] [--config FILE] [--changed-only [--base REF]] [paths...]
   craftsman-ci init [--provider github|gitlab|bitbucket|jenkins]
   craftsman-ci baseline [paths...]
   craftsman-ci export [--target agents-md|cursor|copilot|all]
@@ -296,6 +313,11 @@ Subcommands:
 Options:
   --format json|text    Output format (default: text)
   --config FILE         Path to .craft-config.yml (default: auto-detect)
+  --changed-only        Validate only the files that differ from the base ref
+                        (committed since the merge base, uncommitted, untracked).
+                        Paths, when given, narrow that set; they never widen it.
+  --base REF            The ref --changed-only diffs against (default: the CI
+                        provider's target branch, else origin/main)
   --provider PROVIDER   CI provider (ci: auto-detect, init: github)
   paths...              Paths to scan (default: src/)
 
@@ -370,6 +392,7 @@ fi
 # pipeline then reported clean having opened no file at all. Every common
 # source root that actually exists is scanned; main() refuses to pass on an
 # empty scan, so a layout not listed here fails loudly instead of silently.
+[[ ${#SCAN_PATHS[@]} -gt 0 ]] && CHANGED_SCOPE_GIVEN=true
 if [[ ${#SCAN_PATHS[@]} -eq 0 ]]; then
     DEFAULT_SCAN_USED=true
     for _candidate in src app lib libs packages apps; do
@@ -851,6 +874,139 @@ _ci_normalise_key() {
     printf '%s' "$key"
 }
 
+# =============================================================================
+# --changed-only: the input filter that makes a pipeline affordable
+#
+# Measured on this repository: 83.2s for 197 files, 0.42s a file. Extrapolated
+# to a real Symfony application, 3119 PHP files under src/, that is roughly 22
+# minutes of CI per pull request and on the order of 3000 findings on the first
+# run. A 22-minute job reporting 3000 findings on a one-file pull request goes
+# to allow_failure within the week, and the CI half of the gate becomes
+# decorative: the plugin's strongest claim is that the hooks and the pipeline
+# enforce the same rules, and that claim is worth nothing on a job nobody
+# blocks on.
+#
+# This is a filter on the INPUT, never a change to the engine. Severity
+# resolution, pack dispatch and the parity with the hooks are untouched: a
+# file in the diff is validated exactly as it always was, and a file outside it
+# is validated next time it is touched. Two things it must not become, and both
+# are asserted in tests/ci/test-changed-only.sh: a violation introduced in a
+# changed file must still fail the job, and a run that finds no changed file
+# must say so rather than report a clean scan of nothing.
+# =============================================================================
+
+# The ref the diff is taken against, in order of authority: an explicit
+# --base, then CRAFTSMAN_BASE_REF, then what the CI provider already knows
+# (each names the target branch of the pull request in its own variable), then
+# the usual default branches. No ref at all is an error, never a full scan: a
+# filter that silently widens to the whole repository would put the 22 minutes
+# back on the day a runner's environment changes.
+_changed_base_ref() {
+    local candidate
+    # An explicit ref that does not resolve is an error, never a fallback. The
+    # first version walked on to origin/main when --base named a typo, which
+    # is a diff against the wrong branch reported with full confidence.
+    if [[ -n "${CHANGED_BASE:-}" ]]; then
+        if git rev-parse --verify --quiet "${CHANGED_BASE}^{commit}" >/dev/null 2>&1; then
+            printf '%s' "$CHANGED_BASE"
+            return 0
+        fi
+        echo "craftsman-ci: --base ${CHANGED_BASE} is not a ref this repository knows." >&2
+        return 1
+    fi
+    for candidate in \
+        "${CRAFTSMAN_BASE_REF:-}" \
+        "${GITHUB_BASE_REF:+origin/${GITHUB_BASE_REF}}" \
+        "${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:+origin/${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}}" \
+        "${BITBUCKET_PR_DESTINATION_BRANCH:+origin/${BITBUCKET_PR_DESTINATION_BRANCH}}" \
+        "${CHANGE_TARGET:+origin/${CHANGE_TARGET}}" \
+        origin/main origin/master main master
+    do
+        [[ -z "$candidate" ]] && continue
+        if git rev-parse --verify --quiet "${candidate}^{commit}" >/dev/null 2>&1; then
+            printf '%s' "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Every file that differs from the base: committed on this branch since the
+# merge base (three-dot), plus the working tree against HEAD, plus untracked
+# files, because a developer running this locally before committing wants the
+# file they are editing, not only the ones they pushed. Deleted files are
+# excluded (they cannot be validated), renames are kept under the new name.
+_changed_files() {
+    local base="$1"
+    {
+        git diff --name-only --diff-filter=ACMR "${base}...HEAD" 2>/dev/null
+        git diff --name-only --diff-filter=ACMR HEAD 2>/dev/null
+        git ls-files --others --exclude-standard 2>/dev/null
+    } | sort -u
+}
+
+# The changed files that fall under the requested scan paths, when any were
+# given. The paths are the SCOPE and the diff is the FILTER: `--changed-only
+# src` means "changed files under src/", never "src/ plus the changed files".
+_changed_in_scope() {
+    local file path in_scope
+    while IFS= read -r file; do
+        [[ -z "$file" || ! -f "$file" ]] && continue
+        if [[ "$CHANGED_SCOPE_GIVEN" != true ]]; then
+            printf '%s\n' "$file"
+            continue
+        fi
+        in_scope=false
+        for path in "${SCAN_PATHS[@]}"; do
+            path="${path%/}"
+            [[ "$path" == "." || "$file" == "$path" || "$file" == "$path"/* ]] && in_scope=true
+        done
+        [[ "$in_scope" == true ]] && printf '%s\n' "$file"
+    done
+}
+
+apply_changed_only() {
+    [[ "$CHANGED_ONLY" == true ]] || return 0
+
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        echo "craftsman-ci: --changed-only needs a git repository, and this is not one." >&2
+        exit 2
+    fi
+    local base
+    if ! base=$(_changed_base_ref); then
+        {
+            echo "craftsman-ci: --changed-only could not resolve a base ref."
+            echo "  Pass --base <ref>, set CRAFTSMAN_BASE_REF, or fetch the target branch"
+            echo "  (a shallow clone without it is the usual cause)."
+        } >&2
+        exit 2
+    fi
+    if ! git merge-base "$base" HEAD >/dev/null 2>&1; then
+        {
+            echo "craftsman-ci: --changed-only found no merge base between ${base} and HEAD."
+            echo "  Fetch enough history for the base ref (fetch-depth: 0, or git fetch --unshallow)."
+        } >&2
+        exit 2
+    fi
+
+    local changed
+    changed=$(_changed_files "$base" | _changed_in_scope)
+    CHANGED_BASE_RESOLVED="$base"
+
+    if [[ -z "$changed" ]]; then
+        # Not a pass and not a failure: nothing to validate, said out loud.
+        # main() refuses a scan that opened no file, and this is the one case
+        # where that is the correct state rather than a misconfiguration.
+        CHANGED_NONE=true
+        SCAN_PATHS=()
+        return 0
+    fi
+    SCAN_PATHS=()
+    while IFS= read -r file; do
+        [[ -n "$file" ]] && SCAN_PATHS+=("$file")
+    done <<< "$changed"
+}
+
 scan_paths() {
     local path file list
     list=$(mktemp "${TMPDIR:-/tmp}/craftsman-scan-XXXXXX") || return 1
@@ -1007,6 +1163,10 @@ output_json() {
     "strictness": "${STRICTNESS}",
     "stack": "${STACK}"
   },
+  "scope": {
+    "changed_only": ${CHANGED_ONLY},
+    "base": "${CHANGED_BASE_RESOLVED}"
+  },
   "summary": {
     "files_scanned": ${FILES_SCANNED},
     "violations": ${total_violations},
@@ -1037,6 +1197,7 @@ _rebuild_registry_for_stack() {
 main() {
     _resolve_config
     _rebuild_registry_for_stack
+    apply_changed_only
     scan_paths
 
     case "$FORMAT" in
@@ -1056,6 +1217,18 @@ main() {
     # guards with assert_scanner_is_live, and this pipeline had no equivalent:
     # any repository whose sources sit outside the default roots got a green
     # build with nothing inspected.
+    if [[ $FILES_DISCOVERED -eq 0 && "$CHANGED_NONE" == true ]]; then
+        # The one empty scan that is a true statement: nothing differs from the
+        # base, so there is nothing to validate. Said explicitly, because a
+        # silent green here would be indistinguishable from a filter that
+        # matched nothing by mistake.
+        # The JSON report was already written above with files_scanned 0 and
+        # scope.changed_only true, which is the shape an adapter reads. Text
+        # gets the sentence.
+        [[ "$FORMAT" != "json" ]] && echo "craftsman-ci: --changed-only found no file differing from ${CHANGED_BASE_RESOLVED}. Nothing to validate."
+        exit 0
+    fi
+
     if [[ $FILES_DISCOVERED -eq 0 ]]; then
         {
             echo "craftsman-ci: no source file was found, so this is not a pass."

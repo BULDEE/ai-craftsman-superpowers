@@ -463,6 +463,13 @@ test_hook_inventory() {
     run_subtest "Hook inventory tests pass" "$SCRIPT_DIR/core/test-hook-inventory.sh" || true
 }
 
+test_changed_only() {
+    echo ""
+    log_info "Testing craftsman-ci --changed-only (functional)"
+
+    run_subtest "Changed-only filter tests pass" "$SCRIPT_DIR/ci/test-changed-only.sh" || true
+}
+
 test_ratchet() {
     echo ""
     log_info "Testing structural ratchet (functional)"
@@ -802,6 +809,7 @@ main() {
         test_dynamic_context
         test_ratchet
         test_hook_inventory
+        test_changed_only
         test_design_panel
         test_okf_knowledge
         test_dashboard
