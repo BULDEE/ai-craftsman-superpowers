@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docs/guides/model-tiering-explained.md` claimed aliases follow model
+  releases.** They do not. The models overview states that every Claude model
+  ID is a pinned snapshot, including the dateless ones from the 4.6 generation
+  on, and that a dateless ID is its own snapshot rather than a pointer. So
+  `claude-opus-5` will not become the successor to Opus 5 on its own, and
+  moving a tier is an edit that belongs in a release. What an alias still buys,
+  remappability and per-provider resolution, is unchanged and now stated
+  without the false part. `hooks/lib/haiku-verify.sh` records why its pinned id
+  is pinned, and that it carries the nearest retirement date in the lineup.
+
 ### Added
 
 - **Go pack (`packs/go/`).** Seven owned rules plus NEST001, LOC001, PARAM001
