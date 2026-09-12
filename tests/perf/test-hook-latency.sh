@@ -259,18 +259,33 @@ PHPDIRTY
 DIRTY_PAYLOAD="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \
     "$PROJECT/src/Dirty.php" "$PROJECT")"
 
-measure_hook "post-write-check.sh" 5.5 \
+# The ceilings are per operating system, and that is a measured statement
+# about what the ratio does and does not absorb. On one machine under load it
+# absorbs 94% of the slowdown, because the basket grows the way the hooks grow.
+# Across operating systems it absorbs nothing: the same commit measured
+# post-write at 3.9x on macOS and 9.5x on an ubuntu runner, where a fork costs
+# half as much (calibration 63ms against 135ms) while the hooks cost about the
+# same, so the hooks' remaining cost there is not made of forks. Two variances,
+# two mechanisms: the ratio for load, a table for the OS. The doubling check
+# further down is the one assertion that transfers unchanged.
+case "$(uname -s)" in
+    Linux)  C_POST=13.5; C_PRE=10.5; C_BIAS=3.7;  C_DIRTY=23 ;;
+    *)      C_POST=5.5;  C_PRE=3.2;  C_BIAS=1.8;  C_DIRTY=13 ;;
+esac
+echo "ceilings for $(uname -s): post-write ${C_POST}x, pre-write ${C_PRE}x, bias ${C_BIAS}x, dirty ${C_DIRTY}x"
+
+measure_hook "post-write-check.sh" "$C_POST" \
     "cd '$PROJECT' && printf '%s' '$POST_PAYLOAD' | bash '$ROOT_DIR/hooks/post-write-check.sh' >/dev/null 2>&1"
-measure_hook "pre-write-check.sh" 3.2 \
+measure_hook "pre-write-check.sh" "$C_PRE" \
     "cd '$PROJECT' && printf '%s' '$PRE_PAYLOAD' | bash '$ROOT_DIR/hooks/pre-write-check.sh' >/dev/null 2>&1"
-measure_hook "bias-detector.sh" 1.8 \
+measure_hook "bias-detector.sh" "$C_BIAS" \
     "cd '$PROJECT' && printf '%s' '$PROMPT_PAYLOAD' | bash '$ROOT_DIR/hooks/bias-detector.sh' >/dev/null 2>&1"
 
 # A file that violates nothing measures the floor, and the floor is not what a
 # user pays. Every recorded violation starts its own python3 for the metrics
 # insert, so the cost of a real write scales with the findings in it: this is
 # the path where the remaining latency lives, and no ceiling covered it.
-measure_hook "post-write, 3 violations" 13 \
+measure_hook "post-write, 3 violations" "$C_DIRTY" \
     "cd '$PROJECT' && printf '%s' '$DIRTY_PAYLOAD' | bash '$ROOT_DIR/hooks/post-write-check.sh' >/dev/null 2>&1"
 
 echo ""
