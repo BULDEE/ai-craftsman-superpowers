@@ -50,12 +50,12 @@ stack: fullstack     # symfony | react | fullstack | other
 
 ### Stack values
 
-| Stack | PHP scanned | TypeScript scanned |
-|-------|-------------|-------------------|
-| `symfony` | yes | no |
-| `react` | no | yes |
-| `fullstack` | yes | yes |
-| `other` | no | no |
+`symfony`, `react`, `fullstack` or `other`. The stack selects the doctrine
+the agents load and the hints `/craftsman:setup` proposes; it does not decide
+which files are scanned. Every language pack validates the files of its
+language whatever the stack says, so a `.php` file in a `react` project and a
+`.py` file in a `symfony` one are scanned like any other (#35). To leave a
+directory out, relax or ignore its rules in a `.craft-rules.yml` placed there.
 
 ## Exit Codes
 

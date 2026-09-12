@@ -163,14 +163,12 @@ detect_project_type() {
 DETECTED=$(detect_project_type)
 STRICTNESS=$(config_strictness)
 STACK=$(config_stack)
-PHP_STATUS="OFF"
-TS_STATUS="OFF"
-config_php_enabled && PHP_STATUS="ON"
-config_ts_enabled && TS_STATUS="ON"
 
-# Build message
+# Build message. No "PHP rules: ON/OFF" beside the stack any more: since #35 a
+# language pack validates its files whatever the stack says, and the banner
+# printed OFF for a language whose files were being refused.
 PACK_STATUS=$(_init_packs 2>/dev/null || echo "PACKS:error")
-MSG="Craftsman active | Stack: ${STACK} | Strictness: ${STRICTNESS} | PHP rules: ${PHP_STATUS} | TS rules: ${TS_STATUS} | Metrics: initialized | ${PACK_STATUS}"
+MSG="Craftsman active | Stack: ${STACK} | Strictness: ${STRICTNESS} | Metrics: initialized | ${PACK_STATUS}"
 
 # Correction learning: trends kept separate so the context budget can drop
 # them first (ADR-0021 priority order)

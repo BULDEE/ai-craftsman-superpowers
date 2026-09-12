@@ -206,78 +206,28 @@ test_global_config_fills_missing_keys
 # =============================================================================
 # 4. Stack helpers
 # =============================================================================
-test_stack_react() {
+test_stack_resolution() {
     echo ""
     echo "=== Stack Helpers ==="
 
-    # stack=react: php disabled, ts enabled
+    # The stack resolves; it no longer decides which language is checked.
+    # `config_php_enabled` and `config_ts_enabled` answered "PHP checks off"
+    # for stack=react while PHP files were being refused (#35), so they are
+    # gone rather than kept as a helper waiting for a caller to mislead.
     export CLAUDE_PLUGIN_OPTION_stack="react"
     unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
     rm -f "$TEST_DIR/.craft-config.yml"
-
-    if ! config_php_enabled; then
-        log_pass "config_php_enabled returns false for stack=react"
+    if [[ "$(config_stack)" == "react" ]]; then
+        log_pass "config_stack resolves the plugin option"
     else
-        log_fail "config_php_enabled should return false for react" "returned true"
+        log_fail "config_stack resolves the plugin option" "got '$(config_stack)'"
     fi
-
-    if config_ts_enabled; then
-        log_pass "config_ts_enabled returns true for stack=react"
+    if ! type config_php_enabled >/dev/null 2>&1 && ! type config_ts_enabled >/dev/null 2>&1; then
+        log_pass "no helper claims a language is switched off by the stack"
     else
-        log_fail "config_ts_enabled should return true for react" "returned false"
+        log_fail "no helper claims a language is switched off by the stack" \
+            "config_php_enabled or config_ts_enabled still defined"
     fi
-}
-
-test_stack_symfony() {
-    # stack=symfony: php enabled, ts disabled
-    export CLAUDE_PLUGIN_OPTION_stack="symfony"
-
-    if config_php_enabled; then
-        log_pass "config_php_enabled returns true for stack=symfony"
-    else
-        log_fail "config_php_enabled should return true for symfony" "returned false"
-    fi
-
-    if ! config_ts_enabled; then
-        log_pass "config_ts_enabled returns false for stack=symfony"
-    else
-        log_fail "config_ts_enabled should return false for symfony" "returned true"
-    fi
-}
-
-test_stack_fullstack() {
-    # stack=fullstack: both enabled
-    export CLAUDE_PLUGIN_OPTION_stack="fullstack"
-
-    if config_php_enabled; then
-        log_pass "config_php_enabled returns true for stack=fullstack"
-    else
-        log_fail "config_php_enabled should return true for fullstack" "returned false"
-    fi
-
-    if config_ts_enabled; then
-        log_pass "config_ts_enabled returns true for stack=fullstack"
-    else
-        log_fail "config_ts_enabled should return true for fullstack" "returned false"
-    fi
-}
-
-test_stack_other() {
-    # stack=other: both disabled
-    export CLAUDE_PLUGIN_OPTION_stack="other"
-
-    if ! config_php_enabled; then
-        log_pass "config_php_enabled returns false for stack=other"
-    else
-        log_fail "config_php_enabled should return false for other" "returned true"
-    fi
-
-    if ! config_ts_enabled; then
-        log_pass "config_ts_enabled returns false for stack=other"
-    else
-        log_fail "config_ts_enabled should return false for other" "returned true"
-    fi
-
     unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 }
 
@@ -387,10 +337,7 @@ YAML
     unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 }
 
-test_stack_react
-test_stack_symfony
-test_stack_fullstack
-test_stack_other
+test_stack_resolution
 test_blocking_strict
 test_blocking_moderate
 test_blocking_relaxed

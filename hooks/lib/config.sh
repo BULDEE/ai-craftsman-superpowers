@@ -11,8 +11,6 @@
 #   source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/config.sh"
 #   strictness=$(config_strictness)   # strict | moderate | relaxed
 #   stack=$(config_stack)             # symfony | react | fullstack | other
-#   config_php_enabled && echo "PHP checks active"
-#   config_ts_enabled  && echo "TS checks active"
 #   config_should_block "PHP001" && exit 2 || echo "warn only"
 # =============================================================================
 
@@ -122,24 +120,6 @@ config_strictness() {
 
 config_stack() {
     _config_resolve "stack" "fullstack"
-}
-
-config_php_enabled() {
-    local stack
-    stack=$(config_stack)
-    case "$stack" in
-        symfony|fullstack) return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
-config_ts_enabled() {
-    local stack
-    stack=$(config_stack)
-    case "$stack" in
-        react|fullstack) return 0 ;;
-        *) return 1 ;;
-    esac
 }
 
 config_should_block() {

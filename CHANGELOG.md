@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A language pack validates its files whatever stack the project
+  declares (#35).** `packs/python`, `packs/react` and `packs/symfony` were
+  gated by `compatibility.stack`, so a `.php` file in a `react` project, a
+  `.py` file in a `symfony` one, came back clean: exit 0, nothing printed to
+  say the pack was skipped. The three now declare `["*"]` like every other
+  language pack, `hooks/pre-write-check.sh` keys its layer and strict_types
+  checks on the file's language rather than on `config_php_enabled`, and
+  those two helpers are gone with the "PHP rules: OFF" banner that read from
+  them. The stack still selects the doctrine and the setup hints. BREAKING
+  for a repository that relied on the stack to leave a language unvalidated:
+  relax or ignore its rules in a `.craft-rules.yml` placed in that directory.
+  `tests/packs/test-polyglot.sh` drives `craftsman-ci.sh` against each
+  foreign-stack project, and proves it can fail by putting the old gate back
+  in a copy of the plugin.
+
 - **`docs/guides/model-tiering-explained.md` claimed aliases follow model
   releases.** They do not. The models overview states that every Claude model
   ID is a pinned snapshot, including the dateless ones from the 4.6 generation
