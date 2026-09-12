@@ -51,7 +51,22 @@ _go_emit_structure() {
             GO003|GO004|GO006|WARN-GO001) add_warning "$rule" "$message" ;;
             *)                            add_violation "$rule" "$message" ;;
         esac
-    done < <(python3 "$_GO_STRUCTURE_PY" "$file" 2>/dev/null)
+    done < <(_go_structure_lines "$file")
+}
+
+# The scanner's stdout, and a warning once per process when it did not run.
+# Its stderr used to be discarded and its exit code lost in the process
+# substitution above, so a scanner that could not load the engine's brace walk
+# (an external copy without CLAUDE_PLUGIN_ROOT) read as a clean file.
+_GO_PACK_SCAN_WARNED=""
+_go_structure_lines() {
+    local file="$1" out status=0
+    out=$(python3 "$_GO_STRUCTURE_PY" "$file" 2>/dev/null) || status=$?
+    if [[ "$status" -ne 0 && -z "$out" && -z "${_GO_PACK_SCAN_WARNED}" ]]; then
+        _GO_PACK_SCAN_WARNED=1  # craftsman-ignore: WARN-SH001 - once per process, local would reset it
+        echo "craftsman: go structure scan did not run (exit ${status}), files are not clean, they are unread; set CLAUDE_PLUGIN_ROOT" >&2
+    fi
+    printf '%s\n' "$out"
 }
 
 # GO005: init() runs before anyone asked, in an order the language chooses.

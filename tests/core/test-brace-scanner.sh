@@ -39,8 +39,7 @@ def params(header):
     inner = balanced_group(header, header.index("(", match.end() - 1)).strip()
     return split_params(inner) if inner else []
 
-def first_param_is_ctx(scan, cursor, header, name):
-    plist = params(header)
+def first_param_is_ctx(scan, cursor, header, name, plist):
     if plist and plist[0] != "ctx":
         scan.report("THIRD001", "line %d: %s() does not take ctx first" % (scan.line(cursor), name))
 
@@ -133,6 +132,50 @@ else
     log_fail "split_params generics" "got '$GEN', expected '2 3 2'"
 fi
 
+# An option the profile does not know is refused, not dropped: a typo in
+# on_function would otherwise silence a whole rule with no signal.
+TYPO="$(python3 -c "
+import re, sys; sys.path.insert(0, '$ROOT_DIR/hooks/lib')
+from brace_scanner import Profile
+try:
+    Profile(function_re=re.compile('x'), control_re=re.compile('y'), parameter_list=lambda h: [], on_functon=lambda *a: None, loc_mx=1)
+    print('accepted')
+except TypeError as error:
+    print(error)
+")"
+assert_contains "a misspelled profile option is refused by name" "$TYPO" "unknown option(s) loc_mx, on_functon"
+
+# A language whose declarations end without a brace: the header runs from the
+# previous brace, so `proc short(a) = a + 1` would name the next brace. The
+# profile narrows the header to its last statement through head_of.
+cat > "$WORK/expr.third" <<'SRC'
+proc short(ctx) = 1
+proc long(ctx, a, b, c) {
+    x()
+}
+SRC
+HEADLESS="$(python3 - "$ROOT_DIR/hooks/lib" "$WORK/expr.third" <<'PY'
+import re, sys
+sys.path.insert(0, sys.argv[1])
+from brace_scanner import Profile, balanced_group, split_params, walk_braces
+PROC_RE = re.compile(r"\bproc\b\s*(\w+)?\s*\(")
+def params(header):
+    match = PROC_RE.search(header)
+    if not match:
+        return []
+    inner = balanced_group(header, header.index("(", match.end() - 1)).strip()
+    return split_params(inner) if inner else []
+raw = open(sys.argv[2]).read()
+plain = walk_braces(raw, Profile(function_re=PROC_RE, control_re=re.compile(r"\bwhen\b"), parameter_list=params))
+last = walk_braces(raw, Profile(function_re=PROC_RE, control_re=re.compile(r"\bwhen\b"), parameter_list=params,
+                                head_of=lambda header: header.rsplit("\n", 1)[-1]))
+print("plain:", [m for _, m in plain.findings])
+print("head_of:", [m for _, m in last.findings])
+PY
+)"
+assert_contains "without head_of the earlier declaration names the brace and long() is missed" "$HEADLESS" "plain: \[\]"
+assert_contains "with head_of narrowing to the last line, long() is measured" "$HEADLESS" "head_of: \['line 2: long() has 4 parameters"
+
 # --- The guard: the walk exists once ------------------------------------------
 for scanner in packs/go/hooks/go_structure.py packs/rust/hooks/rust_structure.py; do
     if grep -qE "^class _?Scan\b|^def _open_brace|^def _close_brace|^def line_of|^def drop_ignored" "$ROOT_DIR/$scanner"; then
@@ -156,5 +199,27 @@ cp "$ROOT_DIR/packs/go/hooks/go_structure.py" "$EXT/"
 printf 'package main\n\nfunc Big(a, b, c, d int) {}\n' > "$WORK/big.go"
 EXT_OUT="$(CLAUDE_PLUGIN_ROOT="$ROOT_DIR" python3 "$EXT/go_structure.py" "$WORK/big.go" 2>&1)"
 assert_contains "a pack copied outside the plugin finds the walk through CLAUDE_PLUGIN_ROOT" "$EXT_OUT" "PARAM001"
+
+# And when it cannot find it, that is not a clean file: the scanner says so
+# and exits 2, and the validator that reads it warns instead of reporting
+# nothing. Before this, a traceback on stderr was discarded by the validator
+# and the four-parameter function above read as clean.
+LOST_OUT="$(CLAUDE_PLUGIN_ROOT=/nonexistent python3 "$EXT/go_structure.py" "$WORK/big.go" 2>&1)"; LOST_RC=$?
+if [[ "$LOST_RC" == "2" ]] && echo "$LOST_OUT" | grep -q "cannot load the engine's brace walk"; then
+    log_pass "a scanner that cannot load the walk says so and exits 2 rather than reporting clean"
+else
+    log_fail "a scanner that cannot load the walk says so and exits 2" "rc=$LOST_RC: $LOST_OUT"
+fi
+VALIDATOR_OUT="$(cd "$WORK" && CLAUDE_PLUGIN_ROOT=/nonexistent bash -c "
+    add_violation() { echo \"finding \$1\"; }; add_warning() { echo \"finding \$1\"; }; line_has_ignore() { return 1; }; metrics_record_violation() { true; }; FILE_PATTERN=x
+    _GO_PACK_DIR_OVERRIDE='$EXT'
+    source '$ROOT_DIR/packs/go/hooks/go-validator.sh'
+    _GO_STRUCTURE_PY='$EXT/go_structure.py'
+    pack_validate_go '$WORK/big.go'" 2>&1)"
+if echo "$VALIDATOR_OUT" | grep -q "craftsman: go structure scan did not run" && ! echo "$VALIDATOR_OUT" | grep -q "finding PARAM001"; then
+    log_pass "the validator reports the scan that did not run, once, instead of a clean file"
+else
+    log_fail "the validator reports the scan that did not run instead of a clean file" "$VALIDATOR_OUT"
+fi
 
 test_summary

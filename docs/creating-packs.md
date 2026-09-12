@@ -227,12 +227,26 @@ issue #35 for the measurement.
 Go and Rust are brace-delimited and match neither dialect, so each ships a
 scanner of its own over `hooks/lib/brace_scanner.py`: the brace walk, NEST001,
 LOC001, PARAM001, the ignore filter and the line arithmetic exist once there,
-and the pack supplies a `Profile` (its function head, control heads, an
-optional container head, how to split a parameter list, and two hooks for what
-only it measures). Read `packs/go/hooks/go_structure.py` for the shape; a
-third such language is a profile, not a scanner, and
+and the pack supplies a `Profile`. Read `packs/go/hooks/go_structure.py` for
+the shape; a third such language is a profile, not a scanner, and
 `tests/core/test-brace-scanner.sh` proves it with a language that exists only
-in the test.
+in the test. The contract, stated once:
+
+- the pack blanks its own strings and comments before `walk_braces` (offsets
+  preserved), and resolves the engine where the module actually is: under
+  `CLAUDE_PLUGIN_ROOT`, which the three front-ends export (hooks, CI, Hermes
+  through CI), then beside the pack for a pack inside the plugin tree. A
+  scanner that finds it nowhere must say so and exit 2, and the validator
+  must report a scan that did not run rather than a clean file;
+- a header runs from the previous brace and is classified function, then
+  container, then control; a language whose declarations end without a brace
+  (expression-bodied functions, `;`-terminated trait items) narrows it with
+  `head_of`;
+- `on_function` receives the split parameter list; `on_close` fires for every
+  frame and filters on `frame["kind"]` itself; thresholds are per profile;
+- a `craftsman-ignore` for a brace-anchored finding sits on the line of the
+  `{`, which is the line the finding names;
+- an option the profile does not know raises `TypeError`.
 
 ### On `metrics_dialect`
 

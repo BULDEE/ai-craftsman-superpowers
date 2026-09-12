@@ -34,10 +34,29 @@ import sys
 
 # The brace walk, the parameter split, the ignore filter and the line
 # arithmetic are the engine's (#38): this file keeps what carries the language.
-sys.path.insert(0, os.path.join(
-    os.environ.get("CLAUDE_PLUGIN_ROOT")
-    or os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
-    "hooks", "lib"))
+#
+# The engine is found where it actually is, not where a variable says it is:
+# the three front-ends export CLAUDE_PLUGIN_ROOT, but the bash side only trusts
+# it when the directory exists (pack-loader.sh) and craftsman-ci.sh keeps a
+# pre-existing value while sourcing its own libraries, so a root that loads the
+# pack fine in bash can point the import at a tree without the module. The
+# relative path is the plugin's own layout; the variable serves a pack that
+# lives outside it. Neither holding the module is loud, and not a clean
+# verdict: the validator reads stdout for findings, so a traceback on stderr
+# and an empty stdout used to read as "nothing found" on an unread file.
+def _engine_lib() -> str:
+    here = os.path.dirname(os.path.abspath(__file__))
+    for root in (os.environ.get("CLAUDE_PLUGIN_ROOT"),
+                 os.path.dirname(os.path.dirname(os.path.dirname(here)))):
+        if root and os.path.isfile(os.path.join(root, "hooks", "lib", "brace_scanner.py")):
+            return os.path.join(root, "hooks", "lib")
+    sys.stderr.write("craftsman: rust_structure.py cannot load the engine's brace walk "
+                     "(hooks/lib/brace_scanner.py not under CLAUDE_PLUGIN_ROOT=%r nor beside this pack); "
+                     "set CLAUDE_PLUGIN_ROOT to the plugin root\n" % os.environ.get("CLAUDE_PLUGIN_ROOT"))
+    sys.exit(2)
+
+
+sys.path.insert(0, _engine_lib())
 from brace_scanner import (  # noqa: E402
     Profile, balanced_group, drop_ignored, line_of, read_source, split_params, walk_braces,
 )
