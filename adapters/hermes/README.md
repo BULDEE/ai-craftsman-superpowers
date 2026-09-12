@@ -125,16 +125,34 @@ on the line when the finding is wrong, which the scan honours.
 What "as the file would be" covers, because Hermes's `patch` is not a plain
 replace: an exact `old_string` is applied in memory (`replace_all` honoured);
 an `old_string` that is not in the file may still apply through Hermes's fuzzy
-strategies, so what the patch ADDS is judged rather than waved; a V4A patch
-(`mode: patch`) is judged on the lines it adds per `*** Update File` section.
-The workspace is the written path's own (nearest `.git`, `.craft-config.yml`,
+strategies (`tools/fuzzy_match.py`), so what the patch ADDS is judged rather
+than waved; a V4A patch (`mode: patch`) is refused as unread, with the form to
+use instead, because reading it would duplicate Hermes's parser. The
+workspace is the written path's own (nearest `.git`, `.craft-config.yml`,
 `composer.json`, `package.json`, `pyproject.toml`, `go.mod` or `Cargo.toml`
-above it), never the process cwd: Hermes hands a plugin hook no cwd, and the
-shell hook's cwd is the gateway process's, so anchoring on it judged a
-session's first turn against the wrong tree. The gate protects itself the way
-`pre-verify.sh` does: a write to `.craft-rules.yml`, `.craft-config.yml`,
-`ci/craftsman-ci.sh` or `adapters/hermes/` is refused, and the test fails when
-the two lists drift.
+above it), and every `.craft-rules.yml` on the way down to the file is in the
+mirror, so a directory relaxation holds here as it does in CI and the hooks
+(`tests/adapters/test-parity.sh` carries this gate as a fourth column). Never
+the process cwd: Hermes hands a plugin hook no cwd (the plugin asks Hermes's
+own `get_session_cwd` for the task's directory), and the shell hook's cwd is
+the gateway process's; a relative path that cannot be anchored is refused, not
+guessed. The gate protects itself the way `pre-verify.sh` does: a write to
+`.craft-rules.yml`, `.craft-config.yml`, `ci/craftsman-ci.sh` or
+`adapters/hermes/` is refused, and the test fails when the two lists drift.
+
+Budget: `write_gate_seconds` (default 20, capped at 25) is set explicitly for
+the script, under Hermes's 30s cap on a plugin callback
+(`plugins.hook_callback_timeout`), which would otherwise block with a generic
+message and abandon the worker while `craftsman-ci` ran on.
+
+What this gate refuses that a reviewer may not want refused: SEC002 on
+`exec('git -C ' . escapeshellarg($dir))`, SEC003 on a DQL string assembled
+around `$this->entityClass` with bound parameters, LAYER001 on a test under
+`tests/Domain/` importing an in-memory adapter. Each is a line-local regex
+with no safe-list, and each escapes with `craftsman-ignore: RULE` on the line,
+which the block message says. Whether SEC002 and SEC003 belong at write time
+at all, or only LAYER001 and SEC001 (the two with an unbounded cost), is the
+decision to take from the first weeks of data.
 
 Two failures, two messages. Missing infrastructure (python3, the plugin root,
 `craftsman-ci.sh`) repeats on every write of every session and no agent can
@@ -161,8 +179,10 @@ hooks:
       fail_closed: true
 ```
 
-`hermes hooks test pre_tool_call` shows the block directive the dispatcher
-would receive.
+`hermes hooks test pre_tool_call` is expected to show the block directive the
+dispatcher would receive: the shell wire it serialises (`tool_input`) is what
+`tests/adapters/test-hermes-plugin.sh` feeds the script, but the command
+itself has not been run against this repository yet.
 
 ### Scope comes from git, not from the payload
 

@@ -32,9 +32,10 @@
 #
 # Measured in the hermes-agent source (tools/file_tools.py): write_file takes
 # path and content; patch takes path, old_string, new_string, replace_all, and
-# applies old_string through a chain of fuzzy strategies, and the handler also
-# accepts a V4A patch (`mode: patch`, `patch: "*** Update File: ..."`) from any
-# model. Only those two tools mutate a file through a tool; a write through
+# applies old_string through a chain of fuzzy strategies (tools/fuzzy_match.py),
+# and the handler also accepts a V4A patch (`mode: patch`) from any model,
+# which this gate refuses rather than reads. Only those two tools mutate a
+# file through a tool; a write through
 # `terminal` (sed -i, tee, a redirect) is invisible here by construction and
 # is what the conclusion gate's git-derived scope exists to catch.
 #
@@ -109,9 +110,10 @@ INPUT=$(cat)
 # Prints one of:
 #   MIRROR <relative path>   judge this file in the mirror
 #   GATE <relative path>     the write reconfigures the gate itself
-#   nothing                  not a write this hook judges (another tool, a
-#                            patch whose text is not in the file and carries
-#                            no new content to judge)
+#   UNJUDGED <why>           a form this gate cannot read (a V4A patch, a
+#                            relative path with no workspace): refused, never
+#                            waved, with the form to use instead
+#   nothing                  not a write this hook judges (another tool)
 MIRROR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-write-gate.XXXXXX")
 trap 'rm -rf "$MIRROR"' EXIT
 
@@ -122,6 +124,12 @@ PLACED=$(printf '%s' "$INPUT" | python3 "$SCRIPT_DIR/write_gate_place.py" "$MIRR
 case "$PLACED" in
     GATE\ *)
         _block "This write edits the craftsman gate's own configuration (${PLACED#GATE }). The gated party does not reconfigure the gate: change the rules through a reviewed commit instead."
+        ;;
+    UNJUDGED\ *)
+        # A form this gate cannot read is not a pass: an operator who opted in
+        # asked for fail-closed on these rules, and the message names the form
+        # that is judged.
+        _block "The craftsman write gate cannot judge this write: ${PLACED#UNJUDGED }."
         ;;
 esac
 PLACED="${PLACED#MIRROR }"

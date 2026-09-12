@@ -157,6 +157,21 @@ harmless = pre_tool_call(tool_name="patch",
                          task_id="s1", cwd=repo)
 report("write_gate on: a harmless patch passes", harmless is None, repr(harmless))
 
+# The budget the script receives is the write gate's own, under Hermes's 30s
+# callback cap, never the conclusion gate's 45s.
+seen_env = {}
+real_run = cp.subprocess.run
+def spy_run(*a, **kw):
+    seen_env.update(kw.get("env") or {})
+    seen_env["__timeout__"] = kw.get("timeout")
+    return real_run(*a, **kw)
+cp.subprocess.run = spy_run
+pre_tool_call(tool_name="write_file", args={"path": "src/Loose.php", "content": "<?php\n"}, task_id="s1", cwd=repo)
+cp.subprocess.run = real_run
+report("write_gate on: the script gets a budget under Hermes's 30s callback cap, not the conclusion gate's 45s",
+       seen_env.get("CRAFTSMAN_GATE_SECONDS") == "20" and (seen_env.get("__timeout__") or 99) < 30,
+       f"CRAFTSMAN_GATE_SECONDS={seen_env.get('CRAFTSMAN_GATE_SECONDS')} timeout={seen_env.get('__timeout__')}")
+
 old_write_gate = cp._WRITE_GATE
 cp._WRITE_GATE = Path("/nonexistent/write-gate.sh")
 broken_write = pre_tool_call(tool_name="write_file", args={"path": "src/X.php", "content": "<?php\n"}, task_id="s1", cwd=repo)
@@ -281,11 +296,34 @@ if [[ "${WIRE##*|}" == "2" ]] && echo "${WIRE%|*}" | grep -q "LAYER001"; then
 else
     log_fail "a patch whose old_string is not in the file is judged on what it adds" "$WIRE"
 fi
-WIRE=$(wire "$(printf '{"tool_name":"patch","args":{"mode":"patch","patch":"*** Begin Patch\\n*** Update File: %s/src/Domain/Clean.php\\n@@\\n-final class Clean {}\\n+use App\\\\Infrastructure\\\\Db;\\n+final class Clean {}\\n*** End Patch"}}' "$WG")")
-if [[ "${WIRE##*|}" == "2" ]] && echo "${WIRE%|*}" | grep -q "LAYER001"; then
-    log_pass "a V4A patch is judged on the lines it adds to each file"
+# A V4A patch (mode: patch, any model) is not read here: reading it would
+# duplicate Hermes's parser. An unread mutation is refused, with the form to use.
+WIRE=$(wire "$(printf '{"tool_name":"patch","args":{"mode":"patch","patch":"*** Begin Patch\\n*** Update File: %s/src/Domain/Clean.php\\n@@\\n-final class Clean {}\\n+final class Clean {}\\n*** End Patch"}}' "$WG")")
+if [[ "${WIRE##*|}" == "2" ]] && echo "${WIRE%|*}" | grep -q "use write_file or a replace-mode patch"; then
+    log_pass "a V4A patch is refused as unread, and told which form is judged"
 else
-    log_fail "a V4A patch is judged on the lines it adds" "$WIRE"
+    log_fail "a V4A patch is refused as unread" "$WIRE"
+fi
+# A relative path with no workspace to resolve it against is refused, never
+# resolved against the process cwd (the gateway's, not the task's).
+WIRE=$(wire "$(printf '{"tool_name":"write_file","args":{"path":"src/Domain/Order.php","content":"%s"}}' "$LAYERED")" /)
+if [[ "${WIRE##*|}" == "2" ]] && echo "${WIRE%|*}" | grep -q "relative path with no workspace"; then
+    log_pass "a relative path with no cwd is refused rather than resolved against the process cwd"
+else
+    log_fail "a relative path with no cwd is refused" "$WIRE"
+fi
+
+# Parity with the other front-ends (ADR-0029): a directory .craft-rules.yml
+# that relaxes a rule must relax it here too. The first version copied only
+# the workspace root's rule files into the mirror, so CI said warning and the
+# write gate said block on the same file.
+mkdir -p "$WG/legacy/Domain"
+printf 'rules:\n  LAYER001: warn\n' > "$WG/legacy/.craft-rules.yml"
+WIRE=$(wire "$(printf '{"tool_name":"write_file","args":{"path":"%s/legacy/Domain/Order.php","content":"%s"}}' "$WG" "$LAYERED")")
+if [[ "${WIRE##*|}" == "0" && -z "${WIRE%|*}" ]]; then
+    log_pass "a directory .craft-rules.yml relaxation holds at write time, as it does in CI and the hooks"
+else
+    log_fail "a directory .craft-rules.yml relaxation holds at write time" "$WIRE"
 fi
 
 # The bail needs no python3 and says which kind of failure it is.
