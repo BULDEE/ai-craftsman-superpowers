@@ -6,6 +6,7 @@ payload on stdin, prints one line for the shell half:
 
   MIRROR <relative path>   the would-be file is in the mirror, judge it
   GATE <relative path>     the write edits the gate's own configuration
+  UNJUDGED <why>           a write this hook cannot judge and must not wave
   (nothing)                not a write this hook judges
 
 Usage: write_gate_place.py <mirror dir>  < payload.json
@@ -15,7 +16,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shutil
 import sys
 
@@ -27,8 +27,6 @@ WORKSPACE_MARKERS = (".git", ".craft-config.yml", "composer.json", "package.json
 GATE_OWN_NAMES = (".craft-rules.yml", ".craft-config.yml")
 GATE_OWN_PATHS = ("ci/craftsman-ci.sh",)
 GATE_OWN_PREFIXES = ("adapters/hermes/",)
-
-V4A_FILE_RE = re.compile(r"^\*\*\* (?:Update|Add) File: (.+)$")
 
 
 def _payload() -> dict:
@@ -75,8 +73,6 @@ def _would_be_content(tool: str, args: dict, target: str) -> str | None:
     if tool == "write_file":
         content = args.get("content")
         return content if isinstance(content, str) else None
-    if isinstance(args.get("patch"), str) and args.get("mode") == "patch":
-        return None  # V4A, handled per file by _v4a_contents
     old, new = args.get("old_string"), args.get("new_string")
     if not isinstance(old, str) or not isinstance(new, str):
         return None
@@ -94,46 +90,63 @@ def _would_be_content(tool: str, args: dict, target: str) -> str | None:
     return new
 
 
-def _v4a_contents(patch: str) -> dict:
-    """path -> the lines a V4A patch adds there, per `*** Update File` / `*** Add File` section."""
-    added: dict = {}
-    current = None
-    for line in patch.splitlines():
-        match = V4A_FILE_RE.match(line)
-        if match:
-            current = match.group(1).strip()
-            added.setdefault(current, [])
-            continue
-        if current is not None and line.startswith("+") and not line.startswith("+++"):
-            added[current].append(line[1:])
-    return {path: "\n".join(lines) + "\n" for path, lines in added.items() if lines}
+def _is_v4a(args: dict) -> bool:
+    """`mode: patch` with a `patch` body: the V4A form the handler accepts from any model.
+
+    Not parsed here. A V4A body can name several files and carries its own
+    hunk grammar; reading it would duplicate Hermes's parser and diverge from
+    it. An unread mutation is not a pass: the shell half refuses it and says
+    which form to use instead.
+    """
+    return args.get("mode") == "patch" or isinstance(args.get("patch"), str)
 
 
 def _place(mirror: str, workspace: str, relative: str, content: str) -> None:
+    """The would-be file, and every rule file the engine would read for it.
+
+    `rules_severity_for_file` walks up from the file's own directory, so a
+    directory `.craft-rules.yml` that relaxes a rule (differentiator 2) must
+    be in the mirror too, or the write gate blocks what CI and the hooks let
+    through: the exact disagreement the parity suite exists to refuse.
+    """
     destination = os.path.join(mirror, relative)
     os.makedirs(os.path.dirname(destination), exist_ok=True)
     with open(destination, "w", encoding="utf-8") as handle:
         handle.write(content)
+    for directory in _ancestors(os.path.dirname(relative)):
+        _copy_rules(workspace, mirror, directory)
+
+
+def _ancestors(directory: str) -> list:
+    """The directory and every one above it up to the workspace root ("")."""
+    chain = [directory]
+    while directory:
+        directory = os.path.dirname(directory)
+        chain.append(directory)
+    return chain
+
+
+def _copy_rules(workspace: str, mirror: str, directory: str) -> None:
     for name in (".craft-config.yml", ".craft-rules.yml"):
-        source = os.path.join(workspace, name)
-        if os.path.isfile(source) and not os.path.exists(os.path.join(mirror, name)):
-            shutil.copy(source, os.path.join(mirror, name))
+        source = os.path.join(workspace, directory, name)
+        if os.path.isfile(source):
+            shutil.copy(source, os.path.join(mirror, directory, name))
 
 
 def _resolve(path: str, hint: str) -> tuple:
-    target = os.path.realpath(path if os.path.isabs(path) else os.path.join(hint or os.getcwd(), path))
+    """(target, workspace, relative). A relative path with no cwd to resolve it against is refused.
+
+    Never the process cwd: in gateway mode that is the Hermes process's
+    directory, not the task's, and a mirror built there judges the wrong tree
+    with the wrong project's rules.
+    """
+    if not os.path.isabs(path):
+        if not hint:
+            return None, None, None
+        path = os.path.join(hint, path)
+    target = os.path.realpath(path)
     workspace = _workspace_of(target, os.path.realpath(hint) if hint else "")
     return target, workspace, os.path.relpath(target, workspace)
-
-
-def _writes(tool: str, args: dict, hint: str) -> dict:
-    """path -> would-be content, one entry per file the call writes."""
-    if isinstance(args.get("patch"), str) and args.get("mode") == "patch":
-        return _v4a_contents(args["patch"])
-    if not args.get("path"):
-        return {}
-    content = _would_be_content(tool, args, _resolve(str(args["path"]), hint)[0])
-    return {str(args["path"]): content} if content is not None else {}
 
 
 def main() -> int:
@@ -142,20 +155,24 @@ def main() -> int:
     tool = payload.get("tool_name") or ""
     if tool not in WRITE_TOOLS:
         return 0
-    hint = str(payload.get("cwd") or "")
-    placed = []
-    for path, content in _writes(tool, _arguments(payload), hint).items():
-        _, workspace, relative = _resolve(path, hint)
-        if _touches_gate(relative):
-            print("GATE " + relative)
-            return 0
-        _place(mirror, workspace, relative, content)
-        placed.append(relative)
-    if placed:
-        # One path per run keeps the shell half simple; a V4A patch touching
-        # several files is judged on the first, and the conclusion gate sees
-        # the rest.
-        print("MIRROR " + placed[0])
+    args = _arguments(payload)
+    if _is_v4a(args):
+        print("UNJUDGED a V4A patch (mode: patch) is not read by the write gate; use write_file or a replace-mode patch (old_string/new_string)")
+        return 0
+    if not args.get("path"):
+        return 0
+    target, workspace, relative = _resolve(str(args["path"]), str(payload.get("cwd") or ""))
+    if target is None:
+        print("UNJUDGED a relative path with no workspace to resolve it against; write an absolute path")
+        return 0
+    if _touches_gate(relative):
+        print("GATE " + relative)
+        return 0
+    content = _would_be_content(tool, args, target)
+    if content is None:
+        return 0
+    _place(mirror, workspace, relative, content)
+    print("MIRROR " + relative)
     return 0
 
 

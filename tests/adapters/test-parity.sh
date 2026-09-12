@@ -22,6 +22,7 @@ export CLAUDE_PLUGIN_OPTION_strictness="strict"
 mkdir -p "$CLAUDE_PLUGIN_DATA"
 
 HERMES_HOOK="$ROOT_DIR/adapters/hermes/pre-verify.sh"
+WRITE_GATE="$ROOT_DIR/adapters/hermes/pre-tool-call.sh"
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-parity.XXXXXX")
 PREV_PWD="$PWD"
 
@@ -41,6 +42,16 @@ print(json.dumps({"hook_event_name": "pre_verify", "session_id": "s1",
                   "cwd": sys.argv[1],
                   "extra": {"changed_paths": [], "coding": True, "attempt": 0}}))' "$WORK" \
         | bash "$HERMES_HOOK" 2>/dev/null
+}
+
+# The opt-in write gate, on the content before it is written: stdout|rc.
+_write_gate() {
+    local out rc
+    out=$(python3 -c '
+import json, sys
+print(json.dumps({"tool_name": "write_file", "args": {"path": sys.argv[1], "content": sys.argv[2]}}))' \
+        "$1" "$2" | bash "$WRITE_GATE" 2>/dev/null); rc=$?
+    printf '%s|%s' "$out" "$rc"
 }
 
 _ci_rules_for() {
@@ -66,16 +77,18 @@ HOOK_OUT=$(python3 -c '
 import json, sys
 print(json.dumps({"tool_input": {"file_path": sys.argv[1], "content": sys.argv[2]}}))' \
     "$PHP_FILE" "$PHP_CONTENT" | bash "$ROOT_DIR/hooks/pre-write-check.sh" 2>&1) || RC=$?
+GATE_OUT=$(_write_gate "$PHP_FILE" "$PHP_CONTENT")
 printf '%s' "$PHP_CONTENT" > "$PHP_FILE"
 CI_OUT=$(_ci_rules_for "src/Domain/User/User.php")
 HERMES_OUT=$(_hermes)
 if [[ "$RC" -eq 2 ]] && printf '%s' "$HOOK_OUT" | grep -q "LAYER001" \
     && printf '%s' "$CI_OUT" | grep -q "^LAYER001 critical" \
     && printf '%s' "$HERMES_OUT" | grep -q '"decision"' \
-    && printf '%s' "$HERMES_OUT" | grep -q "LAYER001"; then
-    log_pass "LAYER001 blocks identically in hooks, CI and Hermes"
+    && printf '%s' "$HERMES_OUT" | grep -q "LAYER001" \
+    && [[ "${GATE_OUT##*|}" == "2" ]] && printf '%s' "${GATE_OUT%|*}" | grep -q "LAYER001"; then
+    log_pass "LAYER001 blocks identically in hooks, CI, Hermes and the Hermes write gate"
 else
-    log_fail "LAYER001 parity" "hook rc=$RC ci=[$CI_OUT] hermes=[$HERMES_OUT]"
+    log_fail "LAYER001 parity" "hook rc=$RC ci=[$CI_OUT] hermes=[$HERMES_OUT] gate=[$GATE_OUT]"
 fi
 _clean
 
@@ -122,12 +135,18 @@ HOOK_OUT=$(printf '{"tool_input":{"file_path":"%s"}}' "$WORK/relaxed/Bad.ts" \
     | bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1) || RC=$?
 CI_OUT=$(_ci_rules_for "relaxed/Bad.ts")
 HERMES_OUT=$(_hermes)
+# The write gate judges LAYER001 and SEC001-003 only, so its relaxation case
+# is a Domain file under a directory that relaxes LAYER001.
+mkdir -p "$WORK/relaxed/Domain"
+printf 'rules:\n  TS001: ignore\n  LAYER001: warn\n' > "$WORK/relaxed/.craft-rules.yml"
+GATE_OUT=$(_write_gate "$WORK/relaxed/Domain/Legacy.php" "$PHP_CONTENT")
 if [[ "$RC" -eq 0 ]] \
     && ! printf '%s' "$CI_OUT" | grep -q "^TS001" \
-    && [[ -z "$HERMES_OUT" ]]; then
-    log_pass "a directory .craft-rules.yml relaxation holds in hooks, CI and Hermes"
+    && [[ -z "$HERMES_OUT" ]] \
+    && [[ "${GATE_OUT##*|}" == "0" && -z "${GATE_OUT%|*}" ]]; then
+    log_pass "a directory .craft-rules.yml relaxation holds in hooks, CI, Hermes and the Hermes write gate"
 else
-    log_fail "relaxation parity" "hook rc=$RC ci=[$CI_OUT] hermes=[$HERMES_OUT]"
+    log_fail "relaxation parity" "hook rc=$RC ci=[$CI_OUT] hermes=[$HERMES_OUT] gate=[$GATE_OUT]"
 fi
 _clean
 
