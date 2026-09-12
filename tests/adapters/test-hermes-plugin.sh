@@ -61,8 +61,8 @@ def report(label, ok, detail=""):
 
 ctx = FakeCtx()
 cp.register(ctx)
-report("register wires pre_verify, pre_llm_call, /craftsman and the quality skill",
-       set(ctx.hooks) == {"pre_verify", "pre_llm_call"}
+report("register wires pre_verify, pre_llm_call, pre_tool_call, /craftsman and the quality skill",
+       set(ctx.hooks) == {"pre_verify", "pre_llm_call", "pre_tool_call"}
        and "craftsman" in ctx.commands and "craftsman-quality" in ctx.skills,
        f"hooks={sorted(ctx.hooks)} cmds={sorted(ctx.commands)} skills={sorted(ctx.skills)}")
 
@@ -110,6 +110,76 @@ report("injection survives a process cwd outside the workspace (gateway mode)",
        isinstance(inject, dict) and "TS001" in inject.get("context", ""), repr(inject))
 
 os.chdir(repo)
+
+# The write-time promise (#21): off by default, and when on, refuses only
+# LAYER001 and SEC001-003 before the content reaches disk. Everything else,
+# PHP001 included, still waits for the conclusion.
+pre_tool_call = ctx.hooks["pre_tool_call"]
+LAYERED = ("<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\n"
+           "use App\\Infrastructure\\Repo;\nfinal class Order {}\n")
+# A password literal, not a provider-shaped token: GitHub push protection
+# refuses a commit carrying anything that looks like a real key, fixture or not.
+SECRET = ("<?php\ndeclare(strict_types=1);\nfinal class Pay { private string $password = "
+          "'correct-horse-battery-staple-9'; }\n")
+os.makedirs(os.path.join(repo, "src", "Domain"), exist_ok=True)
+off = pre_tool_call(tool_name="write_file",
+                    args={"path": "src/Domain/Order.php", "content": LAYERED}, task_id="s1", cwd=repo)
+report("the write gate is off by default: a LAYER001 write passes to the conclusion gate", off is None, repr(off))
+
+cp._WRITE_GATE_ON = True
+on = pre_tool_call(tool_name="write_file",
+                   args={"path": "src/Domain/Order.php", "content": LAYERED}, task_id="s1", cwd=repo)
+report("write_gate on: a Domain class importing Infrastructure is refused before it reaches disk",
+       isinstance(on, dict) and on.get("action") == "block" and "LAYER001" in str(on.get("message")), repr(on))
+report("and the file was not written", not os.path.exists(os.path.join(repo, "src", "Domain", "Order.php")))
+secret = pre_tool_call(tool_name="write_file",
+                       args={"path": "src/Pay.php", "content": SECRET}, task_id="s1", cwd=repo)
+report("write_gate on: a hardcoded secret is refused before it reaches disk",
+       isinstance(secret, dict) and secret.get("action") == "block" and "SEC001" in str(secret.get("message")), repr(secret))
+loose = pre_tool_call(tool_name="write_file",
+                      args={"path": "src/Loose.php", "content": "<?php\nclass Loose { public function setX($v) { $this->x = $v; } }\n"},
+                      task_id="s1", cwd=repo)
+report("write_gate on: PHP001, PHP002 and PHP003 still wait for the conclusion (not refused here)", loose is None, repr(loose))
+report("write_gate on: a tool that is not a write passes untouched",
+       pre_tool_call(tool_name="terminal", args={"command": "ls"}, task_id="s1", cwd=repo) is None)
+
+# A patch is judged on the file as it WOULD be, not on the fragment.
+with open(os.path.join(repo, "src", "Domain", "Clean.php"), "w") as fh:
+    fh.write("<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\nuse App\\Domain\\Money;\nfinal class Clean {}\n")
+patched = pre_tool_call(tool_name="patch",
+                        args={"path": "src/Domain/Clean.php", "old_string": "use App\\Domain\\Money;",
+                              "new_string": "use App\\Infrastructure\\Db;"}, task_id="s1", cwd=repo)
+report("write_gate on: a patch that would introduce LAYER001 is refused on the would-be file",
+       isinstance(patched, dict) and patched.get("action") == "block" and "LAYER001" in str(patched.get("message")), repr(patched))
+harmless = pre_tool_call(tool_name="patch",
+                         args={"path": "src/Domain/Clean.php", "old_string": "final class Clean {}",
+                               "new_string": "final class Clean { public function total(): int { return 1; } }"},
+                         task_id="s1", cwd=repo)
+report("write_gate on: a harmless patch passes", harmless is None, repr(harmless))
+
+# The budget the script receives is the write gate's own, under Hermes's 30s
+# callback cap, never the conclusion gate's 45s.
+seen_env = {}
+real_run = cp.subprocess.run
+def spy_run(*a, **kw):
+    seen_env.update(kw.get("env") or {})
+    seen_env["__timeout__"] = kw.get("timeout")
+    return real_run(*a, **kw)
+cp.subprocess.run = spy_run
+pre_tool_call(tool_name="write_file", args={"path": "src/Loose.php", "content": "<?php\n"}, task_id="s1", cwd=repo)
+cp.subprocess.run = real_run
+report("write_gate on: the script gets a budget under Hermes's 30s callback cap, not the conclusion gate's 45s",
+       seen_env.get("CRAFTSMAN_GATE_SECONDS") == "20" and (seen_env.get("__timeout__") or 99) < 30,
+       f"CRAFTSMAN_GATE_SECONDS={seen_env.get('CRAFTSMAN_GATE_SECONDS')} timeout={seen_env.get('__timeout__')}")
+
+old_write_gate = cp._WRITE_GATE
+cp._WRITE_GATE = Path("/nonexistent/write-gate.sh")
+broken_write = pre_tool_call(tool_name="write_file", args={"path": "src/X.php", "content": "<?php\n"}, task_id="s1", cwd=repo)
+cp._WRITE_GATE = old_write_gate
+report("write_gate on: a gate that cannot launch refuses the write rather than passing silently",
+       isinstance(broken_write, dict) and broken_write.get("action") == "block", repr(broken_write))
+cp._WRITE_GATE_ON = False
+
 report("/craftsman on a clean worktree says so", "clean worktree" in ctx.commands["craftsman"](""))
 report("/craftsman status names the metrics database", "metrics.db" in ctx.commands["craftsman"]("status"))
 PYEOF
@@ -141,6 +211,132 @@ if [[ "$ROW" == "TS001|fixed|hermes|hermes attempt 1" ]]; then
     log_pass "the fix between attempts was recorded as a correction"
 else
     log_fail "correction not recorded" "got: ${ROW:-<empty>}"
+fi
+
+# =============================================================================
+# The write gate's shell wire (Path 1), driven the way Hermes drives it.
+#
+# The plugin-form assertions above hand the script `args` and a `cwd`. Hermes
+# does neither on the shell wire: the tool arguments arrive under `tool_input`
+# (agent/shell_hooks.py, _payload_fields), the cwd is the Hermes process's,
+# and a plugin hook gets no cwd at all. The first version read `args` only,
+# so every shell-hook write passed in silence, and it anchored on cwd, so a
+# gateway session's first turn, judged from `/`, passed too.
+# =============================================================================
+echo ""
+echo "--- write gate, shell wire and gateway mode ---"
+GATE="$ROOT_DIR/adapters/hermes/pre-tool-call.sh"
+WG="$WORK/gate-repo"
+mkdir -p "$WG/src/Domain"
+( cd "$WG" && git init -q ) >/dev/null 2>&1
+LAYERED='<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\nuse App\\Infrastructure\\Repo;\nfinal class Order {}\n'
+
+wire() {
+    # wire <json payload> [cwd to run from]; prints stdout|rc
+    local out rc
+    out=$( cd "${2:-$WG}" && printf '%s' "$1" | CLAUDE_PLUGIN_ROOT="$ROOT_DIR" bash "$GATE" 2>/dev/null ); rc=$?
+    printf '%s|%s' "$out" "$rc"
+}
+
+WIRE=$(wire "$(printf '{"hook_event_name":"pre_tool_call","tool_name":"write_file","tool_input":{"path":"%s/src/Domain/Order.php","content":"%s"},"session_id":"s1","cwd":"/","profile":"default","extra":{}}' "$WG" "$LAYERED")" /)
+if [[ "${WIRE##*|}" == "2" ]] && echo "${WIRE%|*}" | grep -q '"action": "block"' && echo "${WIRE%|*}" | grep -q "LAYER001"; then
+    log_pass "the shell wire (tool_input, cwd of the Hermes process) refuses a LAYER001 write, exit 2"
+else
+    log_fail "the shell wire refuses a LAYER001 write" "$WIRE"
+fi
+WIRE=$(wire "$(printf '{"tool_name":"write_file","args":{"path":"%s/src/Domain/Order.php","content":"%s"}}' "$WG" "$LAYERED")" /)
+if [[ "${WIRE##*|}" == "2" ]] && echo "${WIRE%|*}" | grep -q "LAYER001"; then
+    log_pass "gateway mode: no cwd at all and a process cwd of /, the workspace comes from the written path"
+else
+    log_fail "gateway mode: the workspace comes from the written path" "$WIRE"
+fi
+WIRE=$(wire "$(printf '{"tool_name":"write_file","args":{"path":"src/Domain/Order.php","content":"%s"},"cwd":"%s"}' "$LAYERED" "$WG")" /)
+if [[ "${WIRE##*|}" == "2" ]] && echo "${WIRE%|*}" | grep -q "LAYER001"; then
+    log_pass "a relative path resolves against the cwd hint when one is given"
+else
+    log_fail "a relative path resolves against the cwd hint" "$WIRE"
+fi
+
+# The gated party does not reconfigure the gate: the same set pre-verify.sh
+# refuses at the conclusion, and this test fails when the two drift.
+# No comma inside braces in this payload: bash 3.2 brace-expands `{a, b}`
+# even through a quoted command substitution, and the JSON arrived split.
+WIRE=$(wire "$(printf '{"tool_name":"write_file","args":{"path":"%s/.craft-rules.yml","content":"rules: {SEC001: ignore}"}}' "$WG")")
+if [[ "${WIRE##*|}" == "2" ]] && echo "${WIRE%|*}" | grep -q "gate's own configuration"; then
+    log_pass "a write to .craft-rules.yml is refused: the gated party does not reconfigure the gate"
+else
+    log_fail "a write to .craft-rules.yml is refused" "$WIRE"
+fi
+WIRE=$(wire "$(printf '{"tool_name":"write_file","args":{"path":"%s/src/Domain/Order.php","content":"%s"}}' "$WG" "$LAYERED")")
+if [[ "${WIRE##*|}" == "2" ]] && echo "${WIRE%|*}" | grep -q "LAYER001"; then
+    log_pass "and the LAYER001 write after it is still refused"
+else
+    log_fail "and the LAYER001 write after it is still refused" "$WIRE"
+fi
+for own in ".craft-config.yml" "adapters/hermes/pre-verify.sh" "ci/craftsman-ci.sh"; do
+    if grep -qF "$own" "$ROOT_DIR/adapters/hermes/pre-verify.sh" \
+        && python3 - "$ROOT_DIR/adapters/hermes/write_gate_place.py" "$own" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("wgp", sys.argv[1]); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+sys.exit(0 if m._touches_gate(sys.argv[2]) else 1)
+PY
+    then
+        log_pass "both gates refuse $own"
+    else
+        log_fail "both gates refuse $own" "the write gate and pre-verify.sh drifted"
+    fi
+done
+
+# Hermes applies old_string through fuzzy strategies, so a patch whose text is
+# not in the file may still apply: what it adds is judged rather than waved.
+printf '<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\nfinal class Clean {}\n' > "$WG/src/Domain/Clean.php"
+WIRE=$(wire "$(printf '{"tool_name":"patch","args":{"path":"%s/src/Domain/Clean.php","old_string":"    final class Clean {}","new_string":"use App\\\\Infrastructure\\\\Db;\\nfinal class Clean {}"}}' "$WG")")
+if [[ "${WIRE##*|}" == "2" ]] && echo "${WIRE%|*}" | grep -q "LAYER001"; then
+    log_pass "a patch whose old_string is not in the file (fuzzy match ahead) is judged on what it adds"
+else
+    log_fail "a patch whose old_string is not in the file is judged on what it adds" "$WIRE"
+fi
+# A V4A patch (mode: patch, any model) is not read here: reading it would
+# duplicate Hermes's parser. An unread mutation is refused, with the form to use.
+WIRE=$(wire "$(printf '{"tool_name":"patch","args":{"mode":"patch","patch":"*** Begin Patch\\n*** Update File: %s/src/Domain/Clean.php\\n@@\\n-final class Clean {}\\n+final class Clean {}\\n*** End Patch"}}' "$WG")")
+if [[ "${WIRE##*|}" == "2" ]] && echo "${WIRE%|*}" | grep -q "use write_file or a replace-mode patch"; then
+    log_pass "a V4A patch is refused as unread, and told which form is judged"
+else
+    log_fail "a V4A patch is refused as unread" "$WIRE"
+fi
+# A relative path with no workspace to resolve it against is refused, never
+# resolved against the process cwd (the gateway's, not the task's).
+WIRE=$(wire "$(printf '{"tool_name":"write_file","args":{"path":"src/Domain/Order.php","content":"%s"}}' "$LAYERED")" /)
+if [[ "${WIRE##*|}" == "2" ]] && echo "${WIRE%|*}" | grep -q "relative path with no workspace"; then
+    log_pass "a relative path with no cwd is refused rather than resolved against the process cwd"
+else
+    log_fail "a relative path with no cwd is refused" "$WIRE"
+fi
+
+# Parity with the other front-ends (ADR-0029): a directory .craft-rules.yml
+# that relaxes a rule must relax it here too. The first version copied only
+# the workspace root's rule files into the mirror, so CI said warning and the
+# write gate said block on the same file.
+mkdir -p "$WG/legacy/Domain"
+printf 'rules:\n  LAYER001: warn\n' > "$WG/legacy/.craft-rules.yml"
+WIRE=$(wire "$(printf '{"tool_name":"write_file","args":{"path":"%s/legacy/Domain/Order.php","content":"%s"}}' "$WG" "$LAYERED")")
+if [[ "${WIRE##*|}" == "0" && -z "${WIRE%|*}" ]]; then
+    log_pass "a directory .craft-rules.yml relaxation holds at write time, as it does in CI and the hooks"
+else
+    log_fail "a directory .craft-rules.yml relaxation holds at write time" "$WIRE"
+fi
+
+# The bail needs no python3 and says which kind of failure it is.
+WIRE=$( printf '{"tool_name":"write_file","args":{"path":"x.php","content":"<?php"}}' | CLAUDE_PLUGIN_ROOT=/nonexistent bash "$GATE" 2>/dev/null; echo "|$?" )
+if [[ "${WIRE##*|}" == "2" ]] && printf '%s' "${WIRE%|*}" | python3 -c "import json,sys; d=json.load(sys.stdin); sys.exit(0 if d['action']=='block' and 'do not retry' in d['message'] else 1)"; then
+    log_pass "missing infrastructure refuses with valid JSON, exit 2, and says not to retry"
+else
+    log_fail "missing infrastructure refuses with valid JSON and says not to retry" "$WIRE"
+fi
+if ! grep -q "python3 -c" <(sed -n '/^_block()/,/^}/p' "$GATE"); then
+    log_pass "the block is written without python3, so python3 missing can be reported"
+else
+    log_fail "the block is written without python3" "_block calls python3"
 fi
 
 # The curated export is committed output: regenerating it must be clean and

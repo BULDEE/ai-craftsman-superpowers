@@ -35,6 +35,7 @@ from typing import Any
 
 _PLUGIN_ROOT = Path(__file__).resolve().parents[2]
 _GATE = _PLUGIN_ROOT / "adapters" / "hermes" / "pre-verify.sh"
+_WRITE_GATE = _PLUGIN_ROOT / "adapters" / "hermes" / "pre-tool-call.sh"
 _METRICS_LIB = _PLUGIN_ROOT / "hooks" / "lib" / "metrics-db.sh"
 
 _RULE_RE = re.compile(r"\b((?:WARN-)?[A-Z]{2,12}\d{3})\b")
@@ -42,6 +43,15 @@ _FILE_RULE_RE = re.compile(r"^(\S+):\d+\s+((?:WARN-)?[A-Z]{2,12}\d{3})\b", re.MU
 
 _GATE_SECONDS = 45
 _INJECT_TRENDS = True
+# Off by default: the conclusion gate is the design (see pre-verify.sh), and
+# this is the opt-in write-time refusal for LAYER001 and SEC001-003 only (#21).
+_WRITE_GATE_ON = False
+# Under Hermes's cap on a plugin callback (plugins.hook_callback_timeout,
+# 30s by default), which fails the hook closed with a generic message and
+# abandons the worker: a script still running at 30s would be blocked by
+# Hermes with its own diagnostic lost and an orphan craftsman-ci behind it.
+# The conclusion gate's 45s does not apply here.
+_WRITE_GATE_SECONDS = 20
 
 # Rules each session was blocked on at its last gate run. The gateway process
 # is long-lived, so a module dict is the session store; a restart loses only
@@ -192,6 +202,77 @@ def on_pre_verify(
         }
 
 
+def _task_cwd(task_id: str, session: str) -> str:
+    """The directory Hermes resolves this task's file paths against.
+
+    Hermes keeps it per task (tools/file_tools_paths.py resolves through
+    get_session_cwd) and hands this hook none of it, so ask the same source
+    when the plugin runs inside Hermes; outside (the test harness), the
+    session's last gate directory, then the last one seen. Never the process
+    cwd: in gateway mode that is not the task's, and a relative path resolved
+    there is judged in the wrong tree with the wrong project's rules. The
+    script refuses a relative path it cannot anchor rather than guessing.
+    """
+    try:
+        from tools.terminal_tool import get_session_cwd  # type: ignore
+        found = get_session_cwd(task_id) if task_id else ""
+        if found:
+            return str(found)
+    except Exception:
+        pass
+    return str(_session_cwd.get(session) or _last_cwd or "")
+
+
+def _run_write_gate(tool_name: str, args: Any, cwd: str) -> dict[str, Any] | None:
+    # cwd is a hint for a relative path, nothing more: the script derives the
+    # workspace from the written path itself.
+    payload: dict[str, Any] = {"tool_name": tool_name, "args": args or {}}
+    if cwd:
+        payload["cwd"] = cwd
+    env = _env()
+    env["CRAFTSMAN_GATE_SECONDS"] = str(_WRITE_GATE_SECONDS)
+    proc = subprocess.run(
+        ["bash", str(_WRITE_GATE)],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        timeout=_WRITE_GATE_SECONDS + 5,
+        env=env,
+        cwd=cwd or None,
+    )
+    out = (proc.stdout or "").strip()
+    if not out:
+        # The script reports its own failures as a block, so a nonzero exit
+        # with no verdict means it never ran: bash could not find it, or the
+        # interpreter died. Same rule as the conclusion gate.
+        if proc.returncode != 0:
+            raise RuntimeError(f"write gate exited {proc.returncode} with no verdict")
+        return None
+    return json.loads(out.splitlines()[0])
+
+
+def on_pre_tool_call(tool_name: str = "", args: Any = None, task_id: str = "", **kwargs: Any) -> dict[str, Any] | None:
+    """Refuse a write_file or patch whose content carries LAYER001 or SEC001-003.
+
+    Opt-in through `write_gate: on`. Every other tool, and every other rule,
+    passes untouched here and is judged at the conclusion. The gate's own
+    failure is a block, never a silent pass: an operator who opted in asked
+    for fail-closed on exactly these rules.
+    """
+    if not _WRITE_GATE_ON or tool_name not in ("write_file", "patch"):
+        return None
+    # pre_tool_call carries no cwd of its own (hermes_cli/plugins.py hands
+    # tool_name, args, task_id, session_id and ids); a `cwd` kwarg is the
+    # test harness's, never production's.
+    session = str(kwargs.get("session_id") or task_id or "")
+    cwd = str(kwargs.get("cwd") or _task_cwd(task_id, session))
+    try:
+        return _run_write_gate(tool_name, args, cwd)
+    except Exception as exc:
+        return {"action": "block",
+                "message": f"The craftsman write gate could not run ({exc}). Retry the write once."}
+
+
 def on_pre_llm_call(
     session_id: str = "",
     user_message: str = "",
@@ -244,7 +325,15 @@ def _read_version() -> str:
 
 
 def _load_config(ctx: Any) -> None:
-    global _GATE_SECONDS, _INJECT_TRENDS
+    global _GATE_SECONDS, _INJECT_TRENDS, _WRITE_GATE_ON, _WRITE_GATE_SECONDS
+    try:
+        _WRITE_GATE_ON = str(ctx.get_config("write_gate", default="off")).lower() == "on"
+    except Exception:
+        _WRITE_GATE_ON = False
+    try:
+        _WRITE_GATE_SECONDS = min(int(ctx.get_config("write_gate_seconds", default=20)), 25)
+    except Exception:
+        _WRITE_GATE_SECONDS = 20
     try:
         _GATE_SECONDS = int(ctx.get_config("gate_seconds", default=45))
     except Exception:
@@ -285,5 +374,6 @@ def register(ctx: Any) -> None:
     _load_config(ctx)
     ctx.register_hook("pre_verify", on_pre_verify)
     ctx.register_hook("pre_llm_call", on_pre_llm_call)
+    ctx.register_hook("pre_tool_call", on_pre_tool_call)
     _register_command(ctx)
     _register_skills(ctx)

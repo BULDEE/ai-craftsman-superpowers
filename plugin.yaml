@@ -10,6 +10,7 @@ tags: [quality, architecture, ddd, craftsmanship, guardrail]
 provides_hooks:
   - pre_verify
   - pre_llm_call
+  - pre_tool_call
 config_schema:
   gate_seconds:
     type: int
@@ -19,3 +20,11 @@ config_schema:
     type: str
     default: "on"
     description: "on | off - inject correction trends into the first turn of each session"
+  write_gate:
+    type: str
+    default: "off"
+    description: "off | on - also refuse a write_file or patch before it reaches disk when its content carries LAYER001 or SEC001-003; every other rule still waits for the conclusion"
+  write_gate_seconds:
+    type: int
+    default: 20
+    description: "Budget in seconds for one write-gate run, kept under Hermes's 30s callback cap (capped at 25)"

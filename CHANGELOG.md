@@ -86,6 +86,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Hermes: the write-time promise, opt-in (#21).** The gate on Hermes
+  refuses the conclusion by default, and the main README now says so plainly.
+  `write_gate: on` registers `pre_tool_call` (`adapters/hermes/pre-tool-call.sh`
+  and `write_gate_place.py`) for `write_file` and `patch` only, judging the
+  content as the file would be on LAYER001 and SEC001 to SEC003 and nothing
+  else; every other rule still waits for the conclusion, with the skill that
+  fixes it. Two reviewers measured the first version against the Hermes
+  source and it held only through the plugin: the shell wire carries the
+  tool arguments as `tool_input`, not `args`, so Path 1 judged nothing; no
+  cwd reaches a plugin hook and the shell hook's is the gateway process's,
+  so a session's first turn was judged from `/`; a fuzzy or V4A patch passed
+  unjudged; `.craft-rules.yml` could be written through the very hook. Both
+  argument keys are read, the workspace is the written path's own with
+  every directory `.craft-rules.yml` on the way in the mirror (the parity
+  suite carries this gate as a fourth column), the plugin asks Hermes's own
+  `get_session_cwd` for the task's directory and a relative path it cannot
+  anchor is refused rather than guessed, a patch is judged on what it adds
+  when its text is not in the file, a V4A patch is refused as unread with the
+  form to use, and the gate refuses its own configuration the way
+  `pre-verify.sh` does. Its failure refuses the write without needing
+  python3, exit 2, and says whether to retry (a verdict that failed on this
+  file) or not (infrastructure missing on every write). The write gate's
+  budget (`write_gate_seconds`, 20 by default) sits under Hermes's 30s
+  callback cap; Path 1 gets the shell-hook declaration with a timeout above
+  the script's own bound.
+
 - **The semantic layer records what it does.** `hooks/agent-ddd-verifier.sh`
   and `hooks/agent-final-review.sh` shell out to a headless Haiku subprocess on
   every Write/Edit and at every Stop, and recorded nothing at all: measured on
