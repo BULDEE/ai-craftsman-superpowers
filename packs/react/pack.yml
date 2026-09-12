@@ -61,6 +61,7 @@ rules:
       group: TypeScript
       text: "no non-null assertion (!) - handle null explicitly"
       default_severity: warn
+      decision: "advisory - a third-party type whose nullability is wrong is an exception a regex cannot see, and a write blocked on it trains the developer to suppress the rule; set `TS003: block` in .craft-config.yml where the codebase has no such types"
     - id: WARN-TS001
       group: Advisory
       text: "four or more parameters - consider an object"

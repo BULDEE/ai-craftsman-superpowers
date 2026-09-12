@@ -215,6 +215,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cannot declare an idle machine busy. CI prints the latency table on every
   run, not only on a red one, so the rows are tuned from numbers rather than
   from failures.
+- **A rule's advisory default is declared once, in its manifest (#37).**
+  `hooks/lib/rules-engine.sh` and `ci/craftsman-ci.sh` each carried a
+  hand-written list of advisory rules, kept in step by a test that compared
+  them to each other, and both were unreachable for every rule a manifest
+  declares: the registry answers first, and without python3 no rule fires at
+  all. Both lists are gone; the WARN- prefix is the one naming convention
+  kept, and a rule nobody declared blocks under strict, which is the visible
+  direction. `tests/ci/test-craftsman-ci.sh` now fails when a list comes back,
+  checks every declared default against the hooks' engine and against the
+  pipeline's own JSON report on a polyglot fixture, and proves a manifest
+  alone is enough by declaring a rule the engine has never heard of. The
+  reasoning the engine's comments held moved beside the defaults it explains,
+  in `rules/core.yml` and the packs' `decision:` lines.
 
 - **A write with findings costs one interpreter start for its metrics, not one
   per finding.** `metrics_record_violation` queues its rows while

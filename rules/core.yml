@@ -62,6 +62,12 @@ rules:
     text: "no SQL built by concatenation or template literal - bind the parameters"
     default_severity: block
 
+  # The structural rules ship advisory-first so a team can measure the real
+  # noise on an existing codebase before escalating; LOC001 stays advisory
+  # permanently, the other three are promoted with `NEST001: block` and so on
+  # in .craft-config.yml once the codebase is clean. The DB rules were advisory
+  # de facto, by being emitted as warnings; declaring it here hands the choice
+  # to .craft-config.yml and .craft-rules.yml.
   - id: GOD001
     group: Structure
     text: "a class spanning too many lines carries too many responsibilities"

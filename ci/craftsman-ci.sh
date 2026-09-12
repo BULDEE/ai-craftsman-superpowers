@@ -523,18 +523,14 @@ _severity_for() {
         return 0
     fi
 
-    # Standalone fallback, used only when the rules engine could not be
-    # sourced. This list must match _rules_is_advisory in
-    # hooks/lib/rules-engine.sh; tests/ci/test-craftsman-ci.sh fails when
-    # the two diverge.
-    case "$rule" in
-        WARN*|PHP005|NEST001|LOC001|GOD001|PARAM001|CTRL001|RATCHET001) echo "warn"; return 0 ;;
-        TS002|TS003|PHP003) echo "warn"; return 0 ;;
-        DB001|DB002|DB003|PY003|SH001|SH003|SH005) echo "warn"; return 0 ;;
-        PY006|PY007) echo "warn"; return 0 ;;
-        GO003|GO004|GO005|GO006|ERRCHECK001) echo "warn"; return 0 ;;
-        RUST004|RUST005|CLIPPY001) echo "warn"; return 0 ;;
-    esac
+    # Standalone fallback, reached only when hooks/lib/rules-engine.sh could
+    # not be sourced. The packs ship in the same directory, so in that state no
+    # language is registered and no rule can fire: this answers for nobody in
+    # practice, and it carries no list of rules on purpose. The advisory
+    # defaults live in the manifests (rules/core.yml, packs/*/pack.yml) and
+    # reach the pipeline through the engine (#37). The WARN- prefix is the one
+    # convention the engine keeps, mirrored here.
+    [[ "$rule" == WARN* ]] && { echo "warn"; return 0; }
     case "$STRICTNESS" in
         strict)   echo "block" ;;
         moderate) [[ "$rule" == LAYER* || "$rule" == SEC* ]] && echo "block" || echo "warn" ;;

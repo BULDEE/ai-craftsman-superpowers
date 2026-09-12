@@ -580,30 +580,33 @@ fi
 echo ""
 echo "=== No drift between the hooks and the pipeline ==="
 
-# The CI fallback carries its own copy of the advisory list, because it exists
-# for the case where the rules engine could not be sourced and nothing can be
-# shared. A copy drifts unless something compares it.
-ENGINE_ADVISORY=$(awk '/^_rules_is_advisory\(\)/,/^}/' "$ROOT_DIR/hooks/lib/rules-engine.sh" \
-    | grep -oE "^[[:space:]]+[A-Z0-9*|]+\)" | tr -d ' )' | tr '|' '\n' | sort -u)
-CI_ADVISORY=$(awk '/^_severity_for\(\)/,/^}/' "$ROOT_DIR/ci/craftsman-ci.sh" \
-    | grep -E 'echo "warn"; return 0 ;;' | grep -oE "^[[:space:]]+[A-Z0-9*|]+\)" | tr -d ' )' | tr '|' '\n' | sort -u)
+# A rule's advisory default is declared once, in its manifest, and nowhere
+# else (#37). The engine and the pipeline each used to carry a hand-written
+# list, kept in step by comparing them to each other, and both were unreachable
+# for every rule a manifest declares: the registry answers first, and without
+# python3 no rule fires at all. Two lists that agree with each other and with
+# nothing else is the drift this section exists to prevent, so the assertion
+# is now against the manifests, through the two real consumers.
 
-if [[ -z "$ENGINE_ADVISORY" || -z "$CI_ADVISORY" ]]; then
-    log_fail "advisory lists unreadable" \
-        "engine='${ENGINE_ADVISORY//$'\n'/,}' ci='${CI_ADVISORY//$'\n'/,}' - the comparison would pass vacuously"
-elif [[ "$ENGINE_ADVISORY" == "$CI_ADVISORY" ]]; then
-    log_pass "the CI fallback lists exactly the rules the engine calls advisory"
+# 1. No list came back. A rule id inside either function is a second place to
+#    declare a default, which is the defect.
+_advisory_ids_in() {
+    awk "/^$2\\(\\)/,/^}/" "$1" | grep -v '^\s*#' | grep -oE "[A-Z]{2,}[0-9]{3}" | sort -u | tr '\n' ' '
+}
+ENGINE_LISTED="$(_advisory_ids_in "$ROOT_DIR/hooks/lib/rules-engine.sh" "_rules_is_advisory")"
+CI_LISTED="$(_advisory_ids_in "$ROOT_DIR/ci/craftsman-ci.sh" "_severity_for")"
+# LAYER and SEC are the strictness policy (what `moderate` keeps blocking),
+# not an advisory list, and the pipeline's fallback names them for that.
+CI_LISTED="$(printf '%s' "$CI_LISTED" | tr ' ' '\n' | grep -vE '^(LAYER|SEC)' | tr '\n' ' ')"
+if [[ -z "${ENGINE_LISTED// /}" && -z "${CI_LISTED// /}" ]]; then
+    log_pass "neither the engine nor the pipeline holds a list of advisory rules"
 else
-    log_fail "advisory drift" \
-        "engine: $(echo "$ENGINE_ADVISORY" | tr '\n' ' ') | ci: $(echo "$CI_ADVISORY" | tr '\n' ' ')"
+    log_fail "neither the engine nor the pipeline holds a list of advisory rules" \
+        "engine: '${ENGINE_LISTED}' ci: '${CI_LISTED}' - declare the default in the manifest instead"
 fi
 
-# Both lists above are fallbacks, consulted only when the rules engine could not
-# be sourced. Neither knows what a pack declared, so a rule its owner marks
-# `warn` in a manifest still resolves to `block` in that degraded mode: the
-# pipeline would then be stricter than the hooks on the same file, which is the
-# exact disagreement this section exists to prevent. Comparing the two copies
-# against each other cannot see it; comparing them against the registry can.
+# 2. Every default a manifest declares reaches both front-ends, under strict,
+#    where nothing else could turn a block into a warn.
 source "$ROOT_DIR/hooks/lib/rule-registry.sh" 2>/dev/null || true
 DECLARED_WARN=""
 if type rule_default_severity &>/dev/null 2>&1; then
@@ -616,23 +619,119 @@ fi
 
 if [[ -z "${DECLARED_WARN// /}" ]]; then
     log_fail "no advisory rule found in the registry" \
-        "the fallback comparison below would pass against an empty set"
+        "the consumer comparison below would pass against an empty set"
 else
-    MISSING_FROM_CI=""
+    ENGINE_DISAGREES=""
     for _rule in $DECLARED_WARN; do
-        echo "$CI_ADVISORY" | grep -qx "$_rule" && continue
-        # WARN-* is matched by the CI fallback as a prefix pattern.
-        # -F: the CI fallback lists the literal pattern `WARN*`, and without it
-        # grep reads the asterisk as a quantifier and matches nothing.
-        [[ "$_rule" == WARN-* ]] && echo "$CI_ADVISORY" | grep -qxF 'WARN*' && continue
-        MISSING_FROM_CI="${MISSING_FROM_CI} ${_rule}"
+        _engine_says="$(bash -c "
+            export CLAUDE_PLUGIN_ROOT='$ROOT_DIR' CLAUDE_PLUGIN_OPTION_strictness=strict
+            source '$ROOT_DIR/hooks/lib/rules-engine.sh'
+            source '$ROOT_DIR/hooks/lib/pack-loader.sh'
+            rules_init '$FIXTURES_DIR' /nonexistent-global >/dev/null 2>&1
+            pack_loader_init >/dev/null 2>&1
+            rules_severity '$_rule'" 2>/dev/null)"
+        [[ "$_engine_says" == "warn" ]] || ENGINE_DISAGREES="${ENGINE_DISAGREES} ${_rule}=${_engine_says:-empty}"
     done
-    if [[ -z "${MISSING_FROM_CI// /}" ]]; then
-        log_pass "every rule a manifest declares advisory is advisory in the CI fallback too"
+    if [[ -z "${ENGINE_DISAGREES// /}" ]]; then
+        log_pass "every default a manifest declares advisory resolves to warn in the hooks' engine"
     else
-        log_fail "the CI fallback would block a rule its owner declared advisory" \
-            "${MISSING_FROM_CI} - in degraded mode the pipeline is stricter than the hooks"
+        log_fail "every default a manifest declares advisory resolves to warn in the hooks' engine" \
+            "${ENGINE_DISAGREES}"
     fi
+
+    # The pipeline, through its own front door: a polyglot fixture that trips
+    # several declared-advisory rules, scanned under strict. Every one of them
+    # must come back as a warning, and enough of them must fire for the
+    # assertion to be about something.
+    ADVISORY_REPO="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-advisory.XXXXXX")"
+    mkdir -p "$ADVISORY_REPO/src"
+    cat > "$ADVISORY_REPO/src/Order.php" <<'PHP'
+<?php
+declare(strict_types=1);
+final class Order {
+    private string $name = '';
+    public function setName(string $name): void { $this->name = $name; }
+    public function load(): void {
+        try { $this->name = 'x'; } catch (\Throwable $e) { }
+    }
+    public function all(): string { return "SELECT * FROM orders"; }
+}
+PHP
+    cat > "$ADVISORY_REPO/src/widget.ts" <<'TS'
+export default function widget(input: string | null): string {
+    return input!.trim();
+}
+TS
+    cat > "$ADVISORY_REPO/src/tool.py" <<'PY'
+def load(path):
+    return open(path).read()
+PY
+    ( cd "$ADVISORY_REPO" && git init -q && git add -A ) >/dev/null 2>&1
+    advisory_json="$( cd "$ADVISORY_REPO" && CLAUDE_PLUGIN_OPTION_strictness=strict CLAUDE_PLUGIN_ROOT="$ROOT_DIR" \
+        bash "$CLI" --format json src 2>/dev/null )"
+    rm -rf "$ADVISORY_REPO"
+    advisory_pairs="$(printf '%s' "$advisory_json" | python3 -c "
+import json, sys
+try:
+    report = json.load(sys.stdin)
+except ValueError:
+    sys.exit(0)
+for issue in report.get('violations', []):
+    print(issue.get('rule', ''), issue.get('severity', ''))
+" 2>/dev/null | sort -u)"
+    CI_DISAGREES=""
+    CI_ADVISORY_FIRED=0
+    for _rule in $DECLARED_WARN; do
+        _seen="$(printf '%s\n' "$advisory_pairs" | awk -v r="$_rule" '$1 == r { print $2 }' | sort -u | tr '\n' ',')"
+        [[ -z "$_seen" ]] && continue
+        CI_ADVISORY_FIRED=$((CI_ADVISORY_FIRED + 1))
+        [[ "$_seen" == "warning," ]] || CI_DISAGREES="${CI_DISAGREES} ${_rule}=${_seen}"
+    done
+    if [[ "$CI_ADVISORY_FIRED" -lt 4 ]]; then
+        log_fail "the pipeline reports every declared-advisory rule as a warning" \
+            "only ${CI_ADVISORY_FIRED} advisory rule(s) fired on the fixture, the assertion would be vacuous: $(printf '%s' "$advisory_pairs" | tr '\n' ' ')"
+    elif [[ -z "${CI_DISAGREES// /}" ]]; then
+        log_pass "the pipeline reports every declared-advisory rule as a warning (${CI_ADVISORY_FIRED} fired: $(printf '%s\n' "$advisory_pairs" | awk '$2 == "warning" { print $1 }' | sort -u | tr '\n' ' '))"
+    else
+        log_fail "the pipeline reports every declared-advisory rule as a warning" "${CI_DISAGREES}"
+    fi
+fi
+
+# 3. Adding an advisory rule to a pack is one edit: a manifest nobody in the
+#    engine has heard of declares a new rule warn, and the engine says warn.
+ONE_EDIT="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-one-edit.XXXXXX")"
+mkdir -p "$ONE_EDIT/pack"
+cat > "$ONE_EDIT/pack/pack.yml" <<'YML'
+name: one-edit
+version: "1.0.0"
+description: "a pack that exists only to declare one rule"
+compatibility:
+  core: ">=4.9.0"
+  stack: ["*"]
+rules:
+  owned:
+    - id: ONEEDIT001
+      group: Advisory
+      text: "declared advisory by its manifest alone"
+      default_severity: warn
+    - id: ONEEDIT002
+      group: Advisory
+      text: "declared blocking by its manifest alone"
+      default_severity: block
+YML
+one_edit_out="$(bash -c "
+    export CLAUDE_PLUGIN_ROOT='$ROOT_DIR' CLAUDE_PLUGIN_OPTION_strictness=strict
+    source '$ROOT_DIR/hooks/lib/rules-engine.sh'
+    source '$ROOT_DIR/hooks/lib/rule-registry.sh'
+    rules_init '$FIXTURES_DIR' /nonexistent-global >/dev/null 2>&1
+    rule_registry_init '$ROOT_DIR/rules/core.yml' '$ONE_EDIT/pack/pack.yml'
+    printf '%s %s' \"\$(rules_severity ONEEDIT001)\" \"\$(rules_severity ONEEDIT002)\"" 2>/dev/null)"
+rm -rf "$ONE_EDIT"
+if [[ "$one_edit_out" == "warn block" ]]; then
+    log_pass "a rule declared in a manifest alone resolves to its declared default (one edit)"
+else
+    log_fail "a rule declared in a manifest alone resolves to its declared default (one edit)" \
+        "got '$one_edit_out', expected 'warn block'"
 fi
 
 # A directory-level relaxation the hooks honour must be honoured here too.

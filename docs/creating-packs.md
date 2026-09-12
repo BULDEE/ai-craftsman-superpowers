@@ -59,7 +59,8 @@ rules:
     - id: MYPACK001
       group: MyLang
       text: "what the rule asks for, in one line"
-      default_severity: block          # block | warn
+      default_severity: block          # block | warn: the ONLY place a default is declared
+      decision: "why, when the default was adjudicated on measured data"
   builtin: ["MYPACK001", "MYPACK002"]  # every rule this pack detects
   static_analysis: ["MYSA001"]         # SA rule IDs
 
