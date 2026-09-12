@@ -122,18 +122,6 @@ def _bracket_delta(inner: str, index: int, depth: int, angle_brackets: bool) -> 
     return 0
 
 
-_PROFILE_OPTIONS = {
-    "container_re": None,
-    "head_of": None,
-    "on_function": None,
-    "on_close": None,
-    "function_word": "function",
-    "nest_max": NEST_MAX,
-    "loc_max": LOC_MAX,
-    "param_max": PARAM_MAX,
-}
-
-
 class Profile:
     """What carries a language: the heads, the parameter split, three hooks.
 
@@ -153,22 +141,37 @@ class Profile:
     on_close       (scan, frame, span) after the shared LOC001 check, for a
                    frame the language accumulates
     function_word  the noun the messages use: "function"
+    param_remedy   what PARAM001 tells the reader to do: "pass an object";
+                   a language with a word for it says so ("pass a struct")
 
-    An option this class does not know is refused. A typo in `on_function`
-    would otherwise silence a whole rule with no signal, in a module the next
+    Every option is keyword-only, so a misspelled one is a TypeError at
+    construction rather than a rule that never fires, in a module the next
     pack builds on.
     """
 
     def __init__(self, function_re: "re.Pattern", control_re: "re.Pattern",
-                 parameter_list: Callable[[str], list], **options) -> None:
-        unknown = set(options) - set(_PROFILE_OPTIONS)
-        if unknown:
-            raise TypeError("Profile: unknown option(s) %s" % ", ".join(sorted(unknown)))
+                 parameter_list: Callable[[str], list], *,
+                 container_re: Optional["re.Pattern"] = None,
+                 head_of: Optional[Callable[[str], str]] = None,
+                 on_function: Optional[Callable] = None,
+                 on_close: Optional[Callable] = None,
+                 function_word: str = "function",
+                 param_remedy: str = "pass an object",
+                 nest_max: int = NEST_MAX,
+                 loc_max: int = LOC_MAX,
+                 param_max: int = PARAM_MAX) -> None:
         self.function_re = function_re
         self.control_re = control_re
         self.parameter_list = parameter_list
-        for option, default in _PROFILE_OPTIONS.items():
-            setattr(self, option, options.get(option, default))
+        self.container_re = container_re
+        self.head_of = head_of
+        self.on_function = on_function
+        self.on_close = on_close
+        self.function_word = function_word
+        self.param_remedy = param_remedy
+        self.nest_max = nest_max
+        self.loc_max = loc_max
+        self.param_max = param_max
 
 
 class Scan:
@@ -199,8 +202,9 @@ def _open_function(scan: Scan, cursor: int, header: str, name: Optional[str]) ->
     params = profile.parameter_list(header)
     if len(params) > profile.param_max:
         scan.report("PARAM001",
-                    "line %d: %s() has %d parameters (max %d): pass a struct"
-                    % (scan.line(cursor), name or "closure", len(params), profile.param_max))
+                    "line %d: %s() has %d parameters (max %d): %s"
+                    % (scan.line(cursor), name or "closure", len(params), profile.param_max,
+                       profile.param_remedy))
     if profile.on_function:
         profile.on_function(scan, cursor, header, name, params)
 

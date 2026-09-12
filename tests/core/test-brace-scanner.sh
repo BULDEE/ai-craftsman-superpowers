@@ -143,7 +143,7 @@ try:
 except TypeError as error:
     print(error)
 ")"
-assert_contains "a misspelled profile option is refused by name" "$TYPO" "unknown option(s) loc_mx, on_functon"
+assert_contains "a misspelled profile option is refused at construction" "$TYPO" "unexpected keyword argument"
 
 # A language whose declarations end without a brace: the header runs from the
 # previous brace, so `proc short(a) = a + 1` would name the next brace. The
@@ -177,18 +177,33 @@ assert_contains "without head_of the earlier declaration names the brace and lon
 assert_contains "with head_of narrowing to the last line, long() is measured" "$HEADLESS" "head_of: \['line 2: long() has 4 parameters"
 
 # --- The guard: the walk exists once ------------------------------------------
-for scanner in packs/go/hooks/go_structure.py packs/rust/hooks/rust_structure.py; do
-    if grep -qE "^class _?Scan\b|^def _open_brace|^def _close_brace|^def line_of|^def drop_ignored" "$ROOT_DIR/$scanner"; then
-        log_fail "$scanner carries no brace walk of its own" \
-            "$(grep -nE '^class _?Scan\b|^def _open_brace|^def _close_brace|^def line_of|^def drop_ignored' "$ROOT_DIR/$scanner" | tr '\n' ' ')"
+#
+# Behavioural, not a grep on private names: a scanner that grew its own walk
+# back under new names passed the first version of this guard. Each pack's
+# analyze() must reach brace_scanner.walk_braces with the pack's PROFILE.
+for scanner in go:packs/go/hooks/go_structure.py:big.go rust:packs/rust/hooks/rust_structure.py:big.rs; do
+    lang="${scanner%%:*}"; rest="${scanner#*:}"; module="${rest%%:*}"; sample="${rest##*:}"
+    if [[ "$lang" == "go" ]]; then
+        printf 'package main\n\nfunc Big(a, b, c, d int) {}\n' > "$WORK/$sample"
     else
-        log_pass "$scanner carries no brace walk of its own"
+        printf 'fn big(a: u8, b: u8, c: u8, d: u8) {}\n' > "$WORK/$sample"
     fi
-    if grep -q "from brace_scanner import" "$ROOT_DIR/$scanner"; then
-        log_pass "$scanner imports the shared walk"
-    else
-        log_fail "$scanner imports the shared walk" "no import"
-    fi
+    SPY="$(CLAUDE_PLUGIN_ROOT="$ROOT_DIR" python3 - "$ROOT_DIR/$module" "$WORK/$sample" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("scanner", sys.argv[1])
+scanner = importlib.util.module_from_spec(spec); spec.loader.exec_module(scanner)
+import brace_scanner
+calls = []
+real = brace_scanner.walk_braces
+def spy(source, profile):
+    calls.append(profile is scanner.PROFILE)
+    return real(source, profile)
+scanner.walk_braces = spy
+findings = scanner.analyze(sys.argv[2])
+print("walk_called_with_profile=%s findings=%d" % (all(calls) and bool(calls), len(findings)))
+PY
+)"
+    assert_contains "$module reaches the shared walk with its own PROFILE (spy on walk_braces)" "$SPY" "walk_called_with_profile=True findings=[1-9]"
 done
 
 # The pack scanners resolve the engine through CLAUDE_PLUGIN_ROOT first, so an
