@@ -40,7 +40,7 @@
     "stack": {
       "type": "string",
       "title": "Tech Stack",
-      "description": "Your tech stack: symfony (PHP only), react (TS only), fullstack (both), other (minimal rules)",
+      "description": "Your tech stack: symfony, react, fullstack or other. Selects the doctrine and the setup hints; every language pack validates its own files whatever the stack says.",
       "default": "fullstack"
     },
     "agent_hooks": {

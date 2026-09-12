@@ -44,7 +44,12 @@ add_violation() {
 # Layer Validation on Content (before write)
 # =============================================================================
 
-if config_php_enabled; then
+# Keyed on the file's language, not on the declared stack. `config_php_enabled`
+# gated this on `stack: symfony|fullstack`, so a PHP file written into a React
+# project skipped the layer check and the strict_types check at write time,
+# the same hole #35 closed in the packs: the stack selects doctrine and setup
+# hints, never whether a file is validated.
+if [[ "$LANG_ID" == "php" ]]; then
     # PHP: Domain must not import Infrastructure
     if [[ "$FILE_PATH" == *"/Domain/"* ]] && [[ "$EXT" == "php" ]]; then
         if echo "$FILE_CONTENT" | grep -qE "use\s+App\\\\Infrastructure" 2>/dev/null; then
@@ -82,7 +87,7 @@ if config_php_enabled; then
     fi
 fi
 
-if config_ts_enabled; then
+if [[ "$LANG_ID" == "typescript" ]]; then
     # TypeScript: domain must not import infrastructure
     if [[ "$FILE_PATH" == *"/domain/"* ]] && [[ "$EXT" == "ts" || "$EXT" == "tsx" ]]; then
         if echo "$FILE_CONTENT" | grep -qE "from\s+['\"].*infrastructure" 2>/dev/null; then

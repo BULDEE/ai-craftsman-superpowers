@@ -226,26 +226,31 @@ fi
 echo ""
 echo "=== Post-Write Hook - Config-Aware Tests ==="
 
-# Test: stack=react skips PHP rules
+# Test: the declared stack does not silence a language pack (#35).
+#
+# These two used to assert the opposite, "stack=react skips PHP rules", and
+# that assertion is what let a polyglot repository lose its packs in silence:
+# a Symfony backend with a React front declared one stack and half its files
+# went unvalidated, exit 0, nothing printed. Dispatch is by extension; the
+# stack selects doctrine and setup hints, never whether a file is validated.
 export CLAUDE_PLUGIN_OPTION_stack="react"
-unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+export CLAUDE_PLUGIN_OPTION_strictness="strict"
 result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
 exit_code="${result%%|*}"
-if [[ "$exit_code" == "0" ]]; then
-    log_pass "stack=react skips PHP rules (exit 0 on PHP file)"
+if [[ "$exit_code" == "2" ]]; then
+    log_pass "stack=react still refuses a PHP file with a violation (exit 2)"
 else
-    log_fail "stack=react should skip PHP rules" "got exit $exit_code"
+    log_fail "stack=react still refuses a PHP file with a violation" "got exit $exit_code"
 fi
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
-# Test: stack=symfony skips TS rules
 export CLAUDE_PLUGIN_OPTION_stack="symfony"
 result=$(run_post_hook "$FIXTURES_DIR/invalid-any.ts")
 exit_code="${result%%|*}"
-if [[ "$exit_code" == "0" ]]; then
-    log_pass "stack=symfony skips TS rules (exit 0 on TS file)"
+if [[ "$exit_code" == "2" ]]; then
+    log_pass "stack=symfony still refuses a TS file with a violation (exit 2)"
 else
-    log_fail "stack=symfony should skip TS rules" "got exit $exit_code"
+    log_fail "stack=symfony still refuses a TS file with a violation" "got exit $exit_code"
 fi
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
@@ -317,14 +322,18 @@ rm -rf "$DEFAULT_FRESH" "$DEFAULT_AGED"
 echo ""
 echo "=== Pre-Write Hook - Config-Aware Tests ==="
 
-# Test: stack=react skips PHP layer checks
+# Test: the declared stack does not silence the write-time layer gate (#35).
+# This asserted "stack=react skips PHP layer checks" until the gate was keyed
+# on the file's language: a Domain class importing Infrastructure is a layer
+# violation in any repository, whatever stack its config declares.
 export CLAUDE_PLUGIN_OPTION_stack="react"
+export CLAUDE_PLUGIN_OPTION_strictness="strict"
 result=$(run_pre_hook "src/Domain/Service/UserService.php" "<?php\nuse App\\\\Infrastructure\\\\Persistence\\\\Repo;\nfinal class UserService {}")
 exit_code="${result%%|*}"
-if [[ "$exit_code" == "0" ]]; then
-    log_pass "Pre-write: stack=react skips PHP layer checks (exit 0)"
+if [[ "$exit_code" == "2" ]] && [[ "$result" == *LAYER001* ]]; then
+    log_pass "Pre-write: stack=react still refuses a PHP layer violation (exit 2, LAYER001)"
 else
-    log_fail "Pre-write: stack=react should skip PHP" "got exit $exit_code"
+    log_fail "Pre-write: stack=react still refuses a PHP layer violation" "got exit $exit_code"
 fi
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
@@ -534,27 +543,26 @@ else
     log_fail "FileChanged should be silent on clean file" "output=$output"
 fi
 
-# Test: Respects stack config
+# Test: the declared stack does not silence a language pack here either (#35).
+# Same flip as the post-write cases above: FileChanged and post-write-check
+# must agree on what counts as source, and both used to agree on the hole.
 export CLAUDE_PLUGIN_OPTION_stack="react"
 result=$(run_file_changed "$FIXTURES_DIR/invalid-no-strict.php")
-exit_code="${result%%|*}"
 output="${result#*|}"
-if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
-    log_pass "FileChanged respects stack=react (skips PHP)"
+if echo "$output" | grep -q "PHP001"; then
+    log_pass "FileChanged reports PHP001 on a PHP file under stack=react"
 else
-    log_fail "FileChanged should skip PHP for stack=react" "output=$output"
+    log_fail "FileChanged reports PHP001 on a PHP file under stack=react" "output=$output"
 fi
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
-# Test: Respects stack config (skips TS when stack=symfony)
 export CLAUDE_PLUGIN_OPTION_stack="symfony"
 result=$(run_file_changed "$FIXTURES_DIR/invalid-any.ts")
-exit_code="${result%%|*}"
 output="${result#*|}"
-if [[ "$exit_code" == "0" ]] && [[ -z "$output" ]]; then
-    log_pass "FileChanged respects stack=symfony (skips TS)"
+if echo "$output" | grep -q "TS001"; then
+    log_pass "FileChanged reports TS001 on a TS file under stack=symfony"
 else
-    log_fail "FileChanged should skip TS for stack=symfony" "output=$output"
+    log_fail "FileChanged reports TS001 on a TS file under stack=symfony" "output=$output"
 fi
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 

@@ -756,11 +756,13 @@ scan_file() {
     [[ "$PACKS_AVAILABLE" == true ]] && language=$(lang_for_file "$file")
 
     # Discovered, as distinct from scanned. A file whose extension some
-    # installed pack declares counts as discovered even when this project's
-    # stack excludes that pack: that is a deliberate exclusion and a legitimate
-    # pass. A repository where nothing was recognised at all is a gate that
-    # never ran. Counting only php|ts|tsx here is what let one PHP file silence
-    # this guard for every Python and Bash file in a mixed repository.
+    # installed pack declares counts as discovered even when that pack is not
+    # loaded here (an external pack absent from this machine, a pack gated by
+    # its own `compatibility.stack`): that is a deliberate exclusion and a
+    # legitimate pass. A repository where nothing was recognised at all is a
+    # gate that never ran. Counting only php|ts|tsx here is what let one PHP
+    # file silence this guard for every Python and Bash file in a mixed
+    # repository.
     if [[ "$PACKS_AVAILABLE" == true ]] && lang_extension_is_known "$file"; then
         FILES_DISCOVERED=$((FILES_DISCOVERED + 1))
     fi

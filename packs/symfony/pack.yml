@@ -3,7 +3,13 @@ version: "1.0.0"
 description: "PHP/Symfony craftsman pack - DDD, API Platform, Doctrine, Messenger"
 compatibility:
   core: ">=2.4.0"
-  stack: ["symfony", "fullstack"]
+  # `*`, not a stack list. Dispatch happens by extension through the language
+  # registry, so a stack list only meant this pack went silent on a repository
+  # whose declared stack named another ecosystem: a .php file with a known
+  # violation came back clean, exit 0, nothing printed, under `stack: python`.
+  # packs/go, packs/rust, packs/bash and packs/ai-ml declare `*` for the same
+  # reason (#35). The stack still selects the doctrine and the setup hints.
+  stack: ["*"]
 
 languages:
   - id: php

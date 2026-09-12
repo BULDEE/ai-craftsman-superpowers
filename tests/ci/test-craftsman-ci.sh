@@ -297,7 +297,10 @@ echo "=== --config Flag Tests ==="
 TEMP_DIR="/tmp/craftsman-ci-tests-$$"
 mkdir -p "$TEMP_DIR"
 
-# Config with stack=react should skip PHP rules
+# The declared stack does not silence a language pack (#35). These asserted
+# "stack=react skips PHP rules" until the packs stopped being gated by it: a
+# one-line config named the wrong ecosystem and half a polyglot repository was
+# waved through, exit 0, nothing printed.
 cat > "$TEMP_DIR/react-config.yml" <<'YAML'
 strictness: strict
 stack: react
@@ -305,13 +308,12 @@ YAML
 
 result=$(run_ci --format json --config "$TEMP_DIR/react-config.yml" "$FIXTURES_DIR/invalid-no-strict.php")
 exit_code="${result%%|*}"
-if [[ "$exit_code" == "0" ]]; then
-    log_pass "--config with stack=react skips PHP rules (exit 0 on PHP file)"
+if [[ "$exit_code" == "2" ]] && [[ "$result" == *PHP001* ]]; then
+    log_pass "--config with stack=react still refuses a PHP file (exit 2, PHP001)"
 else
-    log_fail "--config stack=react should skip PHP" "got exit $exit_code"
+    log_fail "--config with stack=react still refuses a PHP file" "got exit $exit_code"
 fi
 
-# Config with stack=symfony should skip TS rules
 cat > "$TEMP_DIR/symfony-config.yml" <<'YAML'
 strictness: strict
 stack: symfony
@@ -319,10 +321,10 @@ YAML
 
 result=$(run_ci --format json --config "$TEMP_DIR/symfony-config.yml" "$FIXTURES_DIR/invalid-any.ts")
 exit_code="${result%%|*}"
-if [[ "$exit_code" == "0" ]]; then
-    log_pass "--config with stack=symfony skips TS rules (exit 0 on TS file)"
+if [[ "$exit_code" == "2" ]] && [[ "$result" == *TS001* ]]; then
+    log_pass "--config with stack=symfony still refuses a TS file (exit 2, TS001)"
 else
-    log_fail "--config stack=symfony should skip TS" "got exit $exit_code"
+    log_fail "--config with stack=symfony still refuses a TS file" "got exit $exit_code"
 fi
 
 # Config with strictness=relaxed should produce exit 1 (warnings) not exit 2 (violations)
@@ -356,28 +358,26 @@ rm -rf "$TEMP_DIR"
 # 6. Stack filtering via env var tests
 # =============================================================================
 echo ""
-echo "=== Stack Filtering (env var) Tests ==="
+echo "=== Stack via env var does not silence a pack (#35) ==="
 
-# stack=react via env var skips PHP
 export CLAUDE_PLUGIN_OPTION_stack="react"
 result=$(run_ci "$FIXTURES_DIR/invalid-no-strict.php")
 unset CLAUDE_PLUGIN_OPTION_stack
 exit_code="${result%%|*}"
-if [[ "$exit_code" == "0" ]]; then
-    log_pass "CLAUDE_PLUGIN_OPTION_stack=react skips PHP rules (exit 0)"
+if [[ "$exit_code" == "2" ]] && [[ "$result" == *PHP001* ]]; then
+    log_pass "CLAUDE_PLUGIN_OPTION_stack=react still refuses a PHP file (exit 2, PHP001)"
 else
-    log_fail "Env stack=react should skip PHP" "got exit $exit_code"
+    log_fail "CLAUDE_PLUGIN_OPTION_stack=react still refuses a PHP file" "got exit $exit_code"
 fi
 
-# stack=symfony via env var skips TS
 export CLAUDE_PLUGIN_OPTION_stack="symfony"
 result=$(run_ci "$FIXTURES_DIR/invalid-any.ts")
 unset CLAUDE_PLUGIN_OPTION_stack
 exit_code="${result%%|*}"
-if [[ "$exit_code" == "0" ]]; then
-    log_pass "CLAUDE_PLUGIN_OPTION_stack=symfony skips TS rules (exit 0)"
+if [[ "$exit_code" == "2" ]] && [[ "$result" == *TS001* ]]; then
+    log_pass "CLAUDE_PLUGIN_OPTION_stack=symfony still refuses a TS file (exit 2, TS001)"
 else
-    log_fail "Env stack=symfony should skip TS" "got exit $exit_code"
+    log_fail "CLAUDE_PLUGIN_OPTION_stack=symfony still refuses a TS file" "got exit $exit_code"
 fi
 
 # =============================================================================
