@@ -628,8 +628,21 @@ _NOT_THE_PROJECT = frozenset(
 )
 
 
+# The prune applies to the path INSIDE the project, never to the absolute one.
+# Matched against every segment of the absolute path, `var` skipped every file
+# under /var/www, which is where a deployed PHP application lives, and every
+# fixture under macOS's /var/folders temp directory: the ratchet measured
+# nothing there and said nothing about it.
+def _pruned(file_path: Path) -> bool:
+    try:
+        relative = file_path.resolve().relative_to(project_root(file_path.parent))
+    except (ValueError, OSError):
+        return False
+    return bool(_NOT_THE_PROJECT.intersection(relative.parts[:-1]))
+
+
 def _skipped(file_path: Path) -> bool:
-    if _NOT_THE_PROJECT.intersection(file_path.parts):
+    if _pruned(file_path):
         return True
     if not file_path.is_file() or file_path.suffix not in supported_extensions():
         return True

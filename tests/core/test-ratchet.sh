@@ -655,6 +655,25 @@ else
     log_fail "a craftsman-ignore marker is still counted" "got '$ignores'"
 fi
 
+# The prune must read the path inside the project, not the absolute one. It
+# matched every segment, so `var` skipped every file under /var/www, which is
+# where a deployed PHP application lives, and every fixture under macOS's
+# /var/folders: the ratchet measured nothing there and said nothing.
+VARWWW="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-var.XXXXXX")/var/www/app"
+mkdir -p "$VARWWW/src" "$VARWWW/vendor/acme"
+( cd "$VARWWW" && git init -q ) >/dev/null 2>&1
+printf 'def f(a):\n    if a:\n        return 1\n    return 0\n' > "$VARWWW/src/p.py"
+cp "$VARWWW/src/p.py" "$VARWWW/vendor/acme/p.py"
+under_var=$(cd "$VARWWW" && python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure src/p.py 2>/dev/null | grep -c complexity)
+vendored=$(cd "$VARWWW" && python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure vendor/acme/p.py 2>/dev/null | grep -c complexity)
+if [[ "${under_var:-0}" -eq 1 && "${vendored:-0}" -eq 0 ]]; then
+    log_pass "a project under /var/www is measured, and its vendor/ is still pruned"
+else
+    log_fail "a project under /var/www is measured, and its vendor/ is still pruned" \
+        "src measured=$under_var vendor measured=$vendored"
+fi
+rm -rf "${VARWWW%/var/www/app}"
+
 rm -rf "$LITERALS"
 
 # --- A mark from an older instrument is not a mark -----------------------------
