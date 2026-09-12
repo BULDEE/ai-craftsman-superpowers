@@ -98,8 +98,8 @@ One `AskUserQuestion` call, every answer prefilled from the signals. Wording mat
 
 | Question | Prefilled from | What it decides |
 |---|---|---|
-| Existing project or a new one? | `existing_project` | how the baseline is taken |
-| Prototype or heading to production? | `legacy_signal`, `has_tests` | strictness: `moderate` or `strict` |
+| Existing project or a new one? | `existing_project` | how the baseline is taken, AND the strictness ceiling |
+| Prototype or heading to production? | `legacy_signal`, `has_tests` | strictness, within that ceiling |
 | Solo or team? | `has_ci` | whether a CI template and a doctrine export are proposed |
 | Maximum help or maximum autonomy? | nothing, ask plainly | `guided: true` or `guided: false` |
 
@@ -114,10 +114,59 @@ Mapping, applied silently:
 
 | Answer | Effect |
 |---|---|
-| Already exists | photograph the current state as the baseline |
+| Already exists | photograph the current state as the baseline, and cap strictness at `moderate` |
 | Starting right now | baseline starts empty, zero tolerance from the first file |
 | Prototype | `strictness: moderate` |
-| Going to production | `strictness: strict` |
+| Going to production, on a NEW project | `strictness: strict` |
+| Going to production, on an EXISTING one | `strictness: moderate` |
+
+**Question 1 outranks question 2, and this is the single most important line in
+the mapping.** It is enforced by `config_default_strictness` in
+`hooks/lib/config.sh`, not by this table: a decision that opens or closes the
+front door of the gate cannot depend on a model following prose. A codebase with three years of history is in production, so the
+truthful answer to question 2 is "going to production", and mapping that
+straight to `strict` selects the setting that refuses most of the repository on
+the first edit. Measured on a real Symfony application, 400 files sampled: 98%
+have no `declare(strict_types=1)` and 88% are not `final`.
+
+`moderate` relaxes design and style, never a boundary and never security:
+`LAYER*` and `SEC*` keep their declared severity under it, which is asserted in
+`tests/core/test-rules-engine.sh`. What it stops doing is refusing an edit
+because of a class declaration two hundred lines above the change.
+
+That sentence was written here before it was true. `SEC*` was missing from the
+carve-out, so this change would have made a hardcoded secret advisory on every
+repository with history, justified by a claim in a document a model reads to
+decide. It is true now because the engine was fixed and a test holds it.
+
+The baseline is the other half of the same answer: `craftsman-ci baseline`
+records what the repository already carries, so a recorded violation reports
+without blocking while a new one still refuses the write. Step D runs it.
+
+The mark lives in `.craftsman-baseline.json` at the repository root, and the
+question "which mark answers for this file" is settled by the file's own
+directory, never by where the shell happens to be: a pipeline running from a
+package directory, and a hook fired with whatever working directory the editor
+has, read the same mark. A repository nested inside another (a submodule, a
+package that took its own mark) answers for its own files.
+
+Taking the mark is also what buys `strict` back. An existing repository whose
+debt has never been measured defaults to `moderate`, where only a boundary or a
+secret blocks; once the mark is taken, the default is `strict` again, because
+the debt `strict` would refuse is now recorded and reported without blocking.
+
+Naming a rule in this repository's `.craft-rules.yml` outranks the mark:
+`PHP001: block` blocks a recorded violation too, which is how a project takes
+one rule back out of the debt once it has been cleaned up. The same line in the
+global `~/.claude/.craft-config.yml` does not, because a preference held across
+every repository on the machine is not a statement about this one.
+
+The mark is taken once. A second `craftsman-ci baseline` is refused, and a
+deliberate re-mark needs `--re-baseline --reason "..."` and says out loud which
+files written since the first mark it absorbed.
+
+Raising an existing project to `strict` is a deliberate later step, taken once
+the debt is under a baseline, and it is one line in `.craft-config.yml`.
 | Alone | no CI proposal |
 | Several | propose `craftsman-ci init` (pipeline template) and `craftsman-ci export` (shareable doctrine) |
 | Explain every blocked change | `guided: true` |
@@ -156,7 +205,14 @@ without it in git, CI and your teammates measure against a different photograph.
 
 ### Step E: `--quick` skips the questions
 
-`--quick` bypasses the four questions entirely. It keeps the observed defaults (existing project detection, strict strictness, `guided: false`) and still runs Step D, so a quick setup ends with a valid `.craftsman-baseline.json` like any other.
+`--quick` bypasses the four questions entirely. It keeps the observed defaults
+and still runs Step D, so a quick setup ends with a valid
+`.craftsman-baseline.json` like any other.
+
+Its strictness follows the same rule as the questions, and it does not need to
+be re-derived: `config_default_strictness` in `hooks/lib/config.sh` is the one
+implementation, and `config_strictness` already falls back to it. The table
+above documents what that function returns; it does not compute it.
 
 ---
 

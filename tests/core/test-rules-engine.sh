@@ -637,4 +637,56 @@ assert_eq "Fallback rules: TS001 is warn" "warn" "$fallback_ts001"
 # =============================================================================
 rm -rf "$TEST_DIR"
 
+# --- moderate relaxes design, never security -----------------------------------
+#
+# SEC* was missing from the moderate carve-out, and nothing noticed until an
+# existing project started defaulting to that strictness: a hardcoded secret
+# silently became advisory on every repository with history. The doc for the
+# setting even claimed the opposite. A gate that stops refusing a live
+# credential because the strictness was dialled down is wrong on its own terms.
+MOD_WORK="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-moderate.XXXXXX")"
+trap 'rm -rf "$MOD_WORK"' EXIT
+( cd "$MOD_WORK" && git init -q ) >/dev/null 2>&1
+
+severity_under() {
+    local strictness="$1" rule="$2"
+    printf 'strictness: %s\n' "$strictness" > "$MOD_WORK/.craft-config.yml"
+    ( cd "$MOD_WORK" && bash -c "source '$ROOT_DIR/hooks/lib/rules-engine.sh'; rules_init '$MOD_WORK' 2>/dev/null; rules_severity_for_file src/X.php $rule" )
+}
+
+for rule in SEC001 SEC002 SEC003; do
+    verdict="$(severity_under moderate "$rule")"
+    if [[ "$verdict" == "block" ]]; then
+        log_pass "moderate keeps $rule blocking"
+    else
+        log_fail "moderate keeps $rule blocking" "got '$verdict'"
+    fi
+done
+
+for rule in LAYER001 LAYER002; do
+    verdict="$(severity_under moderate "$rule")"
+    if [[ "$verdict" == "block" ]]; then
+        log_pass "moderate keeps $rule blocking"
+    else
+        log_fail "moderate keeps $rule blocking" "got '$verdict'"
+    fi
+done
+
+# And it does relax what it is for, or it would be `strict` under another name.
+verdict="$(severity_under moderate PHP002)"
+if [[ "$verdict" == "warn" ]]; then
+    log_pass "moderate relaxes a design rule, which is what it is for"
+else
+    log_fail "moderate relaxes a design rule" "PHP002 came back '$verdict'"
+fi
+
+# `relaxed` is the setting for "warn about everything", and it is chosen
+# explicitly, never by default.
+verdict="$(severity_under relaxed SEC001)"
+if [[ "$verdict" == "warn" ]]; then
+    log_pass "relaxed still relaxes everything, security included"
+else
+    log_fail "relaxed still relaxes everything" "SEC001 came back '$verdict'"
+fi
+
 test_summary

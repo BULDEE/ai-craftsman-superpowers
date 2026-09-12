@@ -153,10 +153,78 @@ def measure(path: Path) -> dict:
     }
 
 
+_PROJECT_ROOT = None
+
+
+def set_project_root(path: Path) -> None:
+    """Pin the anchor for the rest of this process.
+
+    `--baseline path/to/file` names where the mark lives, so it also names what
+    the keys inside it are relative to. Without this, a caller that passed an
+    explicit baseline wrote keys against one root and read them back against
+    another: `init` recorded `sub/deep/Deep.php`, the check looked up
+    `deep/Deep.php`, and the ratchet reported nothing at all.
+    """
+    global _PROJECT_ROOT
+    _PROJECT_ROOT = Path(path).resolve()
+
+
+def _repository_of(start: Path):
+    """The nearest `.git` at or above `start`, or None outside any repository."""
+    for candidate in [start] + list(start.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return None
+
+
+def _nearest_baseline(start: Path, repository: Path):
+    """The closest existing baseline between `start` and the repository root.
+
+    Bounded by the repository on purpose. Searching for the baseline before
+    finding the `.git` let a stray `.craftsman-baseline.json` in a workspace
+    directory or in $HOME outrank the project: this repository's marks were
+    written into another tree's file, keyed against an anchor outside it.
+    """
+    for candidate in [start] + list(start.parents):
+        if (candidate / BASELINE_NAME).is_file():
+            return candidate
+        if candidate == repository:
+            break
+    return None
+
+
+def project_root(start=None) -> Path:
+    """The directory the baseline is anchored to.
+
+    Not `Path.cwd()`. A pipeline that runs `cd packages/api && craftsman-ci src`,
+    or a hook fired while the shell sat in a subdirectory, looked for the
+    baseline in that subdirectory, found none, and reported every recorded
+    violation as new: the exact failure this file exists to prevent, silently.
+
+    A pinned anchor answers for everything; otherwise the walk starts where the
+    caller says, which is the file's own directory when there is a file. An
+    existing baseline wins over the repository root, so a package that marked
+    its own state keeps it, and cwd is the last resort for a directory outside
+    any repository.
+    """
+    if _PROJECT_ROOT is not None:
+        return _PROJECT_ROOT
+    override = os.environ.get("CRAFTSMAN_PROJECT_ROOT")
+    if override and Path(override).is_dir():
+        return Path(override)
+    start = Path(start).resolve() if start is not None else Path.cwd().resolve()
+    repository = _repository_of(start)
+    if repository is None:
+        return start
+    return _nearest_baseline(start, repository) or repository
+
+
 def _baseline_path(args) -> Path:
     if "--baseline" in args:
-        return Path(args[args.index("--baseline") + 1])
-    return Path(BASELINE_NAME)
+        explicit = Path(args[args.index("--baseline") + 1])
+        set_project_root(explicit.resolve().parent)
+        return explicit
+    return project_root() / BASELINE_NAME
 
 
 def _flag_value(args, flag: str) -> str:
@@ -255,7 +323,7 @@ def _relative(path: Path):
     repository, and adds entries no teammate can act on.
     """
     try:
-        return str(path.resolve().relative_to(Path.cwd()))
+        return str(path.resolve().relative_to(project_root()))
     except ValueError:
         return None
 
@@ -272,7 +340,18 @@ def _current_entry(file_path: Path):
     return entry
 
 
+# Dependency and build trees are not the project's code. `ci/craftsman-ci.sh`
+# prunes exactly these, and the two halves of one baseline file disagreed: a
+# `vendor/acme/lib/Junk.php` carried a structural mark and no rule mark, which
+# is a row nobody can act on and a diff nobody can read.
+_NOT_THE_PROJECT = frozenset(
+    {"vendor", "node_modules", ".git", "dist", "build", "var"}
+)
+
+
 def _skipped(file_path: Path) -> bool:
+    if _NOT_THE_PROJECT.intersection(file_path.parts):
+        return True
     if not file_path.is_file() or file_path.suffix not in supported_extensions():
         return True
     # A size cap alone is not enough: os.path.getsize("/dev/zero") is 0, so a
@@ -330,14 +409,15 @@ def _cmd_update(args) -> int:
     if current is None:
         return 0
     known = entries.get(current["path"], current)
-    tightened = {"path": current["path"]}
+    # Start from what the row already said, then tighten. Rebuilding from
+    # scratch and copying back the keys this function happens to know about is
+    # how `reason` was lost once, and how `rules` was lost the day it was
+    # added: a row carries more than this command owns, and the next key added
+    # by someone else must not need an edit here to survive.
+    tightened = {key: value for key, value in known.items() if key != "path"}
+    tightened["path"] = current["path"]
     for name in RATCHETED_METRICS:
         tightened[name] = min(known.get(name, current[name]), current[name])
-    # The reason a budget was raised outlives the tightening that follows it.
-    # Rebuilding the entry from scratch dropped it, so the next reader saw a
-    # loosened figure with no record of why it had been accepted.
-    if isinstance(known.get("reason"), str) and known["reason"]:
-        tightened["reason"] = known["reason"]
     entries[current["path"]] = tightened
     save_baseline(baseline_file, entries)
     return 0
@@ -374,6 +454,14 @@ def _refuse_silent_loosening(roots) -> None:
 # keep every other row, because scoping a command must narrow what it writes,
 # never widen what it deletes.
 def _photograph_into(entries: dict, roots: list, reason: str) -> int:
+    """Overwrite the metrics of each row, keep everything else it carried.
+
+    `init` re-measures on purpose: that is what taking a mark means. What it
+    must not do is drop the keys it does not measure. `rules`, written by
+    rule_baseline.py into the same row, was silently erased by a later `init`,
+    and the only symptom was a gate that started refusing inherited debt again
+    weeks after someone recorded it.
+    """
     written = 0
     for source in _iter_sources(roots):
         entry = _current_entry(source)
@@ -381,6 +469,11 @@ def _photograph_into(entries: dict, roots: list, reason: str) -> int:
             continue
         if reason:
             entry["reason"] = reason
+        previous = entries.get(entry["path"])
+        if isinstance(previous, dict):
+            for key, value in previous.items():
+                if key not in entry and key != "path":
+                    entry[key] = value
         entries[entry["path"]] = entry
         written += 1
     return written

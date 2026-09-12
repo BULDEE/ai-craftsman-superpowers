@@ -16,6 +16,13 @@ source "$SCRIPT_DIR/../lib/test-helpers.sh"
 export CLAUDE_PLUGIN_DATA="/tmp/craftsman-hook-tests-$$"
 export CLAUDE_PLUGIN_ROOT="$ROOT_DIR"
 
+# These fixtures assert what a RULE does, so they pin the strictness instead of
+# inheriting it. The default is no longer a constant: a repository with history
+# now seeds `moderate`, and this suite runs inside one, so an unpinned run
+# asserted the default rather than the rule. The default itself is asserted on
+# purpose further down, in both of its shapes.
+export CLAUDE_PLUGIN_OPTION_strictness="strict"
+
 # Run a hook with fixture, capture exit code and output
 run_post_hook() {
     local fixture="$1"
@@ -29,6 +36,13 @@ run_pre_hook() {
     local file_path="$1"
     local content="$2"
     local output
+    # printf '%b', because these fixtures write `\n` and every validator regex
+    # is anchored per line. Passed through verbatim, the whole fixture reached
+    # the hook as ONE line: `use App\Infrastructure` never sat at a line start,
+    # LAYER001 never fired, and the assertion named after it passed on a
+    # different rule blocking for a different reason. It only showed red the day
+    # that other rule stopped blocking.
+    content="$(printf '%b' "$content")"
     output=$(jq -n --arg fp "$file_path" --arg c "$content" '{"tool_input":{"file_path":$fp,"content":$c}}' | bash "$ROOT_DIR/hooks/pre-write-check.sh" 2>/dev/null)
     local exit_code=$?
     echo "$exit_code|$output"
@@ -179,10 +193,13 @@ echo "=== Pre-Write Hook Tests ==="
 # Test: Domain importing Infrastructure should block
 result=$(run_pre_hook "src/Domain/Service/UserService.php" "<?php\nuse App\\\\Infrastructure\\\\Persistence\\\\Repo;\nfinal class UserService {}")
 exit_code="${result%%|*}"
-if [[ "$exit_code" == "2" ]]; then
-    log_pass "Pre-write blocks Domain->Infrastructure import (exit 2)"
+# The rule is named, not just the exit code. This assertion spent its whole life
+# green on PHP001 blocking instead, and an exit code alone cannot tell the two
+# apart.
+if [[ "$exit_code" == "2" ]] && [[ "$result" == *LAYER001* ]]; then
+    log_pass "Pre-write blocks Domain->Infrastructure import (exit 2, LAYER001)"
 else
-    log_fail "Pre-write should block layer violation" "exit=$exit_code"
+    log_fail "Pre-write should block layer violation" "exit=$exit_code, output=${result#*|}"
 fi
 
 # Test: Valid Domain file should pass
@@ -263,14 +280,36 @@ else
 fi
 unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 
-# Test: default behavior unchanged (strict + fullstack)
-result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
-exit_code="${result%%|*}"
-if [[ "$exit_code" == "2" ]]; then
-    log_pass "Default behavior: PHP001 still blocks (backward compatible)"
+# Test: the default itself, in both of its shapes.
+#
+# `strict` on a repository without history, `moderate` on one with. This is the
+# setting the branch changed, so it is asserted against the hook, not against a
+# helper: the seeded value used to reach the session banner and never the gate.
+DEFAULT_FRESH="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-default-fresh.XXXXXX")"
+( cd "$DEFAULT_FRESH" && git init -q && git commit -q --allow-empty -m one ) >/dev/null 2>&1
+cp "$FIXTURES_DIR/invalid-no-strict.php" "$DEFAULT_FRESH/Sample.php"
+fresh_code=0
+( cd "$DEFAULT_FRESH" && echo "{\"tool_input\":{\"file_path\":\"$DEFAULT_FRESH/Sample.php\"}}" \
+    | CLAUDE_PLUGIN_OPTION_strictness="" bash "$ROOT_DIR/hooks/post-write-check.sh" >/dev/null 2>&1 ) || fresh_code=$?
+if [[ "$fresh_code" == "2" ]]; then
+    log_pass "Default on a repository without history: PHP001 blocks"
 else
-    log_fail "Default behavior should block PHP001" "got exit $exit_code"
+    log_fail "Default on a repository without history should block PHP001" "got exit $fresh_code"
 fi
+
+DEFAULT_AGED="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-default-aged.XXXXXX")"
+( cd "$DEFAULT_AGED" && git init -q && for i in $(seq 1 25); do git commit -q --allow-empty -m "c$i"; done ) >/dev/null 2>&1
+cp "$FIXTURES_DIR/invalid-no-strict.php" "$DEFAULT_AGED/Sample.php"
+aged_code=0
+aged_out=$( cd "$DEFAULT_AGED" && echo "{\"tool_input\":{\"file_path\":\"$DEFAULT_AGED/Sample.php\"}}" \
+    | CLAUDE_PLUGIN_OPTION_strictness="" bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1 ) || aged_code=$?
+if [[ "$aged_code" == "0" ]]; then
+    log_pass "Default on a repository with history: PHP001 reports without blocking"
+else
+    log_fail "Default on a repository with history should not block PHP001" \
+        "got exit $aged_code: $(echo "$aged_out" | head -2)"
+fi
+rm -rf "$DEFAULT_FRESH" "$DEFAULT_AGED"
 
 # =============================================================================
 # Pre-Write Hook - Config-Aware Tests
@@ -303,7 +342,7 @@ unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 # Test: default still blocks
 result=$(run_pre_hook "src/Domain/Service/UserService.php" "<?php\nuse App\\\\Infrastructure\\\\Persistence\\\\Repo;\nfinal class UserService {}")
 exit_code="${result%%|*}"
-if [[ "$exit_code" == "2" ]]; then
+if [[ "$exit_code" == "2" ]] && [[ "$result" == *LAYER001* ]]; then
     log_pass "Pre-write: default still blocks layer violations (backward compatible)"
 else
     log_fail "Pre-write: default should block" "got exit $exit_code"
@@ -961,7 +1000,10 @@ SESSION_STATE="${CLAUDE_PLUGIN_DATA}/session-state.json"
 
 # Test: Session state file created when violation blocks
 rm -f "$SESSION_STATE"
-unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+# These assert what happens ON a block, so they need a blocking severity, and
+# the ambient default no longer guarantees one: this suite runs inside a
+# repository with history, which now seeds `moderate`.
+export CLAUDE_PLUGIN_OPTION_strictness="strict"
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 result=$(run_post_hook "$FIXTURES_DIR/invalid-no-strict.php")
 exit_code="${result%%|*}"
@@ -1128,7 +1170,8 @@ fi
 
 # Test: session state has 'patterns' key after a blocked violation
 rm -f "$PATTERN_TEST_STATE"
-unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
+# A blocked violation is the precondition here, so the severity is pinned.
+export CLAUDE_PLUGIN_OPTION_strictness="strict"
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 run_post_hook "$FIXTURES_DIR/invalid-no-strict.php" > /dev/null 2>&1 || true
 

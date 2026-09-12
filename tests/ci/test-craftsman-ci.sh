@@ -286,6 +286,11 @@ fi
 # 5. Config flag tests
 # =============================================================================
 echo ""
+# These assert what --config does, and an environment override outranks a
+# config file by design, so the pin the shared helpers apply is cleared here.
+CLAUDE_PLUGIN_OPTION_strictness=""
+export CLAUDE_PLUGIN_OPTION_strictness
+
 echo "=== --config Flag Tests ==="
 
 # Create temp config file

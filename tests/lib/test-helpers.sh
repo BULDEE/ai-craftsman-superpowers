@@ -16,7 +16,27 @@
 #   - run_hook - generic hook runner (stdin JSON → exit_code|output)
 #   - test_summary - print pass/fail summary, exit with correct code
 #   - setup_test_env / cleanup_test_env - temp directory management
+#
+# Strictness is pinned here, once, for every suite that sources this file.
+# The default is no longer a constant: a repository with history seeds
+# `moderate` (see config_default_strictness), and the suites run inside one, so
+# an unpinned assertion measured the ambient default instead of the rule it
+# names. A suite that asserts the DEFAULT itself clears this variable for that
+# one case, which is the only place the default belongs.
 # =============================================================================
+
+export CLAUDE_PLUGIN_OPTION_strictness="${CLAUDE_PLUGIN_OPTION_strictness:-strict}"
+
+# A git identity, once, for every fixture that commits. The ubuntu runner has
+# none configured, so `git commit --allow-empty` failed silently inside
+# `>/dev/null 2>&1`, every "repository with history" fixture had zero commits,
+# and the default resolved to `strict` where the assertion expected `moderate`.
+# Green on a developer's machine, red on the runner, for a reason that has
+# nothing to do with the code under test.
+export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-craftsman-tests}"
+export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-tests@craftsman.invalid}"
+export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-craftsman-tests}"
+export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-tests@craftsman.invalid}"
 
 # Guard against double-sourcing
 [[ -n "${_TEST_HELPERS_LOADED:-}" ]] && return 0

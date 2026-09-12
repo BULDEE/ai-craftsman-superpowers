@@ -64,6 +64,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CLI installed), where it was +200ms for a row saying the run did not happen.
 
 
+- **A rule baseline, so inherited debt reports without blocking.** The
+  structural ratchet already answered "is this file worse than it was" for
+  complexity and size; `craftsman-ci baseline` now answers it for rules.
+  Measured on a real Symfony application, 400 files sampled: 98% have no
+  `declare(strict_types=1)` and 88% are not `final`, so under the default
+  `strict` the first edit to nearly every file was refused for code the user
+  did not write, and the rational response was to relax every rule until the
+  plugin enforced nothing.
+
+  A recorded violation is **reported and not blocked**, with the reason said
+  out loud in the message: a gate that hides the debt lies about the state of
+  the file, and one that blocks on it cannot be used. A file with no recorded
+  mark still blocks, and so does a rule that was not there before. The
+  comparison is ordinal, so a second bare `except:` in a file marked with one
+  still refuses the write; it is weaker for a rule that fires once per file
+  whatever the file contains, and `tests/core/test-rule-baseline.sh` asserts
+  that limit rather than hiding it.
+
+
 - **Go pack (`packs/go/`).** Seven owned rules plus NEST001, LOC001, PARAM001
   and LAYER001, detected by the pack itself. GO001 refuses `panic()` outside
   `package main`, outside a `Must` prefixed constructor and outside test files;
@@ -112,6 +131,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   space is refused, because it is not a YAML mapping, and a trailing comment is
   not part of the value. All of it is asserted in `tests/core/test-config.sh`.
 
+- **BREAKING: an existing project no longer defaults to `strict`.** This is a
+  gate change at runtime, not a change to what `/craftsman:setup` proposes: an
+  installation that never wrote `strictness:` into `.craft-config.yml` and has
+  no baseline stops blocking PHP001, PHP002, TS001, PY004 and PY005 on upgrade.
+  `LAYER*` and `SEC*` keep blocking under `moderate`, and an explicit
+  `strictness: strict` is unaffected.
+
+  The reasoning: the setup mapping sent "It is going to production" straight to
+  `strict`, and a codebase with three years of history is in production, so the
+  truthful answer selected the setting that refuses most of the repository.
+
+  **Taking the mark buys `strict` back.** A repository with history and no
+  `.craftsman-baseline.json` defaults to `moderate`; once the mark exists the
+  default is `strict` again, because the debt `strict` would refuse is recorded
+  and reported without blocking. Without that coupling the two halves cancelled
+  each other out: under `moderate` only `LAYER*` and `SEC*` block, `SEC*` is
+  exempt from the baseline by design, so on every repository past 20 commits
+  the rule baseline was inert and a brand new file full of violations passed
+  with warnings. To keep 4.8 behaviour on upgrade, write `strictness: strict`
+  in `.craft-config.yml`, or run `craftsman-ci baseline src`.
+
+
 - **`docs/creating-packs.md` documents `languages:` and `rules.owned`.** Their
   absence was the reason the example skeletons taught a manifest the engine
   loads and never dispatches to. `examples/pack-skeleton-go/` and
@@ -123,6 +164,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and semicolons, and the release runner holds the Sigstore signing identity.
 
 ### Fixed
+
+- **`ratchet.py` erased baseline keys it had not measured.** `init` and
+  `update` both rebuilt each row from their own measurement and copied back
+  only the keys they knew about, so the `rules` counts written into the same
+  row disappeared on the next run. The symptom would have been the worst kind:
+  a gate quietly refusing inherited debt again weeks after someone recorded it,
+  with nothing in the diff to explain why. The same shape had already cost
+  `reason` once, so the fix carries forward every unmeasured key rather than
+  naming them one at a time.
+
 
 - **`assert_contains` in `tests/lib/test-helpers.sh`** passed its needle to
   `grep` without `--`, so any assertion on a string starting with `-` failed

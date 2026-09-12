@@ -35,11 +35,16 @@
 _RULES_STORE=""
 _RULES_PROJECT_DIR=""
 _RULES_STRICTNESS="strict"
+_RULES_STRICTNESS_IS_DEFAULT=true
 
 # A rule's default severity belongs to whoever owns the rule, so severity
 # resolution needs the rule registry whether or not the caller loaded the packs.
 # shellcheck source=./rule-registry.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/rule-registry.sh"
+# The rule baseline is part of severity resolution, so the engine owns it and
+# every front-end that sources the engine gets it. Sourcing it here rather than
+# in each front-end is what stopped the hook and CI disagreeing on a file.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/rule-baseline.sh"
 
 _rules_store_dir() {
     local namespace="$1"
@@ -111,6 +116,7 @@ _rules_reset() {
     _RULES_STORE=""
     _RULES_PROJECT_DIR=""
     _RULES_STRICTNESS="strict"
+    _RULES_STRICTNESS_IS_DEFAULT=true
 }
 
 _rules_reset_dir_cache() {
@@ -152,8 +158,12 @@ _rules_apply_parsed_config() {
     local val
     val=$(printf '%s' "$json_output" | jq -r '.strictness // empty' 2>/dev/null)
     if [[ -n "$val" ]]; then
-        if [[ "$source_label" == "project" ]] || [[ -z "$_RULES_STRICTNESS" ]] || [[ "$_RULES_STRICTNESS" == "strict" && "$source_label" == "global" ]]; then
+        if [[ "${_RULES_STRICTNESS_IS_DEFAULT:-false}" == true ]] \
+            || [[ "$source_label" == "project" ]] \
+            || [[ -z "$_RULES_STRICTNESS" ]] \
+            || [[ "$_RULES_STRICTNESS" == "strict" && "$source_label" == "global" ]]; then
             _RULES_STRICTNESS="$val"
+            _RULES_STRICTNESS_IS_DEFAULT=false
         fi
     fi
 
@@ -163,7 +173,7 @@ _rules_apply_parsed_config() {
     local rule_id
     for rule_id in $rule_ids; do
         _rules_id_is_safe "$rule_id" || continue
-        _rules_store_rule_fields "$json_output" "$rule_id"
+        _rules_store_rule_fields "$json_output" "$rule_id" "$source_label"
     done
 }
 
@@ -193,32 +203,54 @@ _rules_parse_config() {
     _rules_apply_parsed_config "$json_output" "$source_label"
 }
 
-# Store all fields (severity, pattern, message, languages) for a single rule from JSON
-_rules_store_rule_fields() {
-    local json_output="$1"
-    local rule_id="$2"
-
+# Where a declared severity came from, stored beside it.
+#
+# "The user named this rule" is not one question. A `PHP001: block` in
+# ~/.claude/.craft-config.yml is a preference across every repository on the
+# machine; the same line in a project's own file is a statement about this
+# repository. Only the second may outrank a baseline, or one global line would
+# silently turn the mark off everywhere.
+_rules_store_severity() {
+    local json_output="$1" rule_id="$2" source_label="$3"
     local severity
     severity=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"].severity // empty" 2>/dev/null)
-    [[ -n "$severity" ]] && _rules_set "severity" "$rule_id" "$severity"
+    [[ -z "$severity" ]] && return 0
+    _rules_set "severity" "$rule_id" "$severity"
+    _rules_set "severity_source" "$rule_id" "$source_label"
+}
 
-    local pattern
-    pattern=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"].pattern // empty" 2>/dev/null)
-    [[ -n "$pattern" ]] && _rules_set "pattern" "$rule_id" "$pattern"
-
-    local message
-    message=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"].message // empty" 2>/dev/null)
-    [[ -n "$message" ]] && _rules_set "message" "$rule_id" "$message"
-
+# `languages` is an array in the config and a comma-joined string in the store,
+# and an EMPTY array is meaningful: it says "this rule applies to no language",
+# which is not the same as never having been declared.
+_rules_store_languages() {
+    local json_output="$1" rule_id="$2"
     local languages
     languages=$(printf '%s' "$json_output" | jq -r '.rules["'"$rule_id"'"].languages // empty | if type == "array" then join(",") else empty end' 2>/dev/null)
     if [[ -n "$languages" ]]; then
         _rules_set "languages" "$rule_id" "$languages"
-    else
-        local languages_type
-        languages_type=$(printf '%s' "$json_output" | jq -r '.rules["'"$rule_id"'"].languages | type' 2>/dev/null)
-        [[ "$languages_type" == "array" ]] && _rules_set "languages" "$rule_id" ""
+        return 0
     fi
+    local languages_type
+    languages_type=$(printf '%s' "$json_output" | jq -r '.rules["'"$rule_id"'"].languages | type' 2>/dev/null)
+    [[ "$languages_type" == "array" ]] && _rules_set "languages" "$rule_id" ""
+    return 0
+}
+
+# Store all fields (severity, pattern, message, languages) for a single rule from JSON
+_rules_store_rule_fields() {
+    local json_output="$1"
+    local rule_id="$2"
+    local source_label="${3:-project}"
+
+    _rules_store_severity "$json_output" "$rule_id" "$source_label"
+
+    local field value
+    for field in pattern message; do
+        value=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"].${field} // empty" 2>/dev/null)
+        [[ -n "$value" ]] && _rules_set "$field" "$rule_id" "$value"
+    done
+
+    _rules_store_languages "$json_output" "$rule_id"
 }
 
 # ---------------------------------------------------------------------------
@@ -397,9 +429,18 @@ _rules_default_severity() {
     [[ "$declared" == "ignore" ]] && { echo "ignore"; return 0; }
     [[ "$declared" == "warn" ]] && { echo "warn"; return 0; }
 
+    # `moderate` relaxes design and style, never a boundary and never security.
+    #
+    # SEC* was missing from this list, and it mattered the day an existing
+    # project started defaulting to `moderate`: a hardcoded secret silently
+    # became advisory on every repository with history. A gate that stops
+    # refusing a live credential because someone dialled the strictness down is
+    # wrong on its own terms, whatever the default is. `relaxed` is the setting
+    # for "warn me about everything, block nothing", and it is chosen
+    # explicitly.
     case "$_RULES_STRICTNESS" in
         relaxed)  echo "warn" ;;
-        moderate) case "$rule_id" in LAYER*) echo "$declared" ;; *) echo "warn" ;; esac ;;
+        moderate) case "$rule_id" in LAYER*|SEC*) echo "$declared" ;; *) echo "warn" ;; esac ;;
         *)        echo "$declared" ;;
     esac
 }
@@ -418,6 +459,7 @@ _rules_load_config_file() {
 
     if [[ -n "${CLAUDE_PLUGIN_OPTION_strictness:-}" ]]; then
         _RULES_STRICTNESS="$CLAUDE_PLUGIN_OPTION_strictness"
+        _RULES_STRICTNESS_IS_DEFAULT=false
     fi
 
     if [[ -n "$global_dir" ]] && [[ -f "$global_dir/.craft-config.yml" ]]; then
@@ -429,13 +471,41 @@ _rules_load_config_file() {
     fi
 }
 
+# The seeded default, and whether it is still only a seed.
+#
+# `_RULES_STRICTNESS="strict"` was a literal here, so `config_default_strictness`
+# reached the banner and never the gate: a repository with history was told
+# `moderate` on the session line while every write was still resolved under
+# `strict`. A setting that two surfaces disagree about is worse than no setting.
+_rules_seed_strictness() {
+    local project_dir="$1"
+    _RULES_STRICTNESS="strict"
+    # Sourced here rather than assumed: a caller that loads only this file would
+    # otherwise fall back to `strict` and reopen the same gap between what the
+    # banner says and what the gate does. config.sh does not load this file, so
+    # there is no cycle.
+    if ! type config_default_strictness >/dev/null 2>&1; then
+        local _rules_config_lib
+        _rules_config_lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/config.sh"
+        # shellcheck source=/dev/null
+        [[ -f "$_rules_config_lib" ]] && source "$_rules_config_lib"
+    fi
+    if type config_default_strictness >/dev/null 2>&1; then
+        _RULES_STRICTNESS="$(config_default_strictness "$project_dir")"
+    fi
+    # A seed loses to any declared value, wherever it is declared. Without this
+    # flag a seeded `moderate` would have outranked a global `strictness: strict`,
+    # because the merge only lets a global override the literal `strict`.
+    _RULES_STRICTNESS_IS_DEFAULT=true
+}
+
 rules_init() {
     local project_dir="$1"
     local global_dir="${2:-}"
 
     _rules_ensure_store
     _RULES_PROJECT_DIR="$project_dir"
-    _RULES_STRICTNESS="strict"
+    _rules_seed_strictness "$project_dir"
 
     _rules_load_config_file "$project_dir" "$global_dir"
 
@@ -611,6 +681,49 @@ _rules_relaxed_in_tests() {
         *" $1 "*) return 0 ;;
     esac
     return 1
+}
+
+# rules_baseline_holds <file> <rule> <severity>
+#
+# Exit 0 when this occurrence of the rule was already in the file at its mark,
+# so the finding must be reported without blocking.
+#
+# It lives in the engine, not in a front-end, for a reason the first version of
+# this feature demonstrated: it was written in post-write-check.sh alone, and a
+# file then passed the hook and failed CI, which is precisely the drift the
+# parity tests exist to prevent. Severity is the engine's decision, and this is
+# a severity decision.
+#
+# It is a separate function rather than a branch inside rules_severity_for_file
+# because both front-ends call that one through $(...). The occurrence counter
+# behind it lives in the shell, and a command substitution is a subshell: every
+# finding would come back as its own first occurrence, and a second bare
+# `except:` in a file marked with one would be waved through. Call this
+# directly.
+# Did a human write this rule id down for this file, rather than inherit it?
+#
+# A `.craft-rules.yml` entry, at project level or in a directory, names the rule
+# explicitly. A pack default plus a strictness level does not.
+rules_severity_is_explicit() {
+    local file_path="$1" rule_id="$2"
+    _rules_find_directory_override "$file_path" "$rule_id" >/dev/null 2>&1 && return 0
+    [[ -n "$(_rules_get "severity" "$rule_id")" ]] || return 1
+    # A global preference is not a statement about this repository, so it does
+    # not outrank this repository's mark.
+    [[ "$(_rules_get "severity_source" "$rule_id")" != "global" ]]
+}
+
+rules_baseline_holds() {
+    local file_path="$1" rule_id="$2" severity="$3"
+    [[ "$severity" != "block" ]] && return 1
+    # An explicit promotion outranks the mark. Writing `PY004: block` in
+    # .craft-rules.yml and watching the finding stay advisory is a setting
+    # silently ignored: the same class of defect as a strictness level that
+    # does nothing. The mark answers for what the engine decided on its own;
+    # it does not answer for what the user asked for by name.
+    rules_severity_is_explicit "$file_path" "$rule_id" && return 1
+    type rule_baseline_is_preexisting >/dev/null 2>&1 || return 1
+    rule_baseline_is_preexisting "$file_path" "$rule_id"
 }
 
 rules_severity_for_file() {
