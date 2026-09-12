@@ -850,6 +850,70 @@ else
         "the case arm no longer matches the SEC prefix"
 fi
 
+# --- A repository without a mark pays nothing to be told so --------------------
+#
+# Most repositories never take a mark, and every blocking finding in them
+# started an interpreter plus a dozen forks to learn that nothing was recorded:
+# 130ms on a write with three findings, on the path the latency benchmark says
+# scales with the debt. The answer now costs no process. Asserted with a shim
+# that counts interpreter starts, in both directions: never started without a
+# mark, started once a mark exists above the file.
+SHIM="$WORK/shim"
+mkdir -p "$SHIM"
+REAL_PYTHON="$(command -v python3)"
+cat > "$SHIM/python3" <<SHIM_EOF
+#!/usr/bin/env bash
+[[ "\${1##*/}" == "rule_baseline.py" ]] && echo "started" >> "$WORK/py-starts"
+exec "$REAL_PYTHON" "\$@"
+SHIM_EOF
+chmod +x "$SHIM/python3"
+
+UNMARKED="$WORK/unmarked"
+mkdir -p "$UNMARKED/src"
+printf '<?php\nclass U { public function setA($v) { $this->a = $v; } }\n' > "$UNMARKED/src/U.php"
+( cd "$UNMARKED" && git init -q && git add -A ) >/dev/null 2>&1
+
+baseline_probe() {
+    ( cd "$UNMARKED" && CRAFTSMAN_PROJECT_ROOT="" PATH="$SHIM:$PATH" bash -c "
+        source '$ROOT_DIR/hooks/lib/rules-engine.sh'
+        rules_init '$UNMARKED' '$WORK/nohome'
+        rules_baseline_holds '$UNMARKED/src/U.php' PHP001 block; echo \"holds=\$?\"
+        rules_baseline_holds '$UNMARKED/src/U.php' PHP002 block; echo \"holds=\$?\"
+    " 2>/dev/null )
+}
+
+rm -f "$WORK/py-starts"
+unmarked_out="$(baseline_probe)"
+if [[ ! -f "$WORK/py-starts" ]]; then
+    log_pass "without a mark anywhere above the file, the interpreter is never started"
+else
+    log_fail "without a mark anywhere above the file, the interpreter is never started" \
+        "$(wc -l < "$WORK/py-starts" | tr -d ' ') start(s)"
+fi
+assert_contains "and every occurrence is new" "$unmarked_out" "holds=1"
+
+printf '[{"path":"src/U.php","rules":{"PHP001":1}}]\n' > "$UNMARKED/.craftsman-baseline.json"
+rm -f "$WORK/py-starts"
+marked_out="$(baseline_probe)"
+if [[ "$(wc -l < "$WORK/py-starts" 2>/dev/null | tr -d ' ')" == "1" ]]; then
+    log_pass "with a mark above the file, the interpreter is consulted once per file"
+else
+    log_fail "with a mark above the file, the interpreter is consulted once per file" \
+        "$(cat "$WORK/py-starts" 2>/dev/null | wc -l | tr -d ' ') start(s)"
+fi
+assert_contains "and the recorded occurrence holds" "$marked_out" "holds=0"
+
+# The shell walks for the file name the Python side writes; a rename on one
+# side would make every mark invisible to the other, silently.
+shell_name="$(grep -oE '^_RULE_BASELINE_NAME="[^"]+"' "$ROOT_DIR/hooks/lib/rule-baseline.sh" | cut -d'"' -f2)"
+python_name="$(grep -oE '^BASELINE_NAME = "[^"]+"' "$ROOT_DIR/hooks/lib/ratchet.py" | cut -d'"' -f2)"
+if [[ -n "$shell_name" && "$shell_name" == "$python_name" ]]; then
+    log_pass "rule-baseline.sh walks for the file ratchet.py writes ($shell_name)"
+else
+    log_fail "rule-baseline.sh walks for the file ratchet.py writes" \
+        "shell '$shell_name' vs python '$python_name'"
+fi
+
 # --- The setup default that made this necessary --------------------------------
 #
 # The mapping sent "It is going to production" to `strict`, and a codebase with

@@ -386,6 +386,41 @@ metrics_relative_path() {
     printf '%s' "${file#"$project_root"/}"
 }
 
+# One interpreter start per WRITE, not per finding.
+#
+# A front-end that reports several findings on one file opens a queue with
+# `metrics_violations_queue_open` and closes it with
+# `metrics_violations_queue_flush`; between the two, every row is appended to
+# a file and inserted together in one python3 start. Measured on a write with
+# five findings: five interpreter starts of ~40ms each, the largest single
+# cost left on that path (tests/perf/test-hook-latency.sh, the "3 violations"
+# row). A caller that never opened a queue inserts immediately, exactly as
+# before, so a validator, a gate or a test that records one row keeps working
+# with no flush to remember.
+#
+# Rows are delimited by the unit separator (0x1f) and newline, both of which a
+# rule id, a severity and a project-relative path cannot carry: the rule id is
+# validated, the hook refuses a path with a newline, and 0x1f is not a
+# character anyone types into a file name. metrics-query.py --batch refuses a
+# row with the wrong shape rather than guessing where a field ended.
+_METRICS_VIOLATIONS_QUEUE=""
+_METRICS_PROJECT_HASH=""
+
+metrics_violations_queue_open() {
+    _METRICS_VIOLATIONS_QUEUE="${METRICS_DB_DIR}/violations-queue.$$"
+    : > "$_METRICS_VIOLATIONS_QUEUE" 2>/dev/null || _METRICS_VIOLATIONS_QUEUE=""
+}
+
+metrics_violations_queue_flush() {
+    local queue="$_METRICS_VIOLATIONS_QUEUE"
+    _METRICS_VIOLATIONS_QUEUE=""
+    [[ -n "$queue" && -s "$queue" ]] || { rm -f "$queue" 2>/dev/null; return 0; }
+    python3 "${METRICS_LIB_DIR}/metrics-query.py" --batch "$METRICS_DB" \
+        "INSERT INTO violations (project_hash, rule, file_pattern, severity, blocked, ignored, source, file_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)" \
+        < "$queue"
+    rm -f "$queue" 2>/dev/null || true
+}
+
 metrics_record_violation() {
     local rule="$1"
     local file_pattern="$2"
@@ -394,12 +429,20 @@ metrics_record_violation() {
     local ignored="${5:-0}"
     local file="${6:-}"
     _metrics_rule_is_valid "$rule" || return 0
-    local project_hash relative
-    project_hash=$(metrics_project_hash)
+    # The hash is a property of the project, not of the finding: four forks
+    # (root, tr, shasum, cut) once per hook rather than once per row.
+    [[ -n "$_METRICS_PROJECT_HASH" ]] || _METRICS_PROJECT_HASH=$(metrics_project_hash)
+    local relative
     relative=$(metrics_relative_path "$file")
-    python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
-        "INSERT INTO violations (project_hash, rule, file_pattern, severity, blocked, ignored, source, file_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)" \
-        "$project_hash" "$rule" "$file_pattern" "$severity" "$blocked" "$ignored" "$(metrics_source)" "$relative"
+    if [[ -n "$_METRICS_VIOLATIONS_QUEUE" ]]; then
+        printf '%s\037%s\037%s\037%s\037%s\037%s\037%s\037%s\n' \
+            "$_METRICS_PROJECT_HASH" "$rule" "$file_pattern" "$severity" "$blocked" "$ignored" "$(metrics_source)" "$relative" \
+            >> "$_METRICS_VIOLATIONS_QUEUE"
+    else
+        python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
+            "INSERT INTO violations (project_hash, rule, file_pattern, severity, blocked, ignored, source, file_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)" \
+            "$_METRICS_PROJECT_HASH" "$rule" "$file_pattern" "$severity" "$blocked" "$ignored" "$(metrics_source)" "$relative"
+    fi
     _metrics_tally_session "$blocked" "$ignored"
 }
 
