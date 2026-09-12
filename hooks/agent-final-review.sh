@@ -25,6 +25,7 @@ if [[ "${CLAUDE_PLUGIN_OPTION_strictness:-strict}" != "strict" ]]; then
     exit 0
 fi
 
+source "${SCRIPT_DIR}/lib/permission-mode.sh"
 source "${SCRIPT_DIR}/lib/haiku-verify.sh"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/pack-loader.sh"

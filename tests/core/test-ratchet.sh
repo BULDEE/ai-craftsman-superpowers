@@ -486,4 +486,135 @@ assert_contains "and any other key a future writer added" \
 assert_contains "and the reason, which cost this lesson once already" \
     "$kept" "a second mark"
 
+# --- A metric must not move when prose moves -----------------------------------
+#
+# BRANCH_RE matched a control keyword anywhere on a line, so
+# `logger.info("retrying if the lock is free")` carried two decision points.
+# RATCHET001 refuses a file whose complexity rose above its mark, which made
+# rewording a log message able to fail a build; and the other direction is
+# worse, because a reworded message could LOWER the number, `update` would
+# write that as the new mark, and a real branch added later would fit under a
+# budget nobody earned.
+LITERALS="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-literals.XXXXXX")"
+
+_complexity_of() {
+    python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure "$1" \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin)["complexity"])' 2>/dev/null
+}
+
+cat > "$LITERALS/pricing.py" <<'PYSRC'
+def price(tier, qty):
+    if tier == "a":
+        return qty
+    logger.info("%s x %s for tier %s")
+    return 0
+PYSRC
+before_reword=$(_complexity_of "$LITERALS/pricing.py")
+
+cat > "$LITERALS/pricing.py" <<'PYSRC'
+def price(tier, qty):
+    if tier == "a":
+        return qty
+    logger.info("%s x %s tier %s")
+    return 0
+PYSRC
+after_reword=$(_complexity_of "$LITERALS/pricing.py")
+
+if [[ "$before_reword" == "$after_reword" && "$before_reword" == "1" ]]; then
+    log_pass "rewording a log message does not move complexity (both $before_reword)"
+else
+    log_fail "rewording a log message does not move complexity" \
+        "was $before_reword, became $after_reword"
+fi
+
+# The other direction, which is the one that corrupts a mark: a keyword ADDED
+# inside a string must not raise the number either.
+cat > "$LITERALS/prose.py" <<'PYSRC'
+def send(message):
+    logger.info("retrying")
+    return message
+PYSRC
+quiet=$(_complexity_of "$LITERALS/prose.py")
+cat > "$LITERALS/prose.py" <<'PYSRC'
+def send(message):
+    logger.info("retrying if the lock is free, for each waiter, while idle")
+    return message
+PYSRC
+wordy=$(_complexity_of "$LITERALS/prose.py")
+if [[ "$quiet" == "$wordy" ]]; then
+    log_pass "keywords added inside a string do not raise complexity (both $quiet)"
+else
+    log_fail "keywords added inside a string do not raise complexity" \
+        "$quiet became $wordy, so prose can fail a RATCHET001 build"
+fi
+
+# A real branch still counts, or the blanker would have bought silence instead
+# of truth.
+cat > "$LITERALS/real.py" <<'PYSRC'
+def send(message):
+    logger.info("retrying")
+    if message:
+        return 1
+    return 0
+PYSRC
+real=$(_complexity_of "$LITERALS/real.py")
+if [[ "$real" -gt "$quiet" ]]; then
+    log_pass "a real branch still counts ($quiet without, $real with)"
+else
+    log_fail "a real branch still counts" "$quiet without, $real with"
+fi
+
+# Each dialect has a shape the C-like blanker alone would get wrong: a Python
+# docstring, a TypeScript private field, a Rust lifetime, a PHP hash comment.
+cat > "$LITERALS/doc.py" <<'PYSRC'
+def g():
+    """if for while in a docstring"""
+    return 1
+PYSRC
+cat > "$LITERALS/priv.ts" <<'TSSRC'
+class A {
+  // if for while
+  private label = `if for ${y} while`;
+  #secret = 1;
+  go(a: number) { if (a) { return 1 } return 0 }
+}
+TSSRC
+printf 'fn pick<%s>(s: &%s str) -> usize {\n    if s.is_empty() { 0 } else { 1 }\n}\n' "'a" "'a" > "$LITERALS/life.rs"
+cat > "$LITERALS/hash.php" <<'PHPSRC'
+<?php
+# if for while
+class A {
+  public function go($a) { if ($a) { return 1; } return 0; }
+}
+PHPSRC
+for pair in "doc.py 0" "priv.ts 1" "life.rs 1" "hash.php 1"; do
+    fixture="${pair%% *}"
+    expected="${pair##* }"
+    got=$(_complexity_of "$LITERALS/$fixture")
+    if [[ "$got" == "$expected" ]]; then
+        log_pass "literals blanked correctly in $fixture (complexity $got)"
+    else
+        log_fail "literals blanked correctly in $fixture" "expected $expected, got $got"
+    fi
+done
+
+# `ignores` is the one metric measured on the RAW source: a craftsman-ignore
+# marker lives in a comment by definition, so blanking comments first would
+# count zero on every file and the ratchet would stop noticing suppressions
+# piling up.
+cat > "$LITERALS/suppressed.py" <<'PYSRC'
+# craftsman-ignore: PY002
+def g():
+    return 1
+PYSRC
+ignores=$(python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure "$LITERALS/suppressed.py" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["ignores"])' 2>/dev/null)
+if [[ "$ignores" == "1" ]]; then
+    log_pass "a craftsman-ignore marker is still counted after comments are blanked"
+else
+    log_fail "a craftsman-ignore marker is still counted" "got '$ignores'"
+fi
+
+rm -rf "$LITERALS"
+
 test_summary

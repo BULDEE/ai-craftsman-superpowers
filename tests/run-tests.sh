@@ -456,6 +456,13 @@ test_dynamic_context() {
     run_subtest "Dynamic-context patterns survive a non-git directory" "$SCRIPT_DIR/core/test-dynamic-context.sh" || true
 }
 
+test_permission_mode() {
+    echo ""
+    log_info "Testing permission mode handling (functional)"
+
+    run_subtest "Permission mode tests pass" "$SCRIPT_DIR/core/test-permission-mode.sh" || true
+}
+
 test_ratchet() {
     echo ""
     log_info "Testing structural ratchet (functional)"
@@ -794,6 +801,7 @@ main() {
         test_hostile_repo
         test_dynamic_context
         test_ratchet
+        test_permission_mode
         test_design_panel
         test_okf_knowledge
         test_dashboard

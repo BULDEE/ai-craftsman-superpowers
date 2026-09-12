@@ -61,6 +61,121 @@ FN_RE = re.compile(
 )
 IGNORE_RE = re.compile(r"craftsman-ignore:")
 
+# Which comment and string syntax a file uses, by extension.
+#
+# `structural_metrics.clean()` already blanks literals, but only for the C-like
+# family: it reads `#` as nothing and knows no triple quote, so Python would
+# come through it with every comment intact. And blanking `#` to end of line in
+# TypeScript would eat `this.#private`. So the dialect is chosen by extension,
+# and a file whose extension is unknown is measured raw, which is what happened
+# to every file before this existed.
+_HASH = "hash"
+_SLASH = "slash"
+_BOTH = "both"
+
+_TRIPLE_DOUBLE = '"' * 3
+_TRIPLE_SINGLE = "'" * 3
+
+_LITERAL_DIALECTS = {
+    ".py": (_HASH, (_TRIPLE_DOUBLE, _TRIPLE_SINGLE), ("'", '"')),
+    ".sh": (_HASH, (), ("'", '"')),
+    ".bash": (_HASH, (), ("'", '"')),
+    ".rb": (_HASH, (), ("'", '"')),
+    ".php": (_BOTH, (), ("'", '"')),
+    ".ts": (_SLASH, (), ("'", '"', "`")),
+    ".tsx": (_SLASH, (), ("'", '"', "`")),
+    ".js": (_SLASH, (), ("'", '"', "`")),
+    ".jsx": (_SLASH, (), ("'", '"', "`")),
+    ".go": (_SLASH, (), ('"', "`")),
+    ".java": (_SLASH, (), ("'", '"')),
+    ".rs": (_SLASH, (), ('"',)),
+    ".c": (_SLASH, (), ("'", '"')),
+    ".h": (_SLASH, (), ("'", '"')),
+    ".cpp": (_SLASH, (), ("'", '"')),
+}
+
+
+def _blank_span(text):
+    """Same length, same line breaks, no content: offsets and counts survive."""
+    return "".join("\n" if char == "\n" else " " for char in text)
+
+
+def _blank_comment_run(source, cursor, opener, closer):
+    """Where a comment starting at `cursor` ends."""
+    length = len(source)
+    if closer is None:
+        end = source.find("\n", cursor)
+        return length if end == -1 else end
+    end = source.find(closer, cursor + len(opener))
+    return length if end == -1 else end + len(closer)
+
+
+# A run that reaches end of line unterminated stops there. A broken literal
+# must not swallow the rest of the file, which is how one stray quote could
+# take every metric on it to zero.
+def _blank_string_run(source, cursor, quote):
+    length = len(source)
+    end = cursor + 1
+    while end < length:
+        if source[end] == "\\":
+            end += 2
+            continue
+        if source[end] == quote:
+            return end + 1
+        if source[end] == "\n":
+            return end
+        end += 1
+    return length
+
+
+# Where the literal or comment starting at `cursor` ends, or None for code,
+# which is the only case the caller copies through untouched.
+def _literal_run(source, cursor, dialect):
+    comment_style, triples, quotes = dialect
+    char = source[cursor]
+    peek = source[cursor + 1] if cursor + 1 < len(source) else ""
+
+    if comment_style in (_SLASH, _BOTH) and char == "/" and peek == "/":
+        return _blank_comment_run(source, cursor, "//", None)
+    if comment_style in (_SLASH, _BOTH) and char == "/" and peek == "*":
+        return _blank_comment_run(source, cursor, "/*", "*/")
+    if comment_style in (_HASH, _BOTH) and char == "#":
+        return _blank_comment_run(source, cursor, "#", None)
+    for triple in triples:
+        if source.startswith(triple, cursor):
+            return _blank_comment_run(source, cursor, triple, triple)
+    if char in quotes:
+        return _blank_string_run(source, cursor, char)
+    return None
+
+
+# Comments and string literals blanked, everything else untouched.
+#
+# The point is not tidiness. `BRANCH_RE` matched `for` anywhere on a line, so
+# `logger.info("retrying if the lock is free")` carried two decision points and
+# rewording a log message moved a file's complexity. RATCHET001 refuses a file
+# whose complexity rose above its mark, so prose could fail a build. The other
+# direction is worse: a reworded message could LOWER the number, `update` would
+# write that as the new mark, and a real branch added later would fit under a
+# budget nobody earned.
+#
+# Rust keeps its single quotes: `&'a str` is a lifetime, not a string, and
+# blanking from it would swallow the rest of the line.
+def _blank_literals(source, extension):
+    dialect = _LITERAL_DIALECTS.get(extension.lower())
+    if dialect is None:
+        return source
+    out = []
+    cursor, length = 0, len(source)
+    while cursor < length:
+        end = _literal_run(source, cursor, dialect)
+        if end is None:
+            out.append(source[cursor])
+            cursor += 1
+            continue
+        out.append(_blank_span(source[cursor:end]))
+        cursor = end
+    return "".join(out)
 
 # Which files are ratcheted is the loaded packs' answer. The literal set this
 # replaces named five extensions, so a project whose pack shipped a sixth got
@@ -140,8 +255,18 @@ def _decision_points(lines) -> int:
 
 
 def measure(path: Path) -> dict:
-    """Structural fingerprint of one file: the five ratcheted metrics."""
-    lines = path.read_text(errors="ignore").split("\n")
+    """Structural fingerprint of one file: the five ratcheted metrics.
+
+    Four of the five are measured on the source with comments and string
+    literals blanked, so a rename or a reworded message cannot move them.
+    `ignores` is measured on the RAW source, because a craftsman-ignore marker
+    lives in a comment by definition: blanking it first would count zero, every
+    time, on every file, and the ratchet would stop noticing suppressions
+    piling up.
+    """
+    raw = path.read_text(errors="ignore")
+    code = _blank_literals(raw, path.suffix)
+    lines = code.split("\n")
     spans = _function_spans(lines)
     return {
         "path": str(path),
@@ -149,7 +274,7 @@ def measure(path: Path) -> dict:
         "file_lines": len(lines),
         "max_fn_lines": max(end - start for start, end in spans),
         "fan_out": sum(1 for line in lines if IMPORT_RE.match(line)),
-        "ignores": sum(1 for line in lines if IGNORE_RE.search(line)),
+        "ignores": sum(1 for line in raw.split("\n") if IGNORE_RE.search(line)),
     }
 
 

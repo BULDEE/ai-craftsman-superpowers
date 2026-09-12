@@ -26,6 +26,12 @@ pack_loader_init
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 
+# No paid subprocess for a file the harness will not create. In `plan` the
+# Write does not execute, and this hook spent a headless Haiku run with
+# --max-turns 8 and Read/Grep/Glob on it anyway.
+source "${SCRIPT_DIR}/lib/permission-mode.sh"
+hook_mode_runs_verification "$(hook_permission_mode "$INPUT")" || exit 0
+
 [[ -z "$FILE_PATH" || ! -f "$FILE_PATH" ]] && exit 0
 
 EXT="${FILE_PATH##*.}"

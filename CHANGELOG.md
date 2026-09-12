@@ -19,6 +19,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without the false part. `hooks/lib/haiku-verify.sh` records why its pinned id
   is pinned, and that it carries the nearest retirement date in the lineup.
 
+- **The structural ratchet counted control keywords inside strings and
+  comments (#41).** `BRANCH_RE` matched `for`, `if` and `while` anywhere on a
+  line, so `logger.info("retrying if the lock is free")` carried two decision
+  points. RATCHET001 refuses a file whose complexity rose above its mark, which
+  made rewording a log message able to fail a build. The other direction was
+  worse: a reworded message could LOWER the number, `update` would write that
+  as the new mark, and a real branch added later would fit under a budget
+  nobody earned. Comments and string literals are blanked before the four
+  structural metrics are measured, per language, because blanking `#` to end of
+  line in TypeScript would eat `this.#private` and a Rust `&'a str` is a
+  lifetime rather than a string. `ignores` keeps reading the raw source, since
+  a craftsman-ignore marker lives in a comment by definition.
+
+- **Hooks now read `permission_mode` (#46).** In `plan` the harness does not
+  execute the Write, and `post-write-check.sh` recorded the finding anyway:
+  violations against files that were never written, counted in the 7-day
+  trends and fed to the instinct candidate query with nothing in the row saying
+  so. `agent-ddd-verifier.sh` also spent a headless Haiku subprocess on a file
+  that would not exist. Both stop in plan mode; the finding is still printed,
+  because telling the model what its plan would break is the value of a check
+  during planning. The gate is unchanged and still exits 2 in every mode,
+  including `bypassPermissions`, which is now a decision taken on purpose
+  rather than by omission, and `tests/core/test-gate-independence.sh` pins that
+  door shut by enumerating the readers and failing when one branches an exit
+  code on the mode.
+
+- **`SECURITY.md` said "19 scripts, 13 events" against 18 and 12 on disk.** A
+  reader auditing what runs on their machine counts the entries and finds a
+  discrepancy they cannot explain, in the one document where that is least
+  acceptable. Corrected, along with `docs/getting-started/concepts.md`, and a
+  test now reads `hooks.json` and fails when any document drifts from it.
+
 ### Added
 
 - **The semantic layer records what it does.** `hooks/agent-ddd-verifier.sh`

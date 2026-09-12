@@ -157,7 +157,7 @@
 {"complexity":0,"fan_out":0,"file_lines":13,"ignores":0,"max_fn_lines":1,"path":"tests/core/fixtures/invalid-no-final.php"},
 {"complexity":0,"fan_out":0,"file_lines":11,"ignores":0,"max_fn_lines":1,"path":"tests/core/fixtures/invalid-no-strict.php"},
 {"complexity":0,"fan_out":0,"file_lines":8,"ignores":0,"max_fn_lines":8,"path":"tests/core/fixtures/unsafe.sh"},
-{"complexity":0,"fan_out":1,"file_lines":16,"ignores":0,"max_fn_lines":16,"path":"tests/core/fixtures/valid-component.tsx"},
+{"complexity":0,"fan_out":0,"file_lines":16,"ignores":0,"max_fn_lines":16,"path":"tests/core/fixtures/valid-component.tsx"},
 {"complexity":0,"fan_out":0,"file_lines":30,"ignores":0,"max_fn_lines":3,"path":"tests/core/fixtures/valid-entity.php"},
 {"complexity":0,"fan_out":0,"file_lines":23,"ignores":2,"max_fn_lines":1,"path":"tests/core/fixtures/with-craftsman-ignore-multi.php"},
 {"complexity":0,"fan_out":0,"file_lines":16,"ignores":1,"max_fn_lines":1,"path":"tests/core/fixtures/with-craftsman-ignore.php"},

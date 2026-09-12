@@ -91,16 +91,49 @@ else
     log_fail "config-protection under auto" "expected exit 2, got $code"
 fi
 
-# Static guard: no hook script reads permission_mode. The behavioural matrix
-# above proves today's verdicts; this line makes a future "soften when auto"
-# patch fail loudly instead of shipping quietly. A legitimate reader must
-# update this test in the same change.
-hits=$(grep -l 'permission_mode' "$ROOT_DIR"/hooks/*.sh "$ROOT_DIR"/hooks/lib/*.sh 2>/dev/null || true)
-if [[ -z "$hits" ]]; then
-    log_pass "no hook script reads permission_mode"
+# Static guard: only the enumerated readers touch permission_mode, and none of
+# them may reach a VERDICT with it.
+#
+# The original line forbade reading the field at all, and said a legitimate
+# reader must update this test in the same change. That happened: plan mode is
+# a mode where the harness does not execute the Write, so recording a violation
+# there files a finding against a file that was never written, and spending a
+# Haiku subprocess there buys a verdict on a file that will not exist. Both are
+# cost and bookkeeping, never a verdict, and the matrix above still proves the
+# verdict is identical in every mode.
+#
+# The door this pins shut is the one that matters: a hook softening a GATE
+# because of a dial. Adding a reader here is deliberate; adding one that
+# changes an exit code makes the matrix above go red.
+PERMISSION_MODE_READERS="hooks/lib/permission-mode.sh hooks/post-write-check.sh hooks/agent-ddd-verifier.sh"
+
+unexpected=""
+while IFS= read -r hook; do
+    relative="${hook#"$ROOT_DIR"/}"
+    case " $PERMISSION_MODE_READERS " in
+        *" $relative "*) continue ;;
+    esac
+    unexpected="${unexpected}${relative} "
+done <<< "$(grep -l 'permission_mode' "$ROOT_DIR"/hooks/*.sh "$ROOT_DIR"/hooks/lib/*.sh 2>/dev/null || true)"
+
+if [[ -z "${unexpected// /}" ]]; then
+    log_pass "only the enumerated hooks read permission_mode"
 else
-    log_fail "hook reads permission_mode" "$hits"
+    log_fail "only the enumerated hooks read permission_mode" \
+        "undeclared reader(s): $unexpected"
 fi
+
+# And no reader may branch an exit code on it. `exit 2` near a permission_mode
+# test is the shape of the patch this guard exists to stop.
+for reader in $PERMISSION_MODE_READERS; do
+    if grep -n 'permission_mode\|PERMISSION_MODE' "$ROOT_DIR/$reader" 2>/dev/null \
+        | grep -qE 'exit[[:space:]]+2'; then
+        log_fail "$reader decides a verdict from the mode" \
+            "an exit 2 is branched on permission_mode"
+    else
+        log_pass "$reader reads the mode without deciding a verdict from it"
+    fi
+done
 
 echo ""
 echo "=== Gate Independence Tests (effort) ==="

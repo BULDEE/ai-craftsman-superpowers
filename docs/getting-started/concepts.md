@@ -111,7 +111,7 @@ This plugin encodes these practices into repeatable skills.
 - `ui-ux-director` - UX, WCAG 2.1 AA
 - `doc-writer` - Technical documentation (Haiku, cost-optimized)
 
-### 5. Hooks (13 events)
+### 5. Hooks (12 events)
 
 **What**: Automated validation running at key lifecycle events.
 
