@@ -13,7 +13,7 @@ which craftsman method to apply to which situation. In ADR-0029 terms:
 
 | Verb | What it means for your agent |
 |------|------------------------------|
-| gate | `pre_verify` refuses the conclusion while LAYER/TS/PHP/SEC criticals remain; advisory findings surface once, without blocking |
+| gate | `pre_verify` refuses the conclusion while LAYER/TS/PHP/SEC criticals remain; advisory findings surface once, without blocking. Opt-in `write_gate: on` also refuses a `write_file` or `patch` before it reaches disk, on LAYER001 and SEC001-003 only |
 | inject | each session's first turn receives the machine's correction history: what keeps getting fixed here |
 | record | every violation and every fix lands in the local metrics database, `source=hermes` |
 | skills | 7 skills selectable by situation: `craftsman-quality`, `-refactor`, `-legacy`, `-debug`, `-test`, `-spec`, `-design` |

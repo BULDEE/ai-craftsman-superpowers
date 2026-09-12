@@ -61,8 +61,8 @@ def report(label, ok, detail=""):
 
 ctx = FakeCtx()
 cp.register(ctx)
-report("register wires pre_verify, pre_llm_call, /craftsman and the quality skill",
-       set(ctx.hooks) == {"pre_verify", "pre_llm_call"}
+report("register wires pre_verify, pre_llm_call, pre_tool_call, /craftsman and the quality skill",
+       set(ctx.hooks) == {"pre_verify", "pre_llm_call", "pre_tool_call"}
        and "craftsman" in ctx.commands and "craftsman-quality" in ctx.skills,
        f"hooks={sorted(ctx.hooks)} cmds={sorted(ctx.commands)} skills={sorted(ctx.skills)}")
 
@@ -110,6 +110,61 @@ report("injection survives a process cwd outside the workspace (gateway mode)",
        isinstance(inject, dict) and "TS001" in inject.get("context", ""), repr(inject))
 
 os.chdir(repo)
+
+# The write-time promise (#21): off by default, and when on, refuses only
+# LAYER001 and SEC001-003 before the content reaches disk. Everything else,
+# PHP001 included, still waits for the conclusion.
+pre_tool_call = ctx.hooks["pre_tool_call"]
+LAYERED = ("<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\n"
+           "use App\\Infrastructure\\Repo;\nfinal class Order {}\n")
+# A password literal, not a provider-shaped token: GitHub push protection
+# refuses a commit carrying anything that looks like a real key, fixture or not.
+SECRET = ("<?php\ndeclare(strict_types=1);\nfinal class Pay { private string $password = "
+          "'correct-horse-battery-staple-9'; }\n")
+os.makedirs(os.path.join(repo, "src", "Domain"), exist_ok=True)
+off = pre_tool_call(tool_name="write_file",
+                    args={"path": "src/Domain/Order.php", "content": LAYERED}, task_id="s1", cwd=repo)
+report("the write gate is off by default: a LAYER001 write passes to the conclusion gate", off is None, repr(off))
+
+cp._WRITE_GATE_ON = True
+on = pre_tool_call(tool_name="write_file",
+                   args={"path": "src/Domain/Order.php", "content": LAYERED}, task_id="s1", cwd=repo)
+report("write_gate on: a Domain class importing Infrastructure is refused before it reaches disk",
+       isinstance(on, dict) and on.get("action") == "block" and "LAYER001" in str(on.get("message")), repr(on))
+report("and the file was not written", not os.path.exists(os.path.join(repo, "src", "Domain", "Order.php")))
+secret = pre_tool_call(tool_name="write_file",
+                       args={"path": "src/Pay.php", "content": SECRET}, task_id="s1", cwd=repo)
+report("write_gate on: a hardcoded secret is refused before it reaches disk",
+       isinstance(secret, dict) and secret.get("action") == "block" and "SEC001" in str(secret.get("message")), repr(secret))
+loose = pre_tool_call(tool_name="write_file",
+                      args={"path": "src/Loose.php", "content": "<?php\nclass Loose { public function setX($v) { $this->x = $v; } }\n"},
+                      task_id="s1", cwd=repo)
+report("write_gate on: PHP001, PHP002 and PHP003 still wait for the conclusion (not refused here)", loose is None, repr(loose))
+report("write_gate on: a tool that is not a write passes untouched",
+       pre_tool_call(tool_name="terminal", args={"command": "ls"}, task_id="s1", cwd=repo) is None)
+
+# A patch is judged on the file as it WOULD be, not on the fragment.
+with open(os.path.join(repo, "src", "Domain", "Clean.php"), "w") as fh:
+    fh.write("<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\nuse App\\Domain\\Money;\nfinal class Clean {}\n")
+patched = pre_tool_call(tool_name="patch",
+                        args={"path": "src/Domain/Clean.php", "old_string": "use App\\Domain\\Money;",
+                              "new_string": "use App\\Infrastructure\\Db;"}, task_id="s1", cwd=repo)
+report("write_gate on: a patch that would introduce LAYER001 is refused on the would-be file",
+       isinstance(patched, dict) and patched.get("action") == "block" and "LAYER001" in str(patched.get("message")), repr(patched))
+harmless = pre_tool_call(tool_name="patch",
+                         args={"path": "src/Domain/Clean.php", "old_string": "final class Clean {}",
+                               "new_string": "final class Clean { public function total(): int { return 1; } }"},
+                         task_id="s1", cwd=repo)
+report("write_gate on: a harmless patch passes", harmless is None, repr(harmless))
+
+old_write_gate = cp._WRITE_GATE
+cp._WRITE_GATE = Path("/nonexistent/write-gate.sh")
+broken_write = pre_tool_call(tool_name="write_file", args={"path": "src/X.php", "content": "<?php\n"}, task_id="s1", cwd=repo)
+cp._WRITE_GATE = old_write_gate
+report("write_gate on: a gate that cannot launch refuses the write rather than passing silently",
+       isinstance(broken_write, dict) and broken_write.get("action") == "block", repr(broken_write))
+cp._WRITE_GATE_ON = False
+
 report("/craftsman on a clean worktree says so", "clean worktree" in ctx.commands["craftsman"](""))
 report("/craftsman status names the metrics database", "metrics.db" in ctx.commands["craftsman"]("status"))
 PYEOF

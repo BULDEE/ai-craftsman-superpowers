@@ -86,6 +86,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Hermes: the write-time promise, opt-in (#21).** The gate on Hermes
+  refuses the conclusion by default, and the main README now says so plainly.
+  `write_gate: on` registers `pre_tool_call` (`adapters/hermes/pre-tool-call.sh`)
+  for `write_file` and `patch` only, judging the content as the file would be
+  (a patch is applied in memory first) on LAYER001 and SEC001 to SEC003 and
+  nothing else; every other rule still waits for the conclusion, with the
+  skill that fixes it. The gate's own failure refuses the write. Path 1 gets
+  the shell-hook declaration (`matcher: "write_file|patch"`, `fail_closed`).
+  Payload shape and tool arguments verified against the Hermes hooks
+  documentation and `tools/file_tools.py`.
+
 - **The semantic layer records what it does.** `hooks/agent-ddd-verifier.sh`
   and `hooks/agent-final-review.sh` shell out to a headless Haiku subprocess on
   every Write/Edit and at every Stop, and recorded nothing at all: measured on
