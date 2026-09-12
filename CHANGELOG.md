@@ -86,6 +86,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`/craftsman:metrics` reports whether each rule earns its severity (#44).**
+  The correction loop recorded whether a user fixed a finding or suppressed
+  it, and nothing read the number back: on one real database PHP002 was
+  fixed 2 times and ignored 153, a 98.7% rejection, still blocking every
+  write. `hooks/lib/acceptance_report.py`, reached through
+  `metrics_acceptance_report [days] [--threshold PCT] [--min-occurrences N]`,
+  prints acceptance per rule (`fixed / (fixed + ignored)`, lowest first), the
+  rules proposed for relaxation under the threshold once enough outcomes
+  exist, each with the `.craft-rules.yml` line to write, and the share of
+  violations that never produced any outcome at all, which the report states
+  it cannot tell from "never acted on". A script rather than rows for a
+  model to add up, because it proposes relaxing a gate; the skill reports the
+  proposals and leaves the decision, and its `decision:` line in the owning
+  manifest, to the user. `tests/core/test-acceptance-report.sh` asserts the
+  values on a database whose arithmetic is known.
+
 - **The semantic layer records what it does.** `hooks/agent-ddd-verifier.sh`
   and `hooks/agent-final-review.sh` shell out to a headless Haiku subprocess on
   every Write/Edit and at every Stop, and recorded nothing at all: measured on
