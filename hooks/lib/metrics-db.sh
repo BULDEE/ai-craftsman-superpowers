@@ -567,6 +567,17 @@ metrics_haiku_report() {
     python3 "${METRICS_LIB_DIR}/haiku_report.py" "$METRICS_DB" "$project_hash" "$days"
 }
 
+# Acceptance per rule, fixed / (fixed + ignored), and the share of violations
+# with no recorded outcome (#44). A script, not rows for a model to add up:
+# it proposes relaxing a gate.
+metrics_acceptance_report() {
+    local days="${1:-90}"
+    shift 2>/dev/null || true
+    local project_hash
+    project_hash=$(metrics_project_hash)
+    python3 "${METRICS_LIB_DIR}/acceptance_report.py" "$METRICS_DB" "$project_hash" "$days" "$@"
+}
+
 metrics_corrections_30d() {
     local project_hash
     project_hash=$(metrics_project_hash)

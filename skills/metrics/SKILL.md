@@ -62,7 +62,36 @@ is one line; "this aggregate mutates another aggregate's state" may be a
 redesign. A lower fixed rate is evidence, not proof, and the two rates are
 printed side by side so a reader can weigh that rather than divide.
 
-### Step 5: Present Report
+### Step 3: Does each rule earn its severity
+
+The correction loop records whether a user fixed a finding or suppressed it,
+and until #44 nothing read that number back. Measured on one real database
+over five months: PHP002 fixed 2 times and ignored 153, a 98.7% rejection,
+still blocking every write it fired on. Read the shipped report, never rows
+you add up yourself, because it proposes relaxing a gate:
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/metrics-db.sh" && metrics_acceptance_report 90
+```
+
+It prints acceptance per rule (`fixed / (fixed + ignored)`, lowest first), the
+rules proposed for relaxation (under 30% acceptance over 20 or more outcomes,
+`--threshold` and `--min-occurrences` to move the bar), each with the
+`.craft-rules.yml` line to write, and the share of violations that never
+produced any outcome at all.
+
+**Report the proposals; do not apply them.** A relaxation is a decision the
+user records as a `decision:` line in the owning manifest (see
+`packs/python/pack.yml` for the vocabulary), with the measured rate and the
+reason, so the next maintainer does not relitigate it. `n/a` means no outcome
+in the window, an empty sample and not a rate of zero.
+
+The no-outcome share is the other half of the picture. A rule that fires
+thousands of times with no correction ever recorded is either never acted on
+or never observed, and this report cannot tell which: say so, with the count,
+rather than reading silence as acceptance.
+
+### Step 4: Present Report
 
 Format the data as a clear report:
 
@@ -83,6 +112,14 @@ Format the data as a clear report:
 | Day        | Sessions | Blocked | Warned |
 |------------|----------|---------|--------|
 | ...        | ...      | ...     | ...    |
+
+### Acceptance per Rule (90 days)
+| Rule | Fixed | Ignored | Acceptance |
+|------|-------|---------|------------|
+| ...  | ...   | ...     | ...        |
+
+Proposed relaxations: [rule: warn, with the measured rate, or none]
+Violations with no recorded outcome: [N rules, X% of the volume]
 
 ### Semantic Layer (Level 2, Haiku)
 | Metric | Value |
