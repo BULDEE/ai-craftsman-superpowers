@@ -222,6 +222,18 @@ a Symfony backend with a Go sidecar, a Python service with a Rust core. See
 issue #35 for the measurement.
 
 
+### On a brace-delimited language the two dialects cannot read
+
+Go and Rust are brace-delimited and match neither dialect, so each ships a
+scanner of its own over `hooks/lib/brace_scanner.py`: the brace walk, NEST001,
+LOC001, PARAM001, the ignore filter and the line arithmetic exist once there,
+and the pack supplies a `Profile` (its function head, control heads, an
+optional container head, how to split a parameter list, and two hooks for what
+only it measures). Read `packs/go/hooks/go_structure.py` for the shape; a
+third such language is a profile, not a scanner, and
+`tests/core/test-brace-scanner.sh` proves it with a language that exists only
+in the test.
+
 ### On `metrics_dialect`
 
 Declaring it gives you NEST001, LOC001, GOD001 and PARAM001 for free, from
