@@ -114,15 +114,41 @@ class of finding is the exception: a live credential, SQL built by
 concatenation, data executed as code, a Domain class importing
 Infrastructure. Those are not debt an agent pays down on its own schedule,
 and no retry budget should let them reach disk. `write_gate: on` registers
-`pre_tool_call` (`adapters/hermes/pre-tool-call.sh`) for `write_file` and
-`patch` only, judging the content as the file WOULD be (a patch is applied in
-memory first) on LAYER001 and SEC001 to SEC003, and nothing else: PHP001,
-TS001 and every other rule still wait for the conclusion, with the skill that
-fixes them. The gate's own failure refuses the write, because an operator who
-opted in asked for fail-closed on exactly these rules. Measured in
-`tests/adapters/test-hermes-plugin.sh`: off by default, LAYER001 and SEC001
-refused before the file exists, PHP001 let through, a harmless patch let
-through, a missing script refusing rather than passing.
+`pre_tool_call` (`adapters/hermes/pre-tool-call.sh`, with
+`write_gate_place.py` for the half that understands the tool call) for
+`write_file` and `patch` only, judging the content as the file WOULD be on
+LAYER001 and SEC001 to SEC003, and nothing else: PHP001, TS001 and every
+other rule still wait for the conclusion, with the skill that fixes them. A
+refused write is told how to get out: rewrite, or `craftsman-ignore: RULE`
+on the line when the finding is wrong, which the scan honours.
+
+What "as the file would be" covers, because Hermes's `patch` is not a plain
+replace: an exact `old_string` is applied in memory (`replace_all` honoured);
+an `old_string` that is not in the file may still apply through Hermes's fuzzy
+strategies, so what the patch ADDS is judged rather than waved; a V4A patch
+(`mode: patch`) is judged on the lines it adds per `*** Update File` section.
+The workspace is the written path's own (nearest `.git`, `.craft-config.yml`,
+`composer.json`, `package.json`, `pyproject.toml`, `go.mod` or `Cargo.toml`
+above it), never the process cwd: Hermes hands a plugin hook no cwd, and the
+shell hook's cwd is the gateway process's, so anchoring on it judged a
+session's first turn against the wrong tree. The gate protects itself the way
+`pre-verify.sh` does: a write to `.craft-rules.yml`, `.craft-config.yml`,
+`ci/craftsman-ci.sh` or `adapters/hermes/` is refused, and the test fails when
+the two lists drift.
+
+Two failures, two messages. Missing infrastructure (python3, the plugin root,
+`craftsman-ci.sh`) repeats on every write of every session and no agent can
+repair it, so the block says not to retry and to report it; a verdict that
+failed on this file (a timeout, a scan crash) says to retry once, the rule the
+conclusion gate applies too. Both are written without python3 and exit 2,
+which is the shell-wire block Hermes reads even when the JSON is not parsed.
+
+Measured in `tests/adapters/test-hermes-plugin.sh`: off by default; through
+the plugin, LAYER001 and SEC001 refused before the file exists, PHP001 let
+through, a harmless patch let through, a missing script refusing; through the
+shell wire (`tool_input`, the gateway's cwd of `/`, no cwd at all), the same
+refusals, the gate's own files refused, a fuzzy and a V4A patch judged on what
+they add.
 
 Path 1 users declare it as a shell hook instead:
 
@@ -131,7 +157,7 @@ hooks:
   pre_tool_call:
     - matcher: "write_file|patch"
       command: "/opt/craftsman/adapters/hermes/pre-tool-call.sh"
-      timeout: 20
+      timeout: 30        # above the script's own 20s bound, so a kill is never mistaken for a pass
       fail_closed: true
 ```
 
