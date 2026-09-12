@@ -21,7 +21,6 @@ trap 'echo "WARNING: post-write-check.sh failed at line $LINENO" >&2; exit 0' ER
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Load helpers
-source "${SCRIPT_DIR}/lib/permission-mode.sh"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
 source "${SCRIPT_DIR}/lib/static-analysis.sh"
 source "${SCRIPT_DIR}/lib/precedence.sh"
@@ -109,9 +108,6 @@ _detect_cross_file_patterns() {
 
 _check_corrections() {
     $HAS_PYTHON3 || return 0
-    # A correction is a statement that a file changed for the better. In plan
-    # mode no file changed at all.
-    hook_mode_records_metrics "$PERMISSION_MODE" || return 0
     local file="$1"
     local file_pattern
     file_pattern=$(metrics_file_pattern "$file")
@@ -152,14 +148,6 @@ pack_loader_init
 # Read tool input from stdin (JSON from Claude Code)
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
-
-# In `plan` the harness does not execute the Write, and this hook ran anyway
-# and recorded every finding: violations on files that were never written,
-# counted in the 7-day trends and fed to the instinct candidate query with
-# nothing in the row saying they never happened. The finding is still printed,
-# because telling the model what its plan would break is the whole value of a
-# check during planning.
-PERMISSION_MODE=$(hook_permission_mode "$INPUT")
 
 # Refuse the characters that are dangerous where the path is interpolated,
 # rather than allow-listing an alphabet. The allowlist excluded [ ] ( ) + , and

@@ -30,10 +30,19 @@ except ImportError:
     structural_metrics = None
     lang_registry_read = None
 
-LANG_BY_EXT = {
-    ".php": "php", ".ts": "ts", ".tsx": "ts", ".js": "ts", ".jsx": "ts",
-    ".py": "py", ".go": "go", ".rs": "rs", ".sh": "bash",
-}
+# Which files are analysed is the loaded packs' answer, through the registry,
+# never a table here. This file carried its own nine-entry list, which the rule
+# in CLAUDE.md exists to forbid: a Dart or Kotlin pack declaring its extension
+# got churn analysis for none of its files, silently. With no registry loaded
+# the set is empty and the analysis says so, rather than falling back to a
+# guess about what languages exist.
+def _analysed_extensions():
+    if lang_registry_read is None:
+        return set()
+    try:
+        return lang_registry_read.known_extensions()
+    except Exception:
+        return set()
 
 # Same cap as the write-time gate, taken from it so the two cannot drift.
 # Counting lines is lazy, but a file with no newline in it is one line: a 400MB
@@ -143,9 +152,10 @@ def _readable_in_repo(abspath, repo):
 def analyze_repo(repo, since, top):
     churn = compute_churn(repo, since)
     rows = []
+    extensions = _analysed_extensions()
     for name, change_count in churn.items():
         ext = os.path.splitext(name)[1]
-        if ext not in LANG_BY_EXT:
+        if ext not in extensions:
             continue
         abspath = os.path.join(repo, name)
         if not _readable_in_repo(abspath, repo):

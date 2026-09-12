@@ -27,29 +27,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   worse: a reworded message could LOWER the number, `update` would write that
   as the new mark, and a real branch added later would fit under a budget
   nobody earned. Comments and string literals are blanked before the four
-  structural metrics are measured, per language, because blanking `#` to end of
-  line in TypeScript would eat `this.#private` and a Rust `&'a str` is a
-  lifetime rather than a string. `ignores` keeps reading the raw source, since
-  a craftsman-ignore marker lives in a comment by definition.
+  structural metrics are measured, by the grammar each pack declares under a
+  new `literal_syntax` capability (`hash`, `hash-triple`, `slash`,
+  `slash-template`, `slash-raw`, `slash-double`, `both`), because one blanker
+  cannot serve every language: `#` opens a comment in a shell and a private
+  field in TypeScript, `&'a str` is a lifetime in Rust, a Go raw string has no
+  escapes, and PHP has heredocs. The engine holds a table of grammars, never of
+  extensions, and the compiler refuses a grammar it does not know. String
+  delimiters are kept and only the content blanked, so `fan_out` still sees a
+  quoted import. `ignores` reads the raw source, since a craftsman-ignore
+  marker lives in a comment by definition.
 
-- **Hooks now read `permission_mode` (#46).** In `plan` the harness does not
-  execute the Write, and `post-write-check.sh` recorded the finding anyway:
-  violations against files that were never written, counted in the 7-day
-  trends and fed to the instinct candidate query with nothing in the row saying
-  so. `agent-ddd-verifier.sh` also spent a headless Haiku subprocess on a file
-  that would not exist. Both stop in plan mode; the finding is still printed,
-  because telling the model what its plan would break is the value of a check
-  during planning. The gate is unchanged and still exits 2 in every mode,
-  including `bypassPermissions`, which is now a decision taken on purpose
-  rather than by omission, and `tests/core/test-gate-independence.sh` pins that
-  door shut by enumerating the readers and failing when one branches an exit
-  code on the mode.
+  Every mark now carries the instrument that took it (`"instrument": 2`),
+  because the two rulers disagree on untouched files and not in one
+  direction: a mark from an older instrument is re-taken on the next touch,
+  said on stderr, instead of failing a build for a measurement change. The
+  committed baseline is re-taken whole with that reason. ADR-0025 records the
+  decision. The span finder also recognises `export function` and
+  `export default function`, which it never had; a TypeScript module's every
+  function had been invisible to it.
 
-- **`SECURITY.md` said "19 scripts, 13 events" against 18 and 12 on disk.** A
+- **Issue #46's premise does not survive the harness, and the mechanism it
+  asked for is not shipped.** The issue said `post-write-check.sh` recorded
+  phantom violations in plan mode. It was built, then two reviews ran Claude
+  Code 2.1.269 with logging hooks: a Write refused in plan mode never reaches
+  a PostToolUse hook at all, because PostToolUse runs after a tool call
+  succeeds. The only PostToolUse Write seen with `permission_mode: plan` is a
+  write that really happened (the plan file, or a session with bypass
+  available, where the documentation says the edit runs), so a plan-mode
+  guard on a PostToolUse hook can only ever skip the recording and the
+  verification of a real write. The three-mode gate matrix in
+  `tests/core/test-gate-independence.sh` covers all six modes now for both
+  blocking hooks, and the reason no hook reads the field is written next to
+  the guard that forbids it.
+
+- **`SECURITY.md` said "19 scripts, 13 events" against 17 and 12 wired.** A
   reader auditing what runs on their machine counts the entries and finds a
   discrepancy they cannot explain, in the one document where that is least
-  acceptable. Corrected, along with `docs/getting-started/concepts.md`, and a
-  test now reads `hooks.json` and fails when any document drifts from it.
+  acceptable. `docs/reference/hooks.md` and `docs/getting-started/concepts.md`
+  said 13 too. All three corrected, and `tests/core/test-hook-inventory.sh`
+  counts what `hooks.json` wires (not files on disk: `hooks/design-panel.sh`
+  is a skill helper no event runs) and fails when any document drifts from it.
 
 ### Added
 

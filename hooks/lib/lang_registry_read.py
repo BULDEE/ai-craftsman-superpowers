@@ -134,6 +134,17 @@ def dialect_for_path(path: str) -> str:
     return metrics_dialect(language_for_path(path))
 
 
+def literal_syntax(language: str) -> str:
+    """Declared literal grammar, empty when the pack declares none. The
+    compiler already refused an unknown name, so what is stored is known."""
+    values = _load().get(language, {}).get("literal_syntax", [])
+    return values[0] if values else ""
+
+
+def literal_syntax_for_path(path: str) -> str:
+    return literal_syntax(language_for_path(path))
+
+
 def known_extensions() -> set:
     found = set()
     for capabilities in _load().values():

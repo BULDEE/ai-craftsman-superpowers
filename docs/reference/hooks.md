@@ -2,7 +2,7 @@
 
 The plugin uses Claude Code hooks to automatically enforce code quality rules. Hooks run as shell scripts and agent prompts triggered by Claude Code events.
 
-**13 hook events wired**, documented below as two groups by what the hook checks: deterministic quality-gate scripts, and headless-Haiku semantic checks ([ADR-0018](../adr/0018-native-prompt-agent-hooks.md)).
+**12 hook events wired**, documented below as two groups by what the hook checks: deterministic quality-gate scripts, and headless-Haiku semantic checks ([ADR-0018](../adr/0018-native-prompt-agent-hooks.md)).
 
 ## Hook Events
 

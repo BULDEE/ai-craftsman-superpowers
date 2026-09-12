@@ -43,6 +43,21 @@ LIST_CAPABILITIES = (
 SCALAR_CAPABILITIES = (
     "lsp",
     "metrics_dialect",
+    "literal_syntax",  # which comment and string syntax a file uses, see ratchet.py
+)
+
+# The grammars the ratchet's blanker knows. A closed set, refused at compile
+# time when a manifest names one outside it, for the same reason `supersedes`
+# is checked here: an open declaration (`quotes: ["'"]` on Rust) would
+# reproduce the lifetime bug with nothing to refuse it, while a name can be.
+KNOWN_LITERAL_SYNTAXES = (
+    "hash",            # `#` comments, single and double quotes: shell
+    "hash-triple",     # hash plus triple quotes: Python
+    "slash",           # `//`, `/* */`, single and double quotes: C, Java
+    "slash-template",  # slash plus multi-line backtick templates, JSX text: TS, JS
+    "slash-raw",       # slash plus raw backtick strings and runes: Go
+    "slash-double",    # slash plus double quotes only, `'` is a lifetime: Rust
+    "both",            # hash and slash comments, heredoc and nowdoc: PHP
 )
 
 KNOWN_CAPABILITIES = LIST_CAPABILITIES + SCALAR_CAPABILITIES
@@ -246,6 +261,8 @@ class _Indexer:
                 self._index_supersedes(lang_id, entry)
             elif capability in LIST_CAPABILITIES:
                 self._index_list(lang_id, capability, entry[capability])
+            elif capability == "literal_syntax":
+                self._index_literal_syntax(lang_id, str(entry[capability]).strip())
             else:
                 _emit(
                     lang_id,
@@ -253,6 +270,19 @@ class _Indexer:
                     str(entry[capability]).strip(),
                     self._pack_dir,
                 )
+
+    def _index_literal_syntax(self, lang_id: str, value: str) -> None:
+        """A grammar this engine does not know is refused, not passed along:
+        the ratchet would measure the file raw and never say so, which is the
+        silence the rule against extension literals exists to prevent."""
+        if value not in KNOWN_LITERAL_SYNTAXES:
+            sys.stderr.write(
+                f"craftsman: '{lang_id}' declares literal_syntax '{value}', which this "
+                f"engine does not know (known: {', '.join(KNOWN_LITERAL_SYNTAXES)}); "
+                f"entry ignored, files measured raw\n"
+            )
+            return
+        _emit(lang_id, "literal_syntax", value, self._pack_dir)
 
     def _index_supersedes(self, lang_id: str, entry: dict) -> None:
         """Compile-time refusal, so a self-silencing pair never reaches the

@@ -456,11 +456,11 @@ test_dynamic_context() {
     run_subtest "Dynamic-context patterns survive a non-git directory" "$SCRIPT_DIR/core/test-dynamic-context.sh" || true
 }
 
-test_permission_mode() {
+test_hook_inventory() {
     echo ""
-    log_info "Testing permission mode handling (functional)"
+    log_info "Testing hook inventory against hooks.json (content)"
 
-    run_subtest "Permission mode tests pass" "$SCRIPT_DIR/core/test-permission-mode.sh" || true
+    run_subtest "Hook inventory tests pass" "$SCRIPT_DIR/core/test-hook-inventory.sh" || true
 }
 
 test_ratchet() {
@@ -801,7 +801,7 @@ main() {
         test_hostile_repo
         test_dynamic_context
         test_ratchet
-        test_permission_mode
+        test_hook_inventory
         test_design_panel
         test_okf_knowledge
         test_dashboard

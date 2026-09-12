@@ -598,6 +598,46 @@ for pair in "doc.py 0" "priv.ts 1" "life.rs 1" "hash.php 1"; do
     fi
 done
 
+# The shapes two reviews found the first blanker getting wrong, one fixture
+# each. `human` is a hand count. fan_out is asserted too, because the first
+# version blanked the quotes with the string and IMPORT_RE needs them: every
+# quoted import on TypeScript and Bash stopped counting, and 98 of this
+# repository's marks lost their fan_out with nobody looking.
+_metric_of() {
+    python3 "$ROOT_DIR/hooks/lib/ratchet.py" measure "$1" \
+        | python3 -c "import json,sys; print(json.load(sys.stdin)['$2'])" 2>/dev/null
+}
+printf "import { a } from './a';\nimport { b } from './b';\nimport React from 'react';\nexport const f = () => 1;\n" > "$LITERALS/imp.ts"
+printf 'source "./lib/a.sh"\nsource ./lib/b.sh\nsource "${DIR}/c.sh"\nf() { :; }\n' > "$LITERALS/src.sh"
+printf 'f() {\n  [[ ${#args[@]} -gt 0 ]] && return 1\n  if [[ $# -eq 0 ]]; then return 2; fi\n  return 0\n}\ng() { :; }\n' > "$LITERALS/hash.sh"
+printf 'const re = /[/*]/g;\nfunction g(a) { if (a) { return 1 } return 0 }\n' > "$LITERALS/regex.js"
+printf 'function f(a,b) {\n  return <p>Don'"'"'t panic {a && <span/>} {b ? "x" : "y"}</p>;\n}\n' > "$LITERALS/jsx.tsx"
+printf 'func f(a int) int {\n\ts := `C:\\`\n\tif a > 0 && s != "" { return 1 }\n\tif r := '"'"'"'"'"'; r == '"'"'"'"'"' && a > 1 { return 2 }\n\treturn 0\n}\n' > "$LITERALS/raw.go"
+printf 'const q = `\n  if (x) for while\n  && ||\n`;\nfunction g(a) { if (a) return 1; return 0 }\n' > "$LITERALS/template.ts"
+printf '<?php\nfunction f($a) {\n  $sql = <<<SQL\n  SELECT CASE WHEN x THEN 1 ELSE 0 END\n  SQL;\n  $t = <<<'"'"'TXT'"'"'\n  if for while case catch\n  TXT;\n  if ($a) { return 1; }\n  return 0;\n}\n' > "$LITERALS/heredoc.php"
+printf 'export function a(x) {\n  if (x) { return 1 }\n  return 0\n}\nexport default function b() { return 2 }\n' > "$LITERALS/exported.ts"
+
+for spec in \
+    "imp.ts|fan_out|3|quoted imports still count as fan_out" \
+    "src.sh|fan_out|3|sourced libraries still count as fan_out" \
+    "hash.sh|complexity|2|\$# and \${#arr[@]} are not comments" \
+    "hash.sh|max_fn_lines|5|and the function span is not swallowed after them" \
+    "regex.js|complexity|1|a /[/*]/ regex does not open a block comment to end of file" \
+    "jsx.tsx|complexity|2|an apostrophe in JSX text does not eat the && and the ternary" \
+    "raw.go|complexity|4|a Go raw string has no escapes and a rune is not a string" \
+    "template.ts|complexity|1|a multi-line template literal is blanked whole" \
+    "heredoc.php|complexity|1|PHP heredoc and nowdoc are blanked" \
+    "exported.ts|max_fn_lines|4|exported functions are seen by the span finder"
+do
+    IFS='|' read -r fixture metric expected why <<< "$spec"
+    got=$(_metric_of "$LITERALS/$fixture" "$metric")
+    if [[ "$got" == "$expected" ]]; then
+        log_pass "$why ($fixture $metric=$got)"
+    else
+        log_fail "$why" "$fixture $metric expected $expected, got $got"
+    fi
+done
+
 # `ignores` is the one metric measured on the RAW source: a craftsman-ignore
 # marker lives in a comment by definition, so blanking comments first would
 # count zero on every file and the ratchet would stop noticing suppressions
