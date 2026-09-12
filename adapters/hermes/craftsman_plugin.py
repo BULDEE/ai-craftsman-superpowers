@@ -197,14 +197,20 @@ def on_pre_verify(
 
 
 def _run_write_gate(tool_name: str, args: Any, cwd: str) -> dict[str, Any] | None:
+    # cwd is a hint for a relative path, nothing more: the script derives the
+    # workspace from the written path itself, because Hermes hands this hook
+    # no cwd and the process's own is not the task's in gateway mode.
+    payload: dict[str, Any] = {"tool_name": tool_name, "args": args or {}}
+    if cwd:
+        payload["cwd"] = cwd
     proc = subprocess.run(
         ["bash", str(_WRITE_GATE)],
-        input=json.dumps({"tool_name": tool_name, "args": args or {}, "cwd": cwd}),
+        input=json.dumps(payload),
         capture_output=True,
         text=True,
         timeout=_GATE_SECONDS + 30,
         env=_env(),
-        cwd=cwd,
+        cwd=cwd or None,
     )
     out = (proc.stdout or "").strip()
     if not out:
@@ -227,10 +233,12 @@ def on_pre_tool_call(tool_name: str = "", args: Any = None, task_id: str = "", *
     """
     if not _WRITE_GATE_ON or tool_name not in ("write_file", "patch"):
         return None
-    # pre_tool_call carries no cwd of its own: the workspace is the one the
-    # session's last gate ran in, the same resolution injection uses.
+    # pre_tool_call carries no cwd of its own (hermes_cli/plugins.py hands
+    # tool_name, args, task_id, session_id and ids). The session's last gate
+    # directory, when there was one, is a hint for a relative path; the
+    # script anchors on the written path's own workspace either way.
     session = str(kwargs.get("session_id") or task_id or "")
-    cwd = str(kwargs.get("cwd") or _session_cwd.get(session) or _last_cwd or os.getcwd())
+    cwd = str(kwargs.get("cwd") or _session_cwd.get(session) or _last_cwd or "")
     try:
         return _run_write_gate(tool_name, args, cwd)
     except Exception as exc:

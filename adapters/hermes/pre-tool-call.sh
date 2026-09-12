@@ -13,19 +13,28 @@
 #                    concatenation
 #
 # Everything else waits for the conclusion gate, which reports it with the
-# advisory channel and the skill to apply. A write blocked here says so, and
-# names the rule, so the agent rewrites the content rather than the plan.
+# advisory channel and the skill to apply. A write blocked here says so, names
+# the rule, and says how to get out (rewrite, or `craftsman-ignore: RULE` on
+# the line when the finding is wrong), so the agent rewrites the content
+# rather than the plan.
 #
-#   stdin   {"tool_name":"write_file","args":{"path":"...","content":"..."},"cwd":"..."}
-#           {"tool_name":"patch","args":{"path":"...","old_string":"...","new_string":"...","replace_all":false},"cwd":"..."}
-#           (Hermes passes tool_name and args to a plugin hook; a shell hook
-#            receives the same fields as JSON on stdin.)
+#   stdin   plugin form  {"tool_name":"write_file","args":{"path":"...","content":"..."},"cwd":"..."}
+#           shell form   {"hook_event_name":"pre_tool_call","tool_name":"patch",
+#                         "tool_input":{"path":"...","old_string":"...","new_string":"..."},
+#                         "session_id":"...","cwd":"...","extra":{...}}
+#           Hermes puts the tool arguments under `tool_input` on the shell
+#           wire (agent/shell_hooks.py, _payload_fields) and hands a plugin
+#           hook `args`; both are read. No `cwd` reaches a plugin hook and
+#           the shell one is the Hermes process's, not the task's, so the
+#           workspace is derived from the written path itself (see below).
 #   stdout  {"action":"block","message":"..."}   refuse the write
 #           nothing                                let it through
 #
 # Measured in the hermes-agent source (tools/file_tools.py): write_file takes
-# path and content, patch takes path, old_string, new_string and replace_all.
-# Only those two tools mutate a file through a tool; a write through
+# path and content; patch takes path, old_string, new_string, replace_all, and
+# applies old_string through a chain of fuzzy strategies, and the handler also
+# accepts a V4A patch (`mode: patch`, `patch: "*** Update File: ..."`) from any
+# model. Only those two tools mutate a file through a tool; a write through
 # `terminal` (sed -i, tee, a redirect) is invisible here by construction and
 # is what the conclusion gate's git-derived scope exists to catch.
 #
@@ -35,7 +44,7 @@
 #     pre_tool_call:
 #       - matcher: "write_file|patch"
 #         command: "/opt/craftsman/adapters/hermes/pre-tool-call.sh"
-#         timeout: 20
+#         timeout: 30        # above the script's own 20s bound, so a kill is never mistaken for a pass
 #         fail_closed: true
 # Try it: `hermes hooks test pre_tool_call`.
 # =============================================================================
@@ -51,92 +60,79 @@ CRAFTSMAN_CI="$PLUGIN_ROOT/ci/craftsman-ci.sh"
 # makes to an agent with no human to break its loop.
 WRITE_GATE_RULES="LAYER001 SEC001 SEC002 SEC003"
 
-# fail_closed is a decision the operator makes in config.yaml; this script's
-# own failure is reported as a block so the operator's choice is what applies,
-# and a silent pass never hides a gate that did not run.
-_bail() {
-    echo "craftsman pre_tool_call: $1" >&2
-    python3 -c '
-import json, sys
-print(json.dumps({"action": "block", "message": "The craftsman write gate could not run (" + sys.argv[1] + "). Retry the write once; if it repeats, the gate needs attention, not the write."}, ensure_ascii=False))
-' "$1" 2>/dev/null
-    exit 0
+# A block written with printf, not python3: the one failure this script must
+# be able to report is python3 being absent, and a bail that needs python3 to
+# say so is a silent pass. Exit 2 as well, which is the shell-wire block
+# Hermes reads even when the JSON is not parsed (agent/shell_hooks.py:
+# exit 2 blocks with stderr as the message).
+_block() {
+    local message="$1"
+    message="${message//\\/\\\\}"
+    message="${message//\"/\\\"}"
+    message="${message//$'\n'/\\n}"
+    printf '{"action": "block", "message": "%s"}\n' "$message"
+    echo "$1" >&2
+    exit 2
 }
-trap '_bail "aborted at line $LINENO"' ERR
 
-command -v python3 >/dev/null 2>&1 || _bail "python3 not found"
-[[ -f "$CRAFTSMAN_CI" ]] || _bail "craftsman-ci not found at ${CRAFTSMAN_CI}"
+# Two failures, two messages. Infrastructure that is missing repeats on every
+# write of every session and no agent can repair it: say so, and say not to
+# retry. A verdict that failed on THIS file (a timeout, a crash of the scan)
+# is worth one retry, which is the rule the conclusion gate applies too.
+_bail_infra() {
+    _block "The craftsman write gate cannot run at all ($1). Every write will be refused until the operator repairs this; do not retry, report it."
+}
+_bail_file() {
+    _block "The craftsman write gate could not judge this file ($1). Retry the write once; if it repeats, the gate needs attention, not the write."
+}
+trap '_bail_file "aborted at line $LINENO"' ERR
+
+command -v python3 >/dev/null 2>&1 || _bail_infra "python3 not found"
+[[ -f "$CRAFTSMAN_CI" ]] || _bail_infra "craftsman-ci not found at ${CRAFTSMAN_CI}"
 source "${PLUGIN_ROOT}/hooks/lib/portable-timeout.sh" 2>/dev/null || true
 
 INPUT=$(cat)
 
-# What the file WOULD contain, laid out under a mirror of the workspace so a
+# What the file WOULD contain, laid out under a mirror of its workspace so a
 # rule that reads the path (LAYER001 keys on /Domain/) sees the real one, and
-# the project's own .craft-config.yml and .craft-rules.yml apply. Prints the
-# mirror root and the relative path, or nothing when this is not a write this
-# hook judges: another tool, a path outside the workspace, a patch whose
-# old_string is not in the file (Hermes will refuse that one itself).
+# the workspace's own .craft-config.yml and .craft-rules.yml apply.
+#
+# The workspace is the written path's own: walked up from the target to the
+# nearest marker (.git, .craft-config.yml, composer.json, package.json,
+# pyproject.toml, go.mod, Cargo.toml). Hermes hands a plugin hook no cwd, and
+# the shell hook's cwd is the Hermes process's, which in gateway mode is not
+# the task's directory: anchoring on it judged the first turn of a session,
+# the one where the agent writes the most, against the wrong tree or not at
+# all. A path with no marker above it is judged under its own directory: the
+# four rules need the path suffix and the content, nothing more.
+#
+# Prints one of:
+#   MIRROR <relative path>   judge this file in the mirror
+#   GATE <relative path>     the write reconfigures the gate itself
+#   nothing                  not a write this hook judges (another tool, a
+#                            patch whose text is not in the file and carries
+#                            no new content to judge)
 MIRROR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-write-gate.XXXXXX")
 trap 'rm -rf "$MIRROR"' EXIT
 
-PLACED=$(printf '%s' "$INPUT" | python3 -c '
-import json, os, sys, shutil
-
-mirror = sys.argv[1]
-try:
-    payload = json.load(sys.stdin)
-except (ValueError, TypeError):
-    sys.exit(0)
-tool = payload.get("tool_name") or ""
-args = payload.get("args") or {}
-if tool not in ("write_file", "patch") or not isinstance(args, dict):
-    sys.exit(0)
-cwd = os.path.realpath(payload.get("cwd") or os.getcwd())
-path = str(args.get("path") or "")
-if not path:
-    sys.exit(0)
-target = os.path.realpath(os.path.join(cwd, path))
-if not (target == cwd or target.startswith(cwd + os.sep)):
-    sys.exit(0)
-relative = os.path.relpath(target, cwd)
-
-if tool == "write_file":
-    content = args.get("content")
-    if not isinstance(content, str):
-        sys.exit(0)
-else:
-    old, new = args.get("old_string"), args.get("new_string")
-    if not isinstance(old, str) or not isinstance(new, str):
-        sys.exit(0)
-    try:
-        with open(target, encoding="utf-8", errors="replace") as handle:
-            current = handle.read()
-    except OSError:
-        sys.exit(0)
-    if old not in current:
-        sys.exit(0)
-    content = current.replace(old, new) if args.get("replace_all") else current.replace(old, new, 1)
-
-destination = os.path.join(mirror, relative)
-os.makedirs(os.path.dirname(destination), exist_ok=True)
-with open(destination, "w", encoding="utf-8") as handle:
-    handle.write(content)
-for name in (".craft-config.yml", ".craft-rules.yml"):
-    source = os.path.join(cwd, name)
-    if os.path.isfile(source):
-        shutil.copy(source, os.path.join(mirror, name))
-print(relative)
-' "$MIRROR" 2>/dev/null)
+PLACED=$(printf '%s' "$INPUT" | python3 "$SCRIPT_DIR/write_gate_place.py" "$MIRROR" 2>/dev/null)
 
 [[ -n "$PLACED" ]] || exit 0
+
+case "$PLACED" in
+    GATE\ *)
+        _block "This write edits the craftsman gate's own configuration (${PLACED#GATE }). The gated party does not reconfigure the gate: change the rules through a reviewed commit instead."
+        ;;
+esac
+PLACED="${PLACED#MIRROR }"
 
 GATE_STATUS=0
 REPORT=$(cd "$MIRROR" && portable_timeout "${CRAFTSMAN_GATE_SECONDS:-20}" \
     bash "$CRAFTSMAN_CI" --format json "$PLACED" 2>/dev/null) || GATE_STATUS=$?
-[[ "$GATE_STATUS" -eq 124 ]] && _bail "gate exceeded ${CRAFTSMAN_GATE_SECONDS:-20}s on ${PLACED}"
-[[ -n "$REPORT" ]] || _bail "gate produced no report (exit ${GATE_STATUS})"
+[[ "$GATE_STATUS" -eq 124 ]] && _bail_file "gate exceeded ${CRAFTSMAN_GATE_SECONDS:-20}s on ${PLACED}"
+[[ -n "$REPORT" ]] || _bail_file "gate produced no report (exit ${GATE_STATUS})"
 
-printf '%s' "$REPORT" | python3 -c '
+VERDICT=$(printf '%s' "$REPORT" | python3 -c '
 import json, sys
 try:
     report = json.load(sys.stdin)
@@ -148,12 +144,11 @@ hits = [v for v in (report.get("violations") or [])
         if v.get("rule") in allowed and v.get("severity") == "critical"]
 if not hits:
     sys.exit(0)
-lines = ["{}:{} {} - {}".format(path, v.get("line", 0), v.get("rule", "?"), v.get("message", ""))
-         for v in hits]
-message = ("craftsman refused this write before it reached disk, on the rules no retry "
-           "budget should let through (LAYER001, SEC001-003):\n" + "\n".join(lines)
-           + "\nRewrite the content without the finding, then write again. "
-           "Every other rule is judged at the conclusion, with the skill that fixes it.")
-print(json.dumps({"action": "block", "message": message}, ensure_ascii=False))
-' "$WRITE_GATE_RULES" "$PLACED"
-exit 0
+print("\n".join("{}:{} {} - {}".format(path, v.get("line", 0), v.get("rule", "?"), v.get("message", ""))
+                for v in hits))
+' "$WRITE_GATE_RULES" "$PLACED")
+
+[[ -n "$VERDICT" ]] || exit 0
+_block "craftsman refused this write before it reached disk, on the rules no retry budget should let through (LAYER001, SEC001-003):
+${VERDICT}
+Rewrite the content without the finding, then write again. If the finding is wrong for this line (a test fixture, a query that is in fact bound), put \`craftsman-ignore: <RULE>\` in a comment on that line and it is honoured. Every other rule is judged at the conclusion, with the skill that fixes it."
