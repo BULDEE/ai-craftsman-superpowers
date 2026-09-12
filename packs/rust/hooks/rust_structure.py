@@ -259,7 +259,8 @@ def _sum_impl_span(scan, frame: dict, span: int) -> None:
 
 
 PROFILE = Profile(function_re=FN_RE, control_re=CONTROL_RE, container_re=IMPL_RE,
-                  parameter_list=parameter_list, on_close=_sum_impl_span)
+                  parameter_list=parameter_list, on_close=_sum_impl_span,
+                  param_remedy="pass a struct")
 
 
 def scan_braces(source: str) -> list[tuple[str, str]]:

@@ -252,9 +252,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the trailing comma of a gofmt multi-line signature as a parameter (three
   parameters were reported as four, on a blocking rule). A scanner that
   cannot load the walk says so and exits 2, and the validators report a scan
-  that did not run instead of a clean file; a profile option the engine does
-  not know raises; `head_of` lets a language whose declarations end without
-  a brace narrow the header. `tests/core/test-brace-scanner.sh` drives the
+  that did not run instead of a clean file; every profile option is
+  keyword-only so a misspelled one raises at construction; `head_of` lets a
+  language whose declarations end without a brace narrow the header; the
+  guard that either pack never grows a walk back is a spy on `walk_braces`,
+  not a grep on private names. `tests/core/test-brace-scanner.sh` drives the
   module through a language that exists only in the test and refuses either
   pack a walk of its own. `structural_metrics.py` is deliberately not
   migrated: its two dialects sit under the regression tests PHP and

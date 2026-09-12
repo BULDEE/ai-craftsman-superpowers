@@ -246,7 +246,9 @@ in the test. The contract, stated once:
   frame and filters on `frame["kind"]` itself; thresholds are per profile;
 - a `craftsman-ignore` for a brace-anchored finding sits on the line of the
   `{`, which is the line the finding names;
-- an option the profile does not know raises `TypeError`.
+- every profile option is keyword-only, so a misspelled one is a `TypeError`
+  at construction; `param_remedy` is the word PARAM001 uses ("pass an object"
+  by default, "pass a struct" for Go and Rust).
 
 ### On `metrics_dialect`
 

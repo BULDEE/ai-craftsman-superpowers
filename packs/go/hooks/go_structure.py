@@ -199,7 +199,8 @@ def _context_first(scan, cursor: int, header: str, name: str | None, params: lis
 
 
 PROFILE = Profile(function_re=FUNC_RE, control_re=CONTROL_RE,
-                  parameter_list=parameter_list, on_function=_context_first)
+                  parameter_list=parameter_list, on_function=_context_first,
+                  param_remedy="pass a struct")
 
 
 def scan_braces(source: str) -> list[tuple[str, str]]:
