@@ -29,12 +29,6 @@ from pathlib import Path
 MIN_OCCURRENCES = 3
 MIN_DISTINCT_FILES = 3
 REPROPOSE_EVIDENCE_STEP = 3
-# A rule suppressed as often as it is applied is not a lesson to teach, it is
-# a rule to relax (#44). Measured before this gate existed: PHP003 was a
-# candidate on 105 fixes while being ignored 167 times, PY002 on 54 against
-# 99. Promoting either would have taught the model a pattern users reject two
-# times out of three.
-MIN_ACCEPTANCE = 0.5
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS instincts (
@@ -44,6 +38,7 @@ CREATE TABLE IF NOT EXISTS instincts (
     pattern_summary TEXT,
     occurrences INTEGER NOT NULL DEFAULT 0,
     distinct_files INTEGER NOT NULL DEFAULT 0,
+    ignored INTEGER NOT NULL DEFAULT 0,
     confidence REAL NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'candidate'
         CHECK (status IN ('candidate', 'approved', 'rejected')),
@@ -53,47 +48,55 @@ CREATE TABLE IF NOT EXISTS instincts (
 )
 """
 
-# Fixes AND suppressions, per rule. The first version counted fixes alone, so
-# a rule could become a candidate on its fixes while being suppressed far more
-# often (#45).
+# Fixes AND rejections, per rule. The first version counted fixes alone, so a
+# rule could become a candidate on its fixes while being rejected far more
+# often: PHP003 was one, on 105 fixes against 167 suppressions, and promoting
+# it would have taught the model a pattern users reject two times out of
+# three (#45). A rule rejected as often as it is applied is not a lesson to
+# teach, it is a rule to relax (#44), so the bar is strict: more fixes than
+# rejections. `ignored` and `scoped` are both rejections of the finding, the
+# second the deliberate kind (the rule is wrong in that context); `overridden`
+# and `open` say nothing about whether the developer agreed.
 CANDIDATE_QUERY = """
 SELECT rule,
        SUM(CASE WHEN action = 'fixed' THEN 1 ELSE 0 END) AS occurrences,
        COUNT(DISTINCT CASE WHEN action = 'fixed' THEN file_pattern END) AS distinct_files,
-       SUM(CASE WHEN action = 'ignored' THEN 1 ELSE 0 END) AS ignored,
+       SUM(CASE WHEN action IN ('ignored', 'scoped') THEN 1 ELSE 0 END) AS ignored,
        MAX(CASE WHEN action = 'fixed' THEN COALESCE(context, '') END) AS sample_context
 FROM corrections
-WHERE project_hash = ? AND action IN ('fixed', 'ignored')
+WHERE project_hash = ? AND action IN ('fixed', 'ignored', 'scoped')
 GROUP BY rule
-HAVING occurrences >= ? AND distinct_files >= ?
-   AND occurrences * 1.0 / (occurrences + ignored) >= ?
+HAVING occurrences >= ? AND distinct_files >= ? AND occurrences > ignored
 """
 
-# The column the gate needs and the first schema did not have. ALTER TABLE has
-# no IF NOT EXISTS in SQLite, so the duplicate-column error is the signal that
-# the migration already ran.
+# A column the first schema did not have, added in place on a database created
+# before it. Guarded by the table's own catalogue, the way metrics-db.sh guards
+# every ADD COLUMN, rather than by the wording of an error.
 MIGRATIONS = (
-    "ALTER TABLE instincts ADD COLUMN ignored INTEGER NOT NULL DEFAULT 0",
+    ("ignored", "ALTER TABLE instincts ADD COLUMN ignored INTEGER NOT NULL DEFAULT 0"),
 )
 
 
-def _migrate(conn: sqlite3.Connection, statement: str) -> None:
-    try:
-        conn.execute(statement)
-    except sqlite3.OperationalError as error:
-        if "duplicate column" not in str(error):
-            raise
+def _has_column(conn: sqlite3.Connection, column: str) -> bool:
+    return any(row[1] == column for row in conn.execute("PRAGMA table_info(instincts)"))
 
 
 def _connect(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.execute(SCHEMA)
-    for statement in MIGRATIONS:
-        _migrate(conn, statement)
+    for column, statement in MIGRATIONS:
+        if not _has_column(conn, column):
+            conn.execute(statement)
     conn.commit()
     return conn
 
 
+# Two statistics on purpose. The candidacy bar in CANDIDATE_QUERY is the point
+# estimate (more fixes than rejections): it states what a candidate IS, and a
+# human can check it by counting. The bound below states how much evidence
+# sits behind it and is only an ORDER: it must not be read as a bar, because
+# 50 fixed against 50 rejected has a bound of 0.40 and would pass any bar that
+# lets 3 fixed against none (0.44) through.
 def _confidence(occurrences: int, ignored: int) -> float:
     """A score that ranks: the lower bound of the acceptance rate, given the evidence.
 
@@ -101,10 +104,10 @@ def _confidence(occurrences: int, ignored: int) -> float:
     0.95. It saturated at nine occurrences, so seven of eight candidates sat at
     exactly 0.95, one with 101 corrections and one with 18, and a reviewer
     opening the list had no order to work with (#45). This is the Wilson
-    lower bound at 95% on fixed / (fixed + ignored): a rule fixed 101 times and
-    never ignored scores 0.96, fixed 18 times 0.82, fixed 3 times 0.44, and a
-    rule ignored as often as it is fixed cannot reach 0.5 however many rows it
-    has. Nothing caps it and nothing reaches the cap.
+    lower bound at 95% on fixed / (fixed + rejected): a rule fixed 101 times
+    and never rejected scores 0.96, fixed 18 times 0.82, fixed 3 times 0.44,
+    and a rule rejected as often as it is fixed cannot reach 0.5 however many
+    rows it has. Nothing caps it and nothing reaches the cap.
     """
     total = occurrences + ignored
     if total == 0:
@@ -143,12 +146,33 @@ def _upsert_candidate(conn: sqlite3.Connection, project_hash: str, row: tuple) -
         )
 
 
+def _withdraw_lapsed(conn: sqlite3.Connection, project_hash: str, live: list) -> None:
+    """A candidate the query no longer yields is withdrawn.
+
+    Every criterion used to be monotonic on an append-only table (fixes and
+    files only grow), so a candidate could never lapse and the upsert never
+    had to remove one. The acceptance bar is the first criterion that can stop
+    holding: a rule listed on three fixes and then rejected twelve times kept
+    its row, its old score and `ignored=0`, stayed in the pending count and
+    could be approved into a learned skill. A never-reviewed row carries no
+    human decision, so dropping it loses nothing, and it returns when the
+    evidence does. Approved and rejected rows are decisions and stay.
+    """
+    query = "DELETE FROM instincts WHERE project_hash = ? AND status = 'candidate'"
+    params: list = [project_hash]
+    if live:
+        query += " AND rule NOT IN (%s)" % ",".join("?" * len(live))
+        params.extend(live)
+    conn.execute(query, params)
+
+
 def refresh_candidates(conn: sqlite3.Connection, project_hash: str) -> None:
     rows = conn.execute(
-        CANDIDATE_QUERY, (project_hash, MIN_OCCURRENCES, MIN_DISTINCT_FILES, MIN_ACCEPTANCE)
+        CANDIDATE_QUERY, (project_hash, MIN_OCCURRENCES, MIN_DISTINCT_FILES)
     ).fetchall()
     for row in rows:
         _upsert_candidate(conn, project_hash, row)
+    _withdraw_lapsed(conn, project_hash, [row[0] for row in rows])
     conn.commit()
 
 

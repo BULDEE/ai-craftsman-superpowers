@@ -67,14 +67,49 @@ fi
 # nothing saturates at 0.95 the way seven of eight candidates did.
 echo ""
 echo "=== The gate reads suppressions (#45) ==="
+# PHP003 was a candidate on this database before the gate existed: the row a
+# real installation carries the day it upgrades, and the one the gate must
+# withdraw rather than leave at its old score with ignored=0.
+sqlite3 "$DB" "INSERT INTO instincts (project_hash, rule, pattern_summary, occurrences, distinct_files, confidence, status)
+               VALUES ('testhash', 'PHP003', 'setter removed', 6, 6, 0.95, 'candidate');"
+# Six explicit patterns, not a random draw: a draw under three distinct files
+# would exclude PHP003 on the files threshold and let the acceptance assertion
+# pass for the wrong reason.
 sqlite3 "$DB" <<'SQL'
-INSERT INTO corrections (project_hash, rule, file_pattern, action, context)
-SELECT 'testhash', 'PHP003', 'src/' || (abs(random()) % 12) || '/**/*.php', 'fixed', 'setter removed'
-FROM (SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6);
+INSERT INTO corrections (project_hash, rule, file_pattern, action, context) VALUES
+  ('testhash', 'PHP003', 'src/1/**/*.php', 'fixed', 'setter removed'),
+  ('testhash', 'PHP003', 'src/2/**/*.php', 'fixed', 'setter removed'),
+  ('testhash', 'PHP003', 'src/3/**/*.php', 'fixed', 'setter removed'),
+  ('testhash', 'PHP003', 'src/4/**/*.php', 'fixed', 'setter removed'),
+  ('testhash', 'PHP003', 'src/5/**/*.php', 'fixed', 'setter removed'),
+  ('testhash', 'PHP003', 'src/6/**/*.php', 'fixed', 'setter removed');
 INSERT INTO corrections (project_hash, rule, file_pattern, action, context)
 SELECT 'testhash', 'PHP003', 'src/A/**/*.php', 'ignored', 'setter kept'
 FROM (SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5
       UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10);
+-- A coin flip is not a lesson: five fixed, five rejected, two of them scoped.
+INSERT INTO corrections (project_hash, rule, file_pattern, action, context) VALUES
+  ('testhash', 'PY004', 'src/a/**/*.py', 'fixed', 'except named'),
+  ('testhash', 'PY004', 'src/b/**/*.py', 'fixed', 'except named'),
+  ('testhash', 'PY004', 'src/c/**/*.py', 'fixed', 'except named'),
+  ('testhash', 'PY004', 'src/d/**/*.py', 'fixed', 'except named'),
+  ('testhash', 'PY004', 'src/e/**/*.py', 'fixed', 'except named'),
+  ('testhash', 'PY004', 'src/a/**/*.py', 'ignored', 'bare except kept'),
+  ('testhash', 'PY004', 'src/a/**/*.py', 'ignored', 'bare except kept'),
+  ('testhash', 'PY004', 'src/a/**/*.py', 'ignored', 'bare except kept'),
+  ('testhash', 'PY004', 'src/b/**/*.py', 'scoped', 'rule wrong in generated code'),
+  ('testhash', 'PY004', 'src/b/**/*.py', 'scoped', 'rule wrong in generated code');
+-- Nine fixes and none rejected: enough to saturate the old formula at 0.95.
+INSERT INTO corrections (project_hash, rule, file_pattern, action, context) VALUES
+  ('testhash', 'SH004', 'src/a/**/*.sh', 'fixed', 'quoted'),
+  ('testhash', 'SH004', 'src/b/**/*.sh', 'fixed', 'quoted'),
+  ('testhash', 'SH004', 'src/c/**/*.sh', 'fixed', 'quoted'),
+  ('testhash', 'SH004', 'src/d/**/*.sh', 'fixed', 'quoted'),
+  ('testhash', 'SH004', 'src/e/**/*.sh', 'fixed', 'quoted'),
+  ('testhash', 'SH004', 'src/f/**/*.sh', 'fixed', 'quoted'),
+  ('testhash', 'SH004', 'src/g/**/*.sh', 'fixed', 'quoted'),
+  ('testhash', 'SH004', 'src/h/**/*.sh', 'fixed', 'quoted'),
+  ('testhash', 'SH004', 'src/i/**/*.sh', 'fixed', 'quoted');
 INSERT INTO corrections (project_hash, rule, file_pattern, action, context) VALUES
   ('testhash', 'TS003', 'src/a/**/*.ts', 'fixed', 'null handled'),
   ('testhash', 'TS003', 'src/b/**/*.ts', 'fixed', 'null handled'),
@@ -96,6 +131,18 @@ if ! echo "$OUTPUT" | grep -q "PHP003"; then
 else
     log_fail "a rule ignored more than it is fixed is not a candidate" "$(echo "$OUTPUT" | grep PHP003)"
 fi
+PHP003_ROWS=$(sqlite3 "$DB" "SELECT COUNT(*) FROM instincts WHERE rule='PHP003';")
+if [[ "$PHP003_ROWS" == "0" ]]; then
+    log_pass "the candidate row it had before the gate is withdrawn, not left at its old score"
+else
+    log_fail "the candidate row it had before the gate is withdrawn" \
+        "$(sqlite3 "$DB" "SELECT rule, status, confidence, ignored FROM instincts WHERE rule='PHP003';")"
+fi
+if ! echo "$OUTPUT" | grep -q "PY004"; then
+    log_pass "five fixed against five rejected (three ignored, two scoped) is not a candidate"
+else
+    log_fail "five fixed against five rejected is not a candidate" "$(echo "$OUTPUT" | grep PY004)"
+fi
 assert_contains "a rule fixed far more than it is ignored is a candidate, and its suppressions are shown" \
     "$OUTPUT" "TS003 \\[candidate\\]"
 assert_contains "with the ignored count beside the fixes" "$OUTPUT" "corrections=12 ignored=1"
@@ -113,10 +160,42 @@ if [[ "$TS003_CONF" != "0.95" && "$PHP001_CONF" != "0.95" ]]; then
 else
     log_fail "no candidate sits at the old 0.95 cap" "TS003 ${TS003_CONF} PHP001 ${PHP001_CONF}"
 fi
-if [[ "$(echo "$OUTPUT" | grep "\[candidate\]" | head -1)" == *TS003* ]]; then
-    log_pass "the best-supported candidate is listed first"
+# The defect in #45 was a tie: 101 and 18 corrections both at the 0.95 cap,
+# and nine fixes were enough to reach it. Here nine clean fixes (SH004) outrank
+# twelve fixes with one rejection (TS003), which outrank three (PHP001): a
+# strict order the old formula could not produce (it tied the first two).
+SH004_CONF=$(echo "$OUTPUT" | grep "SH004" | grep -oE "confidence=[0-9.]+" | cut -d= -f2)
+if [[ "$(echo "$OUTPUT" | grep "\[candidate\]" | head -1)" == *SH004* ]]; then
+    log_pass "the best-supported candidate is listed first (SH004, nine fixes, none rejected)"
 else
     log_fail "the best-supported candidate is listed first" "$(echo "$OUTPUT" | head -1)"
+fi
+if python3 -c "import sys; sys.exit(0 if ${SH004_CONF:-0} > ${TS003_CONF:-1} > ${PHP001_CONF:-1} else 1)"; then
+    log_pass "one rejection costs and evidence pays: no tie at a cap (${SH004_CONF} > ${TS003_CONF} > ${PHP001_CONF})"
+else
+    log_fail "one rejection costs and evidence pays: no tie at a cap" "SH004 ${SH004_CONF} TS003 ${TS003_CONF} PHP001 ${PHP001_CONF}"
+fi
+
+# A candidate that lapses AFTER being listed is withdrawn too: SH004 is
+# rejected thirteen times, refresh, gone from the list and the pending count.
+BEFORE_COUNT=$(python3 "$INSTINCTS" pending-count "$DB" "$PH" 2>/dev/null)
+sqlite3 "$DB" "INSERT INTO corrections (project_hash, rule, file_pattern, action, context)
+               SELECT 'testhash', 'SH004', 'src/a/**/*.sh', 'ignored', 'kept'
+               FROM (SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5
+                     UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10
+                     UNION ALL SELECT 11 UNION ALL SELECT 12 UNION ALL SELECT 13);"
+OUTPUT=$(python3 "$INSTINCTS" candidates "$DB" "$PH" 2>&1)
+AFTER_COUNT=$(python3 "$INSTINCTS" pending-count "$DB" "$PH" 2>/dev/null)
+if ! echo "$OUTPUT" | grep -q "SH004" && [[ "$AFTER_COUNT" == "$((BEFORE_COUNT - 1))" ]]; then
+    log_pass "a candidate whose acceptance fell under the bar after it was listed is withdrawn (pending ${BEFORE_COUNT} to ${AFTER_COUNT})"
+else
+    log_fail "a candidate whose acceptance fell under the bar after it was listed is withdrawn" \
+        "pending ${BEFORE_COUNT} to ${AFTER_COUNT}: $(echo "$OUTPUT" | grep SH004)"
+fi
+if (cd "$TEST_DIR" && python3 "$INSTINCTS" approve "$DB" "$(sqlite3 "$DB" "SELECT COALESCE(MAX(id), 0) + 50 FROM instincts;")" "$TEST_DIR/.claude/skills/craftsman-learned" >/dev/null 2>&1); then
+    log_fail "a withdrawn candidate cannot be approved" "approve of a missing id succeeded"
+else
+    log_pass "a withdrawn candidate cannot be approved (no row to approve)"
 fi
 
 if ! echo "$OUTPUT" | grep -q "PHP005"; then
@@ -131,6 +210,28 @@ if [[ "$COUNT" == "2" ]]; then
 else
     log_fail "pending-count" "expected 2, got $COUNT"
 fi
+
+# A database created by the schema that had no `ignored` column: the first
+# connect adds it, the second finds it in place, and neither raises.
+LEGACY_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-instinct-legacy.XXXXXX")
+LEGACY_DB="$LEGACY_DIR/m.db"
+sqlite3 "$LEGACY_DB" "
+CREATE TABLE instincts(id INTEGER PRIMARY KEY, project_hash TEXT NOT NULL, rule TEXT NOT NULL, pattern_summary TEXT,
+  occurrences INTEGER NOT NULL DEFAULT 0, distinct_files INTEGER NOT NULL DEFAULT 0, confidence REAL NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'candidate', created_at TEXT NOT NULL DEFAULT (datetime('now')), reviewed_at TEXT,
+  UNIQUE(project_hash, rule));
+CREATE TABLE corrections(id INTEGER PRIMARY KEY, timestamp TEXT DEFAULT (datetime('now')),
+  project_hash TEXT, rule TEXT, file_pattern TEXT, action TEXT, context TEXT);
+INSERT INTO instincts (project_hash, rule, pattern_summary, occurrences, distinct_files, confidence, status)
+  VALUES ('p1', 'TS001', 'x', 5, 3, 0.95, 'approved');"
+LEGACY_ONE=$(python3 "$INSTINCTS" list "$LEGACY_DB" p1 2>&1); LEGACY_RC1=$?
+LEGACY_TWO=$(python3 "$INSTINCTS" list "$LEGACY_DB" p1 2>&1); LEGACY_RC2=$?
+if [[ "$LEGACY_RC1" == "0" && "$LEGACY_RC2" == "0" ]] && echo "$LEGACY_TWO" | grep -q "TS001 \[approved\] confidence=0.95 corrections=5 ignored=0"; then
+    log_pass "a database from before the ignored column is migrated once and read twice without error"
+else
+    log_fail "a database from before the ignored column is migrated once and read twice" "rc=$LEGACY_RC1/$LEGACY_RC2: $LEGACY_TWO"
+fi
+rm -rf "$LEGACY_DIR"
 
 echo ""
 echo "=== Approve Generates Learned Skill ==="
