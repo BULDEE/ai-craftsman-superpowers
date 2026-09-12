@@ -122,33 +122,53 @@ def _bracket_delta(inner: str, index: int, depth: int, angle_brackets: bool) -> 
     return 0
 
 
+_PROFILE_OPTIONS = {
+    "container_re": None,
+    "head_of": None,
+    "on_function": None,
+    "on_close": None,
+    "function_word": "function",
+    "nest_max": NEST_MAX,
+    "loc_max": LOC_MAX,
+    "param_max": PARAM_MAX,
+}
+
+
 class Profile:
-    """What carries a language: the heads, the parameter split, two hooks.
+    """What carries a language: the heads, the parameter split, three hooks.
 
     function_re    group(1) is the function name, or None for a closure
     control_re     a head that opens a control block
     container_re   a head that opens a container measured as a whole
                    (a Rust impl); group(1) names it. Optional.
     parameter_list header -> list of parameters, the receiver excluded
-    on_function    (scan, cursor, header, name) after the shared PARAM001
-                   check, for what only this language measures on a head
+    head_of        header -> the part of it to classify. The header runs from
+                   the previous brace, so a language whose declarations end
+                   without one (Kotlin's `fun short(a) = a + 1`, a trait's
+                   `fn area(&self) -> f64;`) needs to narrow it to the last
+                   statement, or the earlier declaration names the brace.
+                   Identity by default; Go and Rust need none.
+    on_function    (scan, cursor, header, name, params) after the shared
+                   PARAM001 check, for what only this language measures
     on_close       (scan, frame, span) after the shared LOC001 check, for a
                    frame the language accumulates
     function_word  the noun the messages use: "function"
+
+    An option this class does not know is refused. A typo in `on_function`
+    would otherwise silence a whole rule with no signal, in a module the next
+    pack builds on.
     """
 
     def __init__(self, function_re: "re.Pattern", control_re: "re.Pattern",
                  parameter_list: Callable[[str], list], **options) -> None:
+        unknown = set(options) - set(_PROFILE_OPTIONS)
+        if unknown:
+            raise TypeError("Profile: unknown option(s) %s" % ", ".join(sorted(unknown)))
         self.function_re = function_re
         self.control_re = control_re
         self.parameter_list = parameter_list
-        self.container_re = options.get("container_re")
-        self.on_function = options.get("on_function")
-        self.on_close = options.get("on_close")
-        self.function_word = options.get("function_word", "function")
-        self.nest_max = options.get("nest_max", NEST_MAX)
-        self.loc_max = options.get("loc_max", LOC_MAX)
-        self.param_max = options.get("param_max", PARAM_MAX)
+        for option, default in _PROFILE_OPTIONS.items():
+            setattr(self, option, options.get(option, default))
 
 
 class Scan:
@@ -182,7 +202,7 @@ def _open_function(scan: Scan, cursor: int, header: str, name: Optional[str]) ->
                     "line %d: %s() has %d parameters (max %d): pass a struct"
                     % (scan.line(cursor), name or "closure", len(params), profile.param_max))
     if profile.on_function:
-        profile.on_function(scan, cursor, header, name)
+        profile.on_function(scan, cursor, header, name, params)
 
 
 def _open_control(scan: Scan, cursor: int) -> None:
@@ -211,6 +231,8 @@ def _classify(profile: Profile, header: str) -> tuple:
 
 
 def _open_brace(scan: Scan, cursor: int, header: str) -> None:
+    if scan.profile.head_of:
+        header = scan.profile.head_of(header)
     kind, name = _classify(scan.profile, header)
     if kind == "function":
         _open_function(scan, cursor, header, name)
