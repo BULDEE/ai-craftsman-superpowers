@@ -322,13 +322,20 @@ else
 fi
 
 # --- An option missing its value must not hang a runner for six hours -------------
+#
+# Bounded with perl's alarm, not `timeout`: coreutils timeout does not exist
+# on the macOS runner (exit 127), and the first version of this block reported
+# "it hung" for a command that had exited 2 on the spot.
+_bounded() {
+    perl -e 'alarm shift; exec @ARGV' "$@"
+}
 for option in --base --config --format; do
     hang_code=0
-    ( timeout 5 bash "$CI" --changed-only "$option" >/dev/null 2>&1 ) || hang_code=$?
+    ( _bounded 5 bash "$CI" --changed-only "$option" >/dev/null 2>&1 ) || hang_code=$?
     if [[ "$hang_code" -eq 2 ]]; then
         log_pass "$option with no value exits 2 at once"
     else
-        log_fail "$option with no value exits 2 at once" "exit $hang_code (124 is the timeout: it hung)"
+        log_fail "$option with no value exits 2 at once" "exit $hang_code (142 is the alarm: it hung)"
     fi
 done
 
