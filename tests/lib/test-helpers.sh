@@ -27,6 +27,17 @@
 
 export CLAUDE_PLUGIN_OPTION_strictness="${CLAUDE_PLUGIN_OPTION_strictness:-strict}"
 
+# A git identity, once, for every fixture that commits. The ubuntu runner has
+# none configured, so `git commit --allow-empty` failed silently inside
+# `>/dev/null 2>&1`, every "repository with history" fixture had zero commits,
+# and the default resolved to `strict` where the assertion expected `moderate`.
+# Green on a developer's machine, red on the runner, for a reason that has
+# nothing to do with the code under test.
+export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-craftsman-tests}"
+export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-tests@craftsman.invalid}"
+export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-craftsman-tests}"
+export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-tests@craftsman.invalid}"
+
 # Guard against double-sourcing
 [[ -n "${_TEST_HELPERS_LOADED:-}" ]] && return 0
 _TEST_HELPERS_LOADED=1
