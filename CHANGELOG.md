@@ -55,6 +55,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING for a CRLF `~/.claude/.craft-config.yml`: `trust_project_tools`
+  and the external pack list are now read from it.** That file is the machine
+  owner's own configuration, and `trust_project_tools` is the only consent this
+  plugin has to run a cloned repository's analysers (`vendor/bin/phpstan`, an
+  eslint flat config, which is executable JavaScript by design). Written with
+  Windows line endings, the previous parser emitted the value with a carriage
+  return still attached, so the key silently did nothing and a declared external
+  pack was silently not loaded. Both are honoured now, which means an
+  installation whose config is CRLF moves from "Level 2 off, external packs
+  ignored" to "Level 2 on, external packs sourced" on upgrade. Two other shapes
+  are pinned to what the old parser did: `trust_project_tools:true` with no
+  space is refused, because it is not a YAML mapping, and a trailing comment is
+  not part of the value. All of it is asserted in `tests/core/test-config.sh`.
+
 - **`docs/creating-packs.md` documents `languages:` and `rules.owned`.** Their
   absence was the reason the example skeletons taught a manifest the engine
   loads and never dispatches to. `examples/pack-skeleton-go/` and

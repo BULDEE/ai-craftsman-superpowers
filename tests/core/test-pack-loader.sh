@@ -424,6 +424,134 @@ rm -rf "$INTEG_ROOT"
 # =============================================================================
 # Cleanup
 # =============================================================================
+# --- The compiled manifest cache decides which validators run ----------------
+#
+# Three ways it silently disarmed every pack, each measured before the fix:
+# a torn read (twelve concurrent readers, three saw zero entries), a cache
+# emptied by a crash or a full disk (served forever after, `-nt` cannot see
+# it), and a key that mapped `a/b` and `a_b` to the same file (one pack served
+# another's validators). Exit 0 and no message in all three.
+CACHE_WORK=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-yml-cache.XXXXXX")
+mkdir -p "$CACHE_WORK/a/b" "$CACHE_WORK/a_b" "$CACHE_WORK/data"
+printf 'compatibility:\n  stack: ["ALPHA"]\n' > "$CACHE_WORK/a/b/pack.yml"
+printf 'compatibility:\n  stack: ["BETA"]\n' > "$CACHE_WORK/a_b/pack.yml"
+
+_cached_stack() {
+    CLAUDE_PLUGIN_DATA="$CACHE_WORK/data" bash -c \
+        "source '$ROOT_DIR/hooks/lib/pack-loader.sh'; _pack_yml_nested_array compatibility stack '$1'"
+}
+
+slash=$(_cached_stack "$CACHE_WORK/a/b/pack.yml")
+underscore=$(_cached_stack "$CACHE_WORK/a_b/pack.yml")
+if [[ "$slash" == "ALPHA" && "$underscore" == "BETA" ]]; then
+    log_pass "two manifests whose paths differ only by / and _ keep their own cache"
+else
+    log_fail "two manifests whose paths differ only by / and _ keep their own cache" \
+        "a/b gave '$slash', a_b gave '$underscore'"
+fi
+
+# A cache emptied outside this process must be recompiled, not served. The
+# header line is what makes that detectable: an empty COMPILE is legitimate, so
+# emptiness alone cannot be the test.
+for cached in "$CACHE_WORK/data/cache/pack-yml"/*; do
+    [[ -f "$cached" ]] && : > "$cached"
+done
+repaired=$(_cached_stack "$CACHE_WORK/a/b/pack.yml")
+if [[ "$repaired" == "ALPHA" ]]; then
+    log_pass "a cache emptied by a crash repairs itself instead of disarming the pack"
+else
+    log_fail "a cache emptied by a crash repairs itself" "got '$repaired'"
+fi
+
+# A manifest that could not be read must not leave a poisoned empty cache newer
+# than itself, which the previous version served forever after.
+rm -rf "$CACHE_WORK/data/cache"
+chmod 000 "$CACHE_WORK/a/b/pack.yml"
+_cached_stack "$CACHE_WORK/a/b/pack.yml" >/dev/null 2>&1
+chmod 644 "$CACHE_WORK/a/b/pack.yml"
+recovered=$(_cached_stack "$CACHE_WORK/a/b/pack.yml")
+if [[ "$recovered" == "ALPHA" ]]; then
+    log_pass "an unreadable manifest does not poison the cache for good"
+else
+    log_fail "an unreadable manifest does not poison the cache for good" "got '$recovered'"
+fi
+
+# Twelve readers on a cold cache, all of which must see the whole compile.
+rm -rf "$CACHE_WORK/data/cache"
+python3 -c "
+entries = ','.join('\"s%d\"' % i for i in range(401))
+open('$CACHE_WORK/big.yml', 'w').write('compatibility:\n  stack: [' + entries + ']\n')
+"
+COUNTS="$CACHE_WORK/counts"
+for _ in $(seq 1 12); do
+    ( _cached_stack "$CACHE_WORK/big.yml" | grep -c . >> "$COUNTS" ) &
+done
+wait
+# `grep -vc` exits 1 when nothing differs, and `|| echo 0` then appended a
+# second zero: the count came back as two lines and the numeric test failed on
+# a run that was actually clean.
+torn=$(awk '$0 != 401 { n++ } END { print n + 0 }' "$COUNTS")
+if [[ "${torn:-1}" -eq 0 ]]; then
+    log_pass "twelve concurrent readers all see the whole compile"
+else
+    log_fail "twelve concurrent readers all see the whole compile" \
+        "$torn reader(s) got a truncated cache: $(sort -u "$COUNTS" | tr '\n' ' ')"
+fi
+
+# The cache is keyed by manifest mtime, and a manifest does not change when the
+# PARSER does. Without a version in the path, a release that fixes the awk
+# would take effect on no installed machine, ever.
+if grep -q '_PACK_YML_CACHE_VERSION' "$ROOT_DIR/hooks/lib/pack-loader.sh"; then
+    log_pass "the cache path carries a parser version, not only the manifest mtime"
+else
+    log_fail "the cache path carries a parser version" \
+        "a parser fix would never reach an installed machine"
+fi
+
+# A manifest whose mtime moved BACKWARDS: `git checkout` of an older version,
+# `git stash pop`, `tar -x`, `rsync -t`. `-nt` only answers "is it newer", so
+# the cache stayed frozen on the newer content indefinitely, which is the pack
+# developer's everyday loop, the one the cache comment claims to protect.
+printf 'compatibility:\n  stack: ["NEW"]\n' > "$CACHE_WORK/a/b/pack.yml"
+_cached_stack "$CACHE_WORK/a/b/pack.yml" >/dev/null
+printf 'compatibility:\n  stack: ["RESTORED"]\n' > "$CACHE_WORK/a/b/pack.yml"
+touch -t 202001010000 "$CACHE_WORK/a/b/pack.yml"
+restored=$(_cached_stack "$CACHE_WORK/a/b/pack.yml")
+if [[ "$restored" == "RESTORED" ]]; then
+    log_pass "a manifest restored from an older version is re-read, not served stale"
+else
+    log_fail "a manifest restored from an older version is re-read" "got '$restored'"
+fi
+
+# A path no filesystem will hold as a file name. The escaping triples every
+# underscore and mktemp adds six characters, so a deep checkout crossed
+# NAME_MAX, mktemp failed, and the pack lost every validator with nothing on
+# stderr.
+DEEP="$CACHE_WORK/$(python3 -c "print('/'.join('seg%02d_x' % i for i in range(24)))")"
+mkdir -p "$DEEP"
+printf 'hooks:\n  validators: ["deep.sh"]\n' > "$DEEP/pack.yml"
+deep_result=$(CLAUDE_PLUGIN_DATA="$CACHE_WORK/data" bash -c \
+    "source '$ROOT_DIR/hooks/lib/pack-loader.sh'; _pack_yml_nested_array hooks validators '$DEEP/pack.yml'" 2>/dev/null)
+if [[ "$deep_result" == "deep.sh" ]]; then
+    log_pass "a manifest too deep for a cache file name is still parsed"
+else
+    log_fail "a manifest too deep for a cache file name is still parsed" "got '$deep_result'"
+fi
+
+# A cache is an optimisation. A read-only data directory must change the cost
+# and never the answer.
+chmod 500 "$CACHE_WORK/data" 2>/dev/null || true
+readonly_result=$(CLAUDE_PLUGIN_DATA="$CACHE_WORK/data" bash -c \
+    "source '$ROOT_DIR/hooks/lib/pack-loader.sh'; _pack_yml_nested_array hooks validators '$DEEP/pack.yml'" 2>/dev/null)
+chmod 700 "$CACHE_WORK/data" 2>/dev/null || true
+if [[ "$readonly_result" == "deep.sh" ]]; then
+    log_pass "an unwritable cache directory falls back to parsing the manifest"
+else
+    log_fail "an unwritable cache directory falls back to parsing the manifest" "got '$readonly_result'"
+fi
+
+rm -rf "$CACHE_WORK"
+
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 rm -rf "$TEST_PACKS_DIR"
 

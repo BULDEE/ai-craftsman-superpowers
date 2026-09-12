@@ -571,6 +571,76 @@ unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 unset CLAUDE_PLUGIN_OPTION_sentry_org 2>/dev/null || true
 unset CLAUDE_PLUGIN_OPTION_sentry_project 2>/dev/null || true
+# --- The one key that consents to running a cloned repository's code ---------
+#
+# `trust_project_tools` lets Level 2 run vendor/bin/phpstan and an eslint flat
+# config, which is executable JavaScript by design. The parser was rewritten
+# in-shell for speed, and three shapes had to be DECIDED rather than inherited
+# from whatever a pipeline happened to do. Each is asserted, because a silent
+# change here is a change to who may execute code on this machine.
+CONSENT_HOME=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-consent.XXXXXX")
+mkdir -p "$CONSENT_HOME/.claude"
+
+_consent_says() {
+    printf '%s' "$1" > "$CONSENT_HOME/.claude/.craft-config.yml"
+    if HOME="$CONSENT_HOME" bash -c "source '$ROOT_DIR/hooks/lib/config.sh'; config_trust_project_tools"; then
+        printf 'trusted'
+    else
+        printf 'inert'
+    fi
+}
+
+for case_line in \
+    'trust_project_tools: true|trusted|the canonical form' \
+    'trust_project_tools: false|inert|an explicit false' \
+    'trust_project_tools:true|inert|no space after the colon is not a YAML mapping' \
+    'trust_project_tools: true # I trust this machine|trusted|a comment is not part of the value' \
+    'trust_project_tools: "true"|trusted|a quoted value' \
+    'other_key: true|inert|another key entirely'
+do
+    IFS='|' read -r line expected why <<< "$case_line"
+    got=$(_consent_says "$line
+")
+    if [[ "$got" == "$expected" ]]; then
+        log_pass "consent: $why ($expected)"
+    else
+        log_fail "consent: $why" "expected $expected, got $got"
+    fi
+done
+
+# CRLF is the one shape that deliberately CHANGED. A CRLF file is valid YAML
+# and the machine owner wrote it; the pipeline this replaced ignored the whole
+# line, which is a user's own declaration silently dropped.
+printf 'trust_project_tools: true\r\n' > "$CONSENT_HOME/.claude/.craft-config.yml"
+if HOME="$CONSENT_HOME" bash -c "source '$ROOT_DIR/hooks/lib/config.sh'; config_trust_project_tools"; then
+    log_pass "consent: a CRLF file is honoured, and this is a deliberate change"
+else
+    log_fail "consent: a CRLF file is honoured" "still ignored"
+fi
+
+# The same question for the external pack list, where the value is a path this
+# plugin then loads code from.
+EXTERNAL_PACK=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-extpack.XXXXXX")
+printf 'packs:\r\n  external:\r\n    - path: %s\r\n' "$EXTERNAL_PACK" \
+    > "$CONSENT_HOME/.claude/.craft-config.yml"
+crlf_path=$(HOME="$CONSENT_HOME" bash -c "source '$ROOT_DIR/hooks/lib/config.sh'; config_external_packs")
+if [[ "$crlf_path" == "$EXTERNAL_PACK" ]]; then
+    log_pass "an external pack path survives CRLF without a stray carriage return"
+else
+    log_fail "an external pack path survives CRLF" "got '$crlf_path'"
+fi
+
+printf 'packs:\n  external:\n    - path: %s # my pack\n' "$EXTERNAL_PACK" \
+    > "$CONSENT_HOME/.claude/.craft-config.yml"
+commented_path=$(HOME="$CONSENT_HOME" bash -c "source '$ROOT_DIR/hooks/lib/config.sh'; config_external_packs")
+if [[ "$commented_path" == "$EXTERNAL_PACK" ]]; then
+    log_pass "and a trailing comment is not part of the path"
+else
+    log_fail "and a trailing comment is not part of the path" "got '$commented_path'"
+fi
+
+rm -rf "$CONSENT_HOME" "$EXTERNAL_PACK"
+
 rm -rf "$TEST_DIR"
 
 test_summary

@@ -91,17 +91,59 @@ _design_was_used() {
     [[ "$design_used" == "true" ]]
 }
 
+# Reported speech is not an instruction.
+#
+# A prompt can NAME a bias without exhibiting it: "why does the bias detector
+# flag 'while we are at it'?", "the ticket says skip the tests, is that wise?",
+# "the client asked for maximum performance in the SLA". Each of those warned,
+# and a warning on an ordinary question costs more than a missed bias, because
+# the first teaches the user to ignore the hook. README.md and CLAUDE.md both
+# claim the detector "requires imperative verb context"; this is the part of
+# that claim which was never implemented.
+#
+# Deliberately narrow: it fires only on a verb of attribution, so "make it
+# configurable, we might need it later" still warns, question mark or not.
+# Per language, declared beside that language's patterns, because a verb of
+# attribution is a fact about a language and not about this file. A language
+# that declares none simply has no guard, which is the honest default: the
+# eleven unmeasured languages are not silently claimed to have one.
+_bias_reported_pattern() {
+    local combined="" tier
+    for tier in curated signal; do
+        local pattern
+        pattern=$(bias_combined_pattern REPORTED "$tier") || continue
+        if [[ -n "$combined" ]]; then
+            combined="${combined}|${pattern}"
+        else
+            combined="$pattern"
+        fi
+    done
+    [[ -z "$combined" ]] && return 1
+    printf '%s' "$combined"
+}
+
+_bias_is_reported() {
+    local pattern
+    pattern=$(_bias_reported_pattern) || return 1
+    printf '%s' "$PROMPT" | grep -iEq "$pattern"
+}
+
+_bias_matches() {
+    _bias_is_reported && return 1
+    printf '%s' "$PROMPT" | grep -iEq "$1"
+}
+
 # Check each curated category. bias_combined_pattern returns non-zero when no
 # language declares a category, and the grep MUST be skipped then: an empty
 # pattern matches every prompt.
 if pat=$(bias_combined_pattern ACCELERATION curated); then
-    echo "$PROMPT" | grep -iEq "$pat" && warn_acceleration || true
+    _bias_matches "$pat" && warn_acceleration || true
 fi
 if pat=$(bias_combined_pattern SCOPE_CREEP curated); then
-    echo "$PROMPT" | grep -iEq "$pat" && warn_scope_creep || true
+    _bias_matches "$pat" && warn_scope_creep || true
 fi
 if pat=$(bias_combined_pattern OVER_OPT curated); then
-    echo "$PROMPT" | grep -iEq "$pat" && warn_over_optimization || true
+    _bias_matches "$pat" && warn_over_optimization || true
 fi
 
 # Workflow enforcement: warn if domain modeling without /craftsman:design
@@ -113,7 +155,11 @@ fi
 # is not a verdict; the main model adjudicates it in context. Matching is
 # case-sensitive on purpose: signal patterns carry explicit case variants
 # because grep -i case folding is locale-dependent beyond ASCII.
-if [[ -z "$WARNINGS" ]]; then
+# The reported-speech guard applies to BOTH tiers. It sat on the curated path
+# alone, so English was protected and the twelve signal languages were not:
+# "le ticket dit qu'on saute les tests, c'est raisonnable ?" still produced a
+# note, which is the same false positive in another language.
+if [[ -z "$WARNINGS" ]] && ! _bias_is_reported; then
     for _cat_pair in "ACCELERATION acceleration" "SCOPE_CREEP scope_creep" \
                      "OVER_OPT over_optimization" "DOMAIN_MODELING domain_modeling"; do
         _cat="${_cat_pair%% *}"
