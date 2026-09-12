@@ -16,7 +16,9 @@ Commands:
     append <state_path> <list_key> <json_item> [max_entries]       - Atomically append to list
     increment <state_path> <counter_key>                           - Atomically increment a counter
     check-flag <state_path> <key>                                  - Print 'true'/'false' for boolean key
-    record-violation <state_path> <file> <directory> <rules_json>  - Record violation with pattern tracking
+    record-violation <state_path> <file> <directory> <rules_json> [--detect]
+                                                                   - Record violation with pattern tracking;
+                                                                     --detect also prints the cross-file patterns
     detect-patterns <state_path>                                   - Detect cross-file patterns
     pre-compact <state_path>                                       - Save session context before compaction
     post-compact <state_path>                                      - Verify state recovery after compaction
@@ -145,6 +147,13 @@ def handle_check_flag(arguments: list[str]) -> None:
 
 
 def handle_record_violation(arguments: list[str]) -> None:
+    """Record, and with `--detect` also print the cross-file patterns.
+
+    The hook always detected right after recording, from a second interpreter
+    start that re-read the state this one had just written. The state is in
+    hand here; printing the patterns from it is the same answer one process
+    earlier.
+    """
     state_path, file_path, directory = arguments[0], arguments[1], arguments[2]
     violated_rules = json.loads(arguments[3])
     state = read_state(state_path)
@@ -152,6 +161,9 @@ def handle_record_violation(arguments: list[str]) -> None:
     violation_patterns = state.setdefault('patterns', {})
     _track_violation_patterns(violation_patterns, violated_rules, directory, file_path)
     write_state_atomically(state_path, state)
+    if '--detect' in arguments[4:]:
+        for pattern_description in _find_cross_file_patterns(violation_patterns):
+            print(pattern_description)
 
 
 def handle_detect_patterns(arguments: list[str]) -> None:

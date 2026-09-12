@@ -282,4 +282,95 @@ else
 fi
 rm -rf "$MIG_HOME"
 
+# =============================================================================
+# One interpreter start per write, not per finding
+#
+# A write with five findings started five interpreters to insert five rows,
+# the largest single cost left on the dirty path of the latency benchmark. The
+# hook now queues its rows and inserts them together on exit. Asserted on the
+# rows (all of them land, with the values the immediate path would have
+# written) and on the starts (one), with a shim that counts them; and the
+# immediate path is asserted too, because every caller that never opened a
+# queue must keep working with no flush to remember.
+# =============================================================================
+echo ""
+echo "--- Queued inserts ---"
+
+BATCH_DATA="$CLAUDE_PLUGIN_DATA/batch"
+mkdir -p "$BATCH_DATA/shim" "$BATCH_DATA/repo/src"
+REAL_PYTHON="$(command -v python3)"
+cat > "$BATCH_DATA/shim/python3" <<SHIM_EOF
+#!/usr/bin/env bash
+[[ "\${1##*/}" == "metrics-query.py" || "\${2##*/}" == "metrics-query.py" ]] && echo "\$*" >> "$BATCH_DATA/query-starts"
+exec "$REAL_PYTHON" "\$@"
+SHIM_EOF
+chmod +x "$BATCH_DATA/shim/python3"
+
+cat > "$BATCH_DATA/repo/src/Dirty.php" <<'PHP'
+<?php
+class Dirty {
+    public function setName($name) { $this->name = $name; }
+    public function query($id) { return "SELECT * FROM t WHERE id = " . $id; }
+}
+PHP
+( cd "$BATCH_DATA/repo" && git init -q && git add -A && git commit -qm one ) >/dev/null 2>&1
+
+rm -f "$BATCH_DATA/query-starts"
+printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \
+    "$BATCH_DATA/repo/src/Dirty.php" "$BATCH_DATA/repo" \
+    | ( cd "$BATCH_DATA/repo" && CLAUDE_PLUGIN_DATA="$BATCH_DATA/data" HOME="$BATCH_DATA/home" \
+        PATH="$BATCH_DATA/shim:$PATH" bash "$ROOT_DIR/hooks/post-write-check.sh" >/dev/null 2>&1 )
+
+BATCH_ROWS="$(python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$BATCH_DATA/data/metrics.db" \
+    "SELECT rule, severity, blocked, file_path FROM violations ORDER BY rule" 2>/dev/null)"
+BATCH_INSERTS="$(grep -c "INSERT INTO violations" "$BATCH_DATA/query-starts" 2>/dev/null || echo 0)"
+if [[ "$BATCH_INSERTS" == "1" ]]; then
+    log_pass "a write with five findings inserts them in one interpreter start"
+else
+    log_fail "a write with five findings inserts them in one interpreter start" \
+        "${BATCH_INSERTS} insert start(s)"
+fi
+if [[ "$(printf '%s\n' "$BATCH_ROWS" | grep -c .)" == "5" ]]; then
+    log_pass "and all five rows land"
+else
+    log_fail "and all five rows land" "$BATCH_ROWS"
+fi
+assert_contains "with the blocking verdict recorded" "$BATCH_ROWS" "PHP001|critical|1|src/Dirty.php"
+assert_contains "and the advisory one" "$BATCH_ROWS" "PHP003|warning|0|src/Dirty.php"
+if ls "$BATCH_DATA/data"/violations-queue.* >/dev/null 2>&1; then
+    log_fail "the queue file does not outlive the hook" "$(ls "$BATCH_DATA/data"/violations-queue.*)"
+else
+    log_pass "the queue file does not outlive the hook"
+fi
+
+# A row that does not have the statement's shape is refused, not guessed at.
+MALFORMED_DB="$BATCH_DATA/malformed.db"
+python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --script "$MALFORMED_DB" \
+    "CREATE TABLE violations (project_hash TEXT, rule TEXT, file_pattern TEXT, severity TEXT, blocked INTEGER, ignored INTEGER, source TEXT, file_path TEXT)"
+MALFORMED_ERR="$(printf 'h\037PHP001\037src/**/*.php\037critical\0371\0370\037session\037src/A.php\nh\037PHP002\037broken\n' \
+    | python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --batch "$MALFORMED_DB" \
+        "INSERT INTO violations VALUES (?, ?, ?, ?, ?, ?, ?, ?)" 2>&1 >/dev/null)"
+MALFORMED_ROWS="$(python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$MALFORMED_DB" "SELECT rule FROM violations" 2>/dev/null)"
+if [[ "$MALFORMED_ROWS" == "PHP001" ]]; then
+    log_pass "--batch inserts the well-formed row and refuses the malformed one"
+else
+    log_fail "--batch inserts the well-formed row and refuses the malformed one" "rows: $MALFORMED_ROWS"
+fi
+assert_contains "and says which line it refused" "$MALFORMED_ERR" "line 2 has 3 field(s), the statement binds 8"
+
+# No queue opened: the immediate path, one start per row, as every other
+# caller expects.
+( PATH="$BATCH_DATA/shim:$PATH" bash -c "
+    source '$ROOT_DIR/hooks/lib/metrics-db.sh'
+    metrics_record_violation IMMEDIATE1 'src/**/*.php' critical 1 0
+    metrics_record_violation IMMEDIATE2 'src/**/*.php' warning 0 0
+" >/dev/null 2>&1 )
+IMMEDIATE_ROWS="$(python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$METRICS_DB" \
+    "SELECT rule FROM violations WHERE rule LIKE 'IMMEDIATE%' ORDER BY rule" 2>/dev/null | tr '\n' ' ')"
+if [[ "$IMMEDIATE_ROWS" == "IMMEDIATE1 IMMEDIATE2 " ]]; then
+    log_pass "a caller that opened no queue still inserts immediately"
+else
+    log_fail "a caller that opened no queue still inserts immediately" "rows: '$IMMEDIATE_ROWS'"
+fi
+
 test_summary

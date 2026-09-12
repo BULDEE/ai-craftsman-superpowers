@@ -37,6 +37,22 @@ command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
 # Session state for correction learning
 SESSION_STATE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
 
+# The blocked rule ids of this write, as a JSON array.
+_blocked_rules_json() {
+    local rules_json="[" first=true line r
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        r="${line%%:*}"
+        if [[ "$first" == true ]]; then
+            rules_json="${rules_json}\"${r}\""
+            first=false
+        else
+            rules_json="${rules_json},\"${r}\""
+        fi
+    done <<< "$(echo -e "$CRITICAL_VIOLATIONS")"
+    printf '%s]' "$rules_json"
+}
+
 _write_session_state() {
     $HAS_PYTHON3 || return 0
     local file="$1"
@@ -45,28 +61,21 @@ _write_session_state() {
     mkdir -p "$(dirname "$SESSION_STATE")"
 
     # Extract directory bucket for cross-file pattern grouping
-    local dir_bucket
+    local dir_bucket rules_json
     dir_bucket=$(dirname "$file" | sed -E "s|${PWD}/||")
+    rules_json=$(_blocked_rules_json)
 
-    # Collect current blocked rules for this file
-    local rules_json="["
-    local first=true
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        local r="${line%%:*}"
-        if [[ "$first" == true ]]; then
-            rules_json="${rules_json}\"${r}\""
-            first=false
-        else
-            rules_json="${rules_json},\"${r}\""
-        fi
-    done <<< "$(echo -e "$CRITICAL_VIOLATIONS")"
-    rules_json="${rules_json}]"
-
-    # Atomically record violation with cross-file pattern tracking
-    python3 "$SCRIPT_DIR/lib/session_state.py" record-violation \
-        "$SESSION_STATE" "$file_pattern" "$dir_bucket" "$rules_json" 2>&1 || echo "WARNING: session state write failed" >&2
+    # Atomically record violation with cross-file pattern tracking. The
+    # patterns come back from the same interpreter start, read from the state
+    # it just wrote: the detection that followed used to be a second start
+    # re-reading the same file.
+    RECORDED_PATTERNS=$(python3 "$SCRIPT_DIR/lib/session_state.py" record-violation \
+        "$SESSION_STATE" "$file_pattern" "$dir_bucket" "$rules_json" --detect 2>&1) \
+        && RECORDED_PATTERNS_FRESH=true \
+        || { echo "WARNING: session state write failed" >&2; RECORDED_PATTERNS=""; }
 }
+RECORDED_PATTERNS=""
+RECORDED_PATTERNS_FRESH=false
 
 # Detect cross-file patterns: same rule in 3+ files → suggest project-wide fix
 #
@@ -81,8 +90,12 @@ _detect_cross_file_patterns() {
     [[ ! -f "$SESSION_STATE" ]] && return
 
     local raw
-    raw=$(python3 "$SCRIPT_DIR/lib/session_state.py" detect-patterns "$SESSION_STATE" 2>&1) \
-        || { echo "WARNING: cross-file pattern detection failed" >&2; return 0; }
+    if $RECORDED_PATTERNS_FRESH; then
+        raw="$RECORDED_PATTERNS"
+    else
+        raw=$(python3 "$SCRIPT_DIR/lib/session_state.py" detect-patterns "$SESSION_STATE" 2>&1) \
+            || { echo "WARNING: cross-file pattern detection failed" >&2; return 0; }
+    fi
 
     local line rule
     while IFS= read -r line; do
@@ -120,6 +133,14 @@ _check_corrections() {
 
 # Init metrics DB (creates tables if needed, idempotent)
 metrics_init 2>/dev/null || true
+
+# Every finding on this write is inserted in ONE interpreter start, on exit,
+# whichever of the three exits below is taken (the ERR trap ends in `exit 0`,
+# which runs this too). Nothing below reads the violations table back within
+# the same run, so deferring the insert changes when the rows land and not what
+# any verdict says. The flush prints nothing: stdout is the hook's JSON.
+metrics_violations_queue_open
+trap 'metrics_violations_queue_flush 2>/dev/null' EXIT
 
 # Init pack loader (discovers and sources pack validators)
 pack_loader_init

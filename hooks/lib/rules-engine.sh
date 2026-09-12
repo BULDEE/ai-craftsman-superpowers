@@ -716,6 +716,10 @@ rules_severity_is_explicit() {
 rules_baseline_holds() {
     local file_path="$1" rule_id="$2" severity="$3"
     [[ "$severity" != "block" ]] && return 1
+    # Cheapest exclusion first: no mark above the file means nothing can be
+    # pre-existing, and that answer costs no process, where the explicit-
+    # severity lookup below costs several forks per finding.
+    type rule_baseline_marked >/dev/null 2>&1 && ! rule_baseline_marked "$file_path" && return 1
     # An explicit promotion outranks the mark. Writing `PY004: block` in
     # .craft-rules.yml and watching the finding stay advisory is a setting
     # silently ignored: the same class of defect as a strictness level that

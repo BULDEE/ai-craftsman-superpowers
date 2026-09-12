@@ -117,6 +117,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A write with findings costs one interpreter start for its metrics, not one
+  per finding.** `metrics_record_violation` queues its rows while
+  `post-write-check.sh` runs and inserts them together on exit through
+  `metrics-query.py --batch`, one statement per line, a malformed line refused
+  and named rather than guessed at. A caller that never opened a queue inserts
+  immediately, as before. Two more starts went the same way: the rule baseline
+  now answers "no mark above this file" in the shell, with no process at all,
+  before it asks Python or walks the explicit-severity lookup, and
+  `record-violation --detect` prints the cross-file patterns from the state it
+  just wrote instead of a second start re-reading it. Measured on a write
+  with five findings: 1872ms to 1401ms on the same machine (the "3 violations"
+  row of `tests/perf/test-hook-latency.sh`), which is what the inherited-debt
+  mark and the semantic telemetry had cost that path since 4.9.0.
+
 - **BREAKING for a CRLF `~/.claude/.craft-config.yml`: `trust_project_tools`
   and the external pack list are now read from it.** That file is the machine
   owner's own configuration, and `trust_project_tools` is the only consent this

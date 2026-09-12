@@ -1168,6 +1168,33 @@ else
     log_fail "Directory pattern detection" "expected DIR_PATTERN:PHP001:src/Domain"
 fi
 
+# Test: the hook itself says PROJECT-WIDE PATTERN, through the real path.
+#
+# The inline detection above proves the arithmetic; this proves the hook
+# reports it. The two used to be separate interpreter starts (record, then
+# detect from a re-read of the state); they are one start now, and a wiring
+# error between them would have left the arithmetic green and the user
+# never told.
+export CLAUDE_PLUGIN_OPTION_strictness="strict"
+unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
+PATTERN_REPO="$(mktemp -d "${TMPDIR:-/tmp}/craftsman-pattern.XXXXXX")"
+mkdir -p "$PATTERN_REPO/src/Domain" "$PATTERN_REPO/src/App" "$PATTERN_REPO/src/Infra"
+( cd "$PATTERN_REPO" && git init -q ) >/dev/null 2>&1
+rm -f "$PATTERN_TEST_STATE"
+THIRD_OUTPUT=""
+for bucket in Domain App Infra; do
+    printf '<?php\nclass %s { public function setX($v) { $this->x = $v; } }\n' "$bucket" > "$PATTERN_REPO/src/$bucket/$bucket.php"
+    THIRD_OUTPUT=$(echo "{\"tool_input\":{\"file_path\":\"$PATTERN_REPO/src/$bucket/$bucket.php\"}}" \
+        | ( cd "$PATTERN_REPO" && bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1 ))
+done
+rm -rf "$PATTERN_REPO"
+if echo "$THIRD_OUTPUT" | grep -q "PROJECT-WIDE PATTERN: PHP001 found in 3 files"; then
+    log_pass "Cross-file patterns: the third blocked file is told PROJECT-WIDE PATTERN by the hook"
+else
+    log_fail "Cross-file patterns: the third blocked file is told PROJECT-WIDE PATTERN by the hook" \
+        "$(echo "$THIRD_OUTPUT" | grep -i "pattern" | head -3)"
+fi
+
 # Test: session state has 'patterns' key after a blocked violation
 rm -f "$PATTERN_TEST_STATE"
 # A blocked violation is the precondition here, so the severity is pinned.

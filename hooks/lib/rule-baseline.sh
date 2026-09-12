@@ -20,6 +20,9 @@
 
 _RULE_BASELINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _RULE_BASELINE_PY="${_RULE_BASELINE_DIR}/rule_baseline.py"
+# The same name ratchet.py's BASELINE_NAME holds; tests/core/test-rule-baseline.sh
+# fails when the two drift.
+_RULE_BASELINE_NAME=".craftsman-baseline.json"
 
 # What this mechanism does NOT catch, stated where the next reader will look.
 #
@@ -123,11 +126,65 @@ _rule_baseline_never_holds() {
     return 1
 }
 
+# rule_baseline_marked <file>
+# Exit 0 when a mark file exists somewhere the Python side could anchor on:
+# the pinned CRAFTSMAN_PROJECT_ROOT, or any directory from the file's own up
+# to the filesystem root, on the logical path and on the physical one.
+#
+# The set is a superset of what `rule_baseline.py` can find (it stops at the
+# repository root; this walks to `/`), so a negative answer here is exact:
+# with no mark anywhere, `counts` prints nothing and every occurrence is new.
+# The answer is computed in this shell with no process at all, and that is the
+# point: a repository that never took a mark (most of them) paid one
+# interpreter start plus a dozen forks per blocking finding to be told so,
+# 130ms on a write with three findings, on the path the latency benchmark
+# names as the one that scales with the debt.
+_RULE_BASELINE_MARKED_FOR=""
+_RULE_BASELINE_MARKED=1
+
+_rule_baseline_mark_above() {
+    local dir="$1"
+    while :; do
+        [[ -f "$dir/$_RULE_BASELINE_NAME" ]] && return 0
+        [[ "$dir" == "/" || -z "$dir" ]] && return 1
+        dir="${dir%/*}"
+        [[ -z "$dir" ]] && dir="/"
+    done
+}
+
+rule_baseline_marked() {
+    local file="$1"
+    if [[ "$_RULE_BASELINE_MARKED_FOR" == "$file" ]]; then
+        return "$_RULE_BASELINE_MARKED"
+    fi
+    _RULE_BASELINE_MARKED_FOR="$file"
+    _RULE_BASELINE_MARKED=1
+    if [[ -n "${CRAFTSMAN_PROJECT_ROOT:-}" && -f "${CRAFTSMAN_PROJECT_ROOT}/$_RULE_BASELINE_NAME" ]]; then
+        _RULE_BASELINE_MARKED=0
+        return 0
+    fi
+    local dir="${file%/*}"
+    [[ "$dir" == "$file" ]] && dir="."
+    [[ "$dir" != /* ]] && dir="${PWD}/${dir}"
+    dir="${dir%/.}"
+    if _rule_baseline_mark_above "$dir"; then
+        _RULE_BASELINE_MARKED=0
+        return 0
+    fi
+    # The Python side resolves symlinks before walking, so a mark that lives on
+    # the physical path counts. One fork, once per file, only on this branch.
+    local physical
+    physical=$(cd "$dir" 2>/dev/null && pwd -P) || return 1
+    [[ "$physical" != "$dir" ]] && _rule_baseline_mark_above "$physical" && _RULE_BASELINE_MARKED=0
+    return "$_RULE_BASELINE_MARKED"
+}
+
 # rule_baseline_is_preexisting <file> <rule>
 # Exit 0 when this occurrence was already there at the mark.
 rule_baseline_is_preexisting() {
     local file="$1" rule="$2"
     _rule_baseline_never_holds "$rule" && return 1
+    rule_baseline_marked "$file" || return 1
     command -v python3 >/dev/null 2>&1 || return 1
     [[ -f "$_RULE_BASELINE_PY" ]] || return 1
 
