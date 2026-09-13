@@ -30,6 +30,9 @@ _rule_registry_is_stale() {
     local cache="$1"
     shift
     [[ ! -f "$cache" ]] && return 0
+    # The compiler is an input too: a column added to the TSV is invisible
+    # to a cache built by the previous compiler, and every manifest is older.
+    [[ "$(_rule_registry_builder)" -nt "$cache" ]] && return 0
     local manifest
     for manifest in "$@"; do
         [[ -f "$manifest" && "$manifest" -nt "$cache" ]] && return 0
@@ -115,6 +118,8 @@ rule_group()            { _rule_field "$1" 2; }
 rule_default_severity() { _rule_field "$1" 3; }
 rule_owner()            { _rule_field "$1" 4; }
 rule_text()             { _rule_field "$1" 5; }
+# The manifest said no marker may silence this rule (`never_ignorable: true`).
+rule_never_ignorable()  { [[ "$(_rule_field "$1" 6)" == "yes" ]]; }
 
 rule_is_known() {
     [[ -n "$(rule_owner "$1")" ]]

@@ -235,7 +235,8 @@ d'héritage :
 
 Forme courte : `PHP001: warn` / `TS001: ignore`. Forme longue : règles
 personnalisées avec regex, sévérité, langages. Supprimez une occurrence unique
-en ligne avec `// craftsman-ignore: RULE_ID`.
+en ligne avec `// craftsman-ignore: RULE_ID`, sauf les règles de sécurité
+(`SEC*`), qu'aucun marqueur ne réduit au silence, sur aucun front.
 
 ## Intégration CI/CD
 

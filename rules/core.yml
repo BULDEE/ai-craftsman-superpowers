@@ -53,14 +53,17 @@ rules:
     group: Security
     text: "no hardcoded secret - read it from the environment or a vault"
     default_severity: block
+    never_ignorable: true
   - id: SEC002
     group: Security
     text: "never eval or shell out with a value you did not author"
     default_severity: block
+    never_ignorable: true
   - id: SEC003
     group: Security
     text: "no SQL built by concatenation or template literal - bind the parameters"
     default_severity: block
+    never_ignorable: true
 
   # The structural rules ship advisory-first so a team can measure the real
   # noise on an existing codebase before escalating; LOC001 stays advisory

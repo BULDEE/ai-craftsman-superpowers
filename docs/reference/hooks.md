@@ -69,7 +69,7 @@ Agent hooks run AI models (Haiku) for semantic analysis beyond regex patterns:
 
 ## Security Invariant Tests (v3.8.0+)
 
-`tests/core/test-security-invariants.sh` proves - rather than assumes - that `config-protection.sh` and `pre-write-check.sh` never execute arbitrary code or touch the filesystem outside their contract, even when fed adversarial `file_path`/`content` values (command substitution, path traversal, shell metacharacters, malformed non-JSON stdin). Sandbox + witness-marker pattern: a marker file is planted, the hook is fed a payload designed to delete or alter it, and the test asserts the marker is untouched. Also verifies both hooks fail open (exit 0) on malformed input rather than crashing into an undefined state.
+`tests/core/test-security-invariants.sh` proves - rather than assumes - that `config-protection.sh` and `pre-write-check.sh` never execute arbitrary code or touch the filesystem outside their contract, even when fed adversarial `file_path`/`content` values (command substitution, path traversal, shell metacharacters, malformed non-JSON stdin). Sandbox + witness-marker pattern: a marker file is planted, the hook is fed a payload designed to delete or alter it, and the test asserts the marker is untouched. Also verifies both hooks let malformed input through (exit 0: no file named, nothing to judge). A gate that cannot run at all (a crash inside the hook, `jq` missing) refuses the write with the reason and a retry advice, exit 2: no verdict is not a clean verdict (ADR-0029). Claude Code's own limit stays: a hook that times out does not block the call.
 
 Note: there is no hook that blocks destructive shell commands (`git reset --hard`, `rm -rf`) at the tool-execution level today - `/craftsman:git`'s destructive-command guidance is a prompt-level convention Claude follows, not code that intercepts Bash execution. This test suite covers what's actually enforceable in code: the Write/Edit quality-gate hooks.
 
@@ -215,6 +215,10 @@ Or suppress multiple rules:
 <?php
 // craftsman-ignore: PHP002
 ```
+
+A reason in the marker is the developer's verdict on the rule, recorded at the moment of the decision: `// craftsman-ignore: PHP002 (wrong: Doctrine proxies subclass entities)` says the rule was wrong here, `(debt: shipping Friday, see #123)` says the rule was right and the code is carried on purpose. A bare marker records no verdict.
+
+**Never ignorable:** a rule declared `never_ignorable: true` in the manifest that owns it (`SEC001`, `SEC002`, `SEC003` in `rules/core.yml`) is not silenced by any marker, on the hook, in CI or on the Hermes write gate: a secret with a comment beside it is still a secret on disk. Fix it, or scope the rule in a `.craft-rules.yml` where a human reviews the change.
 
 > **Important:** Ignored violations are still recorded in the metrics database with `ignored=1`. This ensures transparency - you can always see what was suppressed via `/craftsman:metrics`.
 

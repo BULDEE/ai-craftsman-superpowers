@@ -171,6 +171,20 @@ haiku_finding_rules() {
     done <<< "$1"
 }
 
+# haiku_verdict_is_clean <verdict>: the exact token, and nothing else.
+#
+# The prompt asks for the single word CLEAN. Anything else that is not the
+# findings token is a reply the layer cannot read: a refusal, a rate limit, an
+# empty body, a truncated answer, a sentence with the word in it, an injected
+# instruction. Every one of those used to be treated as CLEAN, recorded as a
+# clean run and allowed to close the file's earlier findings as "fixed". A
+# reply that says nothing is `unavailable`, the same outcome as no reply.
+haiku_verdict_is_clean() {
+    local verdict
+    verdict=$(printf '%s' "$1" | tr -d '[:space:]')
+    [[ "$verdict" == "CLEAN" ]]
+}
+
 # haiku_close_resolved <file> <current-findings>
 #
 # What this layer said about a file last time, and no longer says, is fixed.
@@ -179,13 +193,22 @@ haiku_finding_rules() {
 # else in the tree ever writes a HAIKU_* correction, and a decision report that
 # can only print n/a is worse than no report.
 #
-# A CLEAN verdict resolves everything the file carried, which is the whole
-# point: the same instrument that raised the finding is the one that clears it.
+# The same instrument that raised the finding is the one that clears it, and
+# that is exactly why it may only do so when the FILE changed in between: the
+# same content judged twice with two answers is the model's variance, and a
+# fixed rate fed by variance measures nothing. The content hash recorded with
+# the last run that found something is the witness.
 haiku_close_resolved() {
     local file="$1" current="$2"
     local rule
     type metrics_haiku_previous_rules >/dev/null 2>&1 || return 0
     [[ -z "$file" || ! -e "$file" ]] && return 0
+    if type metrics_haiku_last_finding_hash >/dev/null 2>&1; then
+        local then_hash now_hash
+        then_hash=$(metrics_haiku_last_finding_hash "$file")
+        now_hash=$(metrics_content_hash "$file")
+        [[ -n "$then_hash" && "$then_hash" == "$now_hash" ]] && return 0
+    fi
     while IFS= read -r rule; do
         [[ -z "$rule" ]] && continue
         printf '%s' "$current" | grep -q "$rule" && continue

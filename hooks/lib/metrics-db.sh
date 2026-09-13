@@ -335,6 +335,24 @@ metrics_init() {
     _metrics_migrate_source_column
     _metrics_migrate_file_path_column
     _metrics_create_verdicts_table
+    _metrics_migrate_haiku_content_hash
+}
+
+# What the file looked like when the verifier last judged it. A CLEAN on the
+# SAME content that carried a finding is the model changing its mind, not the
+# developer fixing anything: measured by two reviewers, a stub answering a
+# refusal or nothing closed every earlier finding as "fixed". Closing is
+# allowed only when the content moved between the two verdicts.
+_metrics_migrate_haiku_content_hash() {
+    if ! _metrics_sql_read "PRAGMA table_info(haiku_runs);" | grep -q '|content_hash|'; then
+        _metrics_sql <<< "ALTER TABLE haiku_runs ADD COLUMN content_hash TEXT;" 2>/dev/null
+    fi
+}
+
+# metrics_content_hash <file>: sha256 of the content, empty when unreadable.
+metrics_content_hash() {
+    [[ -n "${1:-}" && -f "$1" ]] || return 0
+    shasum -a 256 "$1" 2>/dev/null | cut -d' ' -f1
 }
 
 # The identity of a project is its git toplevel, not the directory the session
@@ -509,12 +527,27 @@ metrics_record_haiku_run() {
     esac
     [[ "$findings" =~ ^[0-9]+$ ]] || findings=0
     [[ "$duration_ms" =~ ^[0-9]+$ ]] || duration_ms=0
-    local project_hash pattern=""
+    local project_hash pattern="" content_hash=""
     project_hash=$(metrics_project_hash)
     [[ -n "$file" ]] && pattern=$(metrics_file_pattern "$file")
+    [[ -n "$file" ]] && content_hash=$(metrics_content_hash "$file")
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
-        "INSERT INTO haiku_runs (project_hash, hook, verdict, findings, duration_ms, file_pattern) VALUES (?, ?, ?, ?, ?, ?)" \
-        "$project_hash" "$hook" "$verdict" "$findings" "$duration_ms" "$pattern"
+        "INSERT INTO haiku_runs (project_hash, hook, verdict, findings, duration_ms, file_pattern, content_hash) VALUES (?, ?, ?, ?, ?, ?, ?)" \
+        "$project_hash" "$hook" "$verdict" "$findings" "$duration_ms" "$pattern" "$content_hash"
+}
+
+# metrics_haiku_last_finding_hash <file>: the content hash recorded with the
+# most recent run that reported findings on this file, empty when none.
+metrics_haiku_last_finding_hash() {
+    local file="$1"
+    local project_hash pattern
+    project_hash=$(metrics_project_hash)
+    pattern=$(metrics_file_pattern "$file")
+    python3 "${METRICS_LIB_DIR}/metrics-query.py" --raw "$METRICS_DB" \
+        "SELECT COALESCE(content_hash, '') FROM haiku_runs
+         WHERE project_hash=? AND file_pattern=? AND verdict='findings'
+         ORDER BY id DESC LIMIT 1" \
+        "$project_hash" "$pattern" 2>/dev/null || true
 }
 
 # The rules this layer last recorded for one file, from its most recent run.

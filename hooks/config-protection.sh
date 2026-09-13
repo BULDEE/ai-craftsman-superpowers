@@ -9,14 +9,18 @@
 # =============================================================================
 set -uo pipefail
 
-trap 'echo "WARNING: config-protection.sh failed at line $LINENO" >&2; exit 0' ERR
+# A gate that cannot run is not a clean verdict (ADR-0029): refused, with the
+# line and the retry advice. Malformed input names no file and is let through
+# by the tolerant read below, not by this trap.
+trap 'echo "The craftsman config gate could not run (config-protection.sh, line $LINENO). Retry the write once; if it repeats, the gate needs attention, not the write." >&2; exit 2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/hook-profile.sh"
 hook_profile_should_run "config-protection" "always" || exit 0
 
 INPUT=$(cat)
-FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
+command -v jq >/dev/null 2>&1 || false
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
 [[ -z "$FILE_PATH" ]] && exit 0
 
 BASENAME="$(basename "$FILE_PATH")"

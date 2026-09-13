@@ -9,7 +9,7 @@ advisory defaults, so a pack shipping DART001 had nowhere to declare any of it.
 
 Output, one row per rule:
 
-    <id>\t<group>\t<default_severity>\t<owner>\t<text>
+    <id>\t<group>\t<default_severity>\t<owner>\t<text>\t<never_ignorable: yes|no>
 
 Text comes last: it is the only field that may contain spaces, so a consumer can
 cut the first four columns without quoting rules.
@@ -194,16 +194,21 @@ class _Registry:
         group = str(entry.get("group") or "Other").strip()
         if group not in self._groups:
             self._groups.append(group)
+        # A rule a marker may never silence. Declared by the manifest that
+        # owns the rule, read by every marker reader through one predicate:
+        # an ignore marker naming SEC001 used to pass a hardcoded secret on the
+        # hook, the pipeline and the Hermes write gate alike.
+        never_ignorable = "yes" if entry.get("never_ignorable") is True else "no"
         self._rows[rule_id] = [
             rule_id, group, self._severity_of(entry, rule_id), owner,
-            str(entry.get("text") or rule_id),
+            str(entry.get("text") or rule_id), never_ignorable,
         ]
 
     def flush(self) -> None:
         for rule_id in self._rows:
             _emit(self._rows[rule_id])
         for position, name in enumerate(self._groups):
-            _emit([GROUP_MARKER, position, "", "core", name])
+            _emit([GROUP_MARKER, position, "", "core", name, ""])
 
 
 def _owner_of(path: str) -> str:

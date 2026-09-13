@@ -228,7 +228,8 @@ Override any rule per-project or per-directory with 3-level config inheritance:
 
 Short form: `PHP001: warn` / `TS001: ignore`. Long form: custom rules with
 regex, severity, languages. Suppress a single occurrence inline with
-`// craftsman-ignore: RULE_ID`.
+`// craftsman-ignore: RULE_ID`, except the security rules (`SEC*`), which no
+marker silences on any front-end.
 
 ## CI/CD Integration
 

@@ -126,5 +126,11 @@ if [[ "$VERDICT" == REVIEW_ISSUES* ]]; then
     exit 2
 fi
 
+# Only the exact token is a clean verdict; anything else the layer cannot read
+# is recorded unavailable (see agent-ddd-verifier.sh).
+if ! haiku_verdict_is_clean "$VERDICT"; then
+    metrics_record_haiku_run "agent-final-review" "unavailable" 0 "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
+    exit 0
+fi
 metrics_record_haiku_run "agent-final-review" "clean" 0 "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
 exit 0

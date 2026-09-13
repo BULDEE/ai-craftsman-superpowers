@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **An Edit is refused before it lands, like a Write.** `pre-write-check.sh`
+  read `.tool_input.content` only, which an Edit does not carry, so the
+  same layer violation that Write refused went through untouched as an
+  `old_string`/`new_string` pair (guardrail review, E2 against E1). The gate
+  now judges the file as it WOULD be: the current content with the edit
+  applied, or what the edit adds when its anchor is absent, never nothing.
+  The Write path is unchanged and pays no interpreter start.
+
+- **A gate that cannot run refuses the write.** Both PreToolUse hooks
+  trapped their own crash into `exit 0`, and the write landed with a
+  `WARNING` nobody reads: the fail-open ADR-0029 forbids and the Hermes
+  adapter already refused. They now exit 2 with the line and a retry advice.
+  Malformed input is not a crash: it names no file and passes as before.
+  Claude Code's own limit stays and is written where it applies: a hook
+  that times out does not block the call.
+
+- **A secret cannot be silenced with a marker, on any front-end.**
+  `// craftsman-ignore: SEC001` on the line made a hardcoded secret pass the
+  hook, the pipeline and the Hermes write gate whose README said "No escape
+  is offered for a secret" (guardrail review). The baseline already refused
+  to hold `SEC*`; the marker was the same class of escape, honoured by three
+  readers. `rules/core.yml` now declares `SEC001`, `SEC002` and `SEC003`
+  `never_ignorable: true`, `rule_registry.py` compiles it into the registry,
+  and every marker reader asks `rule_never_ignorable` before honouring one.
+  The registry cache is rebuilt when the compiler changes, not only when a
+  manifest does. Parity case on the three front-ends, seen red with the
+  manifest key removed.
+
+- **The Haiku verifier no longer grades itself.** Any reply that was not the
+  findings token was read as CLEAN: a rate-limit message, a refusal, an
+  empty body, a truncated answer, a sentence with the word in it. The run went
+  into `haiku_runs` as `clean` and `haiku_close_resolved` marked every earlier
+  finding on the file "fixed" with the file unchanged, so the Haiku fixed rate
+  that `/craftsman:metrics` uses to recommend `agent_hooks: false` was fed by
+  the model's variance and its outages. Reproduced by two reviewers with a
+  stubbed `claude`. Two locks now: only the exact token `CLEAN` is a clean
+  verdict, anything else is recorded `unavailable` and closes nothing; and a
+  CLEAN closes a finding only when the file's content changed since the run
+  that raised it (`haiku_runs.content_hash`, migrated in place). Seen red both
+  ways, five reply shapes.
+
 ## [4.10.1] - 2026-09-13
 
 The two features that were in review when 4.10.0 was tagged, one hook wiring
