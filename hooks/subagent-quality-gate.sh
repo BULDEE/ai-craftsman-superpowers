@@ -35,7 +35,8 @@ TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
 
 [[ -z "$AGENT_TYPE" ]] && exit 0
 
-SESSION_STATE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
+source "${SCRIPT_DIR}/lib/session-files.sh"
+SESSION_STATE=$(session_file session-state.json)
 
 log_subagent_activity() {
     $HAS_PYTHON3 || return 0

@@ -52,8 +52,12 @@ fi
 _BRIDGE_FILE="${HOME}/.claude/craftsman-session-state-path"
 if [[ -f "$_BRIDGE_FILE" ]]; then
     SESSION_STATE=$(< "$_BRIDGE_FILE")
+    # The bridge names the shared file; this session's own sits beside it.
+    source "${SCRIPT_DIR}/lib/session-files.sh"
+    [[ -n "${CLAUDE_CODE_SESSION_ID:-}" ]] && SESSION_STATE="$(dirname "$SESSION_STATE")/$(basename "$(session_file session-state.json)")"
 else
-    SESSION_STATE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
+    source "${SCRIPT_DIR}/lib/session-files.sh"
+    SESSION_STATE=$(session_file session-state.json)
 fi
 
 LIB_DIR="${SCRIPT_DIR}/lib"

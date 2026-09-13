@@ -528,4 +528,75 @@ else
     log_fail "a bare marker records no verdict" "rows: $(_verdict_rows | tr '\n' ';')"
 fi
 
+# =============================================================================
+# One finding, one verdict: also for rules emitted once per line (review CR-5)
+# =============================================================================
+#
+# TS001 and PHP003 fire once per offending line, and _blocked_rules_json kept
+# every occurrence: two `any` on two lines put ['TS001','TS001'] in the pending
+# set, and ONE fix wrote two `fixed` rows. occurrences in the instinct gate and
+# the acceptance report were inflated by the line count.
+echo ""
+echo "--- A rule that fires on two lines is one pending verdict ---"
+mkdir -p "$FIXTURES_DIR/src/app"
+cat > "$FIXTURES_DIR/src/app/Twice.ts" << 'FIXTURE'
+const first: any = 1;
+const second: any = 2;
+export const total = first + second;
+FIXTURE
+run_post_hook "$FIXTURES_DIR/src/app/Twice.ts" >/dev/null
+cat > "$FIXTURES_DIR/src/app/Twice.ts" << 'FIXTURE'
+const first: number = 1;
+const second: number = 2;
+export const total = first + second;
+FIXTURE
+run_post_hook "$FIXTURES_DIR/src/app/Twice.ts" >/dev/null
+_twice_rows() {
+    python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$CLAUDE_PLUGIN_DATA/metrics.db" \
+        "SELECT COUNT(*) FROM corrections WHERE rule='TS001' AND file_path='src/app/Twice.ts'" 2>/dev/null
+}
+if [[ "$(_twice_rows)" == "1" ]]; then
+    log_pass "two TS001 lines fixed in one write record one TS001 verdict"
+else
+    log_fail "two TS001 lines fixed in one write record one TS001 verdict" "rows: $(_twice_rows)"
+fi
+
+# =============================================================================
+# Two sessions do not share pending findings or patterns (review CR-3)
+# =============================================================================
+#
+# Session A blocks PHP001 on two files; session B, another project, blocks its
+# first file and used to be told "PROJECT-WIDE PATTERN: PHP001 found in 3
+# files". Then A's SessionEnd deleted B's pending finding and B's fix recorded
+# nothing. With the state named after the session, B sees only B.
+echo ""
+echo "--- Two sessions, two states ---"
+SESS_B="/tmp/craftsman-correction-sessb-$$"
+mkdir -p "$SESS_B/src/Domain"; ( cd "$SESS_B" && git init -q ) >/dev/null 2>&1
+for n in One Two; do
+    printf '<?php\n\nfinal class %s\n{\n}\n' "$n" > "$FIXTURES_DIR/src/Domain/$n.php"
+    ( cd "$FIXTURES_DIR" && echo "{\"tool_input\":{\"file_path\":\"$FIXTURES_DIR/src/Domain/$n.php\"}}" \
+        | CLAUDE_CODE_SESSION_ID=sessA bash "$ROOT_DIR/hooks/post-write-check.sh" >/dev/null 2>&1 )
+done
+printf '<?php\n\nfinal class Only\n{\n}\n' > "$SESS_B/src/Domain/Only.php"
+B_OUT=$( cd "$SESS_B" && echo "{\"tool_input\":{\"file_path\":\"$SESS_B/src/Domain/Only.php\"}}" \
+    | CLAUDE_CODE_SESSION_ID=sessB bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1 )
+if echo "$B_OUT" | grep -q "PATTERN"; then
+    log_fail "session B sees no pattern built from session A's files" "$(echo "$B_OUT" | grep PATTERN | head -1 | cut -c1-100)"
+else
+    log_pass "session B sees no pattern built from session A's files"
+fi
+echo '{"session_id":"sessA"}' | CLAUDE_CODE_SESSION_ID=sessA bash "$ROOT_DIR/hooks/session-metrics.sh" >/dev/null 2>&1
+printf '<?php\n\ndeclare(strict_types=1);\n\nfinal class Only\n{\n}\n' > "$SESS_B/src/Domain/Only.php"
+( cd "$SESS_B" && echo "{\"tool_input\":{\"file_path\":\"$SESS_B/src/Domain/Only.php\"}}" \
+    | CLAUDE_CODE_SESSION_ID=sessB bash "$ROOT_DIR/hooks/post-write-check.sh" >/dev/null 2>&1 )
+B_FIX=$(python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$CLAUDE_PLUGIN_DATA/metrics.db" \
+    "SELECT COUNT(*) FROM corrections WHERE rule='PHP001' AND action='fixed' AND file_path='src/Domain/Only.php'" 2>/dev/null)
+if [[ "$B_FIX" == "1" ]]; then
+    log_pass "session A's SessionEnd did not erase session B's pending finding: B's fix is recorded"
+else
+    log_fail "session A's SessionEnd did not erase session B's pending finding" "B fixed rows: $B_FIX"
+fi
+rm -rf "$SESS_B"
+
 test_summary

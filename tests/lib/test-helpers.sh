@@ -26,6 +26,11 @@
 # =============================================================================
 
 export CLAUDE_PLUGIN_OPTION_strictness="${CLAUDE_PLUGIN_OPTION_strictness:-strict}"
+# Claude Code exports the session id into every Bash subprocess, this suite
+# included, and the hooks name their state files after it. A suite that
+# asserts on the shared session-state.json would then read a file no hook
+# wrote. Unset here; a test that wants two sessions sets the id itself.
+unset CLAUDE_CODE_SESSION_ID
 
 # A git identity, once, for every fixture that commits. The ubuntu runner has
 # none configured, so `git commit --allow-empty` failed silently inside

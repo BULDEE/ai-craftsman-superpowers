@@ -404,4 +404,26 @@ else
 fi
 rm -rf "$HEADLESS_DIR"
 
+# --- Two sessions, two states: SessionEnd deletes only its own ---------------
+#
+# One shared session-state.json meant the SessionEnd of session A deleted the
+# pending findings of session B (learning-loop review, CR-3, reproduced with
+# two repositories). Claude Code names the session in CLAUDE_CODE_SESSION_ID
+# for hooks and Bash tool subprocesses alike; the files follow the name.
+TWO_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-two-sessions.XXXXXX")
+mkdir -p "$TWO_DIR/data"
+printf '{"blocked_violations": {"/src/A.php": ["PHP001"]}}' > "$TWO_DIR/data/session-state-sessA.json"
+printf '{"blocked_violations": {"/src/B.php": ["PHP001"]}}' > "$TWO_DIR/data/session-state-sessB.json"
+printf '%s' "$(( $(date +%s) - 60 ))" > "$TWO_DIR/data/session-start-ts-sessA"
+printf '%s' "$(( $(date +%s) - 60 ))" > "$TWO_DIR/data/session-start-ts-sessB"
+echo '{"session_id":"sessA"}' | CLAUDE_CODE_SESSION_ID=sessA CLAUDE_PLUGIN_DATA="$TWO_DIR/data" HOME="$TWO_DIR" \
+    bash "$ROOT_DIR/hooks/session-metrics.sh" >/dev/null 2>&1
+if [[ ! -f "$TWO_DIR/data/session-state-sessA.json" && -f "$TWO_DIR/data/session-state-sessB.json" ]]; then
+    log_pass "SessionEnd of session A deletes A's state and leaves B's pending findings alone"
+else
+    log_fail "SessionEnd of session A deletes A's state and leaves B's" \
+        "A=$( [ -f "$TWO_DIR/data/session-state-sessA.json" ] && echo present || echo gone ) B=$( [ -f "$TWO_DIR/data/session-state-sessB.json" ] && echo present || echo gone )"
+fi
+rm -rf "$TWO_DIR"
+
 test_summary

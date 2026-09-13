@@ -30,6 +30,7 @@ Commands:
 
 import json
 import os
+import re
 import sys
 import tempfile
 
@@ -290,11 +291,19 @@ def _resolve_session_state_path() -> str:
     bridge = os.path.expanduser('~/.claude/craftsman-session-state-path')
     if os.path.isfile(bridge):
         with open(bridge) as bridge_file:
-            return bridge_file.read().strip()
-    return os.path.join(
-        os.environ.get('CLAUDE_PLUGIN_DATA', os.path.expanduser('~/.claude/plugins/data/craftsman')),
-        'session-state.json',
-    )
+            shared = bridge_file.read().strip()
+    else:
+        shared = os.path.join(
+            os.environ.get('CLAUDE_PLUGIN_DATA', os.path.expanduser('~/.claude/plugins/data/craftsman')),
+            'session-state.json',
+        )
+    # The bridge names the shared file; this session's own sits beside it,
+    # named by CLAUDE_CODE_SESSION_ID, which Claude Code sets in Bash tool
+    # subprocesses as in hooks (see hooks/lib/session-files.sh).
+    session_id = re.sub(r'[^A-Za-z0-9_-]', '', os.environ.get('CLAUDE_CODE_SESSION_ID', ''))[:64]
+    if not session_id:
+        return shared
+    return os.path.join(os.path.dirname(shared), f'session-state-{session_id}.json')
 
 
 def handle_set_verified(arguments: list[str]) -> None:

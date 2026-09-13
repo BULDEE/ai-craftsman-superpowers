@@ -21,11 +21,13 @@ source "${SCRIPT_DIR}/lib/metrics-db.sh"
 
 DATA_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
 
-# Session state for correction learning
-SESSION_STATE="${DATA_DIR}/session-state.json"
-START_TS_FILE="${DATA_DIR}/session-start-ts"
-WRITES_FILE="${DATA_DIR}/session-writes"
-VIOLATIONS_FILE="${DATA_DIR}/session-violations"
+# This session's own files, and only its own: one shared session-state.json
+# meant this hook deleted the pending findings of every other live session.
+source "${SCRIPT_DIR}/lib/session-files.sh"
+SESSION_STATE=$(session_file session-state.json)
+START_TS_FILE=$(session_file session-start-ts)
+WRITES_FILE=$(session_file session-writes)
+VIOLATIONS_FILE=$(session_file session-violations)
 
 metrics_init 2>/dev/null || true
 

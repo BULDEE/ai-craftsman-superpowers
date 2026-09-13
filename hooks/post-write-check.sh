@@ -35,14 +35,21 @@ HAS_PYTHON3=true
 command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
 
 # Session state for correction learning
-SESSION_STATE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
+source "${SCRIPT_DIR}/lib/session-files.sh"
+SESSION_STATE=$(session_file session-state.json)
 
 # The blocked rule ids of this write, as a JSON array.
+# One entry per rule, however many lines it fired on: TS001 and PHP003 report
+# once per offending line, and keeping every occurrence put ['TS001','TS001']
+# in the pending set, so one fix wrote two verdicts and every count built on
+# corrections was inflated by the line count.
 _blocked_rules_json() {
-    local rules_json="[" first=true line r
+    local rules_json="[" first=true line r seen=""
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         r="${line%%:*}"
+        case " $seen " in *" $r "*) continue ;; esac
+        seen="$seen $r"
         if [[ "$first" == true ]]; then
             rules_json="${rules_json}\"${r}\""
             first=false
@@ -214,7 +221,7 @@ fi
 # session-metrics.sh at SessionEnd into sessions.writes_count (denominator
 # for violations-per-write benchmarks). Append is atomic enough for hook
 # concurrency; no locking needed.
-echo "1" >> "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-writes" 2>/dev/null || true
+echo "1" >> "$(session_file session-writes)" 2>/dev/null || true
 
 # Get file extension
 EXT="${FILE_PATH##*.}"

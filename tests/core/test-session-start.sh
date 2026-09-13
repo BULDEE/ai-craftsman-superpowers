@@ -178,6 +178,28 @@ else
 fi
 rm -rf "$LEGACY_SKILLS"
 
+# --- The wrapper hashes the project the hooks hash ----------------------------
+#
+# ~/.claude/craftsman-instincts.sh hashed $PWD; the hooks hash the git
+# toplevel's physical path (metrics_project_hash). From a subdirectory, or
+# through a symlinked path, /craftsman:metrics answered "no instincts" while
+# SessionStart announced candidates, and `approve` could not find the id.
+WRAP_HOME=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-wrapper-hash.XXXXXX")
+mkdir -p "$WRAP_HOME/.claude" "$WRAP_HOME/repo/src/Domain" "$WRAP_HOME/data"
+( cd "$WRAP_HOME/repo" && git init -q ) >/dev/null 2>&1
+( cd "$WRAP_HOME/repo" && echo '{}' | HOME="$WRAP_HOME" CLAUDE_PLUGIN_DATA="$WRAP_HOME/data" bash "$ROOT_DIR/hooks/session-start.sh" >/dev/null 2>&1 )
+HOOK_HASH=$( cd "$WRAP_HOME/repo/src/Domain" && bash -c "source '$ROOT_DIR/hooks/lib/metrics-db.sh'; metrics_project_hash" )
+WRAP_HASH=$( cd "$WRAP_HOME/repo/src/Domain" && HOME="$WRAP_HOME" CLAUDE_PLUGIN_DATA="$WRAP_HOME/data" bash -c '
+    sed -n "s/^PROJECT_HASH=//p" "$HOME/.claude/craftsman-instincts.sh" >/dev/null
+    # run the wrapper with a command that prints the hash it resolved
+    CRAFTSMAN_PRINT_PROJECT_HASH=1 bash "$HOME/.claude/craftsman-instincts.sh" candidates 2>/dev/null' )
+if [[ -n "$HOOK_HASH" && "$WRAP_HASH" == "$HOOK_HASH" ]]; then
+    log_pass "the instincts wrapper resolves the same project hash as the hooks from a subdirectory"
+else
+    log_fail "the instincts wrapper resolves the same project hash as the hooks from a subdirectory" "hook=$HOOK_HASH wrapper=$WRAP_HASH"
+fi
+rm -rf "$WRAP_HOME"
+
 rm -rf "$CLAUDE_PLUGIN_DATA" "/tmp/craftsman-fake-home-$$"
 
 echo ""

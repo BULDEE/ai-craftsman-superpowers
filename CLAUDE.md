@@ -13,7 +13,7 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
 - Hook command output MUST be valid JSON (`jq -n` pattern).
 - Semantic verification runs in headless Haiku subprocesses via `hooks/lib/haiku-verify.sh` (never native agent/prompt hook types: no option gating, see ADR-0018). Always guard with `CRAFTSMAN_HEADLESS_VERIFY`.
 - The `metrics-query.py` helper MUST be used for all SQLite writes (parameterized queries). NEVER use string interpolation in SQL.
-- All writes to `session-state.json` MUST use atomic writes (`tempfile.mkstemp() + os.rename()`). Known TOCTOU window between read and rename when multiple async hooks fire simultaneously - acceptable at current hook frequencies but do not add file-locking without benchmarking first.
+- Session state is one file PER SESSION, `session-state-<id>.json`, resolved by `hooks/lib/session-files.sh` from `CLAUDE_CODE_SESSION_ID` (set by Claude Code in hook and Bash tool subprocesses alike; the shared `session-state.json` is the fallback with no id). Never hardcode the shared path: one shared file let a session's end delete another's pending findings and one project's patterns surface in another. All writes MUST use atomic writes (`tempfile.mkstemp() + os.rename()`). Known TOCTOU window between read and rename when multiple async hooks fire simultaneously - acceptable at current hook frequencies but do not add file-locking without benchmarking first.
 - CI adapters follow the `adapter_detect/run/annotate/comment/exit` interface.
 - The engine holds no list of languages. A pack declares its own in `pack.yml`
   under `languages:` (`extensions`, `validators`, `static_analysis`,

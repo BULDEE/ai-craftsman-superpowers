@@ -508,7 +508,13 @@ _metrics_tally_session() {
     local blocked="$1" ignored="$2" kind="warned"
     [[ "$blocked" == "1" ]] && kind="blocked"
     [[ "$ignored" == "1" ]] && kind="ignored"
-    echo "$kind" >> "${METRICS_DB_DIR}/session-violations" 2>/dev/null || true
+    local tally="${METRICS_DB_DIR}/session-violations"
+    if type session_file >/dev/null 2>&1; then
+        tally=$(session_file session-violations)
+    elif [[ -n "${CLAUDE_CODE_SESSION_ID:-}" ]]; then
+        tally="${METRICS_DB_DIR}/session-violations-$(printf '%s' "$CLAUDE_CODE_SESSION_ID" | tr -cd 'A-Za-z0-9_-' | cut -c1-64)"
+    fi
+    echo "$kind" >> "$tally" 2>/dev/null || true
 }
 
 # metrics_record_haiku_run <hook> <verdict> <findings> <duration_ms> [file]
