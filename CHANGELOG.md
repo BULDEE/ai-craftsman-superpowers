@@ -239,6 +239,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`7 of 22 model-invocable, 15 user-typed`). `tests/core/test-routing-table.sh`
   checks every route against the SKILL.md it names, in both directions. The
   routing accuracy eval the issue also asks for is not in this change.
+- **The instinct gate reads rejections, withdraws what lapses, and its
+  confidence ranks (#45).** `CANDIDATE_QUERY` counted fixes alone, so a rule
+  could become a candidate on its fixes while being rejected far more often:
+  PHP003 was one, on 105 fixes against 167 ignores, and promoting it would
+  have taught the model a pattern users reject two times out of three. A rule
+  is now a candidate only when fixed more often than rejected (`ignored` or
+  `scoped`), and a candidate the query no longer yields is withdrawn on the
+  next refresh: every earlier criterion was monotonic on an append-only
+  table, so a lapsed row used to keep its old score, its place in the pending
+  count and its approve button. The confidence formula saturated at nine
+  occurrences and left seven of eight candidates at exactly 0.95, one with
+  101 corrections and one with 18; it is now the Wilson lower bound of the
+  acceptance rate, an order and not a bar. The `instincts` table gains an
+  `ignored` column (in the schema, added in place on an older database) and
+  the listing shows it. ADR-0020 carries the amendment. The batch review
+  surface the issue also asks for is not in this change.
 
 - **A write with findings costs one interpreter start for its metrics, not one
   per finding.** `metrics_record_violation` queues its rows while
