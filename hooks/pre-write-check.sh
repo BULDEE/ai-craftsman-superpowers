@@ -13,6 +13,14 @@ trap 'echo "WARNING: pre-write-check.sh failed at line $LINENO" >&2; exit 0' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/config.sh"
+# Severity is the rules engine's decision, resolved per file (CLAUDE.md).
+# This hook used to resolve it through config.sh's strictness table and a
+# hand-kept advisory list instead: the same file, rule and .craft-rules.yml
+# gave "BLOCKED" before the write and nothing after it, two verdicts inside
+# one front-end, and the parity suite could not see it because it ran the
+# relaxation case through post-write only.
+source "${SCRIPT_DIR}/lib/rules-engine.sh"
+rules_init "$PWD" "${HOME}/.claude"
 # Needed for the language registry: which extensions are source files is the
 # packs' answer, not this hook's. The registry is cached on disk, so the extra
 # load costs a file read on the steady path.
@@ -97,15 +105,38 @@ if [[ "$LANG_ID" == "typescript" ]]; then
 fi
 
 # =============================================================================
+# Severity resolution: the engine answers per file, and its answer is the
+# same one post-write, CI and Hermes get. A rule resolved `ignore` leaves the
+# list; `block` is what refuses the write; `warn` is reported and lets it
+# through.
+# =============================================================================
+
+RESOLVED=""
+RESOLVED_COUNT=0
+local_should_block=false
+while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    rule="${line%%:*}"
+    severity=$(rules_severity_for_file "$FILE_PATH" "$rule")
+    [[ "$severity" == "ignore" ]] && continue
+    RESOLVED="${RESOLVED}${line}\n"
+    ((RESOLVED_COUNT++)) || true
+    [[ "$severity" == "block" ]] && local_should_block=true
+done <<< "$(echo -e "$VIOLATIONS")"
+VIOLATIONS="$RESOLVED"
+VIOLATION_COUNT=$RESOLVED_COUNT
+
+# =============================================================================
 # Auto-fix (ADR-0018): a Write missing only strict_types is corrected in
 # place via updatedInput instead of blocking. The violation is still
 # surfaced as additionalContext so the correction learning loop keeps its
-# signal.
+# signal. Only when PHP001 would have blocked: a directory that demoted the
+# rule asked not to be policed on it, and a fix nobody asked for is policing.
 # =============================================================================
 
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 
-if [[ $VIOLATION_COUNT -eq 1 && "$TOOL_NAME" == "Write" && "$EXT" == "php" ]] \
+if [[ $VIOLATION_COUNT -eq 1 && "$TOOL_NAME" == "Write" && "$EXT" == "php" && "$local_should_block" == true ]] \
    && [[ "$VIOLATIONS" == PHP001* ]] \
    && echo "$FILE_CONTENT" | head -1 | grep -q "^<?php" 2>/dev/null; then
     FIXED_CONTENT=$(printf '%s\n' "$FILE_CONTENT" | awk 'NR==1 && $0 ~ /^<\?php/ {print; print ""; print "declare(strict_types=1);"; next} {print}')
@@ -126,17 +157,6 @@ fi
 # =============================================================================
 
 if [[ $VIOLATION_COUNT -gt 0 ]]; then
-    # Check if ANY violation should block (iterate all, not just first)
-    local_should_block=false
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        rule="${line%%:*}"
-        if config_should_block "$rule"; then
-            local_should_block=true
-            break
-        fi
-    done <<< "$(echo -e "$VIOLATIONS")"
-
     if [[ "$local_should_block" == true ]]; then
         # Human-readable message on stderr (shown in Claude Code UI)
         echo "🚫 BLOCKED by AI Craftsman - ${VIOLATION_COUNT} violation(s) detected before write:" >&2

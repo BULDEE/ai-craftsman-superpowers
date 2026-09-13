@@ -260,117 +260,11 @@ test_stack_resolution() {
 }
 
 # =============================================================================
-# 5. Blocking behavior (config_should_block)
-# =============================================================================
-test_blocking_strict() {
-    echo ""
-    echo "=== Blocking Behavior ==="
 
-    rm -f "$TEST_DIR/.craft-config.yml"
 
-    # strict: always block
-    export CLAUDE_PLUGIN_OPTION_strictness="strict"
-    unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 
-    if config_should_block "PHP001"; then
-        log_pass "strict: blocks PHP001"
-    else
-        log_fail "strict should block PHP001" "returned non-blocking"
-    fi
-
-    if config_should_block "TS001"; then
-        log_pass "strict: blocks TS001"
-    else
-        log_fail "strict should block TS001" "returned non-blocking"
-    fi
-
-    if config_should_block "LAYER001"; then
-        log_pass "strict: blocks LAYER001"
-    else
-        log_fail "strict should block LAYER001" "returned non-blocking"
-    fi
-}
-
-test_blocking_moderate() {
-    # moderate: only LAYER* rules block
-    export CLAUDE_PLUGIN_OPTION_strictness="moderate"
-
-    if config_should_block "LAYER001"; then
-        log_pass "moderate: blocks LAYER001"
-    else
-        log_fail "moderate should block LAYER001" "returned non-blocking"
-    fi
-
-    if config_should_block "LAYER_VIOLATION"; then
-        log_pass "moderate: blocks LAYER_VIOLATION"
-    else
-        log_fail "moderate should block LAYER_VIOLATION" "returned non-blocking"
-    fi
-
-    if ! config_should_block "PHP001"; then
-        log_pass "moderate: does NOT block PHP001 (warns only)"
-    else
-        log_fail "moderate should not block PHP001" "returned blocking"
-    fi
-
-    if ! config_should_block "TS001"; then
-        log_pass "moderate: does NOT block TS001 (warns only)"
-    else
-        log_fail "moderate should not block TS001" "returned blocking"
-    fi
-}
-
-test_blocking_relaxed() {
-    # relaxed: nothing blocks
-    export CLAUDE_PLUGIN_OPTION_strictness="relaxed"
-
-    if ! config_should_block "PHP001"; then
-        log_pass "relaxed: does NOT block PHP001"
-    else
-        log_fail "relaxed should not block PHP001" "returned blocking"
-    fi
-
-    if ! config_should_block "LAYER001"; then
-        log_pass "relaxed: does NOT block LAYER001"
-    else
-        log_fail "relaxed should not block LAYER001" "returned blocking"
-    fi
-
-    if ! config_should_block "TS001"; then
-        log_pass "relaxed: does NOT block TS001"
-    else
-        log_fail "relaxed should not block TS001" "returned blocking"
-    fi
-}
-
-test_blocking_warn_rules() {
-    # WARN rules never block, even in strict
-    cat > "$TEST_DIR/.craft-config.yml" <<'YAML'
-strictness: strict
-YAML
-
-    if ! config_should_block "WARN-PHP001"; then
-        log_pass "strict: WARN-PHP001 does NOT block (warnings never block)"
-    else
-        log_fail "strict: WARN-PHP001 should NOT block" ""
-    fi
-
-    if ! config_should_block "PHP005"; then
-        log_pass "strict: PHP005 does NOT block (warnings never block)"
-    else
-        log_fail "strict: PHP005 should NOT block" ""
-    fi
-
-    rm -f "$TEST_DIR/.craft-config.yml"
-    unset CLAUDE_PLUGIN_OPTION_strictness 2>/dev/null || true
-}
 
 test_stack_resolution
-test_blocking_strict
-test_blocking_moderate
-test_blocking_relaxed
-test_blocking_warn_rules
-
 # =============================================================================
 # 6. Stop review enabled (config_stop_review_enabled)
 # =============================================================================
