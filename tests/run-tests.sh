@@ -30,6 +30,12 @@ trap 'rm -rf "$CLAUDE_PLUGIN_DATA"' EXIT
 # tags its rows, so the next contamination is a DELETE and not a guess.
 export CRAFTSMAN_METRICS_SOURCE="test"
 
+# The hooks name their state files after CLAUDE_CODE_SESSION_ID, which Claude
+# Code exports into this very process when the suite runs from a session.
+# Unset, so every suite reads the shared path it asserts on (a test that wants
+# two sessions sets the id itself).
+unset CLAUDE_CODE_SESSION_ID
+
 # Counters
 TESTS_PASSED=0
 TESTS_FAILED=0

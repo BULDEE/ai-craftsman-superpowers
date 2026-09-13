@@ -250,4 +250,17 @@ else
     log_fail "invalid command should fail" "got exit 0"
 fi
 
+# --- set-verified lands in this session's file, not the shared one -------------
+SV_HOME=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-set-verified.XXXXXX")
+mkdir -p "$SV_HOME/.claude" "$SV_HOME/data"
+printf '%s' "$SV_HOME/data/session-state.json" > "$SV_HOME/.claude/craftsman-session-state-path"
+HOME="$SV_HOME" CLAUDE_CODE_SESSION_ID=sessX python3 "$ROOT_DIR/hooks/lib/session_state.py" set-verified >/dev/null 2>&1
+if [[ -f "$SV_HOME/data/session-state-sessX.json" && ! -f "$SV_HOME/data/session-state.json" ]] \
+    && grep -q '"verified": true' "$SV_HOME/data/session-state-sessX.json"; then
+    log_pass "set-verified through the bridge writes this session's own state file"
+else
+    log_fail "set-verified through the bridge writes this session's own state file" "$(ls "$SV_HOME/data" | tr '\n' ' ')"
+fi
+rm -rf "$SV_HOME"
+
 test_summary

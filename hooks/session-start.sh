@@ -71,15 +71,18 @@ printf '%s' "$METRICS_DB_PATH" > "${HOME}/.claude/craftsman-metrics-db-path" 2>/
 # (only session_id/transcript_path/cwd/reason), so session-metrics.sh
 # derives duration and its violation-count window from this marker.
 _CRAFTSMAN_DATA_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
-printf '%s' "$(date +%s)" > "${_CRAFTSMAN_DATA_DIR}/session-start-ts" 2>/dev/null || true
+source "${SCRIPT_DIR}/lib/session-files.sh"
+printf '%s' "$(date +%s)" > "$(session_file session-start-ts)" 2>/dev/null || true
+# Sessions that ended without a SessionEnd (a crash, a kill) leave their files
+# behind; a week later nobody will resume them.
+session_files_sweep 7
 
 # The per-session tallies restart with the session, like the timestamp above.
 # SessionEnd removes them, but a crash between the two left them in place and
 # the next session counted this one's violations as its own: two writes then
 # one produced three. The duration is already measured from this line, so
 # counting over any other window was incoherent regardless of the crash.
-rm -f "${_CRAFTSMAN_DATA_DIR}/session-violations" \
-      "${_CRAFTSMAN_DATA_DIR}/session-writes" 2>/dev/null || true
+rm -f "$(session_file session-violations)" "$(session_file session-writes)" 2>/dev/null || true
 
 # Generate a self-contained verify wrapper at a well-known path.
 # Skills run via the Bash tool without CLAUDE_PLUGIN_ROOT, so they cannot
@@ -94,11 +97,16 @@ chmod +x "${HOME}/.claude/craftsman-set-verified.sh" 2>/dev/null || true
 
 # Same bridge pattern for the instinct pipeline (ADR-0020): /craftsman:metrics
 # runs via the Bash tool without CLAUDE_PLUGIN_ROOT, so bake resolved paths in.
+# The project is the git toplevel's physical path, hashed the way the hooks
+# hash it (metrics_project_hash): a wrapper that hashed \$PWD answered "no
+# instincts" from a subdirectory while SessionStart announced candidates.
 cat > "${HOME}/.claude/craftsman-instincts.sh" <<WRAPPER
 #!/usr/bin/env bash
 set -uo pipefail
 DB="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db"
-PROJECT_HASH=\$(echo -n "\$PWD" | shasum -a 256 | cut -d' ' -f1)
+source "${SCRIPT_DIR}/lib/metrics-db.sh" 2>/dev/null
+PROJECT_HASH=\$(metrics_project_hash)
+[[ -n "\${CRAFTSMAN_PRINT_PROJECT_HASH:-}" ]] && { printf '%s' "\$PROJECT_HASH"; exit 0; }
 CMD="\${1:-candidates}"
 shift 2>/dev/null || true
 case "\$CMD" in
@@ -118,7 +126,8 @@ cat > "${HOME}/.claude/craftsman-codemap.sh" <<WRAPPER
 #!/usr/bin/env bash
 set -uo pipefail
 DATA_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
-PROJECT_HASH=\$(echo -n "\$PWD" | shasum -a 256 | cut -d' ' -f1)
+source "${SCRIPT_DIR}/lib/metrics-db.sh" 2>/dev/null
+PROJECT_HASH=\$(metrics_project_hash)
 CACHE="\${DATA_DIR}/codemap-\${PROJECT_HASH}"
 HASH_FILE="\${CACHE}.hash"
 CURRENT_HASH=\$(git ls-files 2>/dev/null | shasum | cut -d' ' -f1 || echo "no-git")

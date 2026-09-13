@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Session state is one file per session.** One flat `session-state.json`
+  for the whole machine meant a session's SessionEnd deleted another's
+  pending findings (its next fix recorded nothing), one project's cross-file
+  patterns surfaced in another ("PHP001 found in 3 files" with one file
+  local), and `verified` set by any project satisfied `pre-push-verify` in
+  every other. Reproduced by the learning-loop review with two repositories.
+  Every hook and the `set-verified` skill path now resolve
+  `session-state-<id>.json` (and the start marker, the write and violation
+  tallies) from `CLAUDE_CODE_SESSION_ID`, which Claude Code sets in hook and
+  Bash tool subprocesses alike, through one resolver
+  (`hooks/lib/session-files.sh`); SessionEnd deletes only its own files, and
+  SessionStart sweeps files of sessions that ended without one. With no id
+  the shared path is used, unchanged. Seen red on both leaks.
+
+- **One finding, one verdict, also for rules that fire once per line.**
+  TS001 and PHP003 report every offending line, and the pending set kept
+  each occurrence: two `any` on two lines, one fix, two `fixed` rows, and
+  every count built on `corrections` (instinct occurrences, acceptance)
+  inflated by the line count. The pending set now holds each rule once.
+
+- **The `/craftsman:metrics` wrapper hashes the project the hooks hash.**
+  `~/.claude/craftsman-instincts.sh` and `craftsman-codemap.sh` hashed
+  `$PWD`; the hooks hash the git toplevel's physical path. From a
+  subdirectory, or through a symlinked path, the skill answered "no
+  instincts" while SessionStart announced candidates, and `approve` could
+  not find the id. Both wrappers resolve the hash through
+  `metrics_project_hash`.
+
 - **An Edit is refused before it lands, like a Write.** `pre-write-check.sh`
   read `.tool_input.content` only, which an Edit does not carry, so the
   same layer violation that Write refused went through untouched as an

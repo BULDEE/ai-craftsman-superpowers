@@ -24,7 +24,8 @@ ERROR=$(echo "$INPUT" | jq -r '.error // empty' 2>/dev/null)
 
 [[ -z "$TOOL_NAME" ]] && exit 0
 
-SESSION_STATE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
+source "${SCRIPT_DIR}/lib/session-files.sh"
+SESSION_STATE=$(session_file session-state.json)
 
 if $HAS_PYTHON3; then
     LIB_DIR="${SCRIPT_DIR}/lib"

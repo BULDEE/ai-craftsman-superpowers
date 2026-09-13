@@ -19,7 +19,8 @@ command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
 
 INPUT=$(cat 2>/dev/null) || true
 
-SESSION_STATE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
+source "${SCRIPT_DIR}/lib/session-files.sh"
+SESSION_STATE=$(session_file session-state.json)
 
 if $HAS_PYTHON3 && [[ -f "$SESSION_STATE" ]]; then
     COMPACT_SUMMARY=$(python3 "$SCRIPT_DIR/lib/session_state.py" pre-compact "$SESSION_STATE" 2>/dev/null) || true

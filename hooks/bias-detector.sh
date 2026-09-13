@@ -11,7 +11,9 @@ set -uo pipefail
 # Non-blocking: if hook crashes, pass silently
 trap 'exit 0' ERR
 
-SESSION_STATE="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/session-files.sh"
+SESSION_STATE=$(session_file session-state.json)
 
 # Read the prompt from stdin (JSON format from Claude Code)
 INPUT=$(cat)
