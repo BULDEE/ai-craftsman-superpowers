@@ -43,7 +43,8 @@ What it registers (the three ADR-0029 verbs):
   `craftsman-quality` skill so the agent knows the doctrine it is gated by.
 
 Config (`~/.hermes/config.yaml`, `plugins.entries.craftsman`): `gate_seconds`
-(default 45), `inject_trends` (`on`/`off`).
+(default 45), `inject_trends` (`on`/`off`), `write_gate` (`off`/`on`, see
+"the write-time promise" below).
 
 ### The skills an agent selects from
 
@@ -104,6 +105,101 @@ creates, and an autonomous agent has nobody: with a human present, this plugin
 records 530 suppressed violations against 436 fixed. Refusing a conclusion
 traps nothing, and Hermes bounds the retries itself through
 `agent.max_verify_nudges`.
+
+### The write-time promise, opt-in
+
+The README headline is "refuses the write before it reaches disk", and on
+Hermes the default gate refuses the conclusion, for the reason above. Two
+findings are the exception. A hardcoded secret (SEC001): the one cost that
+waiting does not bound, because a secret on disk in an autonomous loop can be
+committed, pushed or logged before the conclusion, and then it has to be
+rotated. A Domain class importing Infrastructure (LAYER001): reversible in
+one line, kept because it is keyed on the path and free of false positives
+outside test code, so refusing it costs nothing. `write_gate: on` registers
+`pre_tool_call` (`adapters/hermes/pre-tool-call.sh`, with
+`write_gate_place.py` for the half that understands the tool call) for
+`write_file` and `patch` only, judging the content as the file WOULD be on
+those two rules and nothing else: PHP001, TS001 and every other rule still
+wait for the conclusion, with the skill that fixes them. LAYER001 is not
+judged at write time under a test path (the engine's own notion of one:
+`tests/`, `spec/`, `fixtures/`...), where an in-memory adapter importing
+Infrastructure is the normal shape. A refused write is told how to get out:
+a secret is read from the environment or a vault; a LAYER001 finding that is
+wrong for the file escapes with `craftsman-ignore: LAYER001` on the line,
+which the scan honours. No escape is offered for a secret: a unilateral
+bypass on the credential is the retry budget the design refuses.
+
+Why not SEC002 and SEC003, which issue #21 first named. Both are line-local
+regexes with no notion of a sanitizer, and measured on the documented
+mitigations they fire: `exec('git -C ' . escapeshellarg($dir))` (the PHP
+manual's own prescription for a shell argument), `createQuery('SELECT e FROM '
+. $this->entityClass . ' e WHERE e.id = :id')` (a class name, and a bound
+parameter, the form the Doctrine documentation prescribes). Telling a
+sanitized value from an unsanitized one is taint analysis (sources,
+sanitizers, sinks), which is what psalm and phpstan supersede the regex with
+at Level 2, and no taint run fits the 20 seconds a write gets under Hermes's
+30 second callback cap. So at write time those two rules would refuse the
+correct code and let a split line through, teaching the agent the wrong
+lesson; at the conclusion they block exactly as before, the loop is bounded
+by `max_verify_nudges`, and the analyser can outrank the regex. The scope is
+revisited on data: the acceptance report (`/craftsman:metrics`, Step 3) says
+whether SEC001 refusals are fixed or suppressed.
+
+What "as the file would be" covers, because Hermes's `patch` is not a plain
+replace: an exact `old_string` is applied in memory (`replace_all` honoured);
+an `old_string` that is not in the file may still apply through Hermes's fuzzy
+strategies (`tools/fuzzy_match.py`), so what the patch ADDS is judged rather
+than waved; a V4A patch (`mode: patch`) is refused as unread, with the form to
+use instead, because reading it would duplicate Hermes's parser. The
+workspace is the written path's own (nearest `.git`, `.craft-config.yml`,
+`composer.json`, `package.json`, `pyproject.toml`, `go.mod` or `Cargo.toml`
+above it), and every `.craft-rules.yml` on the way down to the file is in the
+mirror, so a directory relaxation holds here as it does in CI and the hooks
+(`tests/adapters/test-parity.sh` carries this gate as a fourth column). Never
+the process cwd: Hermes hands a plugin hook no cwd (the plugin asks Hermes's
+own `get_session_cwd` for the task's directory), and the shell hook's cwd is
+the gateway process's; a relative path that cannot be anchored is refused, not
+guessed. The gate protects itself the way `pre-verify.sh` does: a write to
+`.craft-rules.yml`, `.craft-config.yml`, `ci/craftsman-ci.sh` or
+`adapters/hermes/` is refused, and the test fails when the two lists drift.
+
+Budget: `write_gate_seconds` (default 20, capped at 25) is set explicitly for
+the script, under Hermes's 30s cap on a plugin callback
+(`plugins.hook_callback_timeout`), which would otherwise block with a generic
+message and abandon the worker while `craftsman-ci` ran on.
+
+Two failures, two messages. Missing infrastructure (python3, the plugin root,
+`craftsman-ci.sh`) repeats on every write of every session and no agent can
+repair it, so the block says not to retry and to report it; a verdict that
+failed on this file (a timeout, a scan crash) says to retry once, the rule the
+conclusion gate applies too. Both are written without python3 and exit 2,
+which is the shell-wire block Hermes reads even when the JSON is not parsed.
+
+Measured in `tests/adapters/test-hermes-plugin.sh`: off by default; through
+the plugin, LAYER001 and SEC001 refused before the file exists, SEC002 on
+`escapeshellarg` and SEC003 on a bound DQL string let through at write time
+while still critical for the conclusion gate on the same file, LAYER001
+under `tests/Domain/` let through, PHP001 let
+through, a harmless patch let through, a missing script refusing; through the
+shell wire (`tool_input`, the gateway's cwd of `/`, no cwd at all), the same
+refusals, the gate's own files refused, a fuzzy and a V4A patch judged on what
+they add.
+
+Path 1 users declare it as a shell hook instead:
+
+```yaml
+hooks:
+  pre_tool_call:
+    - matcher: "write_file|patch"
+      command: "/opt/craftsman/adapters/hermes/pre-tool-call.sh"
+      timeout: 30        # above the script's own 20s bound, so a kill is never mistaken for a pass
+      fail_closed: true
+```
+
+`hermes hooks test pre_tool_call` is expected to show the block directive the
+dispatcher would receive: the shell wire it serialises (`tool_input`) is what
+`tests/adapters/test-hermes-plugin.sh` feeds the script, but the command
+itself has not been run against this repository yet.
 
 ### Scope comes from git, not from the payload
 
