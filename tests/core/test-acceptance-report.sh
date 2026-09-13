@@ -147,6 +147,43 @@ assert_contains "metrics_acceptance_report reaches the same database" "$via_shel
 via_flags="$( cd "$WORK" && bash -c "source '$ROOT_DIR/hooks/lib/metrics-db.sh'; metrics_acceptance_report --threshold 60 --min-occurrences 5" 2>/dev/null )"
 assert_contains "the day count is optional before the flags" "$via_flags" "    TS002: warn"
 
+# --- What the finding deserved, beside what the user did ----------------------
+#
+# The acceptance rate measures tolerance: a rule suppressed 153 times may be
+# wrong 153 times or inconvenient 153 times, and only the first justifies
+# relaxing it. The verdict column is the missing half, written by a human
+# through metrics_record_verdict and by nothing else.
+assert_contains "with no verdict recorded, the report says the rate is tolerance and not correctness" "$out" \
+    "rules judged right or wrong by a human: none"
+
+VERDICT_OUT="$( cd "$WORK" && bash -c "source '$ROOT_DIR/hooks/lib/metrics-db.sh'
+    metrics_record_verdict PHP002 wrong '' 'fires on Doctrine entities, which cannot be final'
+    metrics_record_verdict PY001 right
+    metrics_record_verdict PY001 sideways 2>&1 >/dev/null" )"
+assert_contains "a verdict that is neither right nor wrong is refused by name" "$VERDICT_OUT" \
+    "takes right or wrong, not 'sideways'"
+
+judged="$(python3 "$REPORT" "$DB" "$HASH" 30)"
+assert_contains "the judged rate is printed beside the accepted one" "$judged" \
+    "rule PHP002: acceptance 1.3% (2 fixed, 153 ignored), judged wrong 100.0% (1 of 1 verdicts)"
+assert_contains "and the suite of verdicts is summarised" "$judged" \
+    "rules judged by a human: 2 rule(s), 2 verdict(s), 50.0% judged wrong"
+if echo "$judged" | grep -q "rules judged right or wrong by a human: none"; then
+    log_fail "the no-verdict sentence goes away once a verdict exists" "still printed"
+else
+    log_pass "the no-verdict sentence goes away once a verdict exists"
+fi
+
+# No automatic path may fill the column: a loop that grades itself measures its
+# own agreement. The hook writes actions, never verdicts.
+HOOK_VERDICTS="$(python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$DB" \
+    "SELECT COUNT(*) FROM corrections WHERE verdict IS NOT NULL" 2>/dev/null)"
+if [[ "$HOOK_VERDICTS" == "2" ]] && ! grep -rq "metrics_record_verdict" "$ROOT_DIR/hooks/post-write-check.sh" "$ROOT_DIR/hooks/lib/haiku-verify.sh"; then
+    log_pass "only the two human verdicts exist, and no hook can write one"
+else
+    log_fail "only a human writes a verdict" "rows=$HOOK_VERDICTS, or a hook calls metrics_record_verdict"
+fi
+
 # --- A missing database is said, and not created ------------------------------
 missing_out="$(python3 "$REPORT" "$WORK/absent.db" "$HASH" 30)"
 assert_contains "a missing database is named" "$missing_out" "no metrics database at"

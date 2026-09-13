@@ -173,6 +173,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A finding can be judged right or wrong, not only fixed or ignored (#44).**
+  `corrections.action` records what the user DID, so every rate built on it
+  measures tolerance: a rule suppressed 153 times may be wrong 153 times or
+  right and inconvenient 153 times, and only the first is a rule to relax. A
+  loop that records the outcome and never the ideal answer is a mirror of
+  current behaviour. `corrections.verdict` (`right` or `wrong`, migrated in
+  place) is that missing half, written by `metrics_record_verdict` from
+  `/craftsman:metrics` and by nothing else: no hook can fill it, because a
+  loop that grades itself measures its own agreement. The acceptance report
+  prints the judged rate beside the accepted one wherever someone has ruled,
+  and says plainly that the rate is tolerance when nobody has.
+
 - **`/craftsman:metrics` reports whether each rule earns its severity (#44).**
   The correction loop recorded whether a user fixed a finding or suppressed
   it, and nothing read the number back: on one real database PHP002 was

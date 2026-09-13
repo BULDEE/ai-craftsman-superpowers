@@ -92,6 +92,23 @@ reason, so the next maintainer does not relitigate it. `n/a` means no outcome
 in the window, an empty sample and not a rate of zero. A recounted rule is not
 a rule to relax: say that its number is the instrument's, not the users'.
 
+**Acceptance is tolerance, not correctness.** A rule suppressed 153 times may
+be wrong 153 times, or right and inconvenient 153 times, and only the first is
+a rule to relax. The report prints the judged rate beside the accepted one
+wherever someone has ruled, and says so when nobody has. When the user looks at
+a low-acceptance rule with you, ask which of the two it is and record the
+answer, one finding at a time:
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/metrics-db.sh" && \
+  metrics_record_verdict PHP002 wrong "src/Entity/Order.php" "an ORM subclasses entities, they cannot be final"
+```
+
+`right` or `wrong`, nothing else. Only a human writes this: never record a
+verdict from your own reading of the code, and never infer one from what the
+user did with the finding, because a loop that grades itself measures its own
+agreement rather than the rule.
+
 ### Step 4: Present Report
 
 Format the data as a clear report:
@@ -119,6 +136,7 @@ Format the data as a clear report:
 |------|-------|---------|------------|
 | ...  | ...   | ...     | ...        |
 
+Judged by a human: [N rules, M verdicts, X% judged wrong, or none recorded]
 Recounted by the loop (no proposal): [rule: N outcomes for M blocking findings, or none]
 Proposed relaxations: [rule: warn, with the measured rate and the scope note, or none]
 Blocking findings with no verdict: [N rules, X% of the volume, top rule]

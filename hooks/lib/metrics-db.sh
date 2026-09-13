@@ -276,6 +276,24 @@ _metrics_migrate_file_path_column() {
     done
 }
 
+# What the finding DESERVED, beside what the user did with it.
+#
+# `action` records the user's move (fixed, ignored): it measures tolerance, not
+# correctness, and a rule can be suppressed because it is wrong or because the
+# deadline is tomorrow. Nothing in the loop could tell those apart, so the
+# acceptance rate the report proposes a relaxation from is a mirror of current
+# behaviour, which is the trap a production feedback loop falls into when it
+# never records the ideal output. `verdict` is that missing half: `right` when
+# the finding was correct (whatever the user then did about it), `wrong` when
+# the rule fired on code that was fine. It is a human decision, written only
+# through /craftsman:metrics, never by a hook: no automatic path may fill it,
+# because a loop that grades itself measures its own agreement.
+_metrics_migrate_verdict_column() {
+    if ! _metrics_sql_read "PRAGMA table_info(corrections);" | grep -q '|verdict|'; then
+        _metrics_sql <<< "ALTER TABLE corrections ADD COLUMN verdict TEXT;" 2>/dev/null
+    fi
+}
+
 _metrics_migrate_source_column() {
     local table
     for table in violations corrections; do
@@ -301,6 +319,7 @@ metrics_init() {
     _metrics_migrate_correction_outcomes
     _metrics_migrate_source_column
     _metrics_migrate_file_path_column
+    _metrics_migrate_verdict_column
 }
 
 # The identity of a project is its git toplevel, not the directory the session
@@ -565,6 +584,37 @@ metrics_haiku_report() {
     local project_hash
     project_hash=$(metrics_project_hash)
     python3 "${METRICS_LIB_DIR}/haiku_report.py" "$METRICS_DB" "$project_hash" "$days"
+}
+
+# metrics_record_verdict <rule> <right|wrong> [file] [note]
+#
+# A human says whether a finding was correct. The only writer of the `verdict`
+# column, and the reason the acceptance report can tell "this rule is wrong"
+# from "this rule is inconvenient". Refuses anything but the two words: a
+# verdict column that accepts free text stops being a measurement.
+metrics_record_verdict() {
+    local rule="$1" verdict="$2" file="${3:-}" note="${4:-}"
+    _metrics_rule_is_valid "$rule" || return 0
+    case "$verdict" in
+        right|wrong) ;;
+        *)
+            echo "craftsman: metrics_record_verdict takes right or wrong, not '${verdict}'" >&2
+            return 0
+            ;;
+    esac
+    local project_hash relative
+    project_hash=$(metrics_project_hash)
+    relative=$(metrics_relative_path "$file")
+    # The most recent outcome for that rule, on that file when one is named:
+    # a verdict answers a finding, and the finding it answers is the last one
+    # the loop recorded. Older rows keep the verdict they were given.
+    python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
+        "UPDATE corrections SET verdict = ?, context = CASE WHEN ? <> '' THEN ? ELSE context END
+         WHERE id = (SELECT id FROM corrections
+                     WHERE project_hash = ? AND rule = ?
+                       AND (? = '' OR file_path = ?)
+                     ORDER BY id DESC LIMIT 1)" \
+        "$verdict" "$note" "$note" "$project_hash" "$rule" "$relative" "$relative"
 }
 
 # Acceptance per rule, fixed / (fixed + ignored), and the share of violations

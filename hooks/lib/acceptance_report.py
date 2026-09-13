@@ -113,6 +113,31 @@ def acceptance_by_rule(db: sqlite3.Connection, project_hash: str, window: str) -
     return counts
 
 
+def verdicts_by_rule(db: sqlite3.Connection, project_hash: str, window: str) -> dict:
+    """rule -> (right, wrong), the findings a human judged.
+
+    Acceptance says what users did; this says whether the rule was correct, and
+    only the second justifies relaxing one. A rule suppressed 153 times may be
+    wrong 153 times or inconvenient 153 times, and the first is a rule to fix
+    while the second is a deadline. Empty until someone records a verdict
+    through /craftsman:metrics: no hook writes this column, because a loop that
+    grades itself measures its own agreement.
+    """
+    counts = {}
+    for rule, verdict, hits in _rows(db, """
+        SELECT rule, verdict, COUNT(*) FROM corrections
+        WHERE project_hash = ? AND timestamp > datetime('now', ?)
+          AND verdict IN ('right', 'wrong')
+        GROUP BY rule, verdict""", (project_hash, window)):
+        right, wrong = counts.get(rule, (0, 0))
+        if verdict == "right":
+            right += hits
+        else:
+            wrong += hits
+        counts[rule] = (right, wrong)
+    return counts
+
+
 def blocked_by_rule(db: sqlite3.Connection, project_hash: str, window: str) -> dict:
     """rule -> blocking findings in the window, the most a rule can have been judged on.
 
@@ -184,13 +209,23 @@ def fmt_pct(value) -> str:
     return "n/a" if value is None else "%.1f%%" % value
 
 
-def _print_ranked(counts):
-    """Lowest acceptance first, so the rule to look at is the first line."""
+def _print_ranked(counts: dict, verdicts: dict) -> list:
+    """Lowest acceptance first, so the rule to look at is the first line.
+
+    The judged rate is printed beside the accepted one wherever a human has
+    ruled, because they answer different questions and only the first says a
+    rule is wrong.
+    """
     ranked = sorted(counts.items(),
                     key=lambda item: (pct(item[1][0], sum(item[1])) or 0.0, -sum(item[1])))
     for rule, (fixed, ignored) in ranked:
-        print("rule %s: acceptance %s (%d fixed, %d ignored)"
-              % (rule, fmt_pct(pct(fixed, fixed + ignored)), fixed, ignored))
+        line = ("rule %s: acceptance %s (%d fixed, %d ignored)"
+                % (rule, fmt_pct(pct(fixed, fixed + ignored)), fixed, ignored))
+        right, wrong = verdicts.get(rule, (0, 0))
+        if right + wrong:
+            line += (", judged wrong %s (%d of %d verdicts)"
+                     % (fmt_pct(pct(wrong, right + wrong)), wrong, right + wrong))
+        print(line)
     return ranked
 
 
@@ -242,6 +277,24 @@ def _print_proposals(db: sqlite3.Connection, project_hash: str, window: str,
                   "scope, not a relaxation" % (fmt_pct(share), pattern))
 
 
+def _print_judged(verdicts: dict) -> None:
+    """What the rules were judged on, or the fact that nothing was.
+
+    Said out loud when empty, because an acceptance rate read without it is a
+    measure of tolerance presented as a measure of correctness.
+    """
+    if not verdicts:
+        print("rules judged right or wrong by a human: none. Acceptance below is what users DID "
+              "with a finding, not whether the rule was correct; record a verdict with "
+              "metrics_record_verdict <rule> right|wrong [file] to tell the two apart.")
+        return
+    total_right = sum(right for right, _ in verdicts.values())
+    total_wrong = sum(wrong for _, wrong in verdicts.values())
+    print("rules judged by a human: %d rule(s), %d verdict(s), %s judged wrong"
+          % (len(verdicts), total_right + total_wrong,
+             fmt_pct(pct(total_wrong, total_right + total_wrong))))
+
+
 def _print_no_verdict(db: sqlite3.Connection, project_hash: str, window: str) -> None:
     blocking, advisory, volume = no_verdict(db, project_hash, window)
     blocking_volume = sum(hits for _, hits in blocking)
@@ -269,7 +322,10 @@ def main() -> int:
     print("acceptance window: %d days, %d outcome(s) recorded (%d fixed, %d ignored)"
           % (days, outcomes, fixed_total, ignored_total))
     print("overall acceptance: %s" % fmt_pct(pct(fixed_total, outcomes)))
-    _print_proposals(db, project_hash, window, _print_ranked(counts), options)
+    verdicts = verdicts_by_rule(db, project_hash, window)
+    ranked = _print_ranked(counts, verdicts)
+    _print_judged(verdicts)
+    _print_proposals(db, project_hash, window, ranked, options)
     _print_no_verdict(db, project_hash, window)
     return 0
 
