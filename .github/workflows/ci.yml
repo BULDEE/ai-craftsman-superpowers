@@ -128,6 +128,11 @@ jobs:
                       if "hooks" not in hook_group:
                           errors.append(f"{event_name}[{i}]: Missing 'hooks' array")
                           continue
+                      # Claude Code accepts only matcher and hooks at this level and
+                      # drops anything else; an `if` here filtered nothing (2.1.270).
+                      for key in hook_group:
+                          if key not in ("matcher", "hooks"):
+                              errors.append(f"{event_name}[{i}]: key '{key}' is ignored at matcher level; put it on the handler")
 
                       for j, hook in enumerate(hook_group["hooks"]):
                           if "type" not in hook:

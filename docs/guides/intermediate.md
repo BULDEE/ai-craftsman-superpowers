@@ -127,31 +127,25 @@ export function useProduct(productId: ProductId) {
 
 ## Lesson 2: Exploiting Knowledge
 
-### Searching the Knowledge Base
+### Looking up the doctrine behind a rule
 
-With the RAG MCP server, you can query indexed content:
+The knowledge bundle ships as plain Markdown under `knowledge/` (Open Knowledge
+Format, ADR-0024): no index, no embeddings, no external service. When a rule
+fires, the block message already points at the concept that explains it. To
+look one up yourself:
 
-```
-> What are the 6 MLOps principles?
-```
-
-Claude calls `search_knowledge()` and returns grounded answers from your indexed PDFs.
-
-### Listing Available Knowledge
-
-```
-> List my knowledge sources
+```bash
+bash ~/.claude/craftsman-knowledge.sh by-rule LAYER001
 ```
 
-Returns all indexed documents with topics and chunk counts.
+Returns the note whose frontmatter declares that rule, from the core bundle or
+the loaded packs.
 
-### Targeted Searches
+### Reading a concept directly
 
-```
-> Search my knowledge base for "circuit breaker pattern"
-```
-
-Returns relevant chunks from microservices documentation.
+Every note is a file: `knowledge/clean-architecture.md`, `knowledge/ddd/`,
+`packs/symfony/knowledge/`. Ask Claude to read one before a design pass, or
+open it in Obsidian: the bundle is a vault.
 
 ### Knowledge-Informed Design
 

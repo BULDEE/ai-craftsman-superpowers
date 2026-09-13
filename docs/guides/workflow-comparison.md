@@ -204,8 +204,8 @@ Duration: Critical path (T_total) - much faster than sequential
 
 **Prerequisites:**
 - `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in Claude Code settings.json
-- `teammates.mode: "iterm"` or `"tmux"` configured
-- Claude Code v1.0.33+
+- `teammateMode` set to `in-process`, `auto`, `tmux` or `iterm2` (agent teams are experimental: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`)
+- Claude Code >= 2.1.218
 
 **Team setup:**
 ```bash
@@ -220,7 +220,7 @@ Duration: Critical path (T_total) - much faster than sequential
 ```
 
 **Estimating cost:**
-- Team Lead (Sonnet) orchestrates
+- Team Lead (Opus) orchestrates
 - 2-5 team members (Sonnet) execute tasks
 - Hooks (Haiku) validate in real-time
 - Total: ~$0.15-0.40 per feature

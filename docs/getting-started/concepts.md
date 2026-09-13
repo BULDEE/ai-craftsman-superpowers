@@ -91,7 +91,7 @@ This plugin encodes these practices into repeatable skills.
 - **Canonical**: Golden examples to follow
 - **Anti-patterns**: What NOT to do
 
-### 4. Agents (11 total)
+### 4. Agents (12 total)
 
 **What**: Specialized AI agents - 4 reviewers (read-only analysis) and 7 craftsmen (implementation).
 
@@ -117,8 +117,8 @@ This plugin encodes these practices into repeatable skills.
 
 **Command hooks** (shell scripts): validate code rules, detect biases, record
 metrics, gate task completion on verification evidence.
-**Agent hooks** (Haiku model): semantic DDD analysis, Sentry error context,
-project structure analysis, final architecture review.
+**Agent hooks** (Haiku model, headless `claude -p`): semantic DDD analysis,
+Sentry error context, final architecture review.
 
 See [Hooks Reference](../reference/hooks.md) for the full event table.
 
@@ -167,8 +167,7 @@ When rules conflict, this order applies:
 2. Project CLAUDE.md
 3. Global ~/.claude/CLAUDE.md
 4. Pack knowledge
-5. Core knowledge
-6. RAG search results            (lowest priority)
+5. Core knowledge               (lowest priority)
 ```
 
 ## External Resources

@@ -133,7 +133,7 @@ pack_validate_<lang>() {
 - **Never use `exit 1`** - validators must use `exit 0` (pass) or `exit 2` (block)
 - Always redirect stderr: `2>/dev/null` on grep/sed calls
 - Use `line_has_ignore` to respect `craftsman-ignore` comments
-- Keep validators fast (<50ms per file) - regex only, no external tool calls
+- Keep validators regex-only, no external tool calls: their cost is measured by `tests/perf/test-hook-latency.sh`, which fails when a hook crosses its ceiling
 - Static analysis tools (eslint, phpstan, clippy) go in `static-analysis/`, not validators
 
 ## Writing Agents

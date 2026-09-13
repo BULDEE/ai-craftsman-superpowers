@@ -178,7 +178,7 @@
 {"complexity":1,"fan_out":4,"file_lines":176,"ignores":0,"instrument":2,"max_fn_lines":15,"path":"tests/core/test-gate-independence.sh"},
 {"complexity":26,"fan_out":4,"file_lines":166,"ignores":0,"instrument":2,"max_fn_lines":166,"path":"tests/core/test-healthcheck.sh","reason":"hc_check_skills asserted against the frontmatter (#48)"},
 {"complexity":18,"fan_out":3,"file_lines":106,"ignores":0,"instrument":2,"max_fn_lines":106,"path":"tests/core/test-hook-inventory.sh"},
-{"complexity":2,"fan_out":44,"file_lines":1811,"ignores":5,"instrument":2,"max_fn_lines":15,"path":"tests/core/test-hooks.sh","reason":"stack assertions flipped: a foreign stack no longer silences a pack (#35)"},
+{"complexity":2,"fan_out":45,"file_lines":1834,"ignores":5,"instrument":2,"max_fn_lines":15,"path":"tests/core/test-hooks.sh","reason":"matcher-level key check on hooks.json (4.10.1)"},
 {"complexity":1,"fan_out":16,"file_lines":582,"ignores":0,"instrument":2,"max_fn_lines":10,"path":"tests/core/test-hostile-repo.sh"},
 {"complexity":11,"fan_out":1,"file_lines":108,"ignores":0,"instrument":2,"max_fn_lines":108,"path":"tests/core/test-hotspot-analysis.sh"},
 {"complexity":59,"fan_out":3,"file_lines":572,"ignores":0,"instrument":2,"max_fn_lines":572,"path":"tests/core/test-instincts.sh","reason":"option spelling Claude Code exports, and the skill depth it reads (review CR-86)"},

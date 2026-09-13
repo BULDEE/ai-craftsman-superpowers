@@ -197,12 +197,14 @@ each command with its expected output.
 
 ## Commands
 
-All commands are explicitly invoked, never auto-triggered. Full reference:
+Fifteen commands start only when you type them; seven (`challenge`, `debug`,
+`test`, `team`, `rag`, `mlops`, `agent-design`) may be started by the model when
+the context matches. Full reference:
 [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md).
 
 | Category | Commands |
 |----------|----------|
-| Core methodology | `design`, `debug`, `plan`, `challenge`, `verify`, `workflow`, `spec`, `refactor`, `legacy`, `test`, `git`, `parallel` |
+| Core methodology | `design`, `debug`, `plan`, `challenge`, `verify`, `workflow`, `spec`, `refactor`, `legacy`, `test`, `git`, `parallel`, `loop` |
 | Scaffolding | `scaffold entity/usecase/component/hook/api-resource/pack` |
 | AI/ML engineering | `rag`, `mlops`, `agent-design` |
 | Utilities | `metrics`, `setup`, `team`, `healthcheck` |
@@ -262,12 +264,13 @@ this model covers and asserts it fails. Full breakdown: [SECURITY.md](SECURITY.m
 ## Known Limitations
 
 **By design:** code rule violations block, bias detection only warns; no
-auto-commit; commands are explicitly invoked, never auto-triggered; methodology
-is opinionated (DDD/Clean Architecture).
+auto-commit; fifteen commands start only when you type them and seven may be
+started by the model; methodology is opinionated (DDD/Clean Architecture).
 
-**Current constraints:** PHP, TypeScript, Python, Go and Rust get full rule
-coverage, other languages basic support only;
-other language to the model to adjudicate in context; metrics are
+**Current constraints:** PHP, TypeScript, Python, Go, Rust and Bash get full
+rule coverage, other languages basic support only; bias detection warns
+directly in English and hands every other language to the model to adjudicate
+in context; metrics are
 per-machine, not shared across a team; auto-fixing violations and IDE plugins
 are not supported by design.
 
@@ -278,7 +281,7 @@ More detail in the [FAQ](FAQ.md).
 | | |
 |---|---|
 | [What's new in v4](https://github.com/BULDEE/ai-craftsman-superpowers/releases/latest) | Clean break targeting Claude Code >= 2.1.218: closed learning loop, native-first skills, semantic Level 1.5, context budgets. Breaking changes in [MIGRATION.md](MIGRATION.md). |
-| [Architecture decisions](docs/adr/) | 28 ADRs covering every major design choice. Start with [ADR-0016](docs/adr/0016-v4-clean-break-native-first.md) and [ADR-0005](docs/adr/0005-knowledge-first-architecture.md). |
+| [Architecture decisions](docs/adr/) | 31 ADRs covering every major design choice. Start with [ADR-0016](docs/adr/0016-v4-clean-break-native-first.md) and [ADR-0005](docs/adr/0005-knowledge-first-architecture.md). |
 | [Knowledge bundle](knowledge/) | The methodology ships as an [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) bundle: plain Markdown, versioned in git, readable by Obsidian or any OKF consumer. Zero embeddings, zero index, zero external service. |
 | [Hermes quickstart](docs/guides/hermes-quickstart.md) | The same plugin inside Nous Research's Hermes agents: two-command install, recommended bot profile, server deployment pattern, troubleshooting. Runnable proof in [examples/hermes-agent](examples/hermes-agent/demo.sh). |
 | [For non-developers](docs/guides/for-non-developers.md) | What this plugin does, in plain language: the radar-in-the-loop explanation, what a refusal looks like, and the three questions worth asking your team. |
@@ -288,7 +291,7 @@ More detail in the [FAQ](FAQ.md).
 
 ## Using with the Superpowers Plugin
 
-Craftsman and [Superpowers](https://github.com/anthropics/claude-code-plugins/tree/main/superpowers)
+Craftsman and [Superpowers](https://github.com/obra/superpowers)
 load simultaneously with no conflicts. Superpowers orchestrates the workflow
 (brainstorming, planning, TDD, subagent-driven development); Craftsman enforces
 quality inside it.

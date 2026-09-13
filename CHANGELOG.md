@@ -7,7 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.10.1] - 2026-09-13
+
+The two features that were in review when 4.10.0 was tagged, one hook wiring
+defect, and the documentation pass the claims audit asked for: every count,
+price, model and path the docs state was re-measured against the code
+(agents, ADRs, skills the model may start, hook latency, analyser budgets,
+pricing per model, the GitLab artifact shape, a lesson describing a feature
+removed in ADR-0024).
+
+### Fixed
+
+- **`pre-push-verify.sh` ran on every Bash call.** `hooks.json` carried
+  `"if": "Bash(git push*)"` beside `matcher`, and Claude Code reads `if` on
+  the handler only (2.1.270 accepts `matcher` and `hooks` at that level and
+  logs `unknown key "if" in hooks.PreToolUse[1] ignored`). The hook's own
+  `grep "git push"` kept the behaviour right; the filter that avoids the
+  spawn did nothing. Moved onto the handler; `tests/core/test-hooks.sh` and
+  the CI schema job refuse any other key at matcher level.
+
 ### Added
+
+- **A finding can be judged right or wrong, and each rule's acceptance is
+  reported (#44).** `/craftsman:metrics` reports acceptance per rule,
+  fixed / (fixed + ignored), proposes a relaxation under the threshold, and
+  names the share of blocking findings that never got an outcome. A verdict
+  is about a finding, not an outcome, so it lives in its own `verdicts`
+  table with two human writers: the reason spelled out in the suppression at
+  the moment of the decision (`craftsman-ignore: RULE (wrong: why)` or
+  `(debt: why)`, transcribed by the hook), and `metrics_record_verdict`
+  from the review after the fact, which refuses a file that does not exist.
+  No path writes a verdict the developer did not spell out. Found necessary
+  by the learning-loop review: an acceptance rate alone measures tolerance,
+  not correctness.
 
 - **Hermes: the write-time promise, opt-in (#21).** The gate on Hermes
   refuses the conclusion by default, and the main README now says so plainly.

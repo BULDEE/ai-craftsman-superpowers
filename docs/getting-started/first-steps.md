@@ -107,7 +107,7 @@ GENERATED:
 
 ## Quick Reference: Core Commands
 
-All commands use the `/craftsman:` prefix. See the full [Commands Reference](../reference/skills.md) for all 22 commands.
+All commands use the `/craftsman:` prefix. See the [Commands Reference](../reference/skills.md) for the core commands and [COMMANDS-QUICK-REF.md](../../COMMANDS-QUICK-REF.md) for all 22.
 
 | Command | Use When |
 |---------|----------|

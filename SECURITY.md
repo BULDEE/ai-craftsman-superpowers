@@ -17,7 +17,7 @@ Skills are **prompt templates** that guide Claude's behavior. They:
 - ❌ Do NOT access network resources
 - ❌ Do NOT modify system files
 
-### Agents (12 core, 6 more from the packs)
+### Agents (6 core, plus 6 symlinked from the packs: 12 in total)
 
 Agents split into reviewers (read-only analysis) and craftsmen
 (implementation). Each declares a `tools:` allowlist in its frontmatter rather
@@ -37,7 +37,7 @@ than inheriting the full tool pool:
 
 Every hook is a `command` hook: a shell script this repository ships. There
 are no native `agent` or `prompt` hooks (see
-[ADR-0018](docs/adr/0018-native-prompt-agent-hooks.md)); the four scripts
+[ADR-0018](docs/adr/0018-native-prompt-agent-hooks.md)); the three scripts
 whose names start with `agent-` are shell scripts that shell out to a headless
 `claude -p` subprocess on the Haiku tier.
 
@@ -83,7 +83,10 @@ whose names start with `agent-` are shell scripts that shell out to a headless
   `claude -p` for verification. A previous version of this document claimed
   otherwise
 - ❌ Do NOT read environment variables beyond `$CLAUDE_PLUGIN_ROOT`,
-  `$CLAUDE_PLUGIN_DATA`, `$CLAUDE_PLUGIN_OPTION_*`, `$HOME` and `$PWD`
+  `$CLAUDE_PLUGIN_DATA`, `$CLAUDE_PLUGIN_OPTION_*`, `$HOME`, `$PWD`, `$TMPDIR`,
+  Claude Code's own `$CLAUDE_EFFORT`, and the plugin's documented `CRAFTSMAN_*`
+  switches (hook profile, disabled hooks, headless-verify guard, analyser
+  budgets, verify model, bias patterns dir, project root, metrics source)
 
 ## Optional Features
 
@@ -164,7 +167,7 @@ We will respond within 48 hours and work with you on disclosure.
 The hook system (validation, rules engine, metrics, bias detection) uses only system tools:
 
 - `bash` (system)
-- `jq` (optional, for JSON parsing)
+- `jq` (required by the hooks, see README)
 - `grep` (system)
 - `python3` (system, for parameterized SQL queries and YAML parsing)
 
@@ -221,7 +224,7 @@ Every `v<x.y.z>` release publishes `craftsman-<version>.tar.gz` and
 by `.github/workflows/release.yml`.
 
 ```bash
-VERSION=4.10.0
+VERSION=4.10.1
 gh release download "v${VERSION}" --repo BULDEE/ai-craftsman-superpowers \
   --pattern "craftsman-${VERSION}.tar.gz" --pattern SHA256SUMS.txt
 

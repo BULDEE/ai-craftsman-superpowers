@@ -785,15 +785,16 @@ else
     log_fail "Stop hooks async" "expected all async: true"
 fi
 
-# Test: PreToolUse Bash has conditional if field
+# Test: PreToolUse Bash handler carries the conditional if field (handler level, where Claude Code reads it)
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 bash_entry = d['hooks']['PreToolUse'][1]
-assert bash_entry.get('if') is not None, 'Expected if field on Bash PreToolUse'
-assert 'git push' in bash_entry['if'], f'Expected git push in if, got: {bash_entry[\"if\"]}'
+handler = bash_entry['hooks'][0]
+assert handler.get('if') is not None, 'Expected if field on the Bash PreToolUse handler'
+assert 'git push' in handler['if'], f'Expected git push in if, got: {handler[\"if\"]}'
 " 2>/dev/null; then
-    log_pass "PreToolUse Bash: conditional if field for git push"
+    log_pass "PreToolUse Bash: handler-level if for git push"
 else
     log_fail "PreToolUse conditional" "missing if field"
 fi
@@ -1406,6 +1407,28 @@ assert not unsupported, f'Unsupported events: {unsupported}'
     log_pass "hooks.json: all events are supported"
 else
     log_fail "hooks.json events" "contains unsupported hook events"
+fi
+
+# Test: a matcher group carries only `matcher` and `hooks`; `if` belongs on the
+# handler. Claude Code 2.1.270 accepts exactly those two keys at matcher level
+# (`_ko = new Set(["matcher","hooks"])` in the binary) and drops any other with
+# `unknown key "if" in hooks.PreToolUse[1] ignored`, so an `if` written beside
+# `matcher` filtered nothing: pre-push-verify.sh ran on every Bash call.
+BAD_KEYS=$(python3 -c "
+import json, sys
+d = json.load(open(sys.argv[1]))
+bad = []
+for ev, groups in d.get('hooks', {}).items():
+    for i, g in enumerate(groups):
+        for k in g:
+            if k not in ('matcher', 'hooks'):
+                bad.append('%s[%d].%s' % (ev, i, k))
+print(' '.join(bad))
+" "$HOOKS_FILE")
+if [[ -z "$BAD_KEYS" ]]; then
+    log_pass "hooks.json: every matcher group carries only matcher and hooks (if lives on the handler)"
+else
+    log_fail "hooks.json: matcher-level keys the runtime ignores" "$BAD_KEYS"
 fi
 
 # Test: hooks.json is still valid JSON after all additions
