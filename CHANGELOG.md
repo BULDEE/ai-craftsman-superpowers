@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The pre-write gate resolves severity through the rules engine, like
+  every other front-end.** `pre-write-check.sh` decided block-or-warn
+  through `config_should_block`, config.sh's strictness table plus a
+  hand-kept advisory list (`WARN*|PHP005`), and never asked
+  `rules_severity_for_file`. Measured by the architecture review: the same
+  file, the same rule and the same `.craft-rules.yml` demoting LAYER001 gave
+  "BLOCKED" before the write, nothing after it, and nothing in CI: two
+  verdicts inside one front-end, invisible to the parity suite because it
+  ran the relaxation case through post-write only. The gate now runs
+  `rules_init` and resolves each finding per file: `ignore` leaves the list,
+  `block` refuses the write, `warn` reports and lets it through, and the
+  strict_types auto-fix applies only where PHP001 would have blocked.
+  `config_should_block` and its advisory list are gone (the second one the
+  engine was not supposed to have, #37); the parity suite runs the demotion
+  case through pre-write and CI.
+
+
 - **`agent_hooks: false` (and every other plugin option) never reached a
   hook.** Claude Code exports an option as `CLAUDE_PLUGIN_OPTION_<KEY>` with
   the key UPPERCASED; every reader in `hooks/`, `hooks/lib/config.sh`,

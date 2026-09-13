@@ -11,7 +11,7 @@
 #   source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/config.sh"
 #   strictness=$(config_strictness)   # strict | moderate | relaxed
 #   stack=$(config_stack)             # symfony | react | fullstack | other
-#   config_should_block "PHP001" && exit 2 || echo "warn only"
+#   config_strictness            # strict | moderate | relaxed
 # =============================================================================
 
 _config_parse_yml_value() {
@@ -136,24 +136,6 @@ config_strictness() {
 
 config_stack() {
     _config_resolve "stack" "fullstack"
-}
-
-config_should_block() {
-    local rule="$1"
-
-    # Warnings never block regardless of strictness
-    case "$rule" in
-        WARN*|PHP005) return 1 ;;
-    esac
-
-    local strictness
-    strictness=$(config_strictness)
-    case "$strictness" in
-        strict)   return 0 ;;
-        moderate) [[ "$rule" == LAYER* || "$rule" == SEC* ]] && return 0; return 1 ;;
-        relaxed)  return 1 ;;
-        *)        return 0 ;;
-    esac
 }
 
 config_guided() {

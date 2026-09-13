@@ -131,6 +131,32 @@ else
 fi
 _clean
 
+# --- a directory relaxation holds pre-write too ---------------------------
+#
+# pre-write-check.sh resolved severity through config.sh's strictness table
+# and a hand-kept advisory list, never through rules_severity_for_file: the
+# same file, same rule and same .craft-rules.yml gave "BLOCKED" before the
+# write and nothing after it, two verdicts inside one front-end, and this
+# suite ran the relaxation case through post-write only.
+mkdir -p "$WORK/src/Domain/User"
+printf 'rules:\n  LAYER001: warn\n' > "$WORK/src/Domain/.craft-rules.yml"
+RC=0
+HOOK_OUT=$(python3 -c '
+import json, sys
+print(json.dumps({"tool_input": {"file_path": sys.argv[1], "content": sys.argv[2]}}))' \
+    "$PHP_FILE" "$PHP_CONTENT" | bash "$ROOT_DIR/hooks/pre-write-check.sh" 2>&1) || RC=$?
+printf '%s' "$PHP_CONTENT" > "$PHP_FILE"
+CI_OUT=$(_ci_rules_for "src/Domain/User/User.php")
+if [[ "$RC" -eq 0 ]] && printf '%s' "$HOOK_OUT" | grep -q "PRE-WRITE WARNING" \
+    && printf '%s' "$HOOK_OUT" | grep -q "LAYER001" \
+    && printf '%s' "$CI_OUT" | grep -q "^LAYER001 warning"; then
+    log_pass "a directory .craft-rules.yml demotion holds pre-write as it holds in CI"
+else
+    log_fail "pre-write relaxation parity" "hook rc=$RC out=[$(printf '%s' "$HOOK_OUT" | tr '\n' ' ' | cut -c1-120)] ci=[$CI_OUT]"
+fi
+rm -f "$WORK/src/Domain/.craft-rules.yml"
+_clean
+
 # --- every adapter directory is covered here ------------------------------
 UNCOVERED=""
 for dir in "$ROOT_DIR"/adapters/*/; do
