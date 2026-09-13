@@ -138,9 +138,9 @@ _check_corrections() {
         if echo -e "$CRITICAL_VIOLATIONS" | grep -q "^${prev_rule}:"; then
             : # Still violated, do nothing
         elif file_has_ignore "$prev_rule" 2>/dev/null; then
-            metrics_record_correction "$prev_rule" "$file_pattern" "ignored" "craftsman-ignore added" 2>/dev/null || true
+            metrics_record_correction "$prev_rule" "$file_pattern" "ignored" "craftsman-ignore added" "$file" 2>/dev/null || true
         else
-            metrics_record_correction "$prev_rule" "$file_pattern" "fixed" "" 2>/dev/null || true
+            metrics_record_correction "$prev_rule" "$file_pattern" "fixed" "" "$file" 2>/dev/null || true
         fi
     done
 }
@@ -355,7 +355,7 @@ precedence_note_superseded() {
     pattern=$(metrics_file_pattern "$2")
     if declare -F metrics_record_correction >/dev/null 2>&1; then
         metrics_record_correction "$rule" "$pattern" "overridden" \
-            "level 2/3 answered for this rule" 2>/dev/null || true
+            "level 2/3 answered for this rule" "$2" 2>/dev/null || true
     fi
 }
 

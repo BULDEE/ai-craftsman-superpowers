@@ -28,12 +28,23 @@ mkdir -p "$HOME/.claude"
 SESSION_STATE="$CLAUDE_PLUGIN_DATA/session-state.json"
 FIXTURES_DIR="/tmp/craftsman-correction-fixtures-$$"
 mkdir -p "$FIXTURES_DIR/src/Domain"
+# A git repository, because that is what the metrics path helpers key on:
+# outside one, metrics_relative_path refuses (it will not write a host path
+# into a database several machines share) and every correction lands under the
+# single bucket <outside-project> with no file. The suite used to measure that
+# degraded shape and call it the normal one.
+( cd "$FIXTURES_DIR" && git init -q ) >/dev/null 2>&1
 
 # Helper to run post-write hook
+# From inside the fixture repository, because that is where Claude Code runs a
+# hook: the metrics helpers key the project on the hook's own $PWD, so running
+# from elsewhere filed every correction under <outside-project> with no file,
+# and this suite measured that degraded shape as if it were the normal one.
 run_post_hook() {
     local fixture="$1"
     local output
-    output=$(echo "{\"tool_input\":{\"file_path\":\"$fixture\"}}" | bash "$ROOT_DIR/hooks/post-write-check.sh" 2>/dev/null)
+    output=$( cd "$FIXTURES_DIR" && echo "{\"tool_input\":{\"file_path\":\"$fixture\"}}" \
+        | bash "$ROOT_DIR/hooks/post-write-check.sh" 2>/dev/null )
     local exit_code=$?
     echo "$exit_code|$output"
 }
@@ -124,6 +135,20 @@ if [[ "$(_fixed_rows)" == "1" ]]; then
     log_pass "the fix is recorded once, as PHP001 fixed"
 else
     log_fail "the fix is recorded once" "rows: $(_fixed_rows)"
+fi
+
+# The row carries the exact file, not only its directory glob: the instinct
+# gate counts DISTINCT files to decide candidacy (ADR-0020, "across files"),
+# and only the Haiku layer used to pass it, so a Level 1 fix counted as one
+# directory however many files it touched.
+_fixed_row() {
+    python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$CLAUDE_PLUGIN_DATA/metrics.db" \
+        "SELECT rule, file_pattern, file_path FROM corrections WHERE action='fixed' LIMIT 1" 2>/dev/null
+}
+if [[ "$(_fixed_row)" == "PHP001|src/Domain/**/*.php|src/Domain/BadEntity.php" ]]; then
+    log_pass "the correction row carries the exact file beside its directory glob"
+else
+    log_fail "the correction row carries the exact file" "$(_fixed_row)"
 fi
 
 # The same clean file written again: nothing pending, nothing recorded.

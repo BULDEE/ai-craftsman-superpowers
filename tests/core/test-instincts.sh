@@ -501,4 +501,55 @@ fi
 
 rm -rf "$INJ_DIR"
 
+# --- What "across files" counts ------------------------------------------------
+#
+# corrections.file_pattern is a directory glob and corrections.file_path the
+# exact file. Counting the glob made MIN_DISTINCT_FILES a count of directories:
+# measured on a real database, 23 PHP001 fixes under one glob, zero candidates
+# ever. Three fixes in three files of ONE directory is a candidate; a legacy
+# database with no file_path column still counts its globs rather than dying,
+# because session-start.sh reads a crash here as "no candidate".
+echo ""
+echo "=== Across files, not across directories ==="
+ONEDIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-instinct-onedir.XXXXXX")
+ONEDIR_DB="$ONEDIR/m.db"
+sqlite3 "$ONEDIR_DB" "
+CREATE TABLE corrections(id INTEGER PRIMARY KEY, timestamp TEXT DEFAULT (datetime('now')),
+  project_hash TEXT, rule TEXT, file_pattern TEXT, action TEXT, context TEXT, file_path TEXT);
+INSERT INTO corrections (project_hash, rule, file_pattern, action, context, file_path) VALUES
+  ('p1','PHP001','src/Domain/**/*.php','fixed','added strict_types','src/Domain/Order.php'),
+  ('p1','PHP001','src/Domain/**/*.php','fixed','added strict_types','src/Domain/Customer.php'),
+  ('p1','PHP001','src/Domain/**/*.php','fixed','added strict_types','src/Domain/Invoice.php');"
+ONEDIR_OUT=$(python3 "$INSTINCTS" candidates "$ONEDIR_DB" p1 2>&1)
+assert_contains "three fixes in three files of one directory is a candidate" "$ONEDIR_OUT" "PHP001 \\[candidate\\]"
+
+# The same three fixes on ONE file are not three files.
+sqlite3 "$ONEDIR_DB" "DELETE FROM instincts; UPDATE corrections SET file_path='src/Domain/Order.php';"
+SAMEFILE_OUT=$(python3 "$INSTINCTS" candidates "$ONEDIR_DB" p1 2>&1)
+if ! echo "$SAMEFILE_OUT" | grep -q "PHP001"; then
+    log_pass "three fixes on one file is not three files"
+else
+    log_fail "three fixes on one file is not three files" "$SAMEFILE_OUT"
+fi
+
+# A database from before the exact file was recorded: the glob is all it has,
+# and it must still answer rather than crash into a silent zero.
+LEGACYCOL=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-instinct-legacycol.XXXXXX")
+LEGACYCOL_DB="$LEGACYCOL/m.db"
+sqlite3 "$LEGACYCOL_DB" "
+CREATE TABLE corrections(id INTEGER PRIMARY KEY, timestamp TEXT DEFAULT (datetime('now')),
+  project_hash TEXT, rule TEXT, file_pattern TEXT, action TEXT, context TEXT);
+INSERT INTO corrections (project_hash, rule, file_pattern, action, context) VALUES
+  ('p1','TS001','src/a/**/*.ts','fixed','any removed'),
+  ('p1','TS001','src/b/**/*.ts','fixed','any removed'),
+  ('p1','TS001','src/c/**/*.ts','fixed','any removed');"
+LEGACYCOL_OUT=$(python3 "$INSTINCTS" candidates "$LEGACYCOL_DB" p1 2>&1); LEGACYCOL_RC=$?
+LEGACYCOL_COUNT=$(python3 "$INSTINCTS" pending-count "$LEGACYCOL_DB" p1 2>/dev/null)
+if [[ "$LEGACYCOL_RC" == "0" ]] && echo "$LEGACYCOL_OUT" | grep -q "TS001" && [[ "$LEGACYCOL_COUNT" == "1" ]]; then
+    log_pass "a corrections table with no file_path column counts its globs instead of crashing"
+else
+    log_fail "a corrections table with no file_path column counts its globs" "rc=$LEGACYCOL_RC count=$LEGACYCOL_COUNT: $LEGACYCOL_OUT"
+fi
+rm -rf "$ONEDIR" "$LEGACYCOL"
+
 test_summary
