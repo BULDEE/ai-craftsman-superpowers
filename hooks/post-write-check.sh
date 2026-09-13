@@ -53,11 +53,28 @@ _blocked_rules_json() {
     printf '%s]' "$rules_json"
 }
 
-_write_session_state() {
+# The key a file's pending verdicts sit under: the exact file, never its
+# directory glob. Keyed on `metrics_file_pattern` (src/Domain/**/*.php), the
+# pending list was shared by every file under the glob and never cleared, so
+# every later write to ANY of them re-recorded the same outcome: measured on
+# a production database, PHP002 carried 106 `ignored` rows from one pattern
+# against 56 blocking findings, and 5 of 10 rules had more outcomes than
+# findings (#68). One finding, at most one verdict.
+_pending_key() {
+    local file="$1" resolved
+    resolved=$(cd "$(dirname "$file")" 2>/dev/null && pwd -P) || resolved="$(dirname "$file")"
+    printf '%s/%s' "$resolved" "$(basename "$file")"
+}
+
+# Replace the file's pending verdicts with what THIS write still violates,
+# on every write. A rule that dropped out was answered by _check_corrections
+# just before, once; a clean write clears the key. The cross-file patterns
+# come back from the same interpreter start, read from the state it just
+# wrote: the detection that followed used to be a second start re-reading
+# the same file.
+_settle_session_state() {
     $HAS_PYTHON3 || return 0
     local file="$1"
-    local file_pattern
-    file_pattern=$(metrics_file_pattern "$file")
     mkdir -p "$(dirname "$SESSION_STATE")"
 
     # Extract directory bucket for cross-file pattern grouping
@@ -65,12 +82,8 @@ _write_session_state() {
     dir_bucket=$(dirname "$file" | sed -E "s|${PWD}/||")
     rules_json=$(_blocked_rules_json)
 
-    # Atomically record violation with cross-file pattern tracking. The
-    # patterns come back from the same interpreter start, read from the state
-    # it just wrote: the detection that followed used to be a second start
-    # re-reading the same file.
     RECORDED_PATTERNS=$(python3 "$SCRIPT_DIR/lib/session_state.py" record-violation \
-        "$SESSION_STATE" "$file_pattern" "$dir_bucket" "$rules_json" --detect 2>&1) \
+        "$SESSION_STATE" "$(_pending_key "$file")" "$dir_bucket" "$rules_json" --detect 2>&1) \
         && RECORDED_PATTERNS_FRESH=true \
         || { echo "WARNING: session state write failed" >&2; RECORDED_PATTERNS=""; }
 }
@@ -116,9 +129,10 @@ _check_corrections() {
 
     local prev_rules
     prev_rules=$(python3 "$SCRIPT_DIR/lib/session_state.py" get-previous-violations \
-        "$SESSION_STATE" "$file_pattern" 2>/dev/null) || return
+        "$SESSION_STATE" "$(_pending_key "$file")" 2>/dev/null) || return
 
     [[ -z "$prev_rules" ]] && return
+    PENDING_BEFORE="$prev_rules"
 
     for prev_rule in $prev_rules; do
         if echo -e "$CRITICAL_VIOLATIONS" | grep -q "^${prev_rule}:"; then
@@ -457,7 +471,14 @@ precedence_flush
 # back is still violated, and a check that ran first would have seen it absent
 # and recorded it as fixed - teaching the correction learning the opposite of
 # what happened.
+PENDING_BEFORE=""
 _check_corrections "$FILE_PATH"
+# Then the pending set is what this write still violates, empty included: a
+# verdict recorded above is not recorded again on the next write. A clean
+# write with nothing pending has nothing to settle, and pays no start for it.
+if [[ -n "$PENDING_BEFORE" || $CRITICAL_COUNT -gt 0 ]]; then
+    _settle_session_state "$FILE_PATH"
+fi
 
 # =============================================================================
 # Output Decision
@@ -465,8 +486,6 @@ _check_corrections "$FILE_PATH"
 
 if [[ $CRITICAL_COUNT -gt 0 ]]; then
     # Rules engine already routed block vs warn - CRITICAL_VIOLATIONS only contains blocking rules
-    _write_session_state "$FILE_PATH"
-
     # Check for cross-file patterns and append actionable suggestion
     PATTERN_SUGGESTIONS=$(_detect_cross_file_patterns 2>/dev/null) || true
     pattern_msg=""
