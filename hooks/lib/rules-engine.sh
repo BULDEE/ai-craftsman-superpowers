@@ -426,6 +426,14 @@ _rules_load_config_file() {
     local project_dir="$1"
     local global_dir="${2:-}"
 
+    if [[ -n "$global_dir" ]] && [[ -f "$global_dir/.craft-config.yml" ]]; then
+        _rules_parse_config "$global_dir/.craft-config.yml" "global"
+    fi
+
+    # The plugin option outranks the global file and yields to the project
+    # file, the order config.sh resolves in. It used to be applied FIRST, so
+    # `strictness: relaxed` in ~/.claude/.craft-config.yml overrode an
+    # explicit `strict` option and disarmed post-write (guardrail review).
     # Uppercased is how Claude Code exports the option; lowercase is the
     # plugin's own internal export and what the suites set (see config.sh).
     local _option_strictness
@@ -433,10 +441,6 @@ _rules_load_config_file() {
     if [[ -n "$_option_strictness" ]]; then
         _RULES_STRICTNESS="$_option_strictness"
         _RULES_STRICTNESS_IS_DEFAULT=false
-    fi
-
-    if [[ -n "$global_dir" ]] && [[ -f "$global_dir/.craft-config.yml" ]]; then
-        _rules_parse_config "$global_dir/.craft-config.yml" "global"
     fi
 
     if [[ -f "$project_dir/.craft-config.yml" ]]; then

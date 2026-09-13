@@ -24,6 +24,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `config_should_block` and its advisory list are gone (the second one the
   engine was not supposed to have, #37); the parity suite runs the demotion
   case through pre-write and CI.
+- **The gated party no longer reconfigures the gate.** Measured by the
+  guardrail review: a Write to `.craft-rules.yml`, `.craft-config.yml`,
+  `.craftsman-baseline.json`, `.claude/settings.json` or the installed
+  plugin's own `rules-engine.sh` passed `config-protection.sh` with exit 0,
+  and `strictness: relaxed` in the first two disarmed pre-write and
+  post-write in the same session; the block message even named the
+  environment switch that turns the hook off. The hook now answers by kind:
+  tool configs denied as before; the gate's own `.craft-*` files handed to
+  the user through `permissionDecision: "ask"` (scoping a rule is the
+  user's decision by design, and `/craftsman:setup` goes through the same
+  prompt; in bypass mode the docs say "ask" proceeds, and that limit is
+  written where it applies); Claude Code's settings files and anything
+  under the installed plugin denied. The switch is no longer offered to the
+  model.
+
+- **An explicit strictness option outranks the global file.** `rules_init`
+  applied `CLAUDE_PLUGIN_OPTION_strictness` first and parsed
+  `~/.claude/.craft-config.yml` after it, so `strictness: relaxed` in the
+  global file overrode an explicit `strict` option and disarmed post-write
+  (guardrail review, E9ter). The engine now resolves project file, then
+  option, then global file, the order `config.sh` already used.
 
 
 - **`agent_hooks: false` (and every other plugin option) never reached a

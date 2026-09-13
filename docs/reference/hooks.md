@@ -75,11 +75,15 @@ Note: there is no hook that blocks destructive shell commands (`git reset --hard
 
 ## Config Protection (v3.8.0+)
 
-`config-protection.sh` (PreToolUse, Write|Edit) blocks writes to single-purpose linter/formatter/architecture config files - `phpstan.neon(.dist)`, `.eslintrc*`, `eslint.config.*`, `.php-cs-fixer(.dist).php`, `deptrac.y(a)ml`, `.dependency-cruiser.*` - so an agent can't silently loosen a rule instead of fixing the code that violates it.
+`config-protection.sh` (PreToolUse, Write|Edit) answers three kinds of file:
 
-`.craft-config.yml`/`.craft-rules.yml` are intentionally excluded - they're the user-facing rule override mechanism (see Custom Rule Engine) and `/craftsman:setup` writes to them by design. Multi-purpose files (`pyproject.toml`, `package.json`) are excluded too - too much unrelated project metadata to block wholesale.
+- **Tool configs, denied.** Single-purpose linter/formatter/architecture config files (`phpstan.neon(.dist)`, `.eslintrc*`, `eslint.config.*`, `.php-cs-fixer(.dist).php`, `deptrac.y(a)ml`, `.dependency-cruiser.*`, whatever the loaded packs declare under `protected_configs`), so an agent can't silently loosen a rule instead of fixing the code that violates it. Exit 2.
+- **The gate's own configuration, handed to the user.** `.craft-rules.yml`, `.craft-config.yml` and `.craftsman-baseline.json` configure the gate itself: scoping a rule is the user's decision by design (the block message offers it), so the write returns `permissionDecision: "ask"` and Claude Code's own prompt decides. `/craftsman:setup` writing `.craft-config.yml` goes through that same prompt. Documented limit: in bypass mode (`--dangerously-skip-permissions`) "ask" proceeds, a hook cannot force a prompt there.
+- **The gate's machinery, denied.** `.claude/settings.json`, `.claude/settings.local.json` (an `env` block there sets every switch the hooks read) and anything under the installed plugin's own directory: no project session has a legitimate reason to write either.
 
-Blocks with exit 2. Escape hatch: `CRAFTSMAN_DISABLED_HOOKS=config-protection` for a session where a genuine config change is intended.
+Multi-purpose files (`pyproject.toml`, `package.json`) are left alone: too much unrelated project metadata to block wholesale.
+
+The block message no longer names the environment switch that disarms this hook: a guard that tells the gated party how to remove it is not a guard. The switch exists for the operator's shell, like every other hook profile setting below.
 
 ## Hook Profiles (v3.8.0+)
 
