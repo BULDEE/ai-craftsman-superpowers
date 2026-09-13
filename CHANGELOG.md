@@ -279,9 +279,15 @@ proven on the real consumer.
   refuses the conclusion by default, and the main README now says so plainly.
   `write_gate: on` registers `pre_tool_call` (`adapters/hermes/pre-tool-call.sh`
   and `write_gate_place.py`) for `write_file` and `patch` only, judging the
-  content as the file would be on LAYER001 and SEC001 to SEC003 and nothing
-  else; every other rule still waits for the conclusion, with the skill that
-  fixes it. Two reviewers measured the first version against the Hermes
+  content as the file would be on SEC001 (a hardcoded secret, the one cost
+  waiting does not bound) and LAYER001 (outside test paths) and nothing else;
+  every other rule still waits for the conclusion, with the skill that fixes
+  it. Not SEC002 and SEC003, though the issue first named them: both are
+  line-local regexes without a notion of a sanitizer, measured firing on the
+  documented mitigations (`escapeshellarg`, a DQL string with a bound
+  parameter), and telling those apart is taint analysis, which is what
+  Level 2 supersedes the regex with at the conclusion and which no write-time
+  budget can afford. Two reviewers measured the first version against the Hermes
   source and it held only through the plugin: the shell wire carries the
   tool arguments as `tool_input`, not `args`, so Path 1 judged nothing; no
   cwd reaches a plugin hook and the shell hook's is the gateway process's,

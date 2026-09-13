@@ -8,9 +8,30 @@
 # nobody. That stays the default. This hook is the opt-in exception for the
 # findings no retry budget should ever let reach disk, and for nothing else:
 #
-#   LAYER001         Domain importing Infrastructure
-#   SEC001 to SEC003 a hardcoded secret, data executed as code, SQL built by
-#                    concatenation
+#   SEC001    a hardcoded secret: the one finding whose cost is not bounded
+#             by waiting, because a secret on disk in an autonomous loop can be
+#             committed, pushed or logged before the conclusion, and then it
+#             has to be rotated
+#   LAYER001  Domain importing Infrastructure: reversible in one line, kept
+#             because it is free and keyed on the path, so it has no false
+#             positive outside test code; test paths are left to the
+#             conclusion, where an in-memory adapter under tests/Domain is
+#             the normal shape
+#
+# Not SEC002 and SEC003, though #21 first named them. Both are line-local
+# regexes with no notion of a sanitizer, and they fire on the documented
+# mitigation: `exec('git -C ' . escapeshellarg($dir))` (SEC002, escapeshellarg
+# is what the PHP manual prescribes), `createQuery('SELECT e FROM ' .
+# $this->entityClass . ' e WHERE e.id = :id')` (SEC003, a class name and a
+# bound parameter). Telling sanitized from unsanitized data needs taint
+# analysis (sources, sanitizers, sinks), which is what psalm and phpstan
+# supersede the regex with at Level 2, and no taint run fits the 20s a write
+# gets under Hermes's 30s callback cap. At the conclusion those two rules
+# block exactly as before, the loop is bounded by max_verify_nudges, and the
+# analyser can outrank the regex; at write time they would only teach the
+# agent to split a line. The scope is revisited on data: the acceptance
+# report (/craftsman:metrics) says whether SEC001 refusals are fixed or
+# suppressed.
 #
 # Everything else waits for the conclusion gate, which reports it with the
 # advisory channel and the skill to apply. A write blocked here says so, names
@@ -59,7 +80,11 @@ CRAFTSMAN_CI="$PLUGIN_ROOT/ci/craftsman-ci.sh"
 # The rules this hook may refuse a write on. A finding outside this set is
 # never reported here, whatever its severity: that is the promise the default
 # makes to an agent with no human to break its loop.
-WRITE_GATE_RULES="LAYER001 SEC001 SEC002 SEC003"
+WRITE_GATE_RULES="LAYER001 SEC001"
+# LAYER001 is not judged here on a test path: the engine's own notion of one
+# (rules-engine.sh, _RULES_TEST_PATH_RE), because a test double in memory
+# under tests/Domain imports Infrastructure by design.
+WRITE_GATE_TEST_PATH_RE='(^|/)(tests?|spec|__tests__|__mocks__|fixtures?|factories)(/|$)'
 
 # A block written with printf, not python3: the one failure this script must
 # be able to report is python3 being absent, and a bail that needs python3 to
@@ -141,22 +166,24 @@ REPORT=$(cd "$MIRROR" && portable_timeout "${CRAFTSMAN_GATE_SECONDS:-20}" \
 [[ -n "$REPORT" ]] || _bail_file "gate produced no report (exit ${GATE_STATUS})"
 
 VERDICT=$(printf '%s' "$REPORT" | python3 -c '
-import json, sys
+import json, re, sys
 try:
     report = json.load(sys.stdin)
 except (ValueError, TypeError):
     sys.exit(0)
 allowed = set(sys.argv[1].split())
 path = sys.argv[2]
+if re.search(sys.argv[3], path):
+    allowed.discard("LAYER001")
 hits = [v for v in (report.get("violations") or [])
         if v.get("rule") in allowed and v.get("severity") == "critical"]
 if not hits:
     sys.exit(0)
 print("\n".join("{}:{} {} - {}".format(path, v.get("line", 0), v.get("rule", "?"), v.get("message", ""))
                 for v in hits))
-' "$WRITE_GATE_RULES" "$PLACED")
+' "$WRITE_GATE_RULES" "$PLACED" "$WRITE_GATE_TEST_PATH_RE")
 
 [[ -n "$VERDICT" ]] || exit 0
-_block "craftsman refused this write before it reached disk, on the rules no retry budget should let through (LAYER001, SEC001-003):
+_block "craftsman refused this write before it reached disk, on the rules no retry budget should let through (SEC001, LAYER001):
 ${VERDICT}
-Rewrite the content without the finding, then write again. If the finding is wrong for this line (a test fixture, a query that is in fact bound), put \`craftsman-ignore: <RULE>\` in a comment on that line and it is honoured. Every other rule is judged at the conclusion, with the skill that fixes it."
+Rewrite the content without the finding, then write again: a secret is read from the environment or a vault, never written; a Domain class does not import Infrastructure. If a LAYER001 finding is wrong for this file, \`craftsman-ignore: LAYER001\` in a comment on that line is honoured. Every other rule is judged at the conclusion, with the skill that fixes it."

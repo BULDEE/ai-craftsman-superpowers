@@ -109,18 +109,41 @@ traps nothing, and Hermes bounds the retries itself through
 ### The write-time promise, opt-in
 
 The README headline is "refuses the write before it reaches disk", and on
-Hermes the default gate refuses the conclusion, for the reason above. One
-class of finding is the exception: a live credential, SQL built by
-concatenation, data executed as code, a Domain class importing
-Infrastructure. Those are not debt an agent pays down on its own schedule,
-and no retry budget should let them reach disk. `write_gate: on` registers
+Hermes the default gate refuses the conclusion, for the reason above. Two
+findings are the exception. A hardcoded secret (SEC001): the one cost that
+waiting does not bound, because a secret on disk in an autonomous loop can be
+committed, pushed or logged before the conclusion, and then it has to be
+rotated. A Domain class importing Infrastructure (LAYER001): reversible in
+one line, kept because it is keyed on the path and free of false positives
+outside test code, so refusing it costs nothing. `write_gate: on` registers
 `pre_tool_call` (`adapters/hermes/pre-tool-call.sh`, with
 `write_gate_place.py` for the half that understands the tool call) for
 `write_file` and `patch` only, judging the content as the file WOULD be on
-LAYER001 and SEC001 to SEC003, and nothing else: PHP001, TS001 and every
-other rule still wait for the conclusion, with the skill that fixes them. A
-refused write is told how to get out: rewrite, or `craftsman-ignore: RULE`
-on the line when the finding is wrong, which the scan honours.
+those two rules and nothing else: PHP001, TS001 and every other rule still
+wait for the conclusion, with the skill that fixes them. LAYER001 is not
+judged at write time under a test path (the engine's own notion of one:
+`tests/`, `spec/`, `fixtures/`...), where an in-memory adapter importing
+Infrastructure is the normal shape. A refused write is told how to get out:
+a secret is read from the environment or a vault; a LAYER001 finding that is
+wrong for the file escapes with `craftsman-ignore: LAYER001` on the line,
+which the scan honours. No escape is offered for a secret: a unilateral
+bypass on the credential is the retry budget the design refuses.
+
+Why not SEC002 and SEC003, which issue #21 first named. Both are line-local
+regexes with no notion of a sanitizer, and measured on the documented
+mitigations they fire: `exec('git -C ' . escapeshellarg($dir))` (the PHP
+manual's own prescription for a shell argument), `createQuery('SELECT e FROM '
+. $this->entityClass . ' e WHERE e.id = :id')` (a class name, and a bound
+parameter, the form the Doctrine documentation prescribes). Telling a
+sanitized value from an unsanitized one is taint analysis (sources,
+sanitizers, sinks), which is what psalm and phpstan supersede the regex with
+at Level 2, and no taint run fits the 20 seconds a write gets under Hermes's
+30 second callback cap. So at write time those two rules would refuse the
+correct code and let a split line through, teaching the agent the wrong
+lesson; at the conclusion they block exactly as before, the loop is bounded
+by `max_verify_nudges`, and the analyser can outrank the regex. The scope is
+revisited on data: the acceptance report (`/craftsman:metrics`, Step 3) says
+whether SEC001 refusals are fixed or suppressed.
 
 What "as the file would be" covers, because Hermes's `patch` is not a plain
 replace: an exact `old_string` is applied in memory (`replace_all` honoured);
@@ -145,15 +168,6 @@ the script, under Hermes's 30s cap on a plugin callback
 (`plugins.hook_callback_timeout`), which would otherwise block with a generic
 message and abandon the worker while `craftsman-ci` ran on.
 
-What this gate refuses that a reviewer may not want refused: SEC002 on
-`exec('git -C ' . escapeshellarg($dir))`, SEC003 on a DQL string assembled
-around `$this->entityClass` with bound parameters, LAYER001 on a test under
-`tests/Domain/` importing an in-memory adapter. Each is a line-local regex
-with no safe-list, and each escapes with `craftsman-ignore: RULE` on the line,
-which the block message says. Whether SEC002 and SEC003 belong at write time
-at all, or only LAYER001 and SEC001 (the two with an unbounded cost), is the
-decision to take from the first weeks of data.
-
 Two failures, two messages. Missing infrastructure (python3, the plugin root,
 `craftsman-ci.sh`) repeats on every write of every session and no agent can
 repair it, so the block says not to retry and to report it; a verdict that
@@ -162,7 +176,10 @@ conclusion gate applies too. Both are written without python3 and exit 2,
 which is the shell-wire block Hermes reads even when the JSON is not parsed.
 
 Measured in `tests/adapters/test-hermes-plugin.sh`: off by default; through
-the plugin, LAYER001 and SEC001 refused before the file exists, PHP001 let
+the plugin, LAYER001 and SEC001 refused before the file exists, SEC002 on
+`escapeshellarg` and SEC003 on a bound DQL string let through at write time
+while still critical for the conclusion gate on the same file, LAYER001
+under `tests/Domain/` let through, PHP001 let
 through, a harmless patch let through, a missing script refusing; through the
 shell wire (`tool_input`, the gateway's cwd of `/`, no cwd at all), the same
 refusals, the gate's own files refused, a fuzzy and a V4A patch judged on what

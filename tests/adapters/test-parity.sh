@@ -135,7 +135,7 @@ HOOK_OUT=$(printf '{"tool_input":{"file_path":"%s"}}' "$WORK/relaxed/Bad.ts" \
     | bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1) || RC=$?
 CI_OUT=$(_ci_rules_for "relaxed/Bad.ts")
 HERMES_OUT=$(_hermes)
-# The write gate judges LAYER001 and SEC001-003 only, so its relaxation case
+# The write gate judges SEC001 and LAYER001 only, so its relaxation case
 # is a Domain file under a directory that relaxes LAYER001.
 mkdir -p "$WORK/relaxed/Domain"
 printf 'rules:\n  TS001: ignore\n  LAYER001: warn\n' > "$WORK/relaxed/.craft-rules.yml"

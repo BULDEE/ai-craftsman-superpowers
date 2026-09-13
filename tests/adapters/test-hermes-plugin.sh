@@ -112,7 +112,7 @@ report("injection survives a process cwd outside the workspace (gateway mode)",
 os.chdir(repo)
 
 # The write-time promise (#21): off by default, and when on, refuses only
-# LAYER001 and SEC001-003 before the content reaches disk. Everything else,
+# SEC001 and LAYER001 before the content reaches disk. Everything else,
 # PHP001 included, still waits for the conclusion.
 pre_tool_call = ctx.hooks["pre_tool_call"]
 LAYERED = ("<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\n"
@@ -324,6 +324,50 @@ if [[ "${WIRE##*|}" == "0" && -z "${WIRE%|*}" ]]; then
     log_pass "a directory .craft-rules.yml relaxation holds at write time, as it does in CI and the hooks"
 else
     log_fail "a directory .craft-rules.yml relaxation holds at write time" "$WIRE"
+fi
+
+# The scope (option B of the review): SEC001 and LAYER001, not SEC002 and
+# SEC003. Both fire on the documented mitigation, escapeshellarg and a DQL
+# string naming a class beside a bound parameter, because a line-local regex
+# cannot tell a sanitizer from its absence; they block at the conclusion,
+# where the loop is bounded and psalm can outrank the regex. And LAYER001 is
+# not judged on a test path: a test double in memory imports Infrastructure
+# by design. All three are still critical for craftsman-ci on the same file,
+# which is what makes the write-time pass a decision and not a blind spot.
+SHELLED='<?php\ndeclare(strict_types=1);\nfinal class Git { public function st(string $d): string { return (string) exec('"'"'git -C '"'"' . escapeshellarg($d) . '"'"' status'"'"'); } }\n'
+WIRE=$(wire "$(printf '{"tool_name":"write_file","args":{"path":"%s/src/Git.php","content":"%s"}}' "$WG" "$SHELLED")")
+CI_SEC002=$( cd "$WG" && printf '%b' "$SHELLED" > src/Git.php && bash "$ROOT_DIR/ci/craftsman-ci.sh" --format json src/Git.php 2>/dev/null | grep -o '"rule":"SEC002"' | head -1; rm -f src/Git.php )
+if [[ "${WIRE##*|}" == "0" && -z "${WIRE%|*}" && "$CI_SEC002" == '"rule":"SEC002"' ]]; then
+    log_pass "SEC002 on escapeshellarg is not refused at write time, and still fires for the conclusion gate"
+else
+    log_fail "SEC002 is left to the conclusion" "gate=$WIRE ci=$CI_SEC002"
+fi
+DQL='<?php\ndeclare(strict_types=1);\nfinal class Repo { public function find(int $id): mixed { return $this->em->createQuery('"'"'SELECT e FROM '"'"' . $this->cls . '"'"' e WHERE e.id = :id'"'"')->setParameter('"'"'id'"'"', $id)->getOneOrNullResult(); } }\n'
+WIRE=$(wire "$(printf '{"tool_name":"write_file","args":{"path":"%s/src/Repo.php","content":"%s"}}' "$WG" "$DQL")")
+CI_SEC003=$( cd "$WG" && printf '%b' "$DQL" > src/Repo.php && bash "$ROOT_DIR/ci/craftsman-ci.sh" --format json src/Repo.php 2>/dev/null | grep -o '"rule":"SEC003"' | head -1; rm -f src/Repo.php )
+if [[ "${WIRE##*|}" == "0" && -z "${WIRE%|*}" && "$CI_SEC003" == '"rule":"SEC003"' ]]; then
+    log_pass "SEC003 on a DQL string with a bound parameter is not refused at write time, and still fires for the conclusion gate"
+else
+    log_fail "SEC003 is left to the conclusion" "gate=$WIRE ci=$CI_SEC003"
+fi
+mkdir -p "$WG/tests/Domain"
+WIRE=$(wire "$(printf '{"tool_name":"write_file","args":{"path":"%s/tests/Domain/OrderTest.php","content":"%s"}}' "$WG" "$LAYERED")")
+if [[ "${WIRE##*|}" == "0" && -z "${WIRE%|*}" ]]; then
+    log_pass "LAYER001 is not judged at write time on a test path (an in-memory adapter under tests/Domain)"
+else
+    log_fail "LAYER001 is not judged at write time on a test path" "$WIRE"
+fi
+GATE_RE=$(grep -m1 "^WRITE_GATE_TEST_PATH_RE=" "$GATE" | cut -d"'" -f2)
+ENGINE_RE=$(grep -m1 "^_RULES_TEST_PATH_RE=" "$ROOT_DIR/hooks/lib/rules-engine.sh" | cut -d"'" -f2)
+if [[ -n "$GATE_RE" && "$GATE_RE" == "$ENGINE_RE" ]]; then
+    log_pass "the write gate's notion of a test path is the engine's"
+else
+    log_fail "the write gate's notion of a test path is the engine's" "gate='$GATE_RE' engine='$ENGINE_RE'"
+fi
+if [[ "$(grep -m1 '^WRITE_GATE_RULES=' "$GATE")" == 'WRITE_GATE_RULES="LAYER001 SEC001"' ]]; then
+    log_pass "the write-time scope is SEC001 and LAYER001, nothing else"
+else
+    log_fail "the write-time scope is SEC001 and LAYER001" "$(grep -m1 '^WRITE_GATE_RULES=' "$GATE")"
 fi
 
 # The bail needs no python3 and says which kind of failure it is.

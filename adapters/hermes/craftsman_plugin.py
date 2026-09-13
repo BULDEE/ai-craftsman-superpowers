@@ -44,7 +44,7 @@ _FILE_RULE_RE = re.compile(r"^(\S+):\d+\s+((?:WARN-)?[A-Z]{2,12}\d{3})\b", re.MU
 _GATE_SECONDS = 45
 _INJECT_TRENDS = True
 # Off by default: the conclusion gate is the design (see pre-verify.sh), and
-# this is the opt-in write-time refusal for LAYER001 and SEC001-003 only (#21).
+# this is the opt-in write-time refusal for SEC001 and LAYER001 only (#21).
 _WRITE_GATE_ON = False
 # Under Hermes's cap on a plugin callback (plugins.hook_callback_timeout,
 # 30s by default), which fails the hook closed with a generic message and
@@ -252,7 +252,7 @@ def _run_write_gate(tool_name: str, args: Any, cwd: str) -> dict[str, Any] | Non
 
 
 def on_pre_tool_call(tool_name: str = "", args: Any = None, task_id: str = "", **kwargs: Any) -> dict[str, Any] | None:
-    """Refuse a write_file or patch whose content carries LAYER001 or SEC001-003.
+    """Refuse a write_file or patch whose content carries SEC001 or LAYER001.
 
     Opt-in through `write_gate: on`. Every other tool, and every other rule,
     passes untouched here and is judged at the conclusion. The gate's own
