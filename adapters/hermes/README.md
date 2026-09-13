@@ -126,8 +126,10 @@ judged at write time under a test path (the engine's own notion of one:
 Infrastructure is the normal shape. A refused write is told how to get out:
 a secret is read from the environment or a vault; a LAYER001 finding that is
 wrong for the file escapes with `craftsman-ignore: LAYER001` on the line,
-which the scan honours. No escape is offered for a secret: a unilateral
-bypass on the credential is the retry budget the design refuses.
+which the scan honours. No escape is offered for a secret: `SEC*` is declared
+`never_ignorable` in `rules/core.yml`, so a marker on the line silences it on
+no front-end, and a unilateral bypass on the credential is the retry budget
+the design refuses.
 
 Why not SEC002 and SEC003, which issue #21 first named. Both are line-local
 regexes with no notion of a sanitizer, and measured on the documented

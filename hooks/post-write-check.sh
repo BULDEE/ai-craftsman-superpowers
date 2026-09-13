@@ -233,9 +233,17 @@ WARNING_COUNT=0
 # =============================================================================
 # craftsman-ignore support (single rule and multi-rule: PHP001, TS001, LAYER001)
 # =============================================================================
+# A rule the manifest declared never_ignorable (SEC*) is not silenced by any
+# marker, on this front-end or the others: a secret with a comment beside it
+# is still a secret on disk.
+_rule_marker_honoured() {
+    ! { type rule_never_ignorable >/dev/null 2>&1 && rule_never_ignorable "$1"; }
+}
+
 line_has_ignore() {
     local line="$1"
     local rule="$2"
+    _rule_marker_honoured "$rule" || return 1
     # Multi-rule or single rule: "craftsman-ignore: PHP001, TS001, LAYER001"
     # Check if the specific rule appears in the comma-separated list
     if echo "$line" | grep -qE "craftsman-ignore:\s*[^#]*\b${rule}\b" 2>/dev/null; then
@@ -250,6 +258,7 @@ line_has_ignore() {
 
 file_has_ignore() {
     local rule="$1"
+    _rule_marker_honoured "$rule" || return 1
     # Multi-rule or single rule anywhere in the file
     if grep -qE "craftsman-ignore:\s*[^#]*\b${rule}\b" "$FILE_PATH" 2>/dev/null; then
         return 0
@@ -556,6 +565,9 @@ if [[ $CRITICAL_COUNT -gt 0 ]]; then
     echo "  rules:" >&2
     echo "    <RULE_ID>: warn" >&2
     echo "Or silence this one case: // craftsman-ignore: <RULE_ID> (wrong: why the rule is wrong here) or (debt: why the code stays)" >&2
+    if echo -e "$CRITICAL_VIOLATIONS" | grep -q "^SEC"; then
+        echo "A SEC* finding is never silenced by a marker: read the value from the environment or a vault, then rotate it." >&2
+    fi
 
     # OKF doctrine pointer (ADR-0024): route the first blocked rule to the
     # concept that explains it - deterministic frontmatter match, no index.

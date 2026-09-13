@@ -459,6 +459,63 @@ else
     log_fail "a run that could not happen is not counted as clean" "got ${UNAVAILABLE:-none}"
 fi
 
+# A reply that is neither of the two tokens the prompt asked for is not a
+# verdict. It used to be read as CLEAN: the run went into haiku_runs as clean
+# and haiku_close_resolved marked every earlier finding on the file "fixed",
+# with the file unchanged. Reproduced by two reviewers with "Error: rate limit
+# exceeded" and with a refusal; a truncated reply and an injected sentence take
+# the same path. The same instrument that raised a finding must not clear it
+# on a reply that says nothing.
+STUB_FINDING_ROWS_BEFORE=$(_tel_query "SELECT COUNT(*) FROM corrections WHERE source='haiku' AND action='fixed'")
+for garbage in "Error: rate limit exceeded, could not read the file" "I am sorry, but I cannot access that file." "" "clean" "The file looks CLEAN to me."; do
+    printf '#!/bin/sh\nprintf "%%s\\n" "%s"\n' "$garbage" > "$TEL_DIR/bin/claude"
+    chmod +x "$TEL_DIR/bin/claude"
+    _tel_hook || true
+done
+UNPARSED=$(_tel_query "SELECT COUNT(*) FROM haiku_runs WHERE verdict='unavailable'")
+CLEAN_AFTER=$(_tel_query "SELECT COUNT(*) FROM haiku_runs WHERE verdict='clean'")
+FIXED_AFTER=$(_tel_query "SELECT COUNT(*) FROM corrections WHERE source='haiku' AND action='fixed'")
+if [[ "${UNPARSED:-0}" -ge 6 && "${CLEAN_AFTER:-0}" -eq 1 ]]; then
+    log_pass "a reply that is not the exact token is recorded unavailable, never clean (5 shapes)"
+else
+    log_fail "a reply that is not the exact token is recorded unavailable, never clean" \
+        "unavailable=$UNPARSED clean=$CLEAN_AFTER (expected clean to stay at 1: the single CLEAN run)"
+fi
+if [[ "${FIXED_AFTER:-0}" -eq "${STUB_FINDING_ROWS_BEFORE:-0}" ]]; then
+    log_pass "and it closes no earlier finding: only a real CLEAN or a new verdict may"
+else
+    log_fail "an unparsable reply closed earlier findings as fixed" "before=$STUB_FINDING_ROWS_BEFORE after=$FIXED_AFTER"
+fi
+# The exact token still clears, and with the file unchanged that is the layer's
+# own contradiction, not evidence: the earlier finding is closed as "fixed" only
+# when the file changed since it was raised.
+printf '#!/bin/sh\necho "CLEAN"\n' > "$TEL_DIR/bin/claude"; chmod +x "$TEL_DIR/bin/claude"
+FIXED_BEFORE_SAME=$(_tel_query "SELECT COUNT(*) FROM corrections WHERE source='haiku' AND action='fixed'")
+_tel_hook || true
+FIXED_SAME=$(_tel_query "SELECT COUNT(*) FROM corrections WHERE source='haiku' AND action='fixed'")
+if [[ "${FIXED_SAME:-0}" -eq "${FIXED_BEFORE_SAME:-0}" ]]; then
+    log_pass "CLEAN on an unchanged file closes nothing: a verdict that flipped with no edit is variance, not a fix"
+else
+    log_fail "CLEAN on an unchanged file closed findings" "before=$FIXED_BEFORE_SAME after=$FIXED_SAME"
+fi
+
+# The developer fixes the file, the verifier says CLEAN on the NEW content:
+# that, and only that, is a resolved finding. It is what makes the fixed rate
+# below a number.
+cat > "$TEL_DIR/src/Domain/Order.php" <<'PHPFIXED'
+<?php
+namespace App\Domain;
+final class Order {}
+PHPFIXED
+FIXED_BEFORE_EDIT=$(_tel_query "SELECT COUNT(*) FROM corrections WHERE source='haiku' AND action='fixed'")
+_tel_hook || true
+FIXED_AFTER_EDIT=$(_tel_query "SELECT COUNT(*) FROM corrections WHERE source='haiku' AND action='fixed'")
+if [[ "${FIXED_AFTER_EDIT:-0}" -gt "${FIXED_BEFORE_EDIT:-0}" ]]; then
+    log_pass "CLEAN on a changed file closes the earlier findings as fixed"
+else
+    log_fail "CLEAN on a changed file closes the earlier findings as fixed" "before=$FIXED_BEFORE_EDIT after=$FIXED_AFTER_EDIT"
+fi
+
 # The report is what a user reads, and it has to answer with numbers rather
 # than with rows for a model to add up.
 # Level 1 on the same file, because the headline number is a comparison and a

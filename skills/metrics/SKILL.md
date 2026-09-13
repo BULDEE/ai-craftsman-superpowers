@@ -56,6 +56,14 @@ are fewer than 200 verdicts, or either rate is `n/a`, say the sample is too
 small and give the count. A recommendation to switch off a layer on a missing
 number is worse than no recommendation.
 
+What the fixed rate counts: a finding the verifier raised, then no longer
+reported on the SAME file after its content changed. A CLEAN on unchanged
+content closes nothing (that is the model changing its mind, not a fix), and a
+reply that is not the exact token is an `unavailable` run, not a clean one.
+`unavailable` runs are in the run count and in no rate: say how many there
+were when they are a large share, because a verifier that mostly cannot answer
+is a different problem from a verifier that finds nothing.
+
 One caveat to state whenever you report the fixed rate: a Haiku finding and a
 Level 1 finding are not equally cheap to fix. A missing `declare(strict_types=1)`
 is one line; "this aggregate mutates another aggregate's state" may be a

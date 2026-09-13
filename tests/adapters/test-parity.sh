@@ -176,6 +176,38 @@ fi
 rm -f "$WORK/src/Domain/.craft-rules.yml"
 _clean
 
+# --- a secret cannot be silenced with a marker, on any front-end ----------
+#
+# An ignore marker naming SEC001 on the line made a hardcoded secret pass the
+# hook, the pipeline and the Hermes write gate whose README says "No escape is
+# offered for a secret" (guardrail review, H1 and E10b). The baseline already
+# refused to hold SEC* (rule-baseline.sh); the marker is the same class of
+# escape. rules/core.yml declares the rule never_ignorable, and every marker
+# reader asks the registry before honouring one.
+mkdir -p "$WORK/src"
+SECRET_FILE="$WORK/src/Pay.php"
+SECRET_CONTENT="<?php
+declare(strict_types=1);
+final class Pay
+{
+    // craftsman-ignore: SEC001
+    private string \$password = 'correct-horse-battery-staple-9';
+}"
+printf '%s\n' "$SECRET_CONTENT" > "$SECRET_FILE"
+RC=0
+HOOK_OUT=$(printf '{"tool_input":{"file_path":"%s"}}' "$SECRET_FILE" \
+    | bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1) || RC=$?
+CI_OUT=$(_ci_rules_for "src/Pay.php")
+GATE_OUT=$(_write_gate "$SECRET_FILE" "$SECRET_CONTENT")
+if [[ "$RC" -eq 2 ]] && printf '%s' "$HOOK_OUT" | grep -q "SEC001" \
+    && printf '%s' "$CI_OUT" | grep -q "^SEC001 critical" \
+    && printf '%s' "$GATE_OUT" | grep -q "SEC001"; then
+    log_pass "an ignore marker on SEC001 silences nothing: hook, CI and the write gate all refuse the secret"
+else
+    log_fail "a secret with an ignore marker is refused everywhere" "hook rc=$RC ci=[$CI_OUT] gate=[$(printf '%s' "$GATE_OUT" | tr '\n' ' ' | cut -c1-80)]"
+fi
+_clean
+
 # --- every adapter directory is covered here ------------------------------
 UNCOVERED=""
 for dir in "$ROOT_DIR"/adapters/*/; do

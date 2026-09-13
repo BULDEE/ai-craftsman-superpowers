@@ -100,8 +100,16 @@ if [[ "$VERDICT" == DDD_VIOLATIONS* ]]; then
     exit 0
 fi
 
-# A clean verdict resolves everything this layer previously said about the
-# file. The same instrument that raised the finding is the one that clears it.
+# Only the exact token is a clean verdict. A refusal, an empty body, a rate
+# limit message or a sentence with the word in it is a reply this layer cannot
+# read: recorded as unavailable, and it closes nothing.
+if ! haiku_verdict_is_clean "$VERDICT"; then
+    metrics_record_haiku_run "agent-ddd-verifier" "unavailable" 0 "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
+    exit 0
+fi
+
+# A clean verdict resolves what this layer previously said about the file,
+# provided the file changed since (haiku_close_resolved holds the witness).
 haiku_close_resolved "$_ABS_FILE" "" 2>/dev/null || true
 metrics_record_haiku_run "agent-ddd-verifier" "clean" 0 "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
 exit 0

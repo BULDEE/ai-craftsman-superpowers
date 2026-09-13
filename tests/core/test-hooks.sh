@@ -82,6 +82,70 @@ else
     log_fail "pre-write false positive" "expected exit 0, got ${result%%|*}"
 fi
 
+# An Edit is a write too. The gate read `.tool_input.content` only, which an
+# Edit does not carry, so the same LAYER001 that Write refused went through
+# untouched as an old_string/new_string pair (guardrail review, E2 against E1).
+# README.md promises "refused before the write lands"; that has to hold for
+# both tools that land a write.
+EDIT_DIR="/tmp/craftsman-prewrite-$$/src/Domain"
+mkdir -p "$EDIT_DIR"
+printf '<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\nfinal class Order {}\n' > "$EDIT_DIR/Edited.php"
+run_pre_edit() {
+    local file_path="$1" old="$2" new="$3" all="${4:-false}"
+    local output
+    output=$(jq -n --arg fp "$file_path" --arg o "$old" --arg n "$new" --argjson a "$all" \
+        '{"tool_name":"Edit","tool_input":{"file_path":$fp,"old_string":$o,"new_string":$n,"replace_all":$a}}' \
+        | bash "$ROOT_DIR/hooks/pre-write-check.sh" 2>/dev/null)
+    echo "$?|$output"
+}
+result=$(run_pre_edit "$EDIT_DIR/Edited.php" "final class Order {}" "use App\\Infrastructure\\Doctrine\\OrderRepository;
+final class Order {}")
+if [[ "${result%%|*}" == "2" ]]; then
+    log_pass "PreToolUse refuses an Edit that introduces a layer violation (the would-be file is judged)"
+else
+    log_fail "pre-write Edit blocking" "expected exit 2, got ${result%%|*}"
+fi
+result=$(run_pre_edit "$EDIT_DIR/Edited.php" "final class Order {}" "final class Order { public int \$total = 0; }")
+if [[ "${result%%|*}" == "0" ]]; then
+    log_pass "PreToolUse lets a clean Edit through (exit 0)"
+else
+    log_fail "pre-write Edit false positive" "expected exit 0, got ${result%%|*}"
+fi
+# An Edit whose old_string is not in the file: Claude Code refuses it itself,
+# and what the gate can still judge is what the edit adds.
+result=$(run_pre_edit "$EDIT_DIR/Edited.php" "not in this file" "use App\\Infrastructure\\Bus;")
+if [[ "${result%%|*}" == "2" ]]; then
+    log_pass "an Edit whose anchor is absent is judged on what it adds, never waved"
+else
+    log_fail "pre-write Edit with absent anchor" "expected exit 2, got ${result%%|*}"
+fi
+
+# The gate that cannot run is not a clean verdict (ADR-0029, which the Hermes
+# adapter honoured and this hook did not): a crash inside the gate used to
+# exit 0 through the ERR trap and let the write land. Without `jq` nothing in
+# the hook can read its input; that is a crash, and the write is refused with
+# the reason and the retry advice. Malformed stdin is a different case, kept
+# by tests/core/test-security-invariants.sh: no file named, nothing to judge.
+NOJQ_BIN=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-nojq.XXXXXX")
+for tool in bash python3 grep sed awk cat mktemp dirname basename cut tr head tail sort uniq wc printf env cksum shasum readlink find date mkdir rm mv cp touch ls git; do
+    p=$(command -v "$tool" 2>/dev/null) && ln -sf "$p" "$NOJQ_BIN/$tool"
+done
+CRASH_OUT=$(printf '{"tool_input":{"file_path":"%s/Crash.php","content":"<?php\n"}}' "$EDIT_DIR" \
+    | PATH="$NOJQ_BIN" bash "$ROOT_DIR/hooks/pre-write-check.sh" 2>&1); CRASH_RC=$?
+if [[ "$CRASH_RC" == "2" ]] && echo "$CRASH_OUT" | grep -q "could not run"; then
+    log_pass "a gate that cannot run refuses the write and says so (no verdict is not a clean verdict)"
+else
+    log_fail "a gate that cannot run refuses the write" "rc=$CRASH_RC out=$(echo "$CRASH_OUT" | head -2 | tr '\n' ' ')"
+fi
+CRASH_OUT=$(printf '{"tool_input":{"file_path":"%s/phpstan.neon"}}' "$EDIT_DIR" \
+    | PATH="$NOJQ_BIN" bash "$ROOT_DIR/hooks/config-protection.sh" 2>&1); CRASH_RC=$?
+if [[ "$CRASH_RC" == "2" ]] && echo "$CRASH_OUT" | grep -q "could not run"; then
+    log_pass "config-protection that cannot run refuses the write too"
+else
+    log_fail "config-protection that cannot run refuses the write" "rc=$CRASH_RC out=$(echo "$CRASH_OUT" | head -2 | tr '\n' ' ')"
+fi
+rm -rf "$NOJQ_BIN"
+
 # =============================================================================
 # Post-Write Hook Tests - detection only, exit 2 does not prevent the write
 # =============================================================================

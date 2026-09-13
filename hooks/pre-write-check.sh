@@ -8,8 +8,12 @@
 # =============================================================================
 set -uo pipefail
 
-# Fail-open trap: if hook crashes, allow the write
-trap 'echo "WARNING: pre-write-check.sh failed at line $LINENO" >&2; exit 0' ERR
+# A gate that cannot run is not a clean verdict (ADR-0029, which the Hermes
+# adapter honoured and this hook did not: a crash here used to exit 0 and let
+# the write land). Refused, with the line and the retry advice. Malformed or
+# empty input is not a crash: it names no file, and the read below tolerates
+# it so that nothing is refused for nothing.
+trap 'echo "The craftsman pre-write gate could not run (pre-write-check.sh, line $LINENO). Retry the write once; if it repeats, the gate needs attention, not the write." >&2; exit 2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/config.sh"
@@ -28,11 +32,38 @@ source "${SCRIPT_DIR}/lib/pack-loader.sh"
 
 # Read tool input from stdin
 INPUT=$(cat)
-FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
-FILE_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.content // empty' 2>/dev/null)
+command -v jq >/dev/null 2>&1 || false
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
+TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)
 
 # Exit silently if no file path
 [[ -z "$FILE_PATH" ]] && exit 0
+
+# What the file WOULD contain. A Write carries it as `content`; an Edit
+# carries `old_string`/`new_string`, and reading `content` alone let every
+# Edit through the gate untouched while the same text through Write was
+# refused (guardrail review). The would-be file is the current one with the
+# edit applied; when the anchor is absent, Claude Code refuses the Edit itself
+# and what the gate can still judge is what the edit adds, never nothing.
+# A Write's content is read with jq, no interpreter start on the common path;
+# the Edit case pays one python3 start, which is what applying the edit costs.
+FILE_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.content // empty' 2>/dev/null || true)
+[[ -z "$FILE_CONTENT" && "$TOOL_NAME" == "Edit" ]] && FILE_CONTENT=$(printf '%s' "$INPUT" | python3 -c '
+import json, sys
+payload = json.load(sys.stdin)
+args = payload.get("tool_input") or {}
+old, new = args.get("old_string"), args.get("new_string")
+if not isinstance(old, str) or not isinstance(new, str):
+    sys.exit(0)
+try:
+    current = open(args.get("file_path", ""), encoding="utf-8", errors="replace").read()
+except OSError:
+    current = ""
+if old and old in current:
+    sys.stdout.write(current.replace(old, new) if args.get("replace_all") else current.replace(old, new, 1))
+else:
+    sys.stdout.write(new)
+' 2>/dev/null || true)
 
 # Only check source files, as declared by the loaded packs
 pack_loader_init
@@ -133,8 +164,6 @@ VIOLATION_COUNT=$RESOLVED_COUNT
 # signal. Only when PHP001 would have blocked: a directory that demoted the
 # rule asked not to be policed on it, and a fix nobody asked for is policing.
 # =============================================================================
-
-TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 
 if [[ $VIOLATION_COUNT -eq 1 && "$TOOL_NAME" == "Write" && "$EXT" == "php" && "$local_should_block" == true ]] \
    && [[ "$VIOLATIONS" == PHP001* ]] \

@@ -591,7 +591,7 @@ _add_violation() {
     # allowed to have. The file is passed explicitly rather than read from
     # _CI_CURRENT_FILE, because a flushed precedence finding arrives after the
     # scan of its file has moved on.
-    if [[ -f "$file" ]] \
+    if _rule_marker_honoured "$rule" && [[ -f "$file" ]] \
         && grep -qE "craftsman-ignore:[[:space:]]*[^#]*\b${rule}\b" "$file" 2>/dev/null; then
         return 0
     fi
@@ -688,14 +688,22 @@ add_warning() {
     _add_violation "$_CI_CURRENT_FILE" "$line" "$rule" "${parsed#*|}"
 }
 
+# A rule the manifest declared never_ignorable (SEC*) is not silenced by any
+# marker; same predicate as the hook's.
+_rule_marker_honoured() {
+    ! { type rule_never_ignorable >/dev/null 2>&1 && rule_never_ignorable "$1"; }
+}
+
 line_has_ignore() {
     local line="$1"
     local rule="$2"
+    _rule_marker_honoured "$rule" || return 1
     echo "$line" | grep -qE "craftsman-ignore:\s*[^#]*\b${rule}\b" 2>/dev/null
 }
 
 file_has_ignore() {
     local rule="$1"
+    _rule_marker_honoured "$rule" || return 1
     grep -qE "craftsman-ignore:\s*[^#]*\b${rule}\b" "$_CI_CURRENT_FILE" 2>/dev/null
 }
 
