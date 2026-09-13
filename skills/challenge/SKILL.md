@@ -195,13 +195,14 @@ brief and their attachments; the subagents do not, so you write their prompts.
    - A `general-purpose` reviewer for performance: N+1 queries, memory leaks
 
    A named agent is a teammate, and a teammate reports through the team
-   mailbox. That channel can die for the rest of the lead's process while
-   everything else keeps working: measured on 2026-09-13, three reviews of
-   41K to 56K characters were read from the mailbox, marked read and never
-   surfaced, and a fourth reviewer sat two hours on a permission request
-   nobody saw. An unnamed agent returns through a task notification, which
-   kept working in the same process. Name a reviewer only when you need to
-   message it again, and then treat its silence as the mailbox's, not its own.
+   mailbox, which the lead can hold for hours while everything else keeps
+   working: measured on 2026-09-13, three reviews of 41K to 56K characters
+   were read from the mailbox at 10:44Z and surfaced at 19:25Z, all at once,
+   and a reviewer's permission request sat in the same queue for as long. The
+   messages are queued, not lost; what holds and what releases them was not
+   identified. An unnamed agent returns through a task notification, which
+   never stalled in the same process. Name a reviewer only when you need to
+   message it again, and then read its silence as the mailbox's, not its own.
 
 2. **Each reviewer prompt carries**, because none of it crosses the boundary:
    - The scope you fixed above, restated in full
