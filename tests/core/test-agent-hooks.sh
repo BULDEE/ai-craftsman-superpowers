@@ -328,6 +328,7 @@ final class Order {}
 PHPTEL
 cat > "$TEL_DIR/bin/claude" <<'STUB'
 #!/bin/sh
+printf '%s\n' "$@" > "$(dirname "$0")/../argv"
 echo "DDD_VIOLATIONS
 src/Domain/Order.php:3 Layer violation - Domain imports Infrastructure, inject a port
 src/Domain/Order.php:4 Missing Value Object - the raw total is primitive obsession"
@@ -337,6 +338,20 @@ chmod +x "$TEL_DIR/bin/claude"
 
 TEL_EXIT=0
 _tel_hook || TEL_EXIT=$?
+
+# The subprocess runs this plugin's own SessionStart and SessionEnd hooks, and
+# those two used to reset and delete the REAL session's state on every
+# verification. The lock is the recursion guard, which both hooks honour
+# (test-session-start.sh, test-session-metrics.sh). `disableAllHooks` is the
+# smaller lock: measured on 2.1.270 it silences the operator's user and
+# project hooks in the verifier and not plugin hooks, so it is asserted for
+# what it does, not as a substitute for the guard.
+if grep -q -- '--settings' "$TEL_DIR/argv" 2>/dev/null && grep -q 'disableAllHooks' "$TEL_DIR/argv" 2>/dev/null; then
+    log_pass "the verification subprocess is launched with the operator's settings hooks off"
+else
+    log_fail "the verification subprocess is launched with the operator's settings hooks off" \
+        "argv: $(tr '\n' ' ' < "$TEL_DIR/argv" 2>/dev/null | cut -c1-120)"
+fi
 
 _tel_query() {
     python3 -c "
@@ -391,6 +406,24 @@ if [[ "${RUN_ROWS:-0}" -eq 1 ]]; then
     log_pass "the run itself is recorded, with its finding count"
 else
     log_fail "the run itself is recorded, with its finding count" "got ${RUN_ROWS:-none}"
+fi
+
+# Claude Code exports a plugin option as CLAUDE_PLUGIN_OPTION_<KEY> with the
+# key UPPERCASED (plugins-reference; 2.1.270 applies `.toUpperCase()` before
+# the prefix). Every gate in hooks/ read the lowercase spelling, so
+# `agent_hooks: false` never reached a hook, and the tests above posed the
+# lowercase form themselves: a guardrail that had never met its consumer.
+rm -f "$TEL_DIR/argv"
+( cd "$TEL_DIR" && printf '{"tool_name":"Write","tool_input":{"file_path":"src/Domain/Order.php"},"cwd":"%s"}' "$TEL_DIR" \
+    | env -u CLAUDE_EFFORT -u CRAFTSMAN_HEADLESS_VERIFY -u CLAUDE_PLUGIN_OPTION_agent_hooks \
+          CLAUDE_PLUGIN_OPTION_AGENT_HOOKS=false \
+          PATH="$TEL_DIR/bin:$PATH" HOME="$TEL_DIR/home" CLAUDE_PLUGIN_DATA="$TEL_DIR/data" \
+      bash "$ROOT_DIR/hooks/agent-ddd-verifier.sh" >/dev/null 2>&1 )
+if [[ ! -f "$TEL_DIR/argv" ]]; then
+    log_pass "agent_hooks=false reaches the verifier in the spelling Claude Code exports"
+else
+    log_fail "agent_hooks=false reaches the verifier in the spelling Claude Code exports" \
+        "the verifier still launched claude under CLAUDE_PLUGIN_OPTION_AGENT_HOOKS=false"
 fi
 
 # A run that finds nothing is the denominator of every rate here, so it has to

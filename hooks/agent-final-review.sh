@@ -12,7 +12,7 @@ set -uo pipefail
 [[ -n "${CRAFTSMAN_HEADLESS_VERIFY:-}" ]] && exit 0
 
 # Gate: skip entirely if agent hooks are disabled
-if [[ "${CLAUDE_PLUGIN_OPTION_agent_hooks:-true}" == "false" ]]; then
+if [[ "${CLAUDE_PLUGIN_OPTION_AGENT_HOOKS:-${CLAUDE_PLUGIN_OPTION_agent_hooks:-true}}" == "false" ]]; then
     exit 0
 fi
 
@@ -21,7 +21,7 @@ source "${SCRIPT_DIR}/lib/hook-profile.sh"
 hook_profile_should_run "agent-final-review" "standard,strict" || exit 0
 
 # Gate: skip if strictness is not 'strict'
-if [[ "${CLAUDE_PLUGIN_OPTION_strictness:-strict}" != "strict" ]]; then
+if [[ "${CLAUDE_PLUGIN_OPTION_STRICTNESS:-${CLAUDE_PLUGIN_OPTION_strictness:-strict}}" != "strict" ]]; then
     exit 0
 fi
 

@@ -7,6 +7,12 @@
 # =============================================================================
 set -uo pipefail
 
+# A SessionEnd fired by the Haiku verification subprocess is not the end of
+# a session: it used to delete the real session's state, with the pending
+# findings the next write would have turned into a verdict, and insert a
+# zero-write `sessions` row. Same guard as session-start.sh.
+[[ -n "${CRAFTSMAN_HEADLESS_VERIFY:-}" ]] && exit 0
+
 # Non-blocking: session metrics are best-effort
 trap 'echo "WARNING: session-metrics.sh failed at line $LINENO" >&2; exit 0' ERR
 

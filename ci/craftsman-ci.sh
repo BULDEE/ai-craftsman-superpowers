@@ -456,9 +456,10 @@ _resolve_config() {
             [[ -n "$yml_stack" ]] && STACK="$yml_stack"
         fi
 
-        # Env var overrides
-        [[ -n "${CLAUDE_PLUGIN_OPTION_strictness:-}" ]] && STRICTNESS="$CLAUDE_PLUGIN_OPTION_strictness"
-        [[ -n "${CLAUDE_PLUGIN_OPTION_stack:-}" ]] && STACK="$CLAUDE_PLUGIN_OPTION_stack"
+        # Env var overrides, in the spelling Claude Code exports first
+        # (CLAUDE_PLUGIN_OPTION_<KEY>, uppercased), then the plugin's own
+        _ci_opt="${CLAUDE_PLUGIN_OPTION_STRICTNESS:-${CLAUDE_PLUGIN_OPTION_strictness:-}}"; [[ -n "$_ci_opt" ]] && STRICTNESS="$_ci_opt"
+        _ci_opt="${CLAUDE_PLUGIN_OPTION_STACK:-${CLAUDE_PLUGIN_OPTION_stack:-}}"; [[ -n "$_ci_opt" ]] && STACK="$_ci_opt"
     else
         # Standalone mode: self-contained config parsing
         local config_path=""
@@ -479,8 +480,8 @@ _resolve_config() {
         fi
 
         # Env var overrides (same as hooks)
-        [[ -n "${CLAUDE_PLUGIN_OPTION_strictness:-}" ]] && STRICTNESS="$CLAUDE_PLUGIN_OPTION_strictness"
-        [[ -n "${CLAUDE_PLUGIN_OPTION_stack:-}" ]] && STACK="$CLAUDE_PLUGIN_OPTION_stack"
+        _ci_opt="${CLAUDE_PLUGIN_OPTION_STRICTNESS:-${CLAUDE_PLUGIN_OPTION_strictness:-}}"; [[ -n "$_ci_opt" ]] && STRICTNESS="$_ci_opt"
+        _ci_opt="${CLAUDE_PLUGIN_OPTION_STACK:-${CLAUDE_PLUGIN_OPTION_stack:-}}"; [[ -n "$_ci_opt" ]] && STACK="$_ci_opt"
     fi
 }
 
@@ -1279,7 +1280,7 @@ EOF
 _rebuild_registry_for_stack() {
     [[ "$PACKS_AVAILABLE" == true ]] || return 0
     [[ -d "$PLUGIN_ROOT/packs" ]] || return 0
-    export CLAUDE_PLUGIN_OPTION_stack="$STACK"
+    export CLAUDE_PLUGIN_OPTION_stack="$STACK" CLAUDE_PLUGIN_OPTION_STACK="$STACK"
     _pack_reset
     pack_loader_init 2>/dev/null || true
 }

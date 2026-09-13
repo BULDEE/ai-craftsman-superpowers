@@ -43,6 +43,13 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
   the engine nor `ci/craftsman-ci.sh` holds a list of advisory rules;
   `tests/ci/test-craftsman-ci.sh` fails when one comes back, and checks that
   every declared default reaches both front-ends.
+- A plugin option reaches a hook as `CLAUDE_PLUGIN_OPTION_<KEY>` with the key
+  UPPERCASED (`agent_hooks` becomes `CLAUDE_PLUGIN_OPTION_AGENT_HOOKS`). Read
+  it through `config_get` or in the dual form
+  `"${CLAUDE_PLUGIN_OPTION_AGENT_HOOKS:-${CLAUDE_PLUGIN_OPTION_agent_hooks:-true}}"`,
+  exported spelling first; a test that sets only the lowercase form proves
+  nothing about the consumer, which is how `agent_hooks: false` did nothing
+  for four releases.
 - All commands MUST have `description`, `effort` in frontmatter. `effort` is Claude Code's own frontmatter key, not project metadata: it overrides the session effort level, so only `low`, `medium`, `high`, `xhigh`, `max` are valid.
 - Templates MUST have: top-level heading, `## Mission` section, `## Context Files` section.
 - An agent that declares `maxTurns` MUST carry a `## Turn Budget` section ending

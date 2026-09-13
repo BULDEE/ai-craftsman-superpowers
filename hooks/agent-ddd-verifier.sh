@@ -10,8 +10,12 @@ set -uo pipefail
 # Recursion guard: never verify from inside a verification subprocess
 [[ -n "${CRAFTSMAN_HEADLESS_VERIFY:-}" ]] && exit 0
 
-# Gate: skip entirely if agent hooks are disabled
-if [[ "${CLAUDE_PLUGIN_OPTION_agent_hooks:-true}" == "false" ]]; then
+# Gate: skip entirely if agent hooks are disabled. Claude Code exports an
+# option as CLAUDE_PLUGIN_OPTION_<KEY> with the key UPPERCASED; the lowercase
+# spelling is what this plugin's own tests and CI export, and for four
+# releases it was the only one read, so `agent_hooks: false` never reached
+# this line. The exported form is read first.
+if [[ "${CLAUDE_PLUGIN_OPTION_AGENT_HOOKS:-${CLAUDE_PLUGIN_OPTION_agent_hooks:-true}}" == "false" ]]; then
     exit 0
 fi
 

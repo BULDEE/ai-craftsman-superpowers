@@ -21,7 +21,7 @@ v4.0.0 closes the learning loop with a human gate at the promotion step:
 1. **Detection** (existing): violations and corrections recorded in SQLite via `metrics-query.py`.
 2. **Candidate extraction** (new): when 3+ corrections share a pattern (same rule, same fix shape, across files), the pattern becomes a *candidate instinct* with a confidence score derived from occurrence count and consistency. (Amended 2026-09-12, see below.)
 3. **Review** (new, human): `/craftsman:metrics` lists candidate instincts with evidence (the corrections that produced them). The user approves, edits, or rejects each candidate. Nothing activates without approval.
-4. **Codification** (new): an approved instinct is generated as a skill in `.claude/skills/craftsman-learned/<slug>/SKILL.md` with `user-invocable: false`, so it loads as background knowledge when relevant. The generated file records its provenance (source corrections, approval date).
+4. **Codification** (new): an approved instinct is generated as a skill in `.claude/skills/<slug>/SKILL.md` with `user-invocable: false`, so it loads as background knowledge when relevant. The generated file records its provenance (source corrections, approval date).
 5. **Retirement**: learned skills are listed by `/craftsman:metrics` and can be deleted at any time; a rejected candidate is not re-proposed unless new evidence accumulates.
 
 A configurable cap limits how many learned skills inject per session (see ADR-0021).
@@ -92,3 +92,14 @@ Step 2 is amended as follows; the human gate (steps 3 to 5) is unchanged.
 - ADR-0021 (context budgets cap learned-skill injection)
 - ECC continuous-learning v2 spec (reviewed 2026-07): hook observation, scoring, promotion pipeline
 - CLAUDE.md: Correction Learning System differentiator
+
+## Amendment (2026-09-13): the skill is written where Claude Code reads
+
+Step 4 named `.claude/skills/craftsman-learned/<slug>/SKILL.md`. Claude Code
+loads a project skill from `.claude/skills/<name>/SKILL.md` and from nowhere
+deeper (skills reference; measured with `claude -p --debug`: two project
+skills on disk, one at each depth, loaded as `project: 1`). Every approval
+since this ADR produced a file the model never saw, and the test checked
+that the file existed rather than that the consumer loaded it. `approve` now
+writes to `.claude/skills/learned-<slug>/`, refuses any other depth by name,
+and SessionStart names the files left at the old one with the `mv` to make.

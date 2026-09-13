@@ -31,11 +31,11 @@ Claude presents the evidence and asks for a decision:
 ## On approval
 
 ```bash
-bash ~/.claude/craftsman-instincts.sh approve 1 "$PWD/.claude/skills/craftsman-learned"
+bash ~/.claude/craftsman-instincts.sh approve 1 "$PWD/.claude/skills"
 ```
 
 ```
-approved: .claude/skills/craftsman-learned/learned-php001/SKILL.md
+approved: .claude/skills/learned-php001/SKILL.md
 ```
 
 The generated skill is `user-invocable: false` (background knowledge), records its provenance (source corrections, approval date), is shareable with the team via git, and can be retired anytime by deleting the directory.
