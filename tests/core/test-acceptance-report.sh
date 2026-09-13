@@ -151,17 +151,24 @@ assert_contains "the day count is optional before the flags" "$via_flags" "    T
 #
 # The acceptance rate measures tolerance: a rule suppressed 153 times may be
 # wrong 153 times or inconvenient 153 times, and only the first justifies
-# relaxing it. The verdict column is the missing half, written by a human
-# through metrics_record_verdict and by nothing else.
+# relaxing it. A verdict is the missing half, about a finding and not about an
+# outcome, so it has a table of its own and two writers: the reason a developer
+# spells out in the suppression itself (transcribed by the hook, see
+# test-correction-learning.sh), and a human review after the fact.
 assert_contains "with no verdict recorded, the report says the rate is tolerance and not correctness" "$out" \
     "rules judged right or wrong by a human: none"
 
 VERDICT_OUT="$( cd "$WORK" && bash -c "source '$ROOT_DIR/hooks/lib/metrics-db.sh'
     metrics_record_verdict PHP002 wrong '' 'fires on Doctrine entities, which cannot be final'
     metrics_record_verdict PY001 right
-    metrics_record_verdict PY001 sideways 2>&1 >/dev/null" )"
+    metrics_record_verdict PY001 sideways
+    metrics_record_verdict PY001 wrong src/NoSuch.py 'a typo in the path'" 2>&1 >/dev/null )"
 assert_contains "a verdict that is neither right nor wrong is refused by name" "$VERDICT_OUT" \
     "takes right or wrong, not 'sideways'"
+assert_contains "a verdict on a file that does not exist is refused by name, not filed under a typo" "$VERDICT_OUT" \
+    "no such file 'src/NoSuch.py', verdict not recorded"
+assert_contains "a review verdict says what it recorded" "$VERDICT_OUT" \
+    "verdict recorded, PHP002 wrong"
 
 judged="$(python3 "$REPORT" "$DB" "$HASH" 30)"
 assert_contains "the judged rate is printed beside the accepted one" "$judged" \
@@ -174,14 +181,24 @@ else
     log_pass "the no-verdict sentence goes away once a verdict exists"
 fi
 
-# No automatic path may fill the column: a loop that grades itself measures its
-# own agreement. The hook writes actions, never verdicts.
+# Exactly the two verdicts a human spelled out exist, both from the review
+# path; the semantic layer never writes one, because a loop that grades itself
+# measures its own agreement.
 HOOK_VERDICTS="$(python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$DB" \
-    "SELECT COUNT(*) FROM corrections WHERE verdict IS NOT NULL" 2>/dev/null)"
-if [[ "$HOOK_VERDICTS" == "2" ]] && ! grep -rq "metrics_record_verdict" "$ROOT_DIR/hooks/post-write-check.sh" "$ROOT_DIR/hooks/lib/haiku-verify.sh"; then
-    log_pass "only the two human verdicts exist, and no hook can write one"
+    "SELECT COUNT(*) || '|' || GROUP_CONCAT(DISTINCT source) FROM verdicts" 2>/dev/null)"
+if [[ "$HOOK_VERDICTS" == "2|review" ]] && ! grep -q "metrics_record_verdict" "$ROOT_DIR/hooks/lib/haiku-verify.sh"; then
+    log_pass "only the two human verdicts exist, from the review path, and the verifier cannot write one"
 else
-    log_fail "only a human writes a verdict" "rows=$HOOK_VERDICTS, or a hook calls metrics_record_verdict"
+    log_fail "only a human writes a verdict" "rows=$HOOK_VERDICTS, or haiku-verify calls metrics_record_verdict"
+fi
+
+# A database from before the table: no verdicts is a fact, not a traceback.
+python3 "$ROOT_DIR/hooks/lib/metrics-query.py" "$DB" "DROP TABLE verdicts" >/dev/null 2>&1
+pre_table="$(python3 "$REPORT" "$DB" "$HASH" 30 2>&1)"; pre_rc=$?
+if [[ "$pre_rc" == "0" ]] && echo "$pre_table" | grep -q "rules judged right or wrong by a human: none"; then
+    log_pass "a database from before the verdicts table reports no verdicts, rc 0"
+else
+    log_fail "a database from before the verdicts table reports no verdicts, rc 0" "rc=$pre_rc: $(echo "$pre_table" | tail -1)"
 fi
 
 # --- A missing database is said, and not created ------------------------------

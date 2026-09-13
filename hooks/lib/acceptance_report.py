@@ -119,15 +119,18 @@ def verdicts_by_rule(db: sqlite3.Connection, project_hash: str, window: str) -> 
     Acceptance says what users did; this says whether the rule was correct, and
     only the second justifies relaxing one. A rule suppressed 153 times may be
     wrong 153 times or inconvenient 153 times, and the first is a rule to fix
-    while the second is a deadline. Empty until someone records a verdict
-    through /craftsman:metrics: no hook writes this column, because a loop that
-    grades itself measures its own agreement.
+    while the second is a deadline. A verdict is about a finding, not about an
+    outcome, so it lives in its own table: written at the moment of the
+    decision when the suppression carries a reason (the ignore marker followed
+    by `(wrong: ...)` or `(debt: ...)`), or after the fact through
+    /craftsman:metrics. A database from before the table has no verdicts,
+    which is a fact and not a crash.
     """
     counts = {}
+    # _rows answers [] for a table that does not exist yet.
     for rule, verdict, hits in _rows(db, """
-        SELECT rule, verdict, COUNT(*) FROM corrections
+        SELECT rule, verdict, COUNT(*) FROM verdicts
         WHERE project_hash = ? AND timestamp > datetime('now', ?)
-          AND verdict IN ('right', 'wrong')
         GROUP BY rule, verdict""", (project_hash, window)):
         right, wrong = counts.get(rule, (0, 0))
         if verdict == "right":
@@ -285,8 +288,9 @@ def _print_judged(verdicts: dict) -> None:
     """
     if not verdicts:
         print("rules judged right or wrong by a human: none. Acceptance below is what users DID "
-              "with a finding, not whether the rule was correct; record a verdict with "
-              "metrics_record_verdict <rule> right|wrong [file] to tell the two apart.")
+              "with a finding, not whether the rule was correct. A verdict is written at the "
+              "moment of the decision, `craftsman-ignore: RULE (wrong: why)` or `(debt: why)`, "
+              "or after the fact with metrics_record_verdict <rule> right|wrong [file] [why].")
         return
     total_right = sum(right for right, _ in verdicts.values())
     total_wrong = sum(wrong for _, wrong in verdicts.values())

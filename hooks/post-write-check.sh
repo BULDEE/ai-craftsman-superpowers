@@ -155,8 +155,15 @@ _check_corrections() {
 # what the instinct gate reads as rejection and the acceptance report keeps
 # apart from a verdict on the finding.
 _correction_outcome() {
-    local file="$1" rule="$2" severity
+    local file="$1" rule="$2" severity verdict
     if file_has_ignore "$rule" 2>/dev/null; then
+        # A suppression that carries a reason in the grammar the block
+        # message offered, `(wrong: why)` or `(debt: why)`, is the developer's
+        # verdict on the rule, written with the context in front of them;
+        # transcribed as such. A bare marker records no verdict: no guessing.
+        if verdict=$(metrics_ignore_verdict "$file" "$rule"); then
+            metrics_record_verdict "$rule" "${verdict%%|*}" "$file" "${verdict#*|}" inline 2>/dev/null || true
+        fi
         echo "ignored|craftsman-ignore added"
         return
     fi
@@ -548,7 +555,7 @@ if [[ $CRITICAL_COUNT -gt 0 ]]; then
     echo "Fix these, or scope the rule in $(dirname "$FILE_PATH")/.craft-rules.yml:" >&2
     echo "  rules:" >&2
     echo "    <RULE_ID>: warn" >&2
-    echo "Or silence this one case: // craftsman-ignore: <RULE_ID>" >&2
+    echo "Or silence this one case: // craftsman-ignore: <RULE_ID> (wrong: why the rule is wrong here) or (debt: why the code stays)" >&2
 
     # OKF doctrine pointer (ADR-0024): route the first blocked rule to the
     # concept that explains it - deterministic frontmatter match, no index.

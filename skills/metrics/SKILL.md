@@ -95,16 +95,24 @@ a rule to relax: say that its number is the instrument's, not the users'.
 **Acceptance is tolerance, not correctness.** A rule suppressed 153 times may
 be wrong 153 times, or right and inconvenient 153 times, and only the first is
 a rule to relax. The report prints the judged rate beside the accepted one
-wherever someone has ruled, and says so when nobody has. When the user looks at
-a low-acceptance rule with you, ask which of the two it is and record the
-answer, one finding at a time:
+wherever someone has ruled, and says so when nobody has. A verdict is written
+by a human, in one of two places:
+
+- **At the moment of the decision**, in the suppression itself. The block
+  message offers the grammar: `craftsman-ignore: PHP002 (wrong: Doctrine
+  proxies subclass entities)` says the rule was wrong here; `(debt: shipping
+  Friday, see #123)` says the rule was right and the code is carried on
+  purpose. The hook transcribes the reason as it records the `ignored`
+  outcome. A bare marker records no verdict: the loop does not guess.
+- **After the fact**, here, when the user looks at a low-acceptance rule with
+  you. Ask which of the two it is and record the answer, one finding at a time:
 
 ```bash
 source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/metrics-db.sh" && \
   metrics_record_verdict PHP002 wrong "src/Entity/Order.php" "an ORM subclasses entities, they cannot be final"
 ```
 
-`right` or `wrong`, nothing else. Only a human writes this: never record a
+`right` or `wrong`, nothing else, and the file must exist. Never record a
 verdict from your own reading of the code, and never infer one from what the
 user did with the finding, because a loop that grades itself measures its own
 agreement rather than the rule.

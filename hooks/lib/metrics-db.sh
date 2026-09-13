@@ -278,20 +278,35 @@ _metrics_migrate_file_path_column() {
 
 # What the finding DESERVED, beside what the user did with it.
 #
-# `action` records the user's move (fixed, ignored): it measures tolerance, not
-# correctness, and a rule can be suppressed because it is wrong or because the
-# deadline is tomorrow. Nothing in the loop could tell those apart, so the
-# acceptance rate the report proposes a relaxation from is a mirror of current
-# behaviour, which is the trap a production feedback loop falls into when it
-# never records the ideal output. `verdict` is that missing half: `right` when
-# the finding was correct (whatever the user then did about it), `wrong` when
-# the rule fired on code that was fine. It is a human decision, written only
-# through /craftsman:metrics, never by a hook: no automatic path may fill it,
-# because a loop that grades itself measures its own agreement.
-_metrics_migrate_verdict_column() {
-    if ! _metrics_sql_read "PRAGMA table_info(corrections);" | grep -q '|verdict|'; then
-        _metrics_sql <<< "ALTER TABLE corrections ADD COLUMN verdict TEXT;" 2>/dev/null
-    fi
+# `corrections.action` records the user's move (fixed, ignored): it measures
+# tolerance, not correctness, and a rule can be suppressed because it is wrong
+# or because the deadline is tomorrow. A loop that records the outcome and
+# never the ideal answer is a mirror of current behaviour. A verdict is that
+# other half, and it is about a FINDING, not about an outcome: the 321
+# blocked writes with no outcome in a month, and every advisory finding, are
+# exactly the population a column on `corrections` could never judge. So a
+# table of its own, keyed by rule and file, with the moment it was written:
+#   inline   the developer wrote the reason into the suppression itself,
+#            the ignore marker followed by `(wrong: Doctrine proxies subclass
+#            entities)`, and the hook transcribed it at the moment of the
+#            decision, when the context was in front of them
+#   review   /craftsman:metrics, a human looking at a rule after the fact
+# No path writes a verdict the developer did not spell out: a loop that
+# grades itself measures its own agreement.
+_metrics_create_verdicts_table() {
+    _metrics_sql <<'SQL'
+CREATE TABLE IF NOT EXISTS verdicts (
+    id INTEGER PRIMARY KEY,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    project_hash TEXT NOT NULL,
+    rule TEXT NOT NULL,
+    file_path TEXT,
+    verdict TEXT NOT NULL CHECK (verdict IN ('right', 'wrong')),
+    reason TEXT,
+    source TEXT NOT NULL CHECK (source IN ('inline', 'review'))
+);
+CREATE INDEX IF NOT EXISTS idx_verdicts_project ON verdicts(project_hash, rule, timestamp);
+SQL
 }
 
 _metrics_migrate_source_column() {
@@ -319,7 +334,7 @@ metrics_init() {
     _metrics_migrate_correction_outcomes
     _metrics_migrate_source_column
     _metrics_migrate_file_path_column
-    _metrics_migrate_verdict_column
+    _metrics_create_verdicts_table
 }
 
 # The identity of a project is its git toplevel, not the directory the session
@@ -593,7 +608,7 @@ metrics_haiku_report() {
 # from "this rule is inconvenient". Refuses anything but the two words: a
 # verdict column that accepts free text stops being a measurement.
 metrics_record_verdict() {
-    local rule="$1" verdict="$2" file="${3:-}" note="${4:-}"
+    local rule="$1" verdict="$2" file="${3:-}" reason="${4:-}" source="${5:-review}"
     _metrics_rule_is_valid "$rule" || return 0
     case "$verdict" in
         right|wrong) ;;
@@ -602,19 +617,47 @@ metrics_record_verdict() {
             return 0
             ;;
     esac
+    case "$source" in
+        inline|review) ;;
+        *) echo "craftsman: metrics_record_verdict source is inline or review, not '${source}'" >&2; return 0 ;;
+    esac
+    # A file that does not exist is a typo, and a verdict filed under a typo
+    # is a row nobody will ever find again. Refused by name, not written.
+    if [[ -n "$file" && ! -f "$file" ]]; then
+        echo "craftsman: metrics_record_verdict: no such file '${file}', verdict not recorded" >&2
+        return 0
+    fi
     local project_hash relative
     project_hash=$(metrics_project_hash)
     relative=$(metrics_relative_path "$file")
-    # The most recent outcome for that rule, on that file when one is named:
-    # a verdict answers a finding, and the finding it answers is the last one
-    # the loop recorded. Older rows keep the verdict they were given.
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
-        "UPDATE corrections SET verdict = ?, context = CASE WHEN ? <> '' THEN ? ELSE context END
-         WHERE id = (SELECT id FROM corrections
-                     WHERE project_hash = ? AND rule = ?
-                       AND (? = '' OR file_path = ?)
-                     ORDER BY id DESC LIMIT 1)" \
-        "$verdict" "$note" "$note" "$project_hash" "$rule" "$relative" "$relative"
+        "INSERT INTO verdicts (project_hash, rule, file_path, verdict, reason, source) VALUES (?, ?, ?, ?, ?, ?)" \
+        "$project_hash" "$rule" "$relative" "$verdict" "$reason" "$source" || return 0
+    # Said on stderr and only for a review: a hook's stdout is its JSON.
+    [[ "$source" == "review" ]] && echo "craftsman: verdict recorded, ${rule} ${verdict}${relative:+ on ${relative}}" >&2
+    return 0
+}
+
+# metrics_ignore_verdict <file> <rule>: "wrong|reason" or "right|reason" when
+# the suppression on that rule carries a reason in the grammar the developer
+# is offered at block time, nothing otherwise. The marker, the rule, then
+# `(wrong: Doctrine proxies subclass entities)` or `(debt: shipping Friday,
+# fix in #123)`.
+#
+# `debt` is a verdict of right (the rule is correct, the code is not, and it
+# is being carried on purpose). A bare marker says nothing about the rule,
+# and records nothing: that is the loop refusing to guess.
+metrics_ignore_verdict() {
+    local file="$1" rule="$2" match
+    match=$(grep -oE "craftsman-ignore:[^(]*\b${rule}\b[^(]*\((wrong|right|debt):[^)]*\)" "$file" 2>/dev/null | head -1) || true
+    [[ -n "$match" ]] || return 1
+    local keyword reason
+    keyword=${match##*\(}; keyword=${keyword%%:*}
+    reason=${match##*: }; reason=${reason%)}
+    case "$keyword" in
+        wrong) echo "wrong|${reason}" ;;
+        *) echo "right|${reason}" ;;
+    esac
 }
 
 # Acceptance per rule, fixed / (fixed + ignored), and the share of violations
