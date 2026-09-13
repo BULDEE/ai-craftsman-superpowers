@@ -1,6 +1,6 @@
 # Agents Reference
 
-The plugin provides **11 agents** organized in two categories:
+The plugin provides **12 agents** (6 core, 6 symlinked from the packs) organized in two categories:
 - **4 Reviewers** - read-only analysis and code review
 - **7 Craftsmen** - implementation specialists with domain expertise
 
@@ -30,7 +30,7 @@ The plugin provides **11 agents** organized in two categories:
 
 ### team-lead
 
-**Model**: Sonnet | **Effort**: high | **Memory**: user | **Max Turns**: 50
+**Model**: Opus | **Effort**: high | **Memory**: user | **Max Turns**: 50
 
 **Mission**: Orchestrator that delegates, challenges decisions, and validates deliverables. **Never codes directly.**
 
@@ -81,7 +81,7 @@ The plugin provides **11 agents** organized in two categories:
 
 ### architect
 
-**Model**: Sonnet | **Effort**: high | **Memory**: project | **Max Turns**: 20
+**Model**: Opus | **Effort**: high | **Memory**: project | **Max Turns**: 20
 
 **Mission**: DDD/Clean Architecture validation. **Read-only - cannot edit or write files.**
 
@@ -156,6 +156,14 @@ The plugin provides **11 agents** organized in two categories:
 **Verification**: Cross-references documentation against actual code to detect drift.
 
 ---
+
+### legacy-surgeon
+
+Legacy code surgeon - brings untested, tangled, inherited code under control without breaking it. Characterizes behavior first, breaks dependencies with seams, refactors under a net, and migrates with strangler-fig. Never rewrites from scratch. Use for legacy rescue, taming a god class, or getting code under test.
+
+**Model**: Opus | **Effort**: high | **Memory**: project | **Max Turns**: 25
+
+Use for: legacy rescue, taming a god class, characterization tests before a change, strangler-fig migration.
 
 ## Reviewer Agents
 

@@ -203,12 +203,13 @@ déroule les concepts DDD avec des exemples travaillés, et
 
 ## Commandes
 
-Toutes les commandes sont invoquées explicitement, jamais déclenchées
-automatiquement. Référence complète : [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md).
+Quinze commandes ne démarrent que si vous les tapez ; sept (`challenge`,
+`debug`, `test`, `team`, `rag`, `mlops`, `agent-design`) peuvent être lancées
+par le modèle quand le contexte s'y prête. Référence complète : [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md).
 
 | Catégorie | Commandes |
 |-----------|-----------|
-| Méthodologie | `design`, `debug`, `plan`, `challenge`, `verify`, `workflow`, `spec`, `refactor`, `legacy`, `test`, `git`, `parallel` |
+| Méthodologie | `design`, `debug`, `plan`, `challenge`, `verify`, `workflow`, `spec`, `refactor`, `legacy`, `test`, `git`, `parallel`, `loop` |
 | Scaffolding | `scaffold entity/usecase/component/hook/api-resource/pack` |
 | Ingénierie AI/ML | `rag`, `mlops`, `agent-design` |
 | Utilitaires | `metrics`, `setup`, `team`, `healthcheck` |
@@ -272,11 +273,11 @@ et vérifie qu'elle échoue. Détail complet : [SECURITY.md](SECURITY.md).
 ## Limites connues
 
 **Par choix :** les violations de règles bloquent, la détection de biais se
-contente d'avertir ; pas d'auto-commit ; les commandes sont invoquées
-explicitement, jamais déclenchées seules ; la méthodologie assume ses partis
-pris (DDD/Clean Architecture).
+contente d'avertir ; pas d'auto-commit ; quinze commandes ne démarrent que
+si vous les tapez et sept peuvent être lancées par le modèle ; la méthodologie
+assume ses partis pris (DDD/Clean Architecture).
 
-**Contraintes actuelles :** PHP, TypeScript, Python, Go et Rust ont une
+**Contraintes actuelles :** PHP, TypeScript, Python, Go, Rust et Bash ont une
 couverture de règles complète, les autres langages un support de base ;
 avertit directement en anglais et laisse le modèle arbitrer toutes les autres
 langues en contexte ; les métriques sont par machine, pas partagées en
@@ -290,7 +291,7 @@ Plus de détail dans la [FAQ](FAQ.md).
 | | |
 |---|---|
 | [Nouveautés v4](https://github.com/BULDEE/ai-craftsman-superpowers/releases/latest) | Rupture nette visant Claude Code >= 2.1.218 : boucle d'apprentissage fermée, skills natifs, Level 1.5 sémantique, budgets de contexte. Changements cassants dans [MIGRATION.md](MIGRATION.md). |
-| [Décisions d'architecture](docs/adr/) | 28 ADR couvrant chaque choix majeur. Commencez par [ADR-0016](docs/adr/0016-v4-clean-break-native-first.md) et [ADR-0005](docs/adr/0005-knowledge-first-architecture.md). |
+| [Décisions d'architecture](docs/adr/) | 31 ADR couvrant chaque choix majeur. Commencez par [ADR-0016](docs/adr/0016-v4-clean-break-native-first.md) et [ADR-0005](docs/adr/0005-knowledge-first-architecture.md). |
 | [Bundle de connaissance](knowledge/) | La méthodologie est livrée en bundle [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) : du Markdown versionné dans git, lisible par Obsidian ou n'importe quel consommateur OKF. Zéro embedding, zéro index, zéro service externe. |
 | [Guide CLAUDE.md](docs/guides/claude-md-best-practices.md) | Ce qui va dans votre fichier global, dans votre fichier projet, et ce que le plugin doit porter à la place. |
 | [Référence des hooks](docs/reference/hooks.md) | Chaque hook, code de sortie et identifiant de règle, dont le Circuit Breaker et l'Iron Law Pattern. |
@@ -298,7 +299,7 @@ Plus de détail dans la [FAQ](FAQ.md).
 
 ## Avec le plugin Superpowers
 
-Craftsman et [Superpowers](https://github.com/anthropics/claude-code-plugins/tree/main/superpowers)
+Craftsman et [Superpowers](https://github.com/obra/superpowers)
 se chargent simultanément sans conflit. Superpowers orchestre l'enchaînement
 (brainstorming, planification, TDD, développement par sous-agents) ; Craftsman
 impose la qualité à l'intérieur.

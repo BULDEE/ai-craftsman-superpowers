@@ -1,6 +1,6 @@
 # CI Integration
 
-Craftsman quality rules run as Claude Code hooks during development. For CI/CD pipelines, the same rules are available via the standalone `craftsman-ci` CLI and a ready-made GitHub Actions workflow.
+Craftsman quality rules run as Claude Code hooks during development. For CI/CD pipelines, the same rules are available via the standalone `craftsman-ci` CLI and four provider templates (GitHub Actions, GitLab CI, Bitbucket Pipelines, Jenkins), each with native annotations.
 
 ## Quick Start
 
@@ -123,8 +123,6 @@ craftsman:
     - violations=$(jq '.summary.violations' craftsman-report.json)
     - "[ \"$violations\" -gt 0 ] && exit 1 || exit 0"
   artifacts:
-    reports:
-      junit: craftsman-report.json
     paths:
       - craftsman-report.json
     when: always
@@ -158,7 +156,7 @@ bash ci/craftsman-ci.sh --format text
 
 ```json
 {
-  "version": "2.0.0",
+  "version": "4.10.1",
   "timestamp": "2026-03-28T21:00:00Z",
   "config": {
     "strictness": "strict",

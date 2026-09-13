@@ -19,7 +19,7 @@ Result: Better quality where it matters, lower cost where it doesn't.
 
 Haiku is a lightweight model optimized for speed and cost.
 
-**Costs:** 3x cheaper than Sonnet at list price ($1/$5 per Mtok against $3/$15)
+**Costs:** 2x cheaper than Sonnet at list price ($1/$5 per Mtok against $2/$10)
 **Speed:** noticeably faster, which is what keeps a write-time hook out of
 your way. The exact factor depends on prompt size, so no number is quoted here
 
@@ -102,7 +102,7 @@ $ /craftsman:spec
 
 Opus is the most capable model. Use for decision-making and high-stakes judgment.
 
-**Costs:** ~2x more expensive than Sonnet
+**Costs:** 2.5x more expensive than Sonnet at list price ($5/$25 against $2/$10)
 **Speed:** Slower (5-10 seconds)
 **Intelligence:** Highest (excellent reasoning, judgment)
 
@@ -126,7 +126,7 @@ Opus is the most capable model. Use for decision-making and high-stakes judgment
 - `/craftsman:parallel` - Agent orchestration (recommended)
 - Pack-specific: `rag`, `mlops`, `agent-design` (recommended)
 
-> **Note:** Since commands no longer carry a `model:` frontmatter field (see [ADR-0007](../adr/0007-commands-over-skills.md)), model tiering is a recommendation, not an enforcement. The user's active model applies. Agent files (e.g., `team-lead`) do enforce their model via frontmatter.
+> **Note:** Every skill carries a `model:` frontmatter field, and Claude Code applies it for the turn the skill runs in (see "Overriding the tiering" below): the tiering is enforced, not a recommendation.
 
 **Example:**
 ```bash
@@ -244,9 +244,9 @@ than invented totals.
 
 | Tier | Input | Output | Relative to Sonnet |
 |------|-------|--------|--------------------|
-| Haiku 4.5 | $1.00 | $5.00 | 3x cheaper |
-| Sonnet 5 | $3.00 | $15.00 | baseline |
-| Opus 5 | $5.00 | $25.00 | 1.7x more |
+| Haiku 4.5 | $1.00 | $5.00 | 2x cheaper |
+| Sonnet 5 | $2.00 | $10.00 | baseline |
+| Opus 5 | $5.00 | $25.00 | 2.5x more |
 
 Read the tiering decision off that table. A verification pass that re-reads the
 files it just checked is the step whose token count grows fastest, and it is
@@ -317,7 +317,7 @@ resolves by deployment name, which defaults to the Claude API alias.
 
 ### Where Fable 5 fits
 
-Fable 5 is the most capable tier and the natural fit for `legacy`, `team`, and
+Fable 5.1 (the `fable` alias) is the most capable tier and the natural fit for `legacy`, `team`, and
 `parallel` - work that runs longer than a single sitting. It is deliberately
 **not** the default on them, for three reasons:
 

@@ -575,18 +575,18 @@ Reference for planning chains:
 
 | Command | Typical Time | Model |
 |---------|--------------|-------|
-| `/craftsman:design` | 2-5 min | Sonnet |
+| `/craftsman:design` | 2-5 min | Opus |
 | `/craftsman:spec` | 2-3 min | Sonnet |
 | `/craftsman:scaffold` | 3-5 min | Sonnet |
 | `/craftsman:test` | 3-5 min | Sonnet |
 | `/craftsman:challenge` | 3-5 min | Opus |
 | `/craftsman:verify` | 1-2 min | Haiku |
 | `/craftsman:git` | <1 min | Haiku |
-| `/craftsman:debug` | 3-5 min | Sonnet |
-| `/craftsman:refactor` | 3-8 min | Sonnet |
+| `/craftsman:debug` | 3-5 min | Opus |
+| `/craftsman:refactor` | 3-8 min | Opus |
 | `/craftsman:plan` | 3-5 min | Opus |
 | `/craftsman:parallel` | 5-10 min (N tasks) | Opus + N×Sonnet |
-| `/craftsman:team` | 10-30 min (full feature) | Sonnet (team lead) + Sonnet (agents) |
+| `/craftsman:team` | 10-30 min (full feature) | Opus (team lead) + Sonnet (agents) |
 
 **Total feature chain:** ~30-45 minutes for complete implementation + review.
 

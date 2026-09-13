@@ -26,10 +26,10 @@
       },
       {
         "matcher": "Bash",
-        "if": "Bash(git push*)",
         "hooks": [
           {
             "type": "command",
+            "if": "Bash(git push*)",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-push-verify.sh\""
           }
         ]

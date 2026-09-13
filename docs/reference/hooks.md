@@ -182,17 +182,17 @@ Persistence validation ships with the symfony and react packs and runs through t
 
 Hooks implement a progressive validation strategy:
 
-### Level 1: Fast Regex (<50ms)
+### Level 1: Regex, always on
 
-Runs on every write. Pattern-matches code for common violations (PHP001-005, TS001-003, LAYER001-003). Zero dependencies.
+Runs on every write. Cost measured by `tests/perf/test-hook-latency.sh --report`: hundreds of milliseconds per write on a laptop, most of it process spawn, with a ceiling per hook the suite fails on. Pattern-matches code for common violations (PHP001-005, TS001-003, LAYER001-003). Zero dependencies.
 
-### Level 2: Static Analysis (<2s)
+### Level 2: Static Analysis
 
-Runs PHPStan (PHP) or ESLint (TypeScript) if installed. **Graceful degradation:** if tools are not installed, this level is silently skipped.
+Runs PHPStan (PHP) or ESLint (TypeScript) if installed and trusted, under a budget of 15s per file and 30s per project (`CRAFTSMAN_SA_BUDGET_FILE`, `CRAFTSMAN_SA_BUDGET_PROJECT`). **Graceful degradation:** if tools are not installed, this level is silently skipped.
 
-### Level 3: Architecture Validation (<2s)
+### Level 3: Architecture Validation
 
-Runs deptrac (PHP) or dependency-cruiser (TypeScript) if installed. Same graceful degradation as Level 2.
+Runs deptrac (PHP) or dependency-cruiser (TypeScript) if installed and trusted, under the same budget as Level 2. Same graceful degradation as Level 2.
 
 ## Suppressing Rules: `craftsman-ignore`
 
