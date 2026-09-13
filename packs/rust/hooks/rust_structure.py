@@ -28,15 +28,40 @@ Usage: rust_structure.py <file>
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 
-NEST_MAX = 3
-LOC_MAX = 50
-IMPL_LOC_MAX = 300
-PARAM_MAX = 3
+# The brace walk, the parameter split, the ignore filter and the line
+# arithmetic are the engine's (#38): this file keeps what carries the language.
+#
+# The engine is found where it actually is, not where a variable says it is:
+# the three front-ends export CLAUDE_PLUGIN_ROOT, but the bash side only trusts
+# it when the directory exists (pack-loader.sh) and craftsman-ci.sh keeps a
+# pre-existing value while sourcing its own libraries, so a root that loads the
+# pack fine in bash can point the import at a tree without the module. The
+# relative path is the plugin's own layout; the variable serves a pack that
+# lives outside it. Neither holding the module is loud, and not a clean
+# verdict: the validator reads stdout for findings, so a traceback on stderr
+# and an empty stdout used to read as "nothing found" on an unread file.
+def _engine_lib() -> str:
+    here = os.path.dirname(os.path.abspath(__file__))
+    for root in (os.environ.get("CLAUDE_PLUGIN_ROOT"),
+                 os.path.dirname(os.path.dirname(os.path.dirname(here)))):
+        if root and os.path.isfile(os.path.join(root, "hooks", "lib", "brace_scanner.py")):
+            return os.path.join(root, "hooks", "lib")
+    sys.stderr.write("craftsman: rust_structure.py cannot load the engine's brace walk "
+                     "(hooks/lib/brace_scanner.py not under CLAUDE_PLUGIN_ROOT=%r nor beside this pack); "
+                     "set CLAUDE_PLUGIN_ROOT to the plugin root\n" % os.environ.get("CLAUDE_PLUGIN_ROOT"))
+    sys.exit(2)
 
-MAX_SOURCE_BYTES = 512 * 1024
+
+sys.path.insert(0, _engine_lib())
+from brace_scanner import (  # noqa: E402
+    Profile, balanced_group, drop_ignored, line_of, read_source, split_params, walk_braces,
+)
+
+IMPL_LOC_MAX = 300
 
 # `(?:[^<>]|->)*` rather than `[^>]*`: a bound like `<F: Fn(u32) -> u32>`
 # carries a `>` that is not the end of the list, and stopping there left the
@@ -198,162 +223,55 @@ def _blank_plain_string(source: str, cursor: int, out: list) -> int:
 
 # --- Header parsing -----------------------------------------------------------
 
-def line_of(source: str, position: int) -> int:
-    return source.count("\n", 0, position) + 1
-
-
-def _param_group(header: str, start: int) -> str:
-    """Text inside the parameter parentheses.
-
-    Only parentheses count toward the depth. Counting `<` and `>` as well looks
-    right until a parameter is `f: impl Fn(u32) -> u32`: the `>` of the arrow
-    took the depth to zero without a `)`, the walk gave up, and the function
-    was reported as having no parameters at all. `[u8; 1 << 4]` did the same.
-    """
-    depth = 0
-    for index in range(start, len(header)):
-        if header[index] == "(":
-            depth += 1
-        elif header[index] == ")":
-            depth -= 1
-            if depth == 0:
-                return header[start + 1:index]
-    return ""
-
-
 def parameter_list(header: str) -> list[str]:
     """Parameters of the group that follows the function name, `self` excluded.
 
     A `where` clause or a tuple return type is a later balanced group on the
-    same header, so reading the last one counts the wrong thing.
+    same header, so reading the last one counts the wrong thing. Generics nest
+    with `<` and `>`, and a `->` must not close one.
     """
     match = FN_RE.search(header)
     if not match:
         return []
-    inner = _param_group(header, header.index("(", match.end() - 1)).strip()
+    inner = balanced_group(header, header.index("(", match.end() - 1)).strip()
     if not inner:
         return []
-    parts, depth, current = [], 0, ""
-    for index, char in enumerate(inner):
-        if char in "([{":
-            depth += 1
-        elif char in ")]}":
-            depth -= 1
-        elif char == "<" and index and (inner[index - 1].isalnum() or inner[index - 1] == "_"):
-            depth += 1
-        elif char == ">" and index and inner[index - 1] != "-" and depth > 0:
-            depth -= 1
-        if char == "," and depth == 0:
-            parts.append(current.strip())
-            current = ""
-            continue
-        current += char
-    parts.append(current.strip())
     # The receiver is not a parameter the caller passes.
-    return [part for part in parts
-            if part and not re.match(r"^(&\s*)?(mut\s+)?self\b", part)]
+    return [part for part in split_params(inner, angle_brackets=True)
+            if not re.match(r"^(&\s*)?(mut\s+)?self\b", part)]
 
 
 # --- Brace scan ---------------------------------------------------------------
+#
+# What Rust measures beyond the shared walk: a type spreads its methods over
+# several impl blocks, the inherent one then one per trait. Measuring a single
+# block is the defect packs/go documented when it refused GOD001 outright, so
+# the spans are summed per type across frames and judged once, at the end.
 
-class _Scan:
-    """Mutable state of one pass over a file, kept out of the argument lists."""
-
-    def __init__(self, source: str) -> None:
-        self.source = source
-        self.findings: list[tuple[str, str]] = []
-        self.stack: list[dict] = []
-        self.control_depth = 0
-        self.seen_nest: set[int] = set()
-        # A Rust type spreads its methods over several impl blocks: the
-        # inherent one, then one per trait. Measuring a single block is the
-        # defect packs/go documented when it refused GOD001 outright, so the
-        # spans are summed per type and judged once, at the end.
-        self.impl_span: dict = {}
-        self.impl_first_line: dict = {}
-
-    def report(self, rule: str, message: str) -> None:
-        self.findings.append((rule, message))
-
-
-def _open_fn(scan: _Scan, cursor: int, header: str, name: str | None) -> None:
-    params = parameter_list(header)
-    if len(params) > PARAM_MAX:
-        scan.report("PARAM001",
-                    "line %d: %s() has %d parameters (max %d): pass a struct"
-                    % (line_of(scan.source, cursor), name or "closure", len(params), PARAM_MAX))
-
-
-def _open_control(scan: _Scan, cursor: int) -> None:
-    scan.control_depth += 1
-    if scan.control_depth < NEST_MAX:
+def _sum_impl_span(scan, frame: dict, span: int) -> None:
+    if frame["kind"] != "container":
         return
-    line_number = line_of(scan.source, cursor)
-    if line_number in scan.seen_nest:
-        return
-    scan.seen_nest.add(line_number)
-    scan.report("NEST001",
-                "line %d: control flow nested %d levels deep: extract a function "
-                "or return early" % (line_number, scan.control_depth))
+    name = frame["name"] or "?"
+    spans = scan.state.setdefault("impl_span", {})
+    spans[name] = spans.get(name, 0) + span
+    scan.state.setdefault("impl_first_line", {}).setdefault(
+        name, line_of(scan.source, frame["open"]))
 
 
-def _open_brace(scan: _Scan, cursor: int, header: str) -> None:
-    fn_match = FN_RE.search(header)
-    impl_match = IMPL_RE.search(header)
-    if fn_match:
-        kind, name = "fn", fn_match.group(1)
-        _open_fn(scan, cursor, header, name)
-    elif impl_match:
-        kind, name = "impl", impl_match.group(1)
-    elif CONTROL_RE.search(header):
-        kind, name = "control", None
-        _open_control(scan, cursor)
-    else:
-        kind, name = "other", None
-    scan.stack.append({"kind": kind, "open": cursor, "name": name})
-
-
-def _close_brace(scan: _Scan, cursor: int) -> None:
-    if not scan.stack:
-        return
-    frame = scan.stack.pop()
-    span = line_of(scan.source, cursor) - line_of(scan.source, frame["open"])
-    if frame["kind"] == "control":
-        scan.control_depth = max(0, scan.control_depth - 1)
-    elif frame["kind"] == "fn" and span > LOC_MAX:
-        scan.report("LOC001",
-                    "line %d: %s() body is %d lines (max %d): extract a function"
-                    % (line_of(scan.source, frame["open"]), frame["name"] or "closure",
-                       span, LOC_MAX))
-    elif frame["kind"] == "impl":
-        name = frame["name"] or "?"
-        scan.impl_span[name] = scan.impl_span.get(name, 0) + span
-        scan.impl_first_line.setdefault(name, line_of(scan.source, frame["open"]))
+PROFILE = Profile(function_re=FN_RE, control_re=CONTROL_RE, container_re=IMPL_RE,
+                  parameter_list=parameter_list, on_close=_sum_impl_span,
+                  param_remedy="pass a struct")
 
 
 def scan_braces(source: str) -> list[tuple[str, str]]:
-    """Walk the braces. Only `{` and `}` bound a header.
-
-    `;` bounds one in the shared PHP and TypeScript extractor. In Rust that
-    would hide `if let Some(x) = f() {` and `while let`, the same way it hid
-    Go's `if err := f(); err != nil {`.
-    """
-    scan = _Scan(source)
-    header_start = 0
-    for cursor, char in enumerate(source):
-        if char == "{":
-            _open_brace(scan, cursor, source[header_start:cursor])
-        elif char == "}":
-            _close_brace(scan, cursor)
-        else:
-            continue
-        header_start = cursor + 1
-    for name, span in scan.impl_span.items():
+    scan = walk_braces(source, PROFILE)
+    first_line = scan.state.get("impl_first_line", {})
+    for name, span in scan.state.get("impl_span", {}).items():
         if span > IMPL_LOC_MAX:
             scan.report("GOD001",
                         "line %d: the impl blocks of %s span %d lines in total "
                         "(max %d): too many responsibilities, split the type"
-                        % (scan.impl_first_line[name], name, span, IMPL_LOC_MAX))
+                        % (first_line[name], name, span, IMPL_LOC_MAX))
     return scan.findings
 
 
@@ -571,40 +489,16 @@ CLIPPY_EQUIVALENT = {
 }
 
 
-def drop_ignored(findings, raw: str):
-    """Remove a finding its own line, or its preamble, already exempts.
-
-    Two syntaxes are honoured: `craftsman-ignore: <RULE>` on the line, and the
-    `#[allow(clippy::...)]` attribute above the item when clippy has a lint
-    that means the same thing.
-    """
-    lines = raw.split("\n")
-    kept = []
-    for rule, message in findings:
-        match = re.match(r"line (\d+):", message)
-        if not match:
-            kept.append((rule, message))
-            continue
-        index = int(match.group(1)) - 1
-        if not 0 <= index < len(lines):
-            kept.append((rule, message))
-            continue
-        if ("craftsman-ignore: %s" % rule) in lines[index]:
-            continue
-        lint = CLIPPY_EQUIVALENT.get(rule)
-        if lint and lint in _preamble(lines, index):
-            continue
-        kept.append((rule, message))
-    return kept
+def _allowed_by_clippy(rule: str, lines: list, index: int) -> bool:
+    """A `#[allow(clippy::...)]` above the item, when clippy has a lint that
+    means the same thing as the rule."""
+    lint = CLIPPY_EQUIVALENT.get(rule)
+    return bool(lint and lint in _preamble(lines, index))
 
 
 def analyze(path: str) -> list[tuple[str, str]]:
-    try:
-        with open(path, "r", encoding="utf-8", errors="replace") as handle:
-            raw = handle.read(MAX_SOURCE_BYTES + 1)
-    except OSError:
-        return []
-    if len(raw) > MAX_SOURCE_BYTES:
+    raw = read_source(path)
+    if raw is None:
         return []
     source = blank_literals(raw)
     # The pipeline scans relative paths, so `/tests/` alone missed
@@ -615,7 +509,7 @@ def analyze(path: str) -> list[tuple[str, str]]:
     is_test_file = (path.endswith("_test.rs")
                     or "/tests/" in normalised or "/benches/" in normalised)
     findings = scan_braces(source) + scan_lines(source, raw, is_test_file)
-    return drop_ignored(findings, raw)
+    return drop_ignored(findings, raw, also_exempt=_allowed_by_clippy)
 
 
 def main() -> None:
