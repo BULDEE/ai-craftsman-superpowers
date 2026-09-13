@@ -698,4 +698,22 @@ else
     log_fail "CLAUDE_PLUGIN_OPTION_STRICTNESS (as Claude Code exports it) reaches rules_init" "got '$UPPER_STRICT'"
 fi
 
+# --- The plugin option outranks the global file, as it does in config.sh -------
+#
+# rules_init applied CLAUDE_PLUGIN_OPTION_strictness first and parsed
+# ~/.claude/.craft-config.yml after it, so `strictness: relaxed` in the global
+# file disarmed post-write under an explicit `strict` option (guardrail
+# review, E9ter). config.sh resolves project file > option > global file;
+# the engine now does the same.
+OPT_GLOBAL=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-opt-global.XXXXXX")
+mkdir -p "$OPT_GLOBAL/project"
+printf 'strictness: relaxed\n' > "$OPT_GLOBAL/.craft-config.yml"
+OPT_STRICT="$( unset CLAUDE_PLUGIN_OPTION_strictness; CLAUDE_PLUGIN_OPTION_STRICTNESS=strict bash -c "
+    source '$ROOT_DIR/hooks/lib/rules-engine.sh'; rules_init '$OPT_GLOBAL/project' '$OPT_GLOBAL'; echo \"\$_RULES_STRICTNESS\"" 2>/dev/null )"
+assert_eq "an explicit strictness option outranks a relaxed global .craft-config.yml" "strict" "$OPT_STRICT"
+OPT_PROJECT="$( unset CLAUDE_PLUGIN_OPTION_strictness; printf 'strictness: moderate\n' > "$OPT_GLOBAL/project/.craft-config.yml"; CLAUDE_PLUGIN_OPTION_STRICTNESS=strict bash -c "
+    source '$ROOT_DIR/hooks/lib/rules-engine.sh'; rules_init '$OPT_GLOBAL/project' '$OPT_GLOBAL'; echo \"\$_RULES_STRICTNESS\"" 2>/dev/null )"
+assert_eq "and the project file outranks the option, as in config.sh" "moderate" "$OPT_PROJECT"
+rm -rf "$OPT_GLOBAL"
+
 test_summary
