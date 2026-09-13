@@ -188,20 +188,36 @@ For PRs touching 5+ files or 3+ bounded contexts, delegate the reading to
 **parallel reviewer agents** and keep the synthesis here. You hold the user's
 brief and their attachments; the subagents do not, so you write their prompts.
 
-1. **Spawn specialized reviewers** using the Agent tool:
+1. **Spawn specialized reviewers** using the Agent tool, **without a
+   `name`**:
    - `craftsman:architect`: layer violations, aggregate boundaries
    - `craftsman:security-pentester`: OWASP top 10, input validation
    - A `general-purpose` reviewer for performance: N+1 queries, memory leaks
+
+   A named agent is a teammate, and a teammate reports through the team
+   mailbox. That channel can die for the rest of the lead's process while
+   everything else keeps working: measured on 2026-09-13, three reviews of
+   41K to 56K characters were read from the mailbox, marked read and never
+   surfaced, and a fourth reviewer sat two hours on a permission request
+   nobody saw. An unnamed agent returns through a task notification, which
+   kept working in the same process. Name a reviewer only when you need to
+   message it again, and then treat its silence as the mailbox's, not its own.
 
 2. **Each reviewer prompt carries**, because none of it crosses the boundary:
    - The scope you fixed above, restated in full
    - The list of changed files
    - Any evidence the user gave in prose (a subagent never sees their images)
    - The specific checklist for that domain
+   - A file path under the scratchpad where the reviewer writes its full
+     report BEFORE its final message, so a lost delivery costs a `cat` and
+     not the review
 
 3. **Aggregate results** into a single report and a single verdict. A reviewer
-   that returns nothing is a gap in your evidence, not an absence of findings:
-   say so in `NOT REVIEWED` rather than reading its silence as clean.
+   that returns nothing is a gap in your evidence, not an absence of findings.
+   Before writing it off: read its report file, then its transcript
+   (`~/.claude/projects/<project dir>/<agent session>.jsonl`, the longest
+   assistant text block is the report), and only then say so in
+   `NOT REVIEWED` rather than reading its silence as clean.
 
 This is where isolation belongs: fan out from a session that knows the brief,
 instead of forking away the brief itself.
