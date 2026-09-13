@@ -208,6 +208,40 @@ else
 fi
 _clean
 
+# --- one global layer, read by the hooks and CI, ignored by the gates ------
+#
+# The pipeline read `$HOME/.craft-config.yml` and the hooks
+# `~/.claude/.craft-config.yml`, the documented location: a global
+# `PHP002: warn` applied at the keyboard and not in CI (architecture review,
+# BLOCKING 3). One resolver now, `rules_global_dir`. And a gate an agent runs
+# under must not read a layer the same uid can write outside the gated turn:
+# the Hermes adapter sets CRAFTSMAN_GLOBAL_CONFIG_DIR to nothing, so a
+# `strictness: relaxed` in the operator's home cannot degrade the verdict
+# (guardrail review, H5b).
+GLOBAL_HOME=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-global-home.XXXXXX")
+mkdir -p "$GLOBAL_HOME/.claude" "$WORK/src/Domain/User"
+printf 'rules:\n  PHP002: warn\n' > "$GLOBAL_HOME/.claude/.craft-config.yml"
+LOOSE_FILE="$WORK/src/Domain/User/Loose.php"
+printf '<?php\ndeclare(strict_types=1);\nnamespace App\\Domain\\User;\nclass Loose {}\n' > "$LOOSE_FILE"
+RC=0
+HOOK_OUT=$(printf '{"tool_input":{"file_path":"%s"}}' "$LOOSE_FILE" \
+    | HOME="$GLOBAL_HOME" bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1) || RC=$?
+CI_OUT=$(HOME="$GLOBAL_HOME" _ci_rules_for "src/Domain/User/Loose.php")
+HERMES_OUT=$(HOME="$GLOBAL_HOME" _hermes)
+if [[ "$RC" -eq 0 ]] && printf '%s' "$HOOK_OUT" | grep -q "PHP002" \
+    && printf '%s' "$CI_OUT" | grep -q "^PHP002 warning"; then
+    log_pass "a global ~/.claude/.craft-config.yml demotion holds in the hook and in CI alike"
+else
+    log_fail "global layer parity hook/CI" "hook rc=$RC ci=[$CI_OUT]"
+fi
+if printf '%s' "$HERMES_OUT" | grep -q '"decision"' && printf '%s' "$HERMES_OUT" | grep -q "PHP002"; then
+    log_pass "and the Hermes gate ignores the operator's home layer: PHP002 still blocks the turn"
+else
+    log_fail "the Hermes gate ignores the operator's home layer" "hermes=[$(printf '%s' "$HERMES_OUT" | tr '\n' ' ' | cut -c1-120)]"
+fi
+rm -rf "$GLOBAL_HOME"
+_clean
+
 # --- every adapter directory is covered here ------------------------------
 UNCOVERED=""
 for dir in "$ROOT_DIR"/adapters/*/; do

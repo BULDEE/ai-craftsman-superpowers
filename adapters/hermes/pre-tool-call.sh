@@ -76,6 +76,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
 CRAFTSMAN_CI="$PLUGIN_ROOT/ci/craftsman-ci.sh"
+# A gate reads the workspace, never the operator's home: ~/.craft-config.yml
+# or ~/.claude/.craft-config.yml is writable by the uid the agent runs as,
+# outside any gated turn, and `strictness: relaxed` there degraded SEC001 to
+# a non-blocking continue (guardrail review, H5b). No global layer here.
+export CRAFTSMAN_GLOBAL_CONFIG_DIR=""
+# This host's own files, refused by the write gate as by the conclusion gate
+# (pre-verify.sh GATE_TOUCHED); the mirror helper is core and names no host.
+export CRAFTSMAN_GATE_OWN_PATHS="ci/craftsman-ci.sh adapters/hermes/"
 
 # The rules this hook may refuse a write on. A finding outside this set is
 # never reported here, whatever its severity: that is the promise the default
@@ -142,7 +150,7 @@ INPUT=$(cat)
 MIRROR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-write-gate.XXXXXX")
 trap 'rm -rf "$MIRROR"' EXIT
 
-PLACED=$(printf '%s' "$INPUT" | python3 "$SCRIPT_DIR/write_gate_place.py" "$MIRROR" 2>/dev/null)
+PLACED=$(printf '%s' "$INPUT" | python3 "$PLUGIN_ROOT/hooks/lib/write_mirror.py" "$MIRROR" 2>/dev/null)
 
 [[ -n "$PLACED" ]] || exit 0
 

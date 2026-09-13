@@ -38,6 +38,16 @@ _config_option_env() {
     return 1
 }
 
+# The global configuration layer: ~/.claude/.craft-config.yml, the documented
+# location, for every front-end. The pipeline used to read
+# $HOME/.craft-config.yml instead, so a global `PHP002: warn` applied at the
+# keyboard and not in CI. A gate an agent runs under sets
+# CRAFTSMAN_GLOBAL_CONFIG_DIR to nothing (the Hermes adapter does): a layer
+# the same uid can write outside the gated turn must not shape the verdict.
+config_global_dir() {
+    printf '%s' "${CRAFTSMAN_GLOBAL_CONFIG_DIR-${HOME}/.claude}"
+}
+
 _config_resolve() {
     local key="$1"
     local default="$2"
@@ -56,8 +66,8 @@ _config_resolve() {
         return 0
     fi
 
-    if [[ -f "${HOME}/.claude/.craft-config.yml" ]]; then
-        yml_value=$(_config_parse_yml_value "$key" "${HOME}/.claude/.craft-config.yml")
+    if [[ -n "$(config_global_dir)" && -f "$(config_global_dir)/.craft-config.yml" ]]; then
+        yml_value=$(_config_parse_yml_value "$key" "$(config_global_dir)/.craft-config.yml")
         if [[ -n "$yml_value" ]]; then
             echo "$yml_value"
             return 0

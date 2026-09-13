@@ -111,7 +111,7 @@ if [[ "${1:-}" == "export" ]]; then
     fi
     if [[ -f "$PLUGIN_ROOT/hooks/lib/rules-engine.sh" ]]; then
         source "$PLUGIN_ROOT/hooks/lib/rules-engine.sh"
-        rules_init "$PWD" "${HOME:-}" 2>/dev/null || true
+        rules_init "$PWD" "$(rules_global_dir)" 2>/dev/null || true
     fi
     # Rule ids, wording and grouping live in the rule registry, which the pack
     # loader builds. Without this the Rules section renders empty, which reads
@@ -423,7 +423,8 @@ _resolve_config() {
     if [[ "$RULES_ENGINE_AVAILABLE" == true ]]; then
         # Use rules engine for config resolution (plugin context)
         local project_dir="$PWD"
-        local global_dir="${HOME:-}"
+        local global_dir
+        global_dir=$(rules_global_dir)
 
         # stderr is suppressed here for the same reason it is on pack_loader_init
         # and sa_analyze_file: the adapters redirect this command's stderr into

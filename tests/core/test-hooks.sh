@@ -120,6 +120,40 @@ else
     log_fail "pre-write Edit with absent anchor" "expected exit 2, got ${result%%|*}"
 fi
 
+# The pre-write detectors were a fork of the pack validators: "App" hardcoded
+# where packs/symfony reads composer.json's psr-4 root, path-only where the
+# pack is path-or-namespace (architecture review, BLOCKING 2). Measured: an
+# Acme\ project passed pre-write and was refused post-write on the same
+# file. The gate now judges the would-be file through the packs themselves,
+# on a mirror of the workspace, so there is one set of detectors.
+ACME="/tmp/craftsman-prewrite-$$/acme"
+mkdir -p "$ACME/src/Domain"
+( cd "$ACME" && git init -q ) >/dev/null 2>&1
+printf '{"autoload":{"psr-4":{"Acme\\\\":"src/"}}}' > "$ACME/composer.json"
+result=$(run_pre_hook "$ACME/src/Domain/Order.php" \
+    '<?php
+declare(strict_types=1);
+namespace Acme\Domain;
+use Acme\Infrastructure\Doctrine\OrderRepository;
+final class Order {}')
+if [[ "${result%%|*}" == "2" ]] && echo "${result#*|}" | grep -q "LAYER001"; then
+    log_pass "PreToolUse refuses LAYER001 under a psr-4 root that is not App (the packs judge, not a fork)"
+else
+    log_fail "pre-write on a non-App psr-4 root" "expected exit 2 with LAYER001, got ${result%%|*}"
+fi
+# and a directory .craft-rules.yml demoting a rule is honoured on the mirror
+printf 'rules:\n  PHP001: warn\n' > "$ACME/src/Domain/.craft-rules.yml"
+result=$(run_pre_hook "$ACME/src/Domain/Money.php" \
+    '<?php
+namespace Acme\Domain;
+final class Money {}')
+if [[ "${result%%|*}" == "0" ]] && echo "${result#*|}" | grep -q "PHP001"; then
+    log_pass "a directory .craft-rules.yml is read on the mirror: PHP001 demoted to warn passes pre-write"
+else
+    log_fail "directory rules on the mirror" "expected exit 0 with a PHP001 warning, got ${result%%|*}: $(echo "${result#*|}" | tr '\n' ' ' | cut -c1-100)"
+fi
+rm -f "$ACME/src/Domain/.craft-rules.yml"
+
 # The gate that cannot run is not a clean verdict (ADR-0029, which the Hermes
 # adapter honoured and this hook did not): a crash inside the gate used to
 # exit 0 through the ERR trap and let the write land. Without `jq` nothing in

@@ -275,7 +275,8 @@ else
 fi
 for own in ".craft-config.yml" "adapters/hermes/pre-verify.sh" "ci/craftsman-ci.sh"; do
     if grep -qF "$own" "$ROOT_DIR/adapters/hermes/pre-verify.sh" \
-        && python3 - "$ROOT_DIR/adapters/hermes/write_gate_place.py" "$own" <<'PY'
+        && CRAFTSMAN_GATE_OWN_PATHS="$(sed -n 's/^export CRAFTSMAN_GATE_OWN_PATHS="\(.*\)"$/\1/p' "$ROOT_DIR/adapters/hermes/pre-tool-call.sh")" \
+           python3 - "$ROOT_DIR/hooks/lib/write_mirror.py" "$own" <<'PY'
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location("wgp", sys.argv[1]); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 sys.exit(0 if m._touches_gate(sys.argv[2]) else 1)

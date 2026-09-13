@@ -117,7 +117,7 @@ rotated. A Domain class importing Infrastructure (LAYER001): reversible in
 one line, kept because it is keyed on the path and free of false positives
 outside test code, so refusing it costs nothing. `write_gate: on` registers
 `pre_tool_call` (`adapters/hermes/pre-tool-call.sh`, with
-`write_gate_place.py` for the half that understands the tool call) for
+`hooks/lib/write_mirror.py`, shared with the Claude Code pre-write gate, for the half that understands the tool call) for
 `write_file` and `patch` only, judging the content as the file WOULD be on
 those two rules and nothing else: PHP001, TS001 and every other rule still
 wait for the conclusion, with the skill that fixes them. LAYER001 is not
@@ -276,7 +276,10 @@ Stated plainly, because a control that does not control is worse than none.
 turn.** A `.craft-rules.yml` that was already in the repository when it was
 cloned, or one edited outside a gated turn, still switches its rule to
 `ignore` with no refusal. `trust_project_tools` in `~/.claude/.craft-config.yml`
-turns a config toggle into execution of a cloned repository's own binaries.
+turns a config toggle into execution of a cloned repository's own binaries
+(the gates themselves read no global layer: `CRAFTSMAN_GLOBAL_CONFIG_DIR` is
+empty under both adapters, so a `strictness: relaxed` in the bot's home changes
+no verdict).
 Both reproduced before the in-turn guard existed, and both remain live outside
 it.
 

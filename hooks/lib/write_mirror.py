@@ -1,15 +1,32 @@
 #!/usr/bin/env python3
-"""Lay the content a Hermes write WOULD produce under a mirror of its workspace.
+"""Lay the content a write WOULD produce under a mirror of its workspace.
 
-The half of pre-tool-call.sh that understands the tool call. Reads the hook
-payload on stdin, prints one line for the shell half:
+The one mechanism behind "judge the would-be file": the Claude Code pre-write
+gate and the Hermes write gate both place the content here and run the pack
+validators on the mirror, so there is one set of detectors and not a fork of
+them (the fork read "App" where the pack reads composer.json's psr-4 root,
+and an Acme\\ project passed pre-write while post-write refused it).
+
+Reads the hook payload on stdin, prints one line for the shell half:
 
   MIRROR <relative path>   the would-be file is in the mirror, judge it
   GATE <relative path>     the write edits the gate's own configuration
   UNJUDGED <why>           a write this hook cannot judge and must not wave
   (nothing)                not a write this hook judges
 
-Usage: write_gate_place.py <mirror dir>  < payload.json
+Two payload shapes. Hermes: `tool_name` write_file|patch with `args` (plugin
+hook) or `tool_input` (shell hook), `path`, `content` or
+`old_string`/`new_string`/`replace_all`, and `cwd`. Claude Code: `tool_name`
+Write|Edit with `tool_input`, `file_path`, `content` or
+`old_string`/`new_string`/`replace_all`.
+
+Beside the file, the mirror carries what the engine reads for it: every
+`.craft-config.yml`/`.craft-rules.yml` on the ancestor chain, the workspace's
+`composer.json`/`package.json` (namespace root, language markers) and its
+`.craftsman-baseline.json` (a mark the hook and CI honour must hold at write
+time too, or the gate refuses what they let through).
+
+Usage: write_mirror.py <mirror dir>  < payload.json
 """
 
 from __future__ import annotations
@@ -19,14 +36,23 @@ import os
 import shutil
 import sys
 
-WRITE_TOOLS = ("write_file", "patch")
+WRITE_TOOLS = ("write_file", "patch", "Write", "Edit")
 WORKSPACE_MARKERS = (".git", ".craft-config.yml", "composer.json", "package.json",
                      "pyproject.toml", "go.mod", "Cargo.toml")
-# The same set pre-verify.sh refuses at the conclusion (GATE_TOUCHED), and
-# tests/adapters/test-hermes-plugin.sh fails when the two drift.
-GATE_OWN_NAMES = (".craft-rules.yml", ".craft-config.yml")
-GATE_OWN_PATHS = ("ci/craftsman-ci.sh",)
-GATE_OWN_PREFIXES = ("adapters/hermes/",)
+# The gate's own configuration, refused rather than judged. The names are the
+# engine's; a host adds its own paths through CRAFTSMAN_GATE_OWN_PATHS (space
+# separated, a trailing slash marks a directory), so this core helper names no
+# adapter and the adapter's conclusion gate refuses the same set (its suite
+# fails when the two drift). The Claude Code side has its own gate for these
+# files (config-protection.sh).
+GATE_OWN_NAMES = (".craft-rules.yml", ".craft-config.yml", ".craftsman-baseline.json")
+
+
+def _host_gate_own() -> tuple:
+    entries = os.environ.get("CRAFTSMAN_GATE_OWN_PATHS", "").split()
+    paths = tuple(e for e in entries if not e.endswith("/"))
+    prefixes = tuple(e for e in entries if e.endswith("/"))
+    return paths, prefixes
 
 
 def _payload() -> dict:
@@ -58,19 +84,23 @@ def _workspace_of(target: str, hint: str) -> str:
         cursor = parent
     if hint and os.path.isdir(hint) and (target == hint or target.startswith(hint + os.sep)):
         return hint
-    return os.path.dirname(target)
+    # No marker anywhere above: mirror the whole absolute path, so a rule keyed
+    # on a path segment (/Domain/, /Application/) still sees it. Mirroring the
+    # file's own directory alone dropped every segment above the file.
+    return os.path.abspath(os.sep)
 
 
 def _touches_gate(relative: str) -> bool:
     if os.path.basename(relative) in GATE_OWN_NAMES:
         return True
-    if relative in GATE_OWN_PATHS:
+    paths, prefixes = _host_gate_own()
+    if relative in paths:
         return True
-    return any(relative.startswith(prefix) for prefix in GATE_OWN_PREFIXES)
+    return any(relative.startswith(prefix) for prefix in prefixes)
 
 
 def _would_be_content(tool: str, args: dict, target: str) -> str | None:
-    if tool == "write_file":
+    if tool in ("write_file", "Write"):
         content = args.get("content")
         return content if isinstance(content, str) else None
     old, new = args.get("old_string"), args.get("new_string")
@@ -115,6 +145,7 @@ def _place(mirror: str, workspace: str, relative: str, content: str) -> None:
         handle.write(content)
     for directory in _ancestors(os.path.dirname(relative)):
         _copy_rules(workspace, mirror, directory)
+    _copy_roots(workspace, mirror)
 
 
 def _ancestors(directory: str) -> list:
@@ -124,6 +155,17 @@ def _ancestors(directory: str) -> list:
         directory = os.path.dirname(directory)
         chain.append(directory)
     return chain
+
+
+ROOT_FILES = ("composer.json", "package.json", ".craftsman-baseline.json")
+
+
+def _copy_roots(workspace: str, mirror: str) -> None:
+    """The workspace files a validator or a mark reads for any file under it."""
+    for name in ROOT_FILES:
+        source = os.path.join(workspace, name)
+        if os.path.isfile(source):
+            shutil.copy(source, os.path.join(mirror, name))
 
 
 def _copy_rules(workspace: str, mirror: str, directory: str) -> None:
@@ -149,30 +191,37 @@ def _resolve(path: str, hint: str) -> tuple:
     return target, workspace, os.path.relpath(target, workspace)
 
 
-def main() -> int:
-    mirror = sys.argv[1]
-    payload = _payload()
+def _placement(payload: dict, mirror: str) -> str:
+    """The line the shell half reads, or "" for a call this gate does not judge."""
     tool = payload.get("tool_name") or ""
-    if tool not in WRITE_TOOLS:
-        return 0
     args = _arguments(payload)
+    if not tool:
+        # A Claude Code payload with no tool name (the suites build them that
+        # way): the fields say which write it is.
+        tool = "Edit" if "old_string" in args else "Write"
+    if tool not in WRITE_TOOLS:
+        return ""
     if _is_v4a(args):
-        print("UNJUDGED a V4A patch (mode: patch) is not read by the write gate; use write_file or a replace-mode patch (old_string/new_string)")
-        return 0
-    if not args.get("path"):
-        return 0
-    target, workspace, relative = _resolve(str(args["path"]), str(payload.get("cwd") or ""))
+        return "UNJUDGED a V4A patch (mode: patch) is not read by the write gate; use write_file or a replace-mode patch (old_string/new_string)"
+    path = args.get("path") or args.get("file_path")
+    if not path:
+        return ""
+    target, workspace, relative = _resolve(str(path), str(payload.get("cwd") or ""))
     if target is None:
-        print("UNJUDGED a relative path with no workspace to resolve it against; write an absolute path")
-        return 0
+        return "UNJUDGED a relative path with no workspace to resolve it against; write an absolute path"
     if _touches_gate(relative):
-        print("GATE " + relative)
-        return 0
+        return "GATE " + relative
     content = _would_be_content(tool, args, target)
     if content is None:
-        return 0
+        return ""
     _place(mirror, workspace, relative, content)
-    print("MIRROR " + relative)
+    return "MIRROR " + relative
+
+
+def main() -> int:
+    line = _placement(_payload(), sys.argv[1])
+    if line:
+        print(line)
     return 0
 
 
