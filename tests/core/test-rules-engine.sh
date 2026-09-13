@@ -689,4 +689,13 @@ else
     log_fail "relaxed still relaxes everything" "SEC001 came back '$verdict'"
 fi
 
+# --- The option in the spelling Claude Code exports ----------------------------
+UPPER_STRICT="$( unset CLAUDE_PLUGIN_OPTION_strictness; CLAUDE_PLUGIN_OPTION_STRICTNESS=relaxed bash -c "
+    source '$ROOT_DIR/hooks/lib/rules-engine.sh'; rules_init '$PROJECT_DIR'; echo \"\$_RULES_STRICTNESS\"" 2>/dev/null )"
+if [[ "$UPPER_STRICT" == "relaxed" ]]; then
+    log_pass "CLAUDE_PLUGIN_OPTION_STRICTNESS (as Claude Code exports it) reaches rules_init"
+else
+    log_fail "CLAUDE_PLUGIN_OPTION_STRICTNESS (as Claude Code exports it) reaches rules_init" "got '$UPPER_STRICT'"
+fi
+
 test_summary

@@ -426,8 +426,12 @@ _rules_load_config_file() {
     local project_dir="$1"
     local global_dir="${2:-}"
 
-    if [[ -n "${CLAUDE_PLUGIN_OPTION_strictness:-}" ]]; then
-        _RULES_STRICTNESS="$CLAUDE_PLUGIN_OPTION_strictness"
+    # Uppercased is how Claude Code exports the option; lowercase is the
+    # plugin's own internal export and what the suites set (see config.sh).
+    local _option_strictness
+    _option_strictness="${CLAUDE_PLUGIN_OPTION_STRICTNESS:-${CLAUDE_PLUGIN_OPTION_strictness:-}}"
+    if [[ -n "$_option_strictness" ]]; then
+        _RULES_STRICTNESS="$_option_strictness"
         _RULES_STRICTNESS_IS_DEFAULT=false
     fi
 

@@ -11,7 +11,7 @@ set -uo pipefail
 [[ -n "${CRAFTSMAN_HEADLESS_VERIFY:-}" ]] && exit 0
 
 # Gate: skip entirely if agent hooks are disabled
-if [[ "${CLAUDE_PLUGIN_OPTION_agent_hooks:-true}" == "false" ]]; then
+if [[ "${CLAUDE_PLUGIN_OPTION_AGENT_HOOKS:-${CLAUDE_PLUGIN_OPTION_agent_hooks:-true}}" == "false" ]]; then
     exit 0
 fi
 

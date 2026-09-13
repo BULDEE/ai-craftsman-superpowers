@@ -140,6 +140,44 @@ export HOME="$ORIGINAL_HOME"
 restore_home_bridges
 
 # Cleanup
+# --- A verification subprocess is not a session ------------------------------
+#
+# `claude -p` from haiku-verify.sh fires SessionStart too: this hook then
+# rewrote session-start-ts and deleted session-writes and session-violations,
+# so the real session's duration and write count restarted at every Haiku
+# verification. The recursion guard the verifier sets is the signal.
+HEADLESS_HOME=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-headless-start.XXXXXX")
+mkdir -p "$HEADLESS_HOME/data" "$HEADLESS_HOME/.claude"
+printf '1700000000' > "$HEADLESS_HOME/data/session-start-ts"
+printf '3' > "$HEADLESS_HOME/data/session-writes"
+headless_out=$(echo '{}' | CRAFTSMAN_HEADLESS_VERIFY=1 HOME="$HEADLESS_HOME" CLAUDE_PLUGIN_DATA="$HEADLESS_HOME/data" \
+    bash "$ROOT_DIR/hooks/session-start.sh" 2>/dev/null)
+if [[ "$(cat "$HEADLESS_HOME/data/session-start-ts")" == "1700000000" && "$(cat "$HEADLESS_HOME/data/session-writes" 2>/dev/null)" == "3" ]]; then
+    log_pass "a SessionStart fired by the verification subprocess leaves the real session's counters alone"
+else
+    log_fail "a SessionStart fired by the verification subprocess leaves the real session's counters alone" \
+        "start-ts=$(cat "$HEADLESS_HOME/data/session-start-ts" 2>/dev/null) writes=$(cat "$HEADLESS_HOME/data/session-writes" 2>/dev/null)"
+fi
+if [[ -z "$headless_out" ]]; then
+    log_pass "and injects nothing into the subprocess"
+else
+    log_fail "and injects nothing into the subprocess" "output: ${headless_out:0:80}"
+fi
+rm -rf "$HEADLESS_HOME"
+
+# --- Skills approved at the old depth are named, not silently unloaded --------
+LEGACY_SKILLS=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-legacy-skills.XXXXXX")
+mkdir -p "$LEGACY_SKILLS/.claude/skills/craftsman-learned/learned-php001" "$LEGACY_SKILLS/data" "$LEGACY_SKILLS/.claude"
+printf -- '---\nname: learned-php001\n---\n' > "$LEGACY_SKILLS/.claude/skills/craftsman-learned/learned-php001/SKILL.md"
+legacy_out=$( cd "$LEGACY_SKILLS" && echo '{}' | HOME="$LEGACY_SKILLS" CLAUDE_PLUGIN_DATA="$LEGACY_SKILLS/data" \
+    bash "$ROOT_DIR/hooks/session-start.sh" 2>/dev/null )
+if echo "$legacy_out" | grep -q "1 learned skill(s) at a depth Claude Code does not load"; then
+    log_pass "a learned skill approved at the old depth is reported at SessionStart, with the move to make"
+else
+    log_fail "a learned skill approved at the old depth is reported at SessionStart" "output lacks the notice"
+fi
+rm -rf "$LEGACY_SKILLS"
+
 rm -rf "$CLAUDE_PLUGIN_DATA" "/tmp/craftsman-fake-home-$$"
 
 echo ""

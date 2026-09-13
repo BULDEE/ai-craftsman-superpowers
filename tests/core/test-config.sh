@@ -61,6 +61,33 @@ test_default_values() {
 # =============================================================================
 # 2. CLAUDE_PLUGIN_OPTION env var overrides defaults
 # =============================================================================
+# Claude Code exports the option key UPPERCASED (CLAUDE_PLUGIN_OPTION_STRICTNESS);
+# the lowercase form below is what this suite and CI's internal export use.
+# Both must reach the reader, the exported one first.
+test_env_var_uppercase() {
+    echo ""
+    echo "=== Env Var, the spelling Claude Code exports ==="
+
+    rm -f "$TEST_DIR/.craft-config.yml"
+    unset CLAUDE_PLUGIN_OPTION_strictness CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
+    export CLAUDE_PLUGIN_OPTION_STRICTNESS="moderate"
+    export CLAUDE_PLUGIN_OPTION_STACK="python"
+
+    result=$(config_strictness)
+    if [[ "$result" == "moderate" ]]; then
+        log_pass "CLAUDE_PLUGIN_OPTION_STRICTNESS (uppercased, as exported) reaches config_strictness"
+    else
+        log_fail "uppercase strictness option" "got '$result', expected 'moderate'"
+    fi
+    result=$(config_stack)
+    if [[ "$result" == "python" ]]; then
+        log_pass "CLAUDE_PLUGIN_OPTION_STACK reaches config_stack"
+    else
+        log_fail "uppercase stack option" "got '$result', expected 'python'"
+    fi
+    unset CLAUDE_PLUGIN_OPTION_STRICTNESS CLAUDE_PLUGIN_OPTION_STACK 2>/dev/null || true
+}
+
 test_env_var_overrides() {
     echo ""
     echo "=== Env Var Overrides ==="
@@ -198,6 +225,7 @@ test_global_config_fills_missing_keys() {
 
 test_default_values
 test_env_var_overrides
+test_env_var_uppercase
 test_project_config_precedence
 test_global_config_applies
 test_global_config_overridden

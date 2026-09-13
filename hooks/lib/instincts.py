@@ -266,10 +266,23 @@ def _resolve_skills_dir(skills_dir: str) -> Path:
     allowed.append(home / ".claude")
     for root in allowed:
         if target == root or root in target.parents:
-            return target
-    print(f"error: refusing to write skills outside the project or ~/.claude: {target}",
-          file=sys.stderr)
-    sys.exit(1)
+            break
+    else:
+        print(f"error: refusing to write skills outside the project or ~/.claude: {target}",
+              file=sys.stderr)
+        sys.exit(1)
+    # Claude Code loads a project skill from .claude/skills/<name>/SKILL.md and
+    # a user skill from ~/.claude/skills/<name>/SKILL.md, and from nowhere
+    # deeper: measured with `claude -p --debug`, two project skills on disk,
+    # one at that depth and one under .claude/skills/craftsman-learned/, loaded
+    # as `project: 1`. Four releases of approvals went to the second place.
+    # A destination the consumer will never read is refused, not written.
+    if target.name != "skills" or target.parent.name != ".claude":
+        print("error: Claude Code loads a skill from .claude/skills/<name>/SKILL.md "
+              f"(or ~/.claude/skills/<name>/), never from {target}: approve into "
+              "\"$PWD/.claude/skills\"", file=sys.stderr)
+        sys.exit(1)
+    return target
 
 
 SKILL_TEMPLATE = """---

@@ -44,9 +44,20 @@ haiku_verify() {
     # same file. tests/core/test-gate-independence.sh enforces both sides.
     [[ "${CLAUDE_EFFORT:-}" == "low" ]] && return 1
     command -v claude >/dev/null 2>&1 || return 1
+    # The subprocess fires SessionStart and SessionEnd like any session, and
+    # this plugin's two hooks used to reset and delete the REAL session's
+    # state on every verification. The lock is CRAFTSMAN_HEADLESS_VERIFY, which
+    # both hooks now honour. `disableAllHooks` here is a smaller thing than the
+    # hooks page suggests: measured on 2.1.270, it silences user and project
+    # hooks in the subprocess and NOT plugin hooks (a `claude -p` with this flag
+    # and the unguarded 4.9.0 hooks still inserted a `sessions` row). It stays
+    # because a verifier has no business running the operator's own hooks.
+    # `--bare` would skip every hook but never reads OAuth, which is how most
+    # operators are signed in.
     CRAFTSMAN_HEADLESS_VERIFY=1 claude -p "$prompt" \
         --model "$HAIKU_VERIFY_MODEL" \
         --allowedTools "Read,Grep,Glob" \
+        --settings '{"disableAllHooks": true}' \
         --max-turns 8 2>/dev/null || return 1
 }
 

@@ -9,6 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`agent_hooks: false` (and every other plugin option) never reached a
+  hook.** Claude Code exports an option as `CLAUDE_PLUGIN_OPTION_<KEY>` with
+  the key UPPERCASED; every reader in `hooks/`, `hooks/lib/config.sh`,
+  `rules-engine.sh` and `ci/craftsman-ci.sh` read the lowercase spelling, and
+  the suites set the lowercase spelling themselves, so the guard had never
+  met its consumer. Found by the claims audit, verified in the 2.1.270 binary
+  (`.toUpperCase()` before the prefix). Every reader now takes the exported
+  spelling first and the lowercase one second; the tests set the exported
+  one. The README's "turn it off with `agent_hooks: false`" is true from
+  this release, not before.
+
+- **An approved instinct was written where Claude Code never looks.**
+  `instincts.py approve` wrote `.claude/skills/craftsman-learned/learned-<rule>/SKILL.md`,
+  one level below the only depth a project skill is loaded from
+  (`.claude/skills/<name>/SKILL.md`); measured with `claude -p --debug`, two
+  project skills on disk at the two depths loaded as `project: 1`. Every
+  approval since 4.0.0 produced a file the model never saw, and the test
+  checked that the file existed rather than that the consumer read it. Found
+  by two reviewers independently. `approve` now writes to
+  `.claude/skills/learned-<rule>/`, refuses any other depth by name, and
+  SessionStart names the files left at the old depth with the `mv` to make.
+  ADR-0020 amended.
+
+- **Every Haiku verification ended the real session.** `haiku-verify.sh`
+  runs `claude -p`, and that subprocess fires this plugin's SessionStart and
+  SessionEnd hooks like any session: SessionStart restarted the real
+  session's clock and deleted its write and violation counters, SessionEnd
+  deleted `session-state.json`, with the pending findings the next write
+  would have turned into a verdict, and inserted a zero-write `sessions`
+  row. On a live database, 1460 of 1599 sessions in 30 days had no write
+  at all, and 321 blocked writes produced 86 verdicts: the correction loop
+  was measuring verifiers. Found by the learning-loop review. Both hooks now
+  step aside under `CRAFTSMAN_HEADLESS_VERIFY`, the guard the verifier
+  already sets, proven on the real consumer (a `claude -p` under the guard
+  inserts no session). The verifier also passes
+  `--settings '{"disableAllHooks": true}'`, which measured on 2.1.270
+  silences the operator's own hooks in the subprocess and not plugin hooks,
+  and is written up as exactly that.
+
+
 - **The instinct gate counts files, and the Level 1 loop records which file.**
   ADR-0020 says a candidate needs corrections "across files"; the extraction
   counted `corrections.file_pattern`, a directory glob, so

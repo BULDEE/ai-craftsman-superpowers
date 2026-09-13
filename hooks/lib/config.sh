@@ -20,6 +20,24 @@ _config_parse_yml_value() {
     grep -E "^${key}:" "$file" | head -1 | awk '{print $2}' | tr -d '"' | tr -d "'"
 }
 
+# _config_option_env <key>: the plugin option from the environment, if set.
+#
+# Claude Code exports an option as CLAUDE_PLUGIN_OPTION_<KEY> with the key
+# UPPERCASED (plugins-reference); the lowercase form is the plugin's own
+# internal export (ci/craftsman-ci.sh) and what the suites set. Exported form
+# first, and both, because for four releases only the second was read and no
+# option ever reached a hook from plugin.json.
+_config_option_env() {
+    local key="$1" env_var
+    for env_var in "CLAUDE_PLUGIN_OPTION_$(echo "$key" | tr '[:lower:]' '[:upper:]')" "CLAUDE_PLUGIN_OPTION_${key}"; do
+        if [[ -n "${!env_var:-}" ]]; then
+            echo "${!env_var}"
+            return 0
+        fi
+    done
+    return 1
+}
+
 _config_resolve() {
     local key="$1"
     local default="$2"
@@ -34,9 +52,7 @@ _config_resolve() {
         return 0
     fi
 
-    local env_var="CLAUDE_PLUGIN_OPTION_${key}"
-    if [[ -n "${!env_var:-}" ]]; then
-        echo "${!env_var}"
+    if _config_option_env "$key"; then
         return 0
     fi
 

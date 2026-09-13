@@ -373,4 +373,35 @@ else
     log_fail "a caller that opened no queue still inserts immediately" "rows: '$IMMEDIATE_ROWS'"
 fi
 
+# --- A verification subprocess is not a session ------------------------------
+#
+# haiku-verify.sh runs `claude -p`, and that subprocess fires this plugin's
+# SessionStart and SessionEnd hooks like any other session. Without a guard,
+# every Haiku verification deleted the REAL session's state (the pending
+# findings the next write would have turned into a verdict) and inserted a
+# zero-write `sessions` row: measured on a live database, 1460 of 1599
+# sessions in 30 days had no write at all. The recursion guard the verifier
+# already sets is the signal.
+HEADLESS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-headless-end.XXXXXX")
+mkdir -p "$HEADLESS_DIR/data"
+printf '{"blocked_violations": {"/src/Order.php": ["PHP001"]}}' > "$HEADLESS_DIR/data/session-state.json"
+printf '%s' "$(( $(date +%s) - 120 ))" > "$HEADLESS_DIR/data/session-start-ts"
+printf '3' > "$HEADLESS_DIR/data/session-writes"
+echo '{}' | CRAFTSMAN_HEADLESS_VERIFY=1 CLAUDE_PLUGIN_DATA="$HEADLESS_DIR/data" HOME="$HEADLESS_DIR" \
+    bash "$ROOT_DIR/hooks/session-metrics.sh" >/dev/null 2>&1
+if [[ -f "$HEADLESS_DIR/data/session-state.json" && -f "$HEADLESS_DIR/data/session-start-ts" ]]; then
+    log_pass "a SessionEnd fired by the verification subprocess leaves the real session's state alone"
+else
+    log_fail "a SessionEnd fired by the verification subprocess leaves the real session's state alone" \
+        "state or start-ts deleted"
+fi
+HEADLESS_ROWS="$(python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$HEADLESS_DIR/data/metrics.db" \
+    "SELECT COUNT(*) FROM sessions" 2>/dev/null || echo 0)"
+if [[ "${HEADLESS_ROWS:-0}" == "0" ]]; then
+    log_pass "and records no session for it"
+else
+    log_fail "and records no session for it" "sessions rows: $HEADLESS_ROWS"
+fi
+rm -rf "$HEADLESS_DIR"
+
 test_summary

@@ -8,6 +8,15 @@
 # =============================================================================
 set -uo pipefail
 
+# The Haiku verification subprocess (haiku-verify.sh, `claude -p`) is a
+# session to Claude Code and fires this hook. Without this line every
+# verification restarted the REAL session's clock and deleted its write and
+# violation counters, and on a live database 1460 of 1599 sessions in 30 days
+# had no write at all: they were verifiers, not sessions. The recursion guard
+# the verifier sets is the signal. The subprocess is also launched with hooks
+# disabled; this is the lock on this side of the door.
+[[ -n "${CRAFTSMAN_HEADLESS_VERIFY:-}" ]] && exit 0
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
@@ -187,6 +196,17 @@ if $HAS_PYTHON3; then
     if [[ "$_pending" =~ ^[0-9]+$ ]] && [[ "$_pending" -gt 0 ]]; then
         PENDING_INSTINCTS="Instincts: ${_pending} candidate(s) pending review - run /craftsman:metrics"
     fi
+fi
+
+# Skills approved before 4.9.1 went to .claude/skills/craftsman-learned/, a
+# depth Claude Code never loads (see instincts.py). Name them and the move,
+# rather than let an approved instinct stay a file nobody reads.
+_LEGACY_LEARNED=0
+for _d in "${PWD}/.claude/skills/craftsman-learned"/*/SKILL.md; do
+    [[ -f "$_d" ]] && _LEGACY_LEARNED=$((_LEGACY_LEARNED + 1))
+done
+if [[ "$_LEGACY_LEARNED" -gt 0 ]]; then
+    PENDING_INSTINCTS="${PENDING_INSTINCTS:+${PENDING_INSTINCTS} | }${_LEGACY_LEARNED} learned skill(s) at a depth Claude Code does not load: mv .claude/skills/craftsman-learned/* .claude/skills/"
 fi
 
 # Config mismatch warning

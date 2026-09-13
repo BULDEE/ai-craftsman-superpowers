@@ -7,12 +7,12 @@
 set -uo pipefail
 
 # Gate: skip entirely if agent hooks are disabled
-if [[ "${CLAUDE_PLUGIN_OPTION_agent_hooks:-true}" == "false" ]]; then
+if [[ "${CLAUDE_PLUGIN_OPTION_AGENT_HOOKS:-${CLAUDE_PLUGIN_OPTION_agent_hooks:-true}}" == "false" ]]; then
     exit 0
 fi
 
 # Gate: skip if Sentry is not configured
-if [[ -z "${CLAUDE_PLUGIN_OPTION_sentry_org:-}" ]]; then
+if [[ -z "${CLAUDE_PLUGIN_OPTION_SENTRY_ORG:-${CLAUDE_PLUGIN_OPTION_sentry_org:-}}" ]]; then
     exit 0
 fi
 

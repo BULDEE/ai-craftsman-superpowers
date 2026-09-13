@@ -69,7 +69,7 @@ Verify hooks are enabled in your scope:
 
 **Symptom:** you set `agent_hooks: false` but Claude Code still makes Haiku calls on Write/Edit.
 
-**Cause:** config change requires a session restart to take effect, or the setting was applied at project scope while the plugin is loaded at user scope (or vice versa).
+**Cause:** before 4.9.1 the option never reached the hooks at all: Claude Code exports it as `CLAUDE_PLUGIN_OPTION_AGENT_HOOKS` (key uppercased) and the hooks read the lowercase spelling. From 4.9.1 both are read. Otherwise: a config change requires a session restart to take effect.
 
 **Fix:**
 ```bash
