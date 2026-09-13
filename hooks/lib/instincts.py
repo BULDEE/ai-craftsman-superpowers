@@ -57,10 +57,23 @@ CREATE TABLE IF NOT EXISTS instincts (
 # rejections. `ignored` and `scoped` are both rejections of the finding, the
 # second the deliberate kind (the rule is wrong in that context); `overridden`
 # and `open` say nothing about whether the developer agreed.
+# What "across files" counts. `file_path` is the exact file, `file_pattern` a
+# directory glob (src/Domain/**/*.php) the trends group by. ADR-0020 says
+# files, and counting the glob made MIN_DISTINCT_FILES a count of DIRECTORIES:
+# a rule fixed in twenty files of one directory counted as one and could never
+# become a candidate. Measured on a real database, 23 PHP001 fixes under one
+# glob, zero candidates. A database written before the exact file was recorded
+# has no `file_path` column at all, and a crash here would read as "no
+# candidate" through session-start.sh, so the column is detected rather than
+# assumed; rows with a NULL value fall back to the glob they have always
+# counted.
+_FILES_COUNTED = "COALESCE(NULLIF(file_path, ''), file_pattern)"
+_FILES_COUNTED_LEGACY = "file_pattern"
+
 CANDIDATE_QUERY = """
 SELECT rule,
        SUM(CASE WHEN action = 'fixed' THEN 1 ELSE 0 END) AS occurrences,
-       COUNT(DISTINCT CASE WHEN action = 'fixed' THEN file_pattern END) AS distinct_files,
+       COUNT(DISTINCT CASE WHEN action = 'fixed' THEN {files} END) AS distinct_files,
        SUM(CASE WHEN action IN ('ignored', 'scoped') THEN 1 ELSE 0 END) AS ignored,
        MAX(CASE WHEN action = 'fixed' THEN COALESCE(context, '') END) AS sample_context
 FROM corrections
@@ -68,6 +81,15 @@ WHERE project_hash = ? AND action IN ('fixed', 'ignored', 'scoped')
 GROUP BY rule
 HAVING occurrences >= ? AND distinct_files >= ? AND occurrences > ignored
 """
+
+
+def _candidate_query(conn: sqlite3.Connection) -> str:
+    try:
+        columns = [row[1] for row in conn.execute("PRAGMA table_info(corrections)")]
+    except sqlite3.Error:
+        columns = []
+    files = _FILES_COUNTED if "file_path" in columns else _FILES_COUNTED_LEGACY
+    return CANDIDATE_QUERY.format(files=files)
 
 # A column the first schema did not have, added in place on a database created
 # before it. Guarded by the table's own catalogue, the way metrics-db.sh guards
@@ -168,7 +190,7 @@ def _withdraw_lapsed(conn: sqlite3.Connection, project_hash: str, live: list) ->
 
 def refresh_candidates(conn: sqlite3.Connection, project_hash: str) -> None:
     rows = conn.execute(
-        CANDIDATE_QUERY, (project_hash, MIN_OCCURRENCES, MIN_DISTINCT_FILES)
+        _candidate_query(conn), (project_hash, MIN_OCCURRENCES, MIN_DISTINCT_FILES)
     ).fetchall()
     for row in rows:
         _upsert_candidate(conn, project_hash, row)

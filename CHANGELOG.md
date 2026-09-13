@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The instinct gate counts files, and the Level 1 loop records which file.**
+  ADR-0020 says a candidate needs corrections "across files"; the extraction
+  counted `corrections.file_pattern`, a directory glob, so
+  `MIN_DISTINCT_FILES=3` was a count of DIRECTORIES and a rule fixed in twenty
+  files of one directory counted as one. Measured on a real database: 23
+  PHP001 fixes under a single glob, no candidate possible. It counts
+  `corrections.file_path` now, the exact file, which only the semantic layer
+  passed (`haiku-verify.sh`): `post-write-check.sh` and
+  `precedence_note_superseded` pass it too, and a database whose `corrections`
+  table predates that column is detected and counts its globs rather than
+  raising into the silent zero `session-start.sh` would have read. Two test
+  defects came with it: `tests/core/test-correction-learning.sh` ran the hook
+  from the plugin's own directory, so every assertion measured the degraded
+  `<outside-project>` bucket with no file, and nothing covered the exact file
+  reaching the row at all.
+
 - **The correction loop records one verdict per finding, not one per write
   (#68).** The pending verdict for a blocked file was keyed on its directory
   glob (`src/Domain/**/*.php`) and never cleared, so every later write to

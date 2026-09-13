@@ -75,6 +75,12 @@ Step 2 is amended as follows; the human gate (steps 3 to 5) is unchanged.
   a row left behind kept its old score, stayed in the pending count and could be
   approved. A never-reviewed row carries no human decision. Approved and rejected
   rows are decisions and stay.
+- "Across files" counts FILES. The extraction counted `corrections.file_pattern`,
+  a directory glob, so the threshold was a count of directories: a rule fixed in
+  twenty files of one directory counted as one, and measured on a real database
+  23 PHP001 fixes under one glob produced no candidate at all. It counts
+  `corrections.file_path`, the exact file, which only the semantic layer used to
+  record; the Level 1 loop now records it too.
 - The confidence is the Wilson lower bound (95%) of the acceptance rate. It is
   an order, not a bar: 101 fixes and no rejection score 0.96, 18 score 0.82,
   3 score 0.44, and 50 against 50 score 0.40, which would pass any bar that
