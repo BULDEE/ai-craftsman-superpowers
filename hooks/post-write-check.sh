@@ -134,15 +134,40 @@ _check_corrections() {
     [[ -z "$prev_rules" ]] && return
     PENDING_BEFORE="$prev_rules"
 
+    local outcome
     for prev_rule in $prev_rules; do
         if echo -e "$CRITICAL_VIOLATIONS" | grep -q "^${prev_rule}:"; then
-            : # Still violated, do nothing
-        elif file_has_ignore "$prev_rule" 2>/dev/null; then
-            metrics_record_correction "$prev_rule" "$file_pattern" "ignored" "craftsman-ignore added" "$file" 2>/dev/null || true
-        else
-            metrics_record_correction "$prev_rule" "$file_pattern" "fixed" "" "$file" 2>/dev/null || true
+            continue # Still violated, no verdict yet
         fi
+        outcome=$(_correction_outcome "$file" "$prev_rule")
+        metrics_record_correction "$prev_rule" "$file_pattern" "${outcome%%|*}" "${outcome#*|}" "$file" 2>/dev/null || true
     done
+}
+
+# _correction_outcome <file> <rule>: "action|context" for a rule that was
+# blocking on the previous write and is not on this one.
+#
+# It used to be `fixed` whatever made the rule go. When what changed is the
+# rule's SCOPE and not the code (a directory .craft-rules.yml demoting it, a
+# baseline mark holding it), the developer said "this rule is wrong here",
+# and the loop counted a fix and proposed to teach it: three such files made
+# a candidate. Resolve first, conclude after. `scoped` and `overridden` are
+# what the instinct gate reads as rejection and the acceptance report keeps
+# apart from a verdict on the finding.
+_correction_outcome() {
+    local file="$1" rule="$2" severity
+    if file_has_ignore "$rule" 2>/dev/null; then
+        echo "ignored|craftsman-ignore added"
+        return
+    fi
+    severity=$(rules_severity_for_file "$file" "$rule" 2>/dev/null || echo block)
+    if [[ "$severity" != "block" ]]; then
+        echo "scoped|severity resolved to ${severity} for this file"
+    elif printf '%s' "$BASELINE_HELD" | grep -q "^${rule}$"; then
+        echo "overridden|held by the baseline mark"
+    else
+        echo "fixed|"
+    fi
 }
 
 # Init metrics DB (creates tables if needed, idempotent)
@@ -190,6 +215,10 @@ FILE_PATTERN=$(metrics_file_pattern "$FILE_PATH")
 
 # Violation accumulators
 CRITICAL_VIOLATIONS=""
+# Rules the baseline mark held on THIS write, one per line: read by
+# _correction_outcome, which must not ask the mark a second time (the lookup
+# counts occurrences per run, and the emit site consumed this one).
+BASELINE_HELD=""
 CRITICAL_COUNT=0
 WARNING_VIOLATIONS=""
 WARNING_COUNT=0
@@ -296,6 +325,7 @@ add_violation() {
 
     if rules_baseline_holds "$file_path" "$rule" "$severity"; then
         severity="warn"; message="${message} (already present at the baseline, not blocking)"
+        BASELINE_HELD="${BASELINE_HELD}${rule}"$'\n'
     fi
     if [[ $ignored -eq 0 ]]; then
         _record_violation_output "$rule" "$message" "$severity"

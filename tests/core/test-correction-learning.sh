@@ -391,4 +391,72 @@ else
         "the assertion below cannot tell a resolved severity from a pattern channel that never ran"
 fi
 
+# =============================================================================
+# A scoping decision is not a fix (learning-loop review, CR-2)
+# =============================================================================
+#
+# A rule absent from this write's blocking findings was recorded `fixed`,
+# whatever made it absent. When what changed is the RULE'S SCOPE (a directory
+# .craft-rules.yml demoting it, a baseline mark holding it), the developer
+# said "this rule is wrong here", and the loop counted it as a fix and
+# proposed to teach it: three such files made a candidate at 0.57. `scoped`
+# had a place in the schema and no writer.
+echo ""
+echo "--- A scoping decision is recorded as scoped, a baseline mark as overridden ---"
+
+cat > "$FIXTURES_DIR/src/Domain/Scoped.php" << 'FIXTURE'
+<?php
+
+final class Scoped
+{
+    public function __construct(private string $name) {}
+}
+FIXTURE
+result=$(run_post_hook "$FIXTURES_DIR/src/Domain/Scoped.php")
+if [[ "${result%%|*}" == "2" ]]; then
+    log_pass "control: the unscoped file is refused on PHP001"
+else
+    log_fail "control: the unscoped file is refused on PHP001" "got exit ${result%%|*}"
+fi
+cat > "$FIXTURES_DIR/src/Domain/.craft-rules.yml" <<'YAML'
+rules:
+  PHP001: warn
+YAML
+run_post_hook "$FIXTURES_DIR/src/Domain/Scoped.php" >/dev/null
+_scoped_row() {
+    python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$CLAUDE_PLUGIN_DATA/metrics.db" \
+        "SELECT action, context FROM corrections WHERE rule='PHP001' AND file_path='src/Domain/Scoped.php'" 2>/dev/null
+}
+if [[ "$(_scoped_row)" == "scoped|severity resolved to warn for this file" ]]; then
+    log_pass "the same content under a directory rule demoting PHP001 is recorded scoped, not fixed"
+else
+    log_fail "the same content under a directory rule demoting PHP001 is recorded scoped, not fixed" \
+        "rows: $(_scoped_row | tr '\n' ';')"
+fi
+rm -f "$FIXTURES_DIR/src/Domain/.craft-rules.yml"
+
+cat > "$FIXTURES_DIR/src/Domain/Debt.php" << 'FIXTURE'
+<?php
+
+final class Debt
+{
+    public function __construct(private string $name) {}
+}
+FIXTURE
+run_post_hook "$FIXTURES_DIR/src/Domain/Debt.php" >/dev/null
+printf '{"violations": [{"file": "src/Domain/Debt.php", "rule": "PHP001", "severity": "critical"}]}' > "$FIXTURES_DIR/debt-report.json"
+( cd "$FIXTURES_DIR" && python3 "$ROOT_DIR/hooks/lib/rule_baseline.py" record debt-report.json --baseline "$FIXTURES_DIR/.craftsman-baseline.json" >/dev/null 2>&1 )
+run_post_hook "$FIXTURES_DIR/src/Domain/Debt.php" >/dev/null
+_debt_row() {
+    python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$CLAUDE_PLUGIN_DATA/metrics.db" \
+        "SELECT action, context FROM corrections WHERE rule='PHP001' AND file_path='src/Domain/Debt.php'" 2>/dev/null
+}
+if [[ "$(_debt_row)" == "overridden|held by the baseline mark" ]]; then
+    log_pass "the same content once a baseline mark holds PHP001 is recorded overridden, not fixed"
+else
+    log_fail "the same content once a baseline mark holds PHP001 is recorded overridden, not fixed" \
+        "rows: $(_debt_row | tr '\n' ';')"
+fi
+rm -f "$FIXTURES_DIR/.craftsman-baseline.json" "$FIXTURES_DIR/debt-report.json"
+
 test_summary

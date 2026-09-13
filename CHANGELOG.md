@@ -47,6 +47,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--settings '{"disableAllHooks": true}'`, which measured on 2.1.270
   silences the operator's own hooks in the subprocess and not plugin hooks,
   and is written up as exactly that.
+- **A scoping decision is no longer recorded as a fix.** A rule gone from a
+  write's blocking findings was recorded `fixed` whatever made it go: a
+  directory `.craft-rules.yml` demoting it, or a baseline mark holding it,
+  counted as a fix, and three such files made a candidate for a learned
+  skill at 0.57. The developer had said "this rule is wrong here" and the
+  loop proposed to teach it. `scoped` existed in the schema with no writer.
+  The hook now resolves the rule's severity for the file before concluding:
+  a demotion records `scoped` (with the resolved severity), a finding the
+  baseline mark held on that write records `overridden`, and only a rule
+  still blocking that is now gone records `fixed`. The instinct gate reads
+  both as rejection (#45) and the acceptance report keeps both apart (#44).
+  Found by the learning-loop review; seen red first through the real hook.
 
 
 - **The instinct gate counts files, and the Level 1 loop records which file.**
