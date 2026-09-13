@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Hermes: a gate file hidden from git is still the gate's own, and
+  committed work is scanned without a remote.** `echo .craft-rules.yml >>
+  .git/info/exclude` took the file out of the turn's scope, `GATE_TOUCHED`
+  was never set, the engine read the hidden file anyway and the rule went to
+  `ignore` (guardrail review, H4). The gate's own names are looked up by
+  name now, ignored or untracked or modified. And with no remote, no
+  upstream and no `CRAFTSMAN_DIFF_BASE`, the branch point did not resolve
+  and the committed diff was skipped, so a violation the agent had already
+  committed was never scanned (H6): the root commit is the base of last
+  resort. Seen red on both.
+
 ### Changed
 
 - **One global configuration layer, read by the hooks and CI alike, and by

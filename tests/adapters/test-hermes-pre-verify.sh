@@ -289,6 +289,40 @@ else
     log_fail "duplicated gate" "the adapter should call ci/craftsman-ci.sh"
 fi
 
+# The gate's own file hidden from git is still the gate's own file. `echo
+# .craft-rules.yml >> .git/info/exclude` took it out of `git ls-files --others
+# --exclude-standard`, GATE_TOUCHED was never set, the engine read the file
+# anyway, the rule went to ignore and the turn concluded (guardrail review,
+# H4, with a positive control before and after). The gate's own names are
+# now looked up whether or not git lists them.
+git add -A >/dev/null 2>&1
+printf 'rules:\n  TS001: ignore\n' > .craft-rules.yml
+echo '.craft-rules.yml' >> .git/info/exclude
+printf 'const hidden: any = 1;\n' > src/Hidden.ts
+OUT=$(_payload "src/Hidden.ts" 1 | bash "$HOOK" 2>/dev/null)
+if printf '%s' "$OUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d.get("decision")=="block" and "craft-rules" in json.dumps(d) else 1)' 2>/dev/null; then
+    log_pass "a gate file hidden through .git/info/exclude is still refused as the gate's own"
+else
+    log_fail "gate self-edit hidden from git accepted" "expected a block naming .craft-rules.yml, got: ${OUT:-<empty>}"
+fi
+sed -i.bak '/^\.craft-rules\.yml$/d' .git/info/exclude; rm -f .git/info/exclude.bak .craft-rules.yml src/Hidden.ts
+
+# No remote, no upstream, no CRAFTSMAN_DIFF_BASE: the branch point did not
+# resolve, the committed diff was skipped, and a violation the agent had
+# already committed was never scanned (guardrail review, H6). With no base
+# the whole history of the branch is the honest scope.
+git add -A >/dev/null 2>&1
+printf 'const committedNoRemote: any = 1;\n' > src/CommittedNoRemote.ts
+git add -A >/dev/null 2>&1
+git -c user.email=t@t -c user.name=t commit -qm "agent work, no remote" >/dev/null 2>&1
+OUT=$(bash "$HOOK" < <(_payload "" 1) 2>/dev/null)
+if printf '%s' "$OUT" | grep -q "CommittedNoRemote.ts"; then
+    log_pass "with no base to diff against, committed work is scanned back to the root commit"
+else
+    log_fail "committed work unscanned without a remote" "no directive named the committed violation: ${OUT:-<empty>}"
+fi
+git reset -q --hard HEAD~1 >/dev/null 2>&1
+
 cd "$PREV_PWD"
 rm -rf "$WORK"
 

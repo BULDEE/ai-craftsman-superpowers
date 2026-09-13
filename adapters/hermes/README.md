@@ -273,7 +273,9 @@ image; only session state belongs on the volume.
 Stated plainly, because a control that does not control is worse than none.
 
 **The gated party configures the gate, and the refusal above only covers the
-turn.** A `.craft-rules.yml` that was already in the repository when it was
+turn** (a gate file hidden through `.git/info/exclude` or `.gitignore` is
+still found by name; a turn with no remote to diff against is scanned back to
+the root commit). A `.craft-rules.yml` that was already in the repository when it was
 cloned, or one edited outside a gated turn, still switches its rule to
 `ignore` with no refusal. `trust_project_tools` in `~/.claude/.craft-config.yml`
 turns a config toggle into execution of a cloned repository's own binaries

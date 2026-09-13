@@ -127,15 +127,31 @@ _diff_base() {
         [[ -n "$base" ]] || continue
         git merge-base "$base" HEAD 2>/dev/null && return 0
     done
-    return 1
+    # No remote, no upstream, nothing named: the branch point cannot resolve,
+    # and skipping the committed diff left a violation the agent had already
+    # committed unscanned (guardrail review, H6). The root commit is the
+    # honest scope then: everything this branch ever produced.
+    git rev-list --max-parents=0 HEAD 2>/dev/null | tail -1
+}
+
+# The gate's own files, whether or not git lists them: `echo .craft-rules.yml
+# >> .git/info/exclude` took the file out of `git ls-files --others
+# --exclude-standard`, GATE_TOUCHED was never set, and the engine read the
+# hidden file anyway (guardrail review, H4). Ignored and untracked alike, by
+# name, and a tracked one that differs from HEAD.
+_gate_own_files() {
+    git ls-files --others --ignored --exclude-standard -- '.craft-rules.yml' '**/.craft-rules.yml' '.craft-config.yml' '**/.craft-config.yml' 2>/dev/null
+    git ls-files --others --exclude-standard -- '.craft-rules.yml' '**/.craft-rules.yml' '.craft-config.yml' '**/.craft-config.yml' 2>/dev/null
+    git diff --name-only HEAD -- '.craft-rules.yml' '**/.craft-rules.yml' '.craft-config.yml' '**/.craft-config.yml' 2>/dev/null
 }
 
 _git_scope() {
     git rev-parse --show-toplevel >/dev/null 2>&1 || return 0
     git diff --name-only HEAD 2>/dev/null
     git ls-files --others --exclude-standard 2>/dev/null
+    _gate_own_files
     local base
-    base=$(_diff_base) && git diff --name-only "$base"..HEAD 2>/dev/null
+    base=$(_diff_base) && [[ "$base" != "$(git rev-parse HEAD 2>/dev/null)" ]] && git diff --name-only "$base"..HEAD 2>/dev/null
     return 0
 }
 
