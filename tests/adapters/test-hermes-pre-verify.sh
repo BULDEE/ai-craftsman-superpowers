@@ -273,7 +273,7 @@ echo "=== the adapter costs a Claude Code user nothing ==="
 # the files and loads none of them, and that has to be structural rather than
 # remembered: the moment a hook or the manifest reaches into adapters/, every
 # Claude Code session pays for a runtime it does not use.
-LOADERS=$(grep -rl "adapters/" "$ROOT_DIR/hooks" "$ROOT_DIR/.claude-plugin" 2>/dev/null \
+LOADERS=$(grep -rl --exclude-dir=__pycache__ "adapters/" "$ROOT_DIR/hooks" "$ROOT_DIR/.claude-plugin" 2>/dev/null \
     | xargs grep -l "adapters/hermes" 2>/dev/null || true)
 if [[ -z "$LOADERS" ]]; then
     log_pass "no hook and no plugin manifest reaches into adapters/"

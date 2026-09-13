@@ -418,6 +418,13 @@ _rules_default_severity() {
 # PUBLIC API
 # ===========================================================================
 
+# The global layer every front-end passes to rules_init: one answer, see
+# config_global_dir. Defined here too because the pipeline may source this
+# file without config.sh.
+rules_global_dir() {
+    if type config_global_dir >/dev/null 2>&1; then config_global_dir; else printf '%s' "${CRAFTSMAN_GLOBAL_CONFIG_DIR-${HOME}/.claude}"; fi
+}
+
 # ---------------------------------------------------------------------------
 # rules_init "$project_dir" ["$global_dir"]
 # Load and merge config from global → project

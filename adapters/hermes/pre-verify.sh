@@ -56,6 +56,11 @@ print(json.dumps({"decision": "block",
 ADAPTER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_ROOT="$(cd "$ADAPTER_DIR/../.." && pwd)"
 CRAFTSMAN_CI="${PLUGIN_ROOT}/ci/craftsman-ci.sh"
+# A gate reads the workspace, never the operator's home: ~/.craft-config.yml
+# or ~/.claude/.craft-config.yml is writable by the uid the agent runs as,
+# outside any gated turn, and `strictness: relaxed` there degraded SEC001 to
+# a non-blocking continue (guardrail review, H5b). No global layer here.
+export CRAFTSMAN_GLOBAL_CONFIG_DIR=""
 
 command -v python3 >/dev/null 2>&1 || _bail "python3 not found, gate not run"
 [[ -f "$CRAFTSMAN_CI" ]] || _bail "craftsman-ci not found at ${CRAFTSMAN_CI}, gate not run"

@@ -45,7 +45,7 @@ whose names start with `agent-` are shell scripts that shell out to a headless
 |------|-------|--------------|--------|
 | `session-start.sh` | SessionStart | Initialization, config and pack loading | Session state, bridge files |
 | `config-protection.sh` | PreToolUse | Refuses writes to tool configs and to the gate's machinery (Claude Code settings, the installed plugin); hands the gate's own `.craft-*` files to the user's permission prompt | None |
-| `pre-write-check.sh` | PreToolUse | Layer validation before write | Rewrites the pending content (see below) |
+| `pre-write-check.sh` | PreToolUse | The would-be file judged by the pack validators on a mirror under `$TMPDIR`, removed on exit | Rewrites the pending content (see below) |
 | `pre-push-verify.sh` | PreToolUse | Gates `git push` on a verified session | None |
 | `post-write-check.sh` | PostToolUse | Rule enforcement after write | Metrics DB |
 | `agent-ddd-verifier.sh` | PostToolUse | Semantic architecture check | Metrics DB |

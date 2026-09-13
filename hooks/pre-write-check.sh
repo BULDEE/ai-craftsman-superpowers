@@ -24,7 +24,7 @@ source "${SCRIPT_DIR}/lib/config.sh"
 # one front-end, and the parity suite could not see it because it ran the
 # relaxation case through post-write only.
 source "${SCRIPT_DIR}/lib/rules-engine.sh"
-rules_init "$PWD" "${HOME}/.claude"
+rules_init "$PWD" "$(rules_global_dir)"
 # Needed for the language registry: which extensions are source files is the
 # packs' answer, not this hook's. The registry is cached on disk, so the extra
 # load costs a file read on the steady path.
@@ -74,88 +74,72 @@ LANG_ID=$(lang_for_file "$FILE_PATH")
 VIOLATIONS=""
 VIOLATION_COUNT=0
 
-add_violation() {
-    VIOLATIONS="${VIOLATIONS}$1\n"
+# =============================================================================
+# The would-be file, judged by the packs themselves
+#
+# These detectors used to be a fork of the pack validators, written for the
+# content in hand: "App" hardcoded where packs/symfony reads composer.json's
+# psr-4 root, path-only where the pack is path-or-namespace, PHP001 only on a
+# file declaring a class. Measured: an Acme\ project passed here and was
+# refused post-write on the same file, two verdicts inside one front-end.
+#
+# The content is laid out under a mirror of its workspace (hooks/lib/
+# write_mirror.py, shared with the Hermes write gate) with the rule files,
+# the namespace roots and the baseline mark the engine reads for it, and the
+# same pack validators post-write and CI run are run on the mirror. One set
+# of detectors; the shims below are post-write's emit contract without the
+# metrics, the precedence hold and the Level 2/3 analysers, none of which
+# belong before a write.
+# =============================================================================
+MIRROR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-pre-write.XXXXXX")
+trap 'rm -rf "$MIRROR"' EXIT
+# A relative file_path is relative to the session's working directory, which
+# is this hook's; the helper is told, since the payload does not carry it.
+PLACED=$(printf '%s' "$INPUT" | jq --arg cwd "$PWD" '. + {cwd: $cwd}' 2>/dev/null \
+    | python3 "${SCRIPT_DIR}/lib/write_mirror.py" "$MIRROR" 2>/dev/null || true)
+case "$PLACED" in
+    MIRROR\ *) MIRROR_FILE="$MIRROR/${PLACED#MIRROR }" ;;
+    *) exit 0 ;;   # not a write this gate judges (config-protection.sh owns the gate's own files)
+esac
+
+# Same order as post-write's add_violation: severity for THIS file, an
+# explicit ignore leaves, a marker the rule allows silences, a baseline mark
+# demotes to a warning. Findings are keyed by rule, once each.
+_rule_marker_honoured() {
+    ! { type rule_never_ignorable >/dev/null 2>&1 && rule_never_ignorable "$1"; }
+}
+line_has_ignore() {
+    _rule_marker_honoured "$2" || return 1
+    echo "$1" | grep -qE "craftsman-ignore:\s*[^#]*\b${2}\b" 2>/dev/null
+}
+file_has_ignore() {
+    _rule_marker_honoured "$1" || return 1
+    grep -qE "craftsman-ignore:\s*[^#]*\b${1}\b" "$MIRROR_FILE" 2>/dev/null
+}
+BLOCKING_RULES=""
+_pre_emit() {
+    local rule="$1" message="$2" severity
+    severity=$(rules_severity_for_file "$MIRROR_FILE" "$rule")
+    [[ "$severity" == "ignore" ]] && return 0
+    file_has_ignore "$rule" && return 0
+    if rules_baseline_holds "$MIRROR_FILE" "$rule" "$severity"; then
+        severity="warn"; message="${message} (already present at the baseline, not blocking)"
+    fi
+    case " $BLOCKING_RULES " in *" $rule "*) return 0 ;; esac
+    [[ "$severity" == "block" ]] && BLOCKING_RULES="$BLOCKING_RULES $rule"
+    VIOLATIONS="${VIOLATIONS}${rule}: ${message}\n"
     ((VIOLATION_COUNT++)) || true
 }
+add_violation() { _pre_emit "$1" "$2"; }
+add_warning()   { _pre_emit "$1" "$2"; }
+metrics_record_violation() { :; }
+FILE_PATH_REAL="$FILE_PATH"
+FILE_PATH="$MIRROR_FILE"
+pack_dispatch_file "$MIRROR_FILE"
+FILE_PATH="$FILE_PATH_REAL"
 
-# =============================================================================
-# Layer Validation on Content (before write)
-# =============================================================================
-
-# Keyed on the file's language, not on the declared stack. `config_php_enabled`
-# gated this on `stack: symfony|fullstack`, so a PHP file written into a React
-# project skipped the layer check and the strict_types check at write time,
-# the same hole #35 closed in the packs: the stack selects doctrine and setup
-# hints, never whether a file is validated.
-if [[ "$LANG_ID" == "php" ]]; then
-    # PHP: Domain must not import Infrastructure
-    if [[ "$FILE_PATH" == *"/Domain/"* ]] && [[ "$EXT" == "php" ]]; then
-        if echo "$FILE_CONTENT" | grep -qE "use\s+App\\\\Infrastructure" 2>/dev/null; then
-            add_violation "LAYER001: Domain imports Infrastructure - DDD layer violation"
-        fi
-        if echo "$FILE_CONTENT" | grep -qE "use\s+App\\\\Presentation" 2>/dev/null; then
-            add_violation "LAYER002: Domain imports Presentation - DDD layer violation"
-        fi
-    fi
-
-    # Also check namespace in content (catches when path doesn't contain /Domain/)
-    if [[ "$EXT" == "php" ]] && echo "$FILE_CONTENT" | grep -qE "namespace\s+App\\\\Domain" 2>/dev/null; then
-        if echo "$FILE_CONTENT" | grep -qE "use\s+App\\\\Infrastructure" 2>/dev/null; then
-            # Avoid duplicate if already caught by path check
-            if [[ "$FILE_PATH" != *"/Domain/"* ]]; then
-                add_violation "LAYER001: Domain imports Infrastructure - DDD layer violation (detected via namespace)"
-            fi
-        fi
-    fi
-
-    # PHP: Application must not import Presentation
-    if [[ "$FILE_PATH" == *"/Application/"* ]] && [[ "$EXT" == "php" ]]; then
-        if echo "$FILE_CONTENT" | grep -qE "use\s+App\\\\Presentation" 2>/dev/null; then
-            add_violation "LAYER003: Application imports Presentation - DDD layer violation"
-        fi
-    fi
-
-    # PHP: strict_types must be present in class files
-    if [[ "$EXT" == "php" ]] && [[ -n "$FILE_CONTENT" ]]; then
-        if ! echo "$FILE_CONTENT" | grep -q "declare(strict_types=1)" 2>/dev/null; then
-            if echo "$FILE_CONTENT" | grep -qE "(class |interface |trait |enum )" 2>/dev/null; then
-                add_violation "PHP001: Missing declare(strict_types=1) in class file"
-            fi
-        fi
-    fi
-fi
-
-if [[ "$LANG_ID" == "typescript" ]]; then
-    # TypeScript: domain must not import infrastructure
-    if [[ "$FILE_PATH" == *"/domain/"* ]] && [[ "$EXT" == "ts" || "$EXT" == "tsx" ]]; then
-        if echo "$FILE_CONTENT" | grep -qE "from\s+['\"].*infrastructure" 2>/dev/null; then
-            add_violation "LAYER001: domain imports infrastructure - layer violation"
-        fi
-    fi
-fi
-
-# =============================================================================
-# Severity resolution: the engine answers per file, and its answer is the
-# same one post-write, CI and Hermes get. A rule resolved `ignore` leaves the
-# list; `block` is what refuses the write; `warn` is reported and lets it
-# through.
-# =============================================================================
-
-RESOLVED=""
-RESOLVED_COUNT=0
 local_should_block=false
-while IFS= read -r line; do
-    [[ -z "$line" ]] && continue
-    rule="${line%%:*}"
-    severity=$(rules_severity_for_file "$FILE_PATH" "$rule")
-    [[ "$severity" == "ignore" ]] && continue
-    RESOLVED="${RESOLVED}${line}\n"
-    ((RESOLVED_COUNT++)) || true
-    [[ "$severity" == "block" ]] && local_should_block=true
-done <<< "$(echo -e "$VIOLATIONS")"
-VIOLATIONS="$RESOLVED"
-VIOLATION_COUNT=$RESOLVED_COUNT
+[[ -n "$BLOCKING_RULES" ]] && local_should_block=true
 
 # =============================================================================
 # Auto-fix (ADR-0018): a Write missing only strict_types is corrected in
@@ -165,7 +149,7 @@ VIOLATION_COUNT=$RESOLVED_COUNT
 # rule asked not to be policed on it, and a fix nobody asked for is policing.
 # =============================================================================
 
-if [[ $VIOLATION_COUNT -eq 1 && "$TOOL_NAME" == "Write" && "$EXT" == "php" && "$local_should_block" == true ]] \
+if [[ $VIOLATION_COUNT -eq 1 && "$TOOL_NAME" == "Write" && "$LANG_ID" == "php" && "$local_should_block" == true ]] \
    && [[ "$VIOLATIONS" == PHP001* ]] \
    && echo "$FILE_CONTENT" | head -1 | grep -q "^<?php" 2>/dev/null; then
     FIXED_CONTENT=$(printf '%s\n' "$FILE_CONTENT" | awk 'NR==1 && $0 ~ /^<\?php/ {print; print ""; print "declare(strict_types=1);"; next} {print}')

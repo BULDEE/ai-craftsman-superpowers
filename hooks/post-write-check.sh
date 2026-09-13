@@ -28,7 +28,7 @@ source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/rules-engine.sh"
 source "${SCRIPT_DIR}/lib/pack-loader.sh"
 source "${SCRIPT_DIR}/lib/structural.sh"
-rules_init "$PWD" "${HOME}/.claude"
+rules_init "$PWD" "$(rules_global_dir)"
 
 # Python3 availability - skip correction learning features if missing
 HAS_PYTHON3=true

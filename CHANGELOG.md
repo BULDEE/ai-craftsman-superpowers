@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **One global configuration layer, read by the hooks and CI alike, and by
+  no gate.** The pipeline read `$HOME/.craft-config.yml` while the hooks
+  read `~/.claude/.craft-config.yml`, the documented location: a global
+  `PHP002: warn` applied at the keyboard and not in CI (architecture
+  review, BLOCKING 3). `config_global_dir` is the one answer. The Hermes
+  adapters set `CRAFTSMAN_GLOBAL_CONFIG_DIR` to nothing: a layer the same
+  uid can write outside the gated turn must not shape a gate's verdict
+  (`strictness: relaxed` in the bot's home degraded SEC001, guardrail
+  review H5b). Parity case on the three front-ends.
+
+- **The pre-write gate judges through the packs, on a mirror.** Its
+  detectors were a fork of the pack validators, written for the content in
+  hand: `App` hardcoded where `packs/symfony` reads composer.json's psr-4
+  root, path-only where the pack is path-or-namespace, PHP001 only on a
+  file declaring a class (architecture review, BLOCKING 2). Measured: an
+  `Acme\` project passed pre-write and was refused post-write on the same
+  file. The would-be content is now laid out under a mirror of its workspace
+  (`hooks/lib/write_mirror.py`, moved from the Hermes adapter and shared
+  with its write gate) with the rule files, the namespace roots and the
+  baseline mark the engine reads for it, and the same pack validators
+  post-write and CI run are run on the mirror. One set of detectors. The
+  pre-write latency ceiling is raised on purpose (2.5x to 3.5x on Darwin,
+  7.3x to 9.0x on Linux; this laptop 1.91x to 2.64x): 150ms for parity.
+
 ### Fixed
 
 - **Session state is one file per session.** One flat `session-state.json`

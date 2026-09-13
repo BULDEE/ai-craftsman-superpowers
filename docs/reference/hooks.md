@@ -12,7 +12,7 @@ The plugin uses Claude Code hooks to automatically enforce code quality rules. H
 |-------|------|---------|
 | SessionStart | `session-start.sh` | Initialization, config loading, first-run detection |
 | PreToolUse | `config-protection.sh` | Refuse writes that would tamper with plugin configuration |
-| PreToolUse | `pre-write-check.sh` | Validate content **before** file write (layer violations) |
+| PreToolUse | `pre-write-check.sh` | Judge the would-be file **before** it lands, through the same pack validators post-write runs, on a mirror of the workspace |
 | PreToolUse | `pre-push-verify.sh` | Validate git push commands for safety |
 | PostToolUse | `post-write-check.sh` | Validate file **after** write (all rules) |
 | PostToolUse | `post-bash-test-verify.sh` | Read recorded test runs; a failing run revokes verification evidence |
