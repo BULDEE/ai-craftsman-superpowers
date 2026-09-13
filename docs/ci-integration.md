@@ -156,7 +156,7 @@ bash ci/craftsman-ci.sh --format text
 
 ```json
 {
-  "version": "4.10.1",
+  "version": "4.10.2",
   "timestamp": "2026-03-28T21:00:00Z",
   "config": {
     "strictness": "strict",

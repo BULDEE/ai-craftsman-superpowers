@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.10.2] - 2026-09-14
+
+The rest of the whole-plugin review's blocking findings, every one seen red
+first and verified on the real consumer where there is one: the Haiku
+verifier no longer grades itself, a secret is never ignorable, an Edit is
+judged before it lands, a gate that cannot run refuses, session state is one
+file per session, the pre-write gate judges through the packs on a mirror
+instead of a fork of them, one global configuration layer for every
+front-end and none for a gate, and the Hermes conclusion gate finds its own
+files whether git lists them or not.
+
 ### Fixed
 
 - **Hermes: a gate file hidden from git is still the gate's own, and
