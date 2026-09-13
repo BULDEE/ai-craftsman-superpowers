@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.10.0] - 2026-09-13
+
+Twenty-nine pull requests since 4.9.0. The first half closed every open
+issue (#35 to #50: packs validate their files whatever the stack says, the
+advisory default is declared once in the manifest, one brace walk for every
+brace-delimited pack, the routing table says which commands the model can
+call, `--changed-only` in CI, per-environment latency ceilings, the ratchet
+re-taken once). The second half came out of a whole-plugin review by four
+reviewers crossed with the maintainer's knowledge base on guardrails, evals
+and production feedback loops; every finding below carries the measurement
+that found it, and every fix was seen red first.
+
+The one to read if you read one: **every Haiku verification used to end the
+real session** (1460 of 1599 sessions in 30 days had no write; they were
+verifiers). The correction loop was measuring its own verifier. Fixed, and
+proven on the real consumer.
+
 ### Fixed
 
 - **The pre-write gate resolves severity through the rules engine, like
