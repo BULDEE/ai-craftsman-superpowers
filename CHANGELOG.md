@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The correction loop records one verdict per finding, not one per write
+  (#68).** The pending verdict for a blocked file was keyed on its directory
+  glob (`src/Domain/**/*.php`) and never cleared, so every later write to
+  ANY file under the glob re-recorded the same `fixed` or `ignored`: on a
+  production database PHP002 carried 106 `ignored` rows from one pattern
+  against 56 blocking findings, 5 of 10 rules had more outcomes than
+  findings, and outside a repository every file shared the single key
+  `<outside-project>`. The key is the exact file now, and the pending set is
+  replaced on every write with what that write still violates, empty
+  included, so a verdict is recorded once and a settled file leaves nothing
+  behind. A clean write with nothing pending pays no extra start. The
+  cross-file pattern detection keeps its directory bucket and now counts
+  files rather than globs. `tests/core/test-correction-learning.sh` asserts
+  the rows through the real hook: a fix once, the same clean file again
+  nothing, a clean neighbour under the same glob nothing, a
+  `craftsman-ignore` once across two writes; and it isolates `HOME`, because
+  `metrics_init` adopts the machine's legacy database into a fresh one and
+  seeded 366 rows into what the suite counted as empty.
+
 - **A language pack validates its files whatever stack the project
   declares (#35).** `packs/python`, `packs/react` and `packs/symfony` were
   gated by `compatibility.stack`, so a `.php` file in a `react` project, a

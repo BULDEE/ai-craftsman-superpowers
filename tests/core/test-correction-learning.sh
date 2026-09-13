@@ -20,6 +20,11 @@ trap 'rm -rf "$CLAUDE_PLUGIN_DATA" /tmp/craftsman-correction-fixtures-$$' EXIT
 
 source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
+# A home of its own: metrics_init recovers history from the machine's legacy
+# database under $HOME, and this suite counts correction rows, so the real
+# home would seed hundreds of them into a "fresh" database.
+export HOME="$CLAUDE_PLUGIN_DATA/home"
+mkdir -p "$HOME/.claude"
 SESSION_STATE="$CLAUDE_PLUGIN_DATA/session-state.json"
 FIXTURES_DIR="/tmp/craftsman-correction-fixtures-$$"
 mkdir -p "$FIXTURES_DIR/src/Domain"
@@ -106,16 +111,88 @@ else
     log_fail "Fixed file should pass" "got exit $exit_code"
 fi
 
-# Check corrections table in SQLite
-if [[ -f "$CLAUDE_PLUGIN_DATA/metrics.db" ]]; then
-    correction_count=$(sqlite3 "$CLAUDE_PLUGIN_DATA/metrics.db" "SELECT COUNT(*) FROM corrections;" 2>/dev/null || echo "0")
-    if [[ "$correction_count" -gt 0 ]]; then
-        log_pass "Correction recorded in SQLite ($correction_count entries)"
-    else
-        log_pass "Correction flow executed (no DB entry expected in isolated test)"
-    fi
+# One finding, one verdict (#68). The pending verdict was keyed on the
+# directory glob and never cleared, so every later write under the glob
+# re-recorded the same outcome: PHP002 on a production database carried 106
+# ignored rows from one pattern against 56 blocking findings. Asserted on the
+# rows, through the real hook, on the shapes that used to recount.
+_fixed_rows() {
+    python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$CLAUDE_PLUGIN_DATA/metrics.db" \
+        "SELECT COUNT(*) FROM corrections WHERE rule='PHP001' AND action='fixed'" 2>/dev/null
+}
+if [[ "$(_fixed_rows)" == "1" ]]; then
+    log_pass "the fix is recorded once, as PHP001 fixed"
 else
-    log_pass "Metrics DB not required for correction flow test"
+    log_fail "the fix is recorded once" "rows: $(_fixed_rows)"
+fi
+
+# The same clean file written again: nothing pending, nothing recorded.
+run_post_hook "$FIXTURES_DIR/src/Domain/BadEntity.php" >/dev/null
+if [[ "$(_fixed_rows)" == "1" ]]; then
+    log_pass "writing the same clean file again records nothing"
+else
+    log_fail "writing the same clean file again records nothing" "rows: $(_fixed_rows)"
+fi
+
+# A different clean file under the same directory glob: the old key shared
+# the pending list across the glob, and this write re-recorded the fix.
+cat > "$FIXTURES_DIR/src/Domain/Neighbour.php" << 'FIXTURE'
+<?php
+
+declare(strict_types=1);
+
+final class Neighbour
+{
+    public function __construct(private string $name) {}
+}
+FIXTURE
+run_post_hook "$FIXTURES_DIR/src/Domain/Neighbour.php" >/dev/null
+if [[ "$(_fixed_rows)" == "1" ]]; then
+    log_pass "a clean neighbour under the same directory glob records nothing"
+else
+    log_fail "a clean neighbour under the same directory glob records nothing" "rows: $(_fixed_rows)"
+fi
+
+# The pending key is the exact file, and a settled file leaves no key behind.
+pending_keys=$(python3 -c "
+import json
+state = json.load(open('$SESSION_STATE'))
+print(' '.join(sorted(state.get('blocked_violations', {}).keys())))
+" 2>/dev/null)
+if [[ -z "$pending_keys" ]]; then
+    log_pass "a settled file leaves no pending key behind"
+else
+    log_fail "a settled file leaves no pending key behind" "pending: $pending_keys"
+fi
+
+# An ignore is a verdict too, recorded once. The neighbour breaks the rule,
+# then carries a craftsman-ignore for it.
+cat > "$FIXTURES_DIR/src/Domain/Neighbour.php" << 'FIXTURE'
+<?php
+
+final class Neighbour
+{
+    public function __construct(private string $name) {}
+}
+FIXTURE
+run_post_hook "$FIXTURES_DIR/src/Domain/Neighbour.php" >/dev/null
+cat > "$FIXTURES_DIR/src/Domain/Neighbour.php" << 'FIXTURE'
+<?php
+// craftsman-ignore: PHP001
+
+final class Neighbour
+{
+    public function __construct(private string $name) {}
+}
+FIXTURE
+run_post_hook "$FIXTURES_DIR/src/Domain/Neighbour.php" >/dev/null
+run_post_hook "$FIXTURES_DIR/src/Domain/Neighbour.php" >/dev/null
+ignored_rows=$(python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$CLAUDE_PLUGIN_DATA/metrics.db" \
+    "SELECT COUNT(*) FROM corrections WHERE rule='PHP001' AND action='ignored'" 2>/dev/null)
+if [[ "$ignored_rows" == "1" ]]; then
+    log_pass "a craftsman-ignore is recorded once as PHP001 ignored, not once per write"
+else
+    log_fail "a craftsman-ignore is recorded once" "ignored rows: $ignored_rows"
 fi
 
 # =============================================================================

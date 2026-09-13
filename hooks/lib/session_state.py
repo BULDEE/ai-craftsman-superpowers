@@ -17,7 +17,8 @@ Commands:
     increment <state_path> <counter_key>                           - Atomically increment a counter
     check-flag <state_path> <key>                                  - Print 'true'/'false' for boolean key
     record-violation <state_path> <file> <directory> <rules_json> [--detect]
-                                                                   - Record violation with pattern tracking;
+                                                                   - Replace the file's pending verdicts (an
+                                                                     empty list clears them) and track patterns;
                                                                      --detect also prints the cross-file patterns
     detect-patterns <state_path>                                   - Detect cross-file patterns
     pre-compact <state_path>                                       - Save session context before compaction
@@ -157,7 +158,15 @@ def handle_record_violation(arguments: list[str]) -> None:
     state_path, file_path, directory = arguments[0], arguments[1], arguments[2]
     violated_rules = json.loads(arguments[3])
     state = read_state(state_path)
-    state.setdefault('blocked_violations', {})[file_path] = violated_rules
+    # The pending verdicts for THIS file, replaced on every write: a rule no
+    # longer in the list was answered (fixed or ignored) by the hook before
+    # this call, once, and must not be answered again on the next write. An
+    # empty list clears the key, so a settled file leaves nothing behind.
+    pending = state.setdefault('blocked_violations', {})
+    if violated_rules:
+        pending[file_path] = violated_rules
+    else:
+        pending.pop(file_path, None)
     violation_patterns = state.setdefault('patterns', {})
     _track_violation_patterns(violation_patterns, violated_rules, directory, file_path)
     write_state_atomically(state_path, state)
