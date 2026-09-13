@@ -459,4 +459,73 @@ else
 fi
 rm -f "$FIXTURES_DIR/.craftsman-baseline.json" "$FIXTURES_DIR/debt-report.json"
 
+# =============================================================================
+# A reason in the suppression is the developer's verdict, transcribed
+# =============================================================================
+echo ""
+echo "--- A suppression with a reason records a verdict; a bare one records none ---"
+
+cat > "$FIXTURES_DIR/src/Domain/Judged.php" << 'FIXTURE'
+<?php
+
+final class Judged
+{
+    public function __construct(private string $name) {}
+}
+FIXTURE
+run_post_hook "$FIXTURES_DIR/src/Domain/Judged.php" >/dev/null
+cat > "$FIXTURES_DIR/src/Domain/Judged.php" << 'FIXTURE'
+<?php
+// craftsman-ignore: PHP001 (wrong: legacy bootstrap file, loaded before any declare)
+
+final class Judged
+{
+    public function __construct(private string $name) {}
+}
+FIXTURE
+run_post_hook "$FIXTURES_DIR/src/Domain/Judged.php" >/dev/null
+_verdict_rows() {
+    python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$CLAUDE_PLUGIN_DATA/metrics.db" \
+        "SELECT rule, file_path, verdict, reason, source FROM verdicts ORDER BY id" 2>/dev/null
+}
+if [[ "$(_verdict_rows)" == "PHP001|src/Domain/Judged.php|wrong|legacy bootstrap file, loaded before any declare|inline" ]]; then
+    log_pass "a suppression carrying (wrong: why) records the developer's verdict at the moment of the decision"
+else
+    log_fail "a suppression carrying (wrong: why) records the developer's verdict" "rows: $(_verdict_rows | tr '\n' ';')"
+fi
+_judged_outcome() {
+    python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$CLAUDE_PLUGIN_DATA/metrics.db" \
+        "SELECT action FROM corrections WHERE file_path='src/Domain/Judged.php'" 2>/dev/null
+}
+if [[ "$(_judged_outcome)" == "ignored" ]]; then
+    log_pass "and the outcome is still recorded as ignored"
+else
+    log_fail "and the outcome is still recorded as ignored" "got '$(_judged_outcome)'"
+fi
+
+cat > "$FIXTURES_DIR/src/Domain/Bare.php" << 'FIXTURE'
+<?php
+
+final class Bare
+{
+    public function __construct(private string $name) {}
+}
+FIXTURE
+run_post_hook "$FIXTURES_DIR/src/Domain/Bare.php" >/dev/null
+cat > "$FIXTURES_DIR/src/Domain/Bare.php" << 'FIXTURE'
+<?php
+// craftsman-ignore: PHP001
+
+final class Bare
+{
+    public function __construct(private string $name) {}
+}
+FIXTURE
+run_post_hook "$FIXTURES_DIR/src/Domain/Bare.php" >/dev/null
+if [[ "$(_verdict_rows | wc -l | tr -d ' ')" == "1" ]]; then
+    log_pass "a bare marker records no verdict: the loop does not guess"
+else
+    log_fail "a bare marker records no verdict" "rows: $(_verdict_rows | tr '\n' ';')"
+fi
+
 test_summary

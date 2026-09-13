@@ -629,6 +629,7 @@ test_session_metrics() {
     log_info "Testing session metrics (functional)"
 
     run_subtest "Session metrics tests pass" "$SCRIPT_DIR/core/test-session-metrics.sh" || true
+    run_subtest "Acceptance report tests pass" "$SCRIPT_DIR/core/test-acceptance-report.sh" || true
     run_subtest "Metrics consolidation tests pass" "$SCRIPT_DIR/core/test-consolidate-metrics.sh" || true
     run_subtest "Runner integrity tests pass" "$SCRIPT_DIR/core/test-runner-integrity.sh" || true
     run_subtest "Circuit breaker and cache tests pass" "$SCRIPT_DIR/core/test-circuit-breaker.sh" || true

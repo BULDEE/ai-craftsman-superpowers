@@ -211,6 +211,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A finding can be judged right or wrong, not only fixed or ignored (#44).**
+  `corrections.action` records what the user DID, so every rate built on it
+  measures tolerance: a rule suppressed 153 times may be wrong 153 times or
+  right and inconvenient 153 times, and only the first is a rule to relax. A
+  loop that records the outcome and never the ideal answer is a mirror of
+  current behaviour. A verdict is about a finding, not about an outcome (the
+  321 blocked writes with no outcome in a month, and every advisory finding,
+  are exactly what a column on `corrections` could never judge), so it has a
+  table of its own, `verdicts`, and two human writers: the reason spelled
+  out in the suppression at the moment of the decision, `craftsman-ignore:
+  PHP002 (wrong: Doctrine proxies subclass entities)` or `(debt: ...)`,
+  transcribed by the hook as it records the outcome; and `/craftsman:metrics`
+  after the fact, which refuses a file that does not exist rather than file
+  a verdict under a typo. No path writes a verdict the developer did not
+  spell out. The acceptance report prints the judged rate beside the
+  accepted one wherever someone has ruled, says plainly that the rate is
+  tolerance when nobody has, and reads a database from before the table as
+  no verdicts, not as a crash. The first cut of this was a column on
+  `corrections` written by `/craftsman:metrics` alone; the learning-loop
+  review showed it could only ever judge findings that already had an
+  outcome, three weeks after the context was gone.
+
+- **`/craftsman:metrics` reports whether each rule earns its severity (#44).**
+  The correction loop recorded whether a user fixed a finding or suppressed
+  it, and nothing read the number back: on one real database PHP002 was
+  fixed 2 times and ignored 153, a 98.7% rejection, still blocking every
+  write. `hooks/lib/acceptance_report.py`, reached through
+  `metrics_acceptance_report [days] [--threshold PCT] [--min-occurrences N]`,
+  prints acceptance per rule (`fixed / (fixed + ignored)`, lowest first,
+  HAIKU rows left to their own report), the rules proposed for relaxation
+  under the threshold once enough outcomes exist, under the `rules:` key a
+  `.craft-rules.yml` needs and with a note when one directory holds most of
+  the rejections (a scope, not a relaxation: the one decision this
+  repository recorded was of that kind), and the findings with no verdict in
+  the window, blocking apart from advisory. Two things the review of this
+  change measured on the real database and the report now states rather
+  than hides: the hook records an outcome per WRITE under a directory glob,
+  not once per finding, so a rule with more outcomes than blocking findings
+  is being recounted and gets no proposal (PHP002 there: 106 `ignored` from
+  one pattern against 56 blocking findings); and 99.5% of the silent volume
+  was advisory, which the loop cannot observe by construction. A verdict is
+  a `fixed` or `ignored` row in the window on both halves of the report; an
+  `overridden` row or a fix from a year ago answers nothing. A script rather
+  than rows for a model to add up, because it proposes relaxing a gate; the
+  skill reports the proposals and leaves the decision to the user.
+  `tests/core/test-acceptance-report.sh` asserts the values on a database
+  whose arithmetic is known, each guard seen red.
+
 - **The semantic layer records what it does.** `hooks/agent-ddd-verifier.sh`
   and `hooks/agent-final-review.sh` shell out to a headless Haiku subprocess on
   every Write/Edit and at every Stop, and recorded nothing at all: measured on

@@ -10,8 +10,8 @@ disable-model-invocation: true
 ## Outcome Contract
 
 - **Outcome**: a data-grounded picture of code quality trends, and a decision about pending learned instincts.
-- **Done when**: trends are read from the metrics database, not estimated; every pending instinct candidate got an explicit approve or reject from the user.
-- **Evidence**: the SQLite query output, the hotspot ranking, and the instinct candidate list.
+- **Done when**: trends are read from the metrics database, not estimated; the acceptance report's proposals are reported and not applied, with the share of blocking findings that got no verdict stated with its count; every pending instinct candidate got an explicit approve or reject from the user.
+- **Evidence**: the SQLite query output, the acceptance report's stdout, the hotspot ranking, and the instinct candidate list.
 
 You are a **metrics analyst** reporting on code quality trends.
 
@@ -62,7 +62,62 @@ is one line; "this aggregate mutates another aggregate's state" may be a
 redesign. A lower fixed rate is evidence, not proof, and the two rates are
 printed side by side so a reader can weigh that rather than divide.
 
-### Step 5: Present Report
+### Step 3: Does each rule earn its severity
+
+The correction loop records whether a user fixed a finding or suppressed it,
+and until #44 nothing read that number back. Read the shipped report, never
+rows you add up yourself, because it proposes relaxing a gate, and the only
+legitimate source of every number in this section is its stdout:
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/metrics-db.sh" && metrics_acceptance_report 90
+```
+
+It prints, in order: acceptance per rule (`fixed / (fixed + ignored)`, lowest
+first); the rules the loop RECOUNTS (more outcomes than blocking findings,
+because the hook records an outcome per write under a directory glob rather
+than once per finding), which get no proposal; the proposals, already under
+the `rules:` key a `.craft-rules.yml` needs, under 30% acceptance over 20 or
+more outcomes (`--threshold` and `--min-occurrences` to move the bar, the day
+count optional before them), each with a note when one directory holds most of
+the rejections, since that is a scope and not a relaxation; then the blocking
+findings with no verdict in the window, and apart from them the advisory
+findings, which the loop cannot observe at all (only a blocking finding enters
+the session state the hook reads).
+
+**Report the proposals; do not apply them.** A relaxation is a decision the
+user records as a `decision:` line in the owning manifest (see
+`packs/python/pack.yml` for the vocabulary), with the measured rate and the
+reason, so the next maintainer does not relitigate it. `n/a` means no outcome
+in the window, an empty sample and not a rate of zero. A recounted rule is not
+a rule to relax: say that its number is the instrument's, not the users'.
+
+**Acceptance is tolerance, not correctness.** A rule suppressed 153 times may
+be wrong 153 times, or right and inconvenient 153 times, and only the first is
+a rule to relax. The report prints the judged rate beside the accepted one
+wherever someone has ruled, and says so when nobody has. A verdict is written
+by a human, in one of two places:
+
+- **At the moment of the decision**, in the suppression itself. The block
+  message offers the grammar: `craftsman-ignore: PHP002 (wrong: Doctrine
+  proxies subclass entities)` says the rule was wrong here; `(debt: shipping
+  Friday, see #123)` says the rule was right and the code is carried on
+  purpose. The hook transcribes the reason as it records the `ignored`
+  outcome. A bare marker records no verdict: the loop does not guess.
+- **After the fact**, here, when the user looks at a low-acceptance rule with
+  you. Ask which of the two it is and record the answer, one finding at a time:
+
+```bash
+source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/metrics-db.sh" && \
+  metrics_record_verdict PHP002 wrong "src/Entity/Order.php" "an ORM subclasses entities, they cannot be final"
+```
+
+`right` or `wrong`, nothing else, and the file must exist. Never record a
+verdict from your own reading of the code, and never infer one from what the
+user did with the finding, because a loop that grades itself measures its own
+agreement rather than the rule.
+
+### Step 4: Present Report
 
 Format the data as a clear report:
 
@@ -83,6 +138,17 @@ Format the data as a clear report:
 | Day        | Sessions | Blocked | Warned |
 |------------|----------|---------|--------|
 | ...        | ...      | ...     | ...    |
+
+### Acceptance per Rule (90 days)
+| Rule | Fixed | Ignored | Acceptance |
+|------|-------|---------|------------|
+| ...  | ...   | ...     | ...        |
+
+Judged by a human: [N rules, M verdicts, X% judged wrong, or none recorded]
+Recounted by the loop (no proposal): [rule: N outcomes for M blocking findings, or none]
+Proposed relaxations: [rule: warn, with the measured rate and the scope note, or none]
+Blocking findings with no verdict: [N rules, X% of the volume, top rule]
+Advisory findings with no verdict: [N rules, X% of the volume; unobservable by construction]
 
 ### Semantic Layer (Level 2, Haiku)
 | Metric | Value |
