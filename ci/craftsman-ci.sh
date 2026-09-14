@@ -47,6 +47,34 @@ done
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
 PLUGIN_ROOT="$(dirname "$SCRIPT_DIR")"
 
+# =============================================================================
+# The engine is not optional
+# =============================================================================
+# These four libraries ARE the gate: the severity of every finding, the
+# validators that produce them, and the level arbitration between them all live
+# there. Sourcing them under `if [[ -f ]]` meant a checkout missing one of them
+# scanned nothing and exited 0, which is the one verdict a quality gate must
+# never give by accident. ADR-0029 already says it for a timeout: no verdict is
+# not a clean verdict. A missing library is the same case, so it exits 2 and
+# names the file.
+_CI_REQUIRED_LIBS=(config.sh rules-engine.sh pack-loader.sh precedence.sh)
+
+_ci_source_engine() {
+    local lib
+    for lib in "${_CI_REQUIRED_LIBS[@]}"; do
+        if [[ ! -f "$PLUGIN_ROOT/hooks/lib/$lib" ]]; then
+            echo "craftsman-ci: hooks/lib/$lib is missing under $PLUGIN_ROOT." >&2
+            echo "craftsman-ci: the gate cannot judge anything without it, so it reports no verdict. Reinstall the plugin." >&2
+            exit 2
+        fi
+        # shellcheck source=/dev/null
+        if ! source "$PLUGIN_ROOT/hooks/lib/$lib"; then
+            echo "craftsman-ci: hooks/lib/$lib failed to load; refusing to report a verdict." >&2
+            exit 2
+        fi
+    done
+}
+
 if [[ "${1:-}" == "ci" ]]; then
     shift
     # Parse ci-specific args
@@ -105,21 +133,13 @@ if [[ "${1:-}" == "export" ]]; then
     fi
     # The doctrine is rendered FROM the rules engine, so it must be resolved
     # first: without it every rule falls back to its default severity and the
-    # exported files would contradict what the gate actually enforces.
-    if [[ -f "$PLUGIN_ROOT/hooks/lib/config.sh" ]]; then
-        source "$PLUGIN_ROOT/hooks/lib/config.sh"
-    fi
-    if [[ -f "$PLUGIN_ROOT/hooks/lib/rules-engine.sh" ]]; then
-        source "$PLUGIN_ROOT/hooks/lib/rules-engine.sh"
-        rules_init "$PWD" "$(rules_global_dir)" 2>/dev/null || true
-    fi
-    # Rule ids, wording and grouping live in the rule registry, which the pack
-    # loader builds. Without this the Rules section renders empty, which reads
-    # as "nothing is enforced".
-    if [[ -f "$PLUGIN_ROOT/hooks/lib/pack-loader.sh" ]]; then
-        source "$PLUGIN_ROOT/hooks/lib/pack-loader.sh"
-        pack_loader_init 2>/dev/null || true
-    fi
+    # exported files would contradict what the gate actually enforces. Rule
+    # ids, wording and grouping come from the registry the pack loader builds:
+    # without it the Rules section renders empty, which reads as "nothing is
+    # enforced".
+    _ci_source_engine
+    rules_init "$PWD" "$(rules_global_dir)" 2>/dev/null || true
+    pack_loader_init 2>/dev/null || true
     source "${SCRIPT_DIR}/doctrine-export.sh"
     doctrine_export "$EXPORT_TARGET"
     exit $?
@@ -358,41 +378,24 @@ export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}"
 export CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
 
 # Source shared libraries if available (plugin context)
-PACKS_AVAILABLE=false
-RULES_ENGINE_AVAILABLE=false
 SA_AVAILABLE=false
 
-if [[ -f "$PLUGIN_ROOT/hooks/lib/config.sh" ]]; then
-    source "$PLUGIN_ROOT/hooks/lib/config.sh"
-fi
+_ci_source_engine
 
-if [[ -f "$PLUGIN_ROOT/hooks/lib/rules-engine.sh" ]]; then
-    source "$PLUGIN_ROOT/hooks/lib/rules-engine.sh"
-    RULES_ENGINE_AVAILABLE=true
-fi
-
-if [[ -f "$PLUGIN_ROOT/hooks/lib/pack-loader.sh" ]]; then
-    source "$PLUGIN_ROOT/hooks/lib/pack-loader.sh"
-    PACKS_AVAILABLE=true
-fi
-
+# Level 2 and 3 are genuinely optional: they run the project's own analysers,
+# and a project with none installed is still fully judged at Level 1.
 if [[ -f "$PLUGIN_ROOT/hooks/lib/static-analysis.sh" ]]; then
     source "$PLUGIN_ROOT/hooks/lib/static-analysis.sh"
     SA_AVAILABLE=true
 fi
 
-# Level precedence is the same arbitration in both front-ends. Resolving it in
-# one only would put the pipeline and the editor in disagreement on a project
-# whose analysers are installed: green locally, red in CI, on a rule neither of
-# them decided differently.
-PRECEDENCE_AVAILABLE=false
-if [[ -f "$PLUGIN_ROOT/hooks/lib/precedence.sh" ]]; then
-    source "$PLUGIN_ROOT/hooks/lib/precedence.sh"
-    PRECEDENCE_AVAILABLE=true
-fi
+# Level precedence is the same arbitration in both front-ends, and _ci_source_engine
+# loaded it above. Resolving it in one front-end only would put the pipeline and
+# the editor in disagreement on a project whose analysers are installed: green
+# locally, red in CI, on a rule neither of them decided differently.
 
 # Init packs (discovers and sources pack validators + SA tools)
-if [[ "$PACKS_AVAILABLE" == true && -d "$PLUGIN_ROOT/packs" ]]; then
+if [[ -d "$PLUGIN_ROOT/packs" ]]; then
     pack_loader_init 2>/dev/null || true
 fi
 
@@ -420,72 +423,50 @@ _parse_yml_value() {
 
 # craftsman-ignore: SH002 - config resolution is inherently sequential, splitting would reduce readability
 _resolve_config() {
-    if [[ "$RULES_ENGINE_AVAILABLE" == true ]]; then
-        # Use rules engine for config resolution (plugin context)
-        local project_dir="$PWD"
-        local global_dir
-        global_dir=$(rules_global_dir)
+    # The rules engine is the only authority here. A self-contained parser used
+    # to stand in when it could not be sourced; that state now exits 2
+    # (_ci_source_engine), and a second table for strictness is exactly the
+    # duplication #37 removed from the severity path.
+    local project_dir="$PWD"
+    local global_dir
+    global_dir=$(rules_global_dir)
 
-        # stderr is suppressed here for the same reason it is on pack_loader_init
-        # and sa_analyze_file: the adapters redirect this command's stderr into
-        # the JSON report file, so a single warning makes the report unparseable.
-        # rules-engine warns on any malformed custom rule, and .craft-config.yml
-        # is supplied by the repository under audit - so leaving stderr on let a
-        # pull request corrupt its own report and take the gate green with it.
-        rules_init "$project_dir" "$global_dir" 2>/dev/null
+    # stderr is suppressed here for the same reason it is on pack_loader_init
+    # and sa_analyze_file: the adapters redirect this command's stderr into
+    # the JSON report file, so a single warning makes the report unparseable.
+    # rules-engine warns on any malformed custom rule, and .craft-config.yml
+    # is supplied by the repository under audit - so leaving stderr on let a
+    # pull request corrupt its own report and take the gate green with it.
+    rules_init "$project_dir" "$global_dir" 2>/dev/null
 
-        # If --config was passed explicitly, feed it to the rules engine
-        # (rules_init only looks for .craft-config.yml by convention name)
-        if [[ -n "$CONFIG_FILE" && -f "$CONFIG_FILE" ]]; then
-            _rules_parse_config "$CONFIG_FILE" "project"
-        fi
-
-        # Sync STRICTNESS from engine
-        STRICTNESS="$_RULES_STRICTNESS"
-
-        # Stack: rules engine doesn't manage stack, so parse it ourselves
-        local config_path=""
-        if [[ -n "$CONFIG_FILE" ]]; then
-            config_path="$CONFIG_FILE"
-        elif [[ -f "$PWD/.craft-config.yml" ]]; then
-            config_path="$PWD/.craft-config.yml"
-        fi
-
-        if [[ -n "$config_path" && -f "$config_path" ]]; then
-            local yml_stack
-            yml_stack=$(_parse_yml_value "stack" "$config_path")
-            [[ -n "$yml_stack" ]] && STACK="$yml_stack"
-        fi
-
-        # Env var overrides, in the spelling Claude Code exports first
-        # (CLAUDE_PLUGIN_OPTION_<KEY>, uppercased), then the plugin's own
-        _ci_opt="${CLAUDE_PLUGIN_OPTION_STRICTNESS:-${CLAUDE_PLUGIN_OPTION_strictness:-}}"; [[ -n "$_ci_opt" ]] && STRICTNESS="$_ci_opt"
-        _ci_opt="${CLAUDE_PLUGIN_OPTION_STACK:-${CLAUDE_PLUGIN_OPTION_stack:-}}"; [[ -n "$_ci_opt" ]] && STACK="$_ci_opt"
-    else
-        # Standalone mode: self-contained config parsing
-        local config_path=""
-
-        if [[ -n "$CONFIG_FILE" ]]; then
-            config_path="$CONFIG_FILE"
-        elif [[ -f "$PWD/.craft-config.yml" ]]; then
-            config_path="$PWD/.craft-config.yml"
-        fi
-
-        if [[ -n "$config_path" && -f "$config_path" ]]; then
-            local yml_strictness yml_stack
-            yml_strictness=$(_parse_yml_value "strictness" "$config_path")
-            yml_stack=$(_parse_yml_value "stack" "$config_path")
-
-            [[ -n "$yml_strictness" ]] && STRICTNESS="$yml_strictness"
-            [[ -n "$yml_stack" ]] && STACK="$yml_stack"
-        fi
-
-        # Env var overrides (same as hooks)
-        _ci_opt="${CLAUDE_PLUGIN_OPTION_STRICTNESS:-${CLAUDE_PLUGIN_OPTION_strictness:-}}"; [[ -n "$_ci_opt" ]] && STRICTNESS="$_ci_opt"
-        _ci_opt="${CLAUDE_PLUGIN_OPTION_STACK:-${CLAUDE_PLUGIN_OPTION_stack:-}}"; [[ -n "$_ci_opt" ]] && STACK="$_ci_opt"
+    # If --config was passed explicitly, feed it to the rules engine
+    # (rules_init only looks for .craft-config.yml by convention name)
+    if [[ -n "$CONFIG_FILE" && -f "$CONFIG_FILE" ]]; then
+        _rules_parse_config "$CONFIG_FILE" "project"
     fi
-}
 
+    # Sync STRICTNESS from engine
+    STRICTNESS="$_RULES_STRICTNESS"
+
+    # Stack: rules engine doesn't manage stack, so parse it ourselves
+    local config_path=""
+    if [[ -n "$CONFIG_FILE" ]]; then
+        config_path="$CONFIG_FILE"
+    elif [[ -f "$PWD/.craft-config.yml" ]]; then
+        config_path="$PWD/.craft-config.yml"
+    fi
+
+    if [[ -n "$config_path" && -f "$config_path" ]]; then
+        local yml_stack
+        yml_stack=$(_parse_yml_value "stack" "$config_path")
+        [[ -n "$yml_stack" ]] && STACK="$yml_stack"
+    fi
+
+    # Env var overrides, in the spelling Claude Code exports first
+    # (CLAUDE_PLUGIN_OPTION_<KEY>, uppercased), then the plugin's own
+    _ci_opt="${CLAUDE_PLUGIN_OPTION_STRICTNESS:-${CLAUDE_PLUGIN_OPTION_strictness:-}}"; [[ -n "$_ci_opt" ]] && STRICTNESS="$_ci_opt"
+    _ci_opt="${CLAUDE_PLUGIN_OPTION_STACK:-${CLAUDE_PLUGIN_OPTION_stack:-}}"; [[ -n "$_ci_opt" ]] && STACK="$_ci_opt"
+}
 _php_enabled() {
     case "$STACK" in
         symfony|fullstack) return 0 ;;
@@ -506,39 +487,22 @@ _ts_enabled() {
 # pipeline while the hook stayed silent on the same file.
 _severity_for() {
     local rule="$1" file="${2:-}"
-    if [[ "$RULES_ENGINE_AVAILABLE" == true ]]; then
-        # rules_severity_for_file, not rules_severity: the hooks honour a
-        # directory-level .craft-rules.yml and CI did not, so a directory a
-        # team had deliberately relaxed still failed the pipeline. That is the
-        # drift this pipeline exists to not have.
-        if [[ -n "$file" ]]; then
-            # Absolute, because the walk up to the project root is what makes a
-            # directory override apply. CI is handed paths relative to the
-            # working directory, and a relative walk stops at "." without ever
-            # reaching the root that holds the override.
-            local abs_file="$file"
-            [[ "$abs_file" != /* ]] && abs_file="$PWD/$file"
-            rules_severity_for_file "$abs_file" "$rule"
-        else
-            rules_severity "$rule"
-        fi
-        return 0
+    # rules_severity_for_file, not rules_severity: the hooks honour a
+    # directory-level .craft-rules.yml and CI did not, so a directory a
+    # team had deliberately relaxed still failed the pipeline. That is the
+    # drift this pipeline exists to not have.
+    if [[ -n "$file" ]]; then
+        # Absolute, because the walk up to the project root is what makes a
+        # directory override apply. CI is handed paths relative to the
+        # working directory, and a relative walk stops at "." without ever
+        # reaching the root that holds the override.
+        local abs_file="$file"
+        [[ "$abs_file" != /* ]] && abs_file="$PWD/$file"
+        rules_severity_for_file "$abs_file" "$rule"
+    else
+        rules_severity "$rule"
     fi
-
-    # Standalone fallback, reached only when hooks/lib/rules-engine.sh could
-    # not be sourced. The packs ship in the same directory, so in that state no
-    # language is registered and no rule can fire: this answers for nobody in
-    # practice, and it carries no list of rules on purpose. The advisory
-    # defaults live in the manifests (rules/core.yml, packs/*/pack.yml) and
-    # reach the pipeline through the engine (#37). The WARN- prefix is the one
-    # convention the engine keeps, mirrored here.
-    [[ "$rule" == WARN* ]] && { echo "warn"; return 0; }
-    case "$STRICTNESS" in
-        strict)   echo "block" ;;
-        moderate) [[ "$rule" == LAYER* || "$rule" == SEC* ]] && echo "block" || echo "warn" ;;
-        relaxed)  echo "warn" ;;
-        *)        echo "block" ;;
-    esac
+    return 0
 }
 
 # =============================================================================
@@ -565,15 +529,16 @@ FIND_PREDICATE=()
 # higher level claims is HELD here too, and scan_file flushes it once the
 # analysers have had their say on that file.
 #
-# precedence.sh is optional (PRECEDENCE_AVAILABLE); with no library there is no
-# deferral, so every Level 1 rule reports - which is the safe direction.
+# precedence.sh is required (_ci_source_engine): a run without it would report
+# every Level 1 rule an analyser already answered for, which is a different
+# verdict from the hook's on the same file.
 _add_violation() {
     local file="$1"
     local line="$2"
     local rule="$3"
     local message="$4"
 
-    if [[ "$PRECEDENCE_AVAILABLE" == true ]] && precedence_defers "$rule" "$file"; then
+    if precedence_defers "$rule" "$file"; then
         precedence_hold "$rule" "$file" "$line" "$message"
         return 0
     fi
@@ -735,7 +700,7 @@ _run_static_analysis() {
     sa_errors=$(sa_analyze_file "$file" 2>/dev/null) || true
     [[ -z "$sa_errors" ]] && return 0
 
-    [[ "$PRECEDENCE_AVAILABLE" == true ]] && precedence_higher_level_begin
+    precedence_higher_level_begin
     while IFS= read -r err_line; do
         [[ -z "$err_line" ]] && continue
         local sa_code sa_lineno sa_msg
@@ -743,10 +708,10 @@ _run_static_analysis() {
         sa_lineno=$(echo "$err_line" | cut -d: -f2)
         sa_msg=$(echo "$err_line" | cut -d: -f3-)
         sa_msg="${sa_msg#"${sa_msg%%[![:space:]]*}"}"
-        [[ "$PRECEDENCE_AVAILABLE" == true ]] && precedence_declare_covered "$sa_code"
+        precedence_declare_covered "$sa_code"
         _add_violation "$file" "${sa_lineno:-0}" "$sa_code" "$sa_msg"
     done <<< "$sa_errors"
-    [[ "$PRECEDENCE_AVAILABLE" == true ]] && precedence_higher_level_end
+    precedence_higher_level_end
     return 0
 }
 
@@ -759,7 +724,7 @@ scan_file() {
     local ext="${file##*.}"
 
     local language=""
-    [[ "$PACKS_AVAILABLE" == true ]] && language=$(lang_for_file "$file")
+    language=$(lang_for_file "$file")
 
     # Discovered, as distinct from scanned. A file whose extension some
     # installed pack declares counts as discovered even when that pack is not
@@ -769,7 +734,7 @@ scan_file() {
     # gate that never ran. Counting only php|ts|tsx here is what let one PHP
     # file silence this guard for every Python and Bash file in a mixed
     # repository.
-    if [[ "$PACKS_AVAILABLE" == true ]] && lang_extension_is_known "$file"; then
+    if lang_extension_is_known "$file"; then
         FILES_DISCOVERED=$((FILES_DISCOVERED + 1))
     fi
 
@@ -785,7 +750,7 @@ scan_file() {
     # baseline's occurrence counter is per file for the same reason, and it had
     # no caller at all: a file reached twice through overlapping scan roots
     # inherited the first pass's count and its recorded debt was read as new.
-    [[ "$PRECEDENCE_AVAILABLE" == true ]] && precedence_reset
+    precedence_reset
     type rule_baseline_reset >/dev/null 2>&1 && rule_baseline_reset
     pack_dispatch_file "$file"
 
@@ -808,32 +773,30 @@ scan_file() {
     # Static analysis Level 2/3 (PHPStan, ESLint, Deptrac, dependency-cruiser)
     _run_static_analysis "$file"
 
-    # Custom rules from rules engine (plugin context only)
-    if [[ "$RULES_ENGINE_AVAILABLE" == true ]]; then
-        if [[ -n "$language" ]]; then
-            local custom_rules
-            custom_rules=$(rules_custom_list "$language")
-            while IFS= read -r rule_id; do
-                [[ -z "$rule_id" ]] && continue
-                local pattern msg ln_num=0
-                pattern=$(rules_pattern "$rule_id")
-                msg=$(rules_message "$rule_id")
-                [[ -z "$pattern" ]] && continue
-                while IFS= read -r fline; do
-                    ln_num=$((ln_num + 1))
-                    # -e: repo-supplied pattern, see rules-engine.sh for the note
-                    if echo "$fline" | grep -qE -e "$pattern" 2>/dev/null; then
-                        _add_violation "$file" "$ln_num" "$rule_id" "$msg"
-                        break
-                    fi
-                done < "$file"
-            done <<< "$custom_rules"
-        fi
+    # Custom rules from the rules engine
+    if [[ -n "$language" ]]; then
+        local custom_rules
+        custom_rules=$(rules_custom_list "$language")
+        while IFS= read -r rule_id; do
+            [[ -z "$rule_id" ]] && continue
+            local pattern msg ln_num=0
+            pattern=$(rules_pattern "$rule_id")
+            msg=$(rules_message "$rule_id")
+            [[ -z "$pattern" ]] && continue
+            while IFS= read -r fline; do
+                ln_num=$((ln_num + 1))
+                # -e: repo-supplied pattern, see rules-engine.sh for the note
+                if echo "$fline" | grep -qE -e "$pattern" 2>/dev/null; then
+                    _add_violation "$file" "$ln_num" "$rule_id" "$msg"
+                    break
+                fi
+            done < "$file"
+        done <<< "$custom_rules"
     fi
 
     # Every emitter for this file has run. What no analyser answered for comes
     # back now, with the same severity resolution it would have had first time.
-    [[ "$PRECEDENCE_AVAILABLE" == true ]] && precedence_flush
+    precedence_flush
 
     FILES_SCANNED=$((FILES_SCANNED + 1))
 }
@@ -854,14 +817,12 @@ scan_file() {
 _find_name_predicate() {
     FIND_PREDICATE=()
     local extension
-    if [[ "$PACKS_AVAILABLE" == true ]]; then
-        while IFS= read -r extension; do
-            [[ -z "$extension" ]] && continue
-            [[ ! "$extension" =~ ^[A-Za-z0-9_+-]+$ ]] && continue
-            [[ ${#FIND_PREDICATE[@]} -gt 0 ]] && FIND_PREDICATE+=(-o)
-            FIND_PREDICATE+=(-name "*.${extension}")
-        done <<< "$(lang_all_known_extensions)"
-    fi
+    while IFS= read -r extension; do
+        [[ -z "$extension" ]] && continue
+        [[ ! "$extension" =~ ^[A-Za-z0-9_+-]+$ ]] && continue
+        [[ ${#FIND_PREDICATE[@]} -gt 0 ]] && FIND_PREDICATE+=(-o)
+        FIND_PREDICATE+=(-name "*.${extension}")
+    done <<< "$(lang_all_known_extensions)"
 
     # No pack, no language, nothing to walk. A predicate matching nothing keeps
     # find syntactically valid, and FILES_DISCOVERED staying at zero is what
@@ -1050,7 +1011,7 @@ _changed_in_scope() {
         # the diff and failed as "no source file was found".
         [[ "${file##*/}" == "craftsman-comment.md" ]] && continue
         _changed_is_pruned "$file" && continue
-        if [[ "$PACKS_AVAILABLE" == true ]] && ! lang_extension_is_known "$file"; then
+        if ! lang_extension_is_known "$file"; then
             continue
         fi
         in_scope=false
@@ -1288,7 +1249,6 @@ EOF
 # real stack is known: otherwise `--config stack=symfony` still validates .ts,
 # because the React pack was admitted before anyone knew it should not be.
 _rebuild_registry_for_stack() {
-    [[ "$PACKS_AVAILABLE" == true ]] || return 0
     [[ -d "$PLUGIN_ROOT/packs" ]] || return 0
     export CLAUDE_PLUGIN_OPTION_stack="$STACK" CLAUDE_PLUGIN_OPTION_STACK="$STACK"
     _pack_reset

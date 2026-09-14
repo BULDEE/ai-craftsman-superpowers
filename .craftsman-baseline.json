@@ -145,7 +145,7 @@
 {"complexity":2,"fan_out":9,"file_lines":434,"ignores":0,"instrument":2,"max_fn_lines":12,"path":"tests/ci/test-adapter-delivery.sh"},
 {"complexity":1,"fan_out":20,"file_lines":734,"ignores":0,"instrument":2,"max_fn_lines":7,"path":"tests/ci/test-adapters.sh"},
 {"complexity":1,"fan_out":1,"file_lines":353,"ignores":0,"instrument":2,"max_fn_lines":3,"path":"tests/ci/test-changed-only.sh"},
-{"complexity":1,"fan_out":14,"file_lines":749,"ignores":0,"instrument":2,"max_fn_lines":6,"path":"tests/ci/test-craftsman-ci.sh","reason":"advisory parity asserted against the manifests through both consumers (#37)"},
+{"complexity":1,"fan_out":14,"file_lines":796,"ignores":0,"instrument":2,"max_fn_lines":6,"path":"tests/ci/test-craftsman-ci.sh","reason":"the engine-is-required section: four removals, one control, one guard on the standalone path"},
 {"complexity":17,"fan_out":2,"file_lines":156,"ignores":0,"instrument":2,"max_fn_lines":156,"path":"tests/ci/test-doctrine-export.sh"},
 {"complexity":1,"fan_out":7,"file_lines":323,"ignores":0,"instrument":2,"max_fn_lines":4,"path":"tests/ci/test-jenkins-adapter.sh"},
 {"complexity":3,"fan_out":1,"file_lines":206,"ignores":0,"instrument":2,"max_fn_lines":6,"path":"tests/ci/test-ratchet-ci.sh"},
