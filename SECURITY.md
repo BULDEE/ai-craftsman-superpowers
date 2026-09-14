@@ -224,7 +224,7 @@ Every `v<x.y.z>` release publishes `craftsman-<version>.tar.gz` and
 by `.github/workflows/release.yml`.
 
 ```bash
-VERSION=4.10.2
+VERSION=4.10.3
 gh release download "v${VERSION}" --repo BULDEE/ai-craftsman-superpowers \
   --pattern "craftsman-${VERSION}.tar.gz" --pattern SHA256SUMS.txt
 
