@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.10.3] - 2026-09-14
+
+A security patch and the tail of the whole-plugin review. On a machine
+without PyYAML (the macOS system python, the CI runners) `never_ignorable`
+compiled as `no`, so an ignore marker silenced a hardcoded secret on the
+hook, the pipeline and the Hermes write gate alike; the compiler now reads
+the YAML boolean whichever reader produced it. With it: unknown capability
+keys refused at compile time, the ratchet inert without a mark and anchored
+on the file, the dogfood test walking every shipped script through the
+rules engine, and CI on `main` green again.
+
 ### Fixed
 
 - **`never_ignorable` held only on machines with PyYAML.** The registry
