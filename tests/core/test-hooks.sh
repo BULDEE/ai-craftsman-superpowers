@@ -1548,31 +1548,43 @@ echo "=== Session Metrics Agent/Team Tracking Tests ==="
 
 # Test: session-metrics outputs agent count from session state
 mkdir -p "$CLAUDE_PLUGIN_DATA"
+# The keys are the ones subagent-quality-gate.sh writes on SubagentStop. The
+# three this test used to write (agent_invocations, team_type, completed_tasks)
+# were written by no hook, so it asserted a summary no real session produced.
 python3 -c "
 import json, sys
 with open(sys.argv[1], 'w') as f:
-    json.dump({'agent_invocations': 3, 'team_type': 'symfony-ddd', 'completed_tasks': [{'task':'t1'},{'task':'t2'}]}, f)
+    json.dump({'subagent_count': 3,
+               'subagent_activity': [{'agent_type': 'craftsman:architect'},
+                                     {'agent_type': 'craftsman:symfony-reviewer'},
+                                     {'agent_type': 'craftsman:architect'}]}, f)
 " "${CLAUDE_PLUGIN_DATA}/session-state.json" 2>/dev/null
 
 result=$(echo '{"session_duration_seconds": 10}' | bash "$ROOT_DIR/hooks/session-metrics.sh" 2>/dev/null)
-if echo "$result" | grep -q "agent"; then
-    log_pass "session-metrics: includes agent count in summary"
+if echo "$result" | grep -q "3 agent invocation"; then
+    log_pass "session-metrics: includes the subagent count in summary"
 else
-    log_fail "session-metrics: should include agent stats" "got: $result"
+    log_fail "session-metrics: should include the subagent count" "got: $result"
 fi
 
-# Test: session-metrics outputs team type from session state
-if echo "$result" | grep -q "symfony-ddd\|team"; then
-    log_pass "session-metrics: includes team type in summary"
+# Test: the agent types come from the activity log, deduplicated
+if echo "$result" | grep -q "craftsman:architect" && echo "$result" | grep -q "craftsman:symfony-reviewer"; then
+    log_pass "session-metrics: names the agent types the gate recorded"
 else
-    log_fail "session-metrics: should include team type" "got: $result"
+    log_fail "session-metrics: should name the agent types" "got: $result"
 fi
 
-# Test: session-metrics outputs task count from session state
-if echo "$result" | grep -q "task\|complet"; then
-    log_pass "session-metrics: includes completed task count in summary"
+# Test: a state with no subagent activity says nothing about agents
+python3 -c "
+import json, sys
+with open(sys.argv[1], 'w') as f:
+    json.dump({}, f)
+" "${CLAUDE_PLUGIN_DATA}/session-state.json" 2>/dev/null
+empty_result=$(echo '{"session_duration_seconds": 10}' | bash "$ROOT_DIR/hooks/session-metrics.sh" 2>/dev/null)
+if ! echo "$empty_result" | grep -q "agent invocation"; then
+    log_pass "session-metrics: no agent line when no subagent ran"
 else
-    log_fail "session-metrics: should include task count" "got: $result"
+    log_fail "session-metrics: should not claim agents when none ran" "got: $empty_result"
 fi
 
 # Test: session-metrics still exits 0

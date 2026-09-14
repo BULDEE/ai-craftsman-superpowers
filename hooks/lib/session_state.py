@@ -24,7 +24,7 @@ Commands:
     pre-compact <state_path>                                       - Save session context before compaction
     post-compact <state_path>                                      - Verify state recovery after compaction
     get-previous-violations <state_path> <file>                    - Get previously blocked rules for a file
-    read-session-metrics <state_path>                              - Read agent/team/task counts for metrics
+    read-session-metrics <state_path>                              - Read the subagent count and the agent types
     set-verified                                                   - Set verified=true (auto-resolves path via bridge file)
 """
 
@@ -272,14 +272,21 @@ def handle_get_previous_violations(arguments: list[str]) -> None:
 
 
 def handle_read_session_metrics(arguments: list[str]) -> None:
+    """Counts for the session row, read from the keys hooks actually write.
+
+    This read `agent_invocations`, `team_type` and `completed_tasks`, three
+    keys no hook has ever written, so sessions.agents_spawned held [] on every
+    row. The subagent gate writes `subagent_count` and `subagent_activity` on
+    every SubagentStop: those are the same facts under the names that exist.
+    """
     state_path = arguments[0]
     state = read_state(state_path)
-    agent_invocation_count = state.get('agent_invocations', 0)
-    team_type = state.get('team_type', '')
-    completed_task_count = len(state.get('completed_tasks', []))
-    print(agent_invocation_count)
-    print(team_type)
-    print(completed_task_count)
+    activity = state.get('subagent_activity', [])
+    agent_types = sorted({
+        entry.get('agent_type', '') for entry in activity if isinstance(entry, dict)
+    } - {''})
+    print(state.get('subagent_count', 0))
+    print(','.join(agent_types))
 
 
 def _resolve_session_state_path() -> str:

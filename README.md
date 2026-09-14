@@ -81,7 +81,7 @@ wrote, and the linters you already run.
 | Claude sees the violation *before* writing | no | no | yes |
 | Same verdict on your machine and in the pipeline | n/a | partial | yes |
 | Stops Claude from repeating the same mistake | no | no | yes |
-| Blocks a design decision made without a design pass | no | no | yes |
+| Warns when a domain model is written without a design pass | no | no | yes |
 
 ## What it actually does
 

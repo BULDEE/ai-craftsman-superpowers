@@ -83,6 +83,18 @@ add_signal_note() {
     SIGNAL_NOTES="${SIGNAL_NOTES}- Bias signal (${slug}): lexeme \"${lexeme}\" suggests $(_signal_intent "$slug")."$'\n'
 }
 
+# This hook is the only UserPromptSubmit surface the plugin has, so it is where
+# the plugin learns that a design pass was asked for. The flag was read here
+# and written nowhere: the exemption below could never fire, and the README row
+# promising a design decision is caught described a branch no session reached.
+_record_design_pass() {
+    case "$PROMPT" in
+        */craftsman:design*|/craftsman:design*)
+            python3 "$LIB_DIR/session_state.py" merge "$SESSION_STATE" design_used true >/dev/null 2>&1 || true
+            ;;
+    esac
+}
+
 # Design-session predicate, shared by the curated and the signal domain-modeling
 # paths: both defer to /craftsman:design having already run.
 _design_was_used() {
@@ -92,6 +104,8 @@ _design_was_used() {
     fi
     [[ "$design_used" == "true" ]]
 }
+
+_record_design_pass
 
 # Reported speech is not an instruction.
 #

@@ -85,7 +85,7 @@ avez déjà écrit, et les linters que vous faites déjà tourner.
 | Claude voit la violation *avant* d'écrire | non | non | oui |
 | Même verdict sur votre machine et dans le pipeline | n/a | partiel | oui |
 | Empêche Claude de refaire la même erreur | non | non | oui |
-| Bloque une décision d'architecture prise sans passe de design | non | non | oui |
+| Avertit quand un modèle de domaine est écrit sans passe de design | non | non | oui |
 
 ## Ce qu'il fait vraiment
 

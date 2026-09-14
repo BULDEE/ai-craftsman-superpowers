@@ -48,7 +48,16 @@ VERIFIED=$(python3 "${SCRIPT_DIR}/lib/session_state.py" check-flag "$SESSION_STA
 # or a corrupt session state let a task be marked complete with no evidence at
 # all, which is the one thing this hook exists to prevent. An unreadable count
 # is treated as "there were writes" and the task still has to show evidence.
-WRITES=$(python3 "${SCRIPT_DIR}/lib/session_state.py" read "$SESSION_STATE" writes_count 0 2>/dev/null) || WRITES="unknown"
+# One authority for the write count: the session-writes file post-write-check.sh
+# appends to, which session-metrics.sh already counts at SessionEnd. This hook
+# read a `writes_count` key of the session state that no hook ever wrote, saw
+# nothing, and let every task through.
+WRITES_FILE=$(session_file session-writes)
+if [[ -f "$WRITES_FILE" ]]; then
+    WRITES=$(wc -l < "$WRITES_FILE" 2>/dev/null | tr -d ' ') || WRITES="unknown"
+else
+    WRITES=0
+fi
 [[ "$WRITES" =~ ^[0-9]+$ ]] || WRITES="unknown"
 [[ "$WRITES" == "0" ]] && exit 0
 
