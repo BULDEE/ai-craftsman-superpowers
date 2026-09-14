@@ -141,7 +141,7 @@ fork.
 
 ## Version Sync Checklist
 
-Run `scripts/bump-version.sh <version>`: it updates the four tracked files and
+Run `scripts/bump-version.sh <version>`: it updates the five tracked files and
 exits non-zero on any that drifted. It does not write the changelog or the tag.
 
 When bumping version, update ALL of these:
@@ -151,6 +151,9 @@ When bumping version, update ALL of these:
 - `CLAUDE.md` → `**Current version:**` (this file; the checklist used to omit
   itself, so 4.6.2 shipped with 4.6.1 written here and only the bump script
   caught it)
+- `plugin.yaml` → `version:` (the Hermes manifest at the repository root, what
+  `hermes plugins` reports; it was off this list, so 4.9.0 and 4.10.x shipped
+  with it still at 4.8.1)
 - `CHANGELOG.md` → new entry
 - `README.md` → Version badge
 - `README.fr.md` → Version badge + sync any README.md content changes (French mirror, English is the source of truth)
@@ -161,7 +164,7 @@ Then tag with `claude plugin tag --push`, which produces the
 
 Pushing the `v<version>` tag runs `.github/workflows/release.yml`, which
 orchestrates two scripts and nothing else. `scripts/release-guard.sh <tag>`
-refuses a tag that is not `v<x.y.z>`, a tag the four tracked files disagree
+refuses a tag that is not `v<x.y.z>`, a tag the five tracked files disagree
 with (through `scripts/bump-version.sh --check`, so there is one list of those
 files and not two), and a `craftsman--v<version>` tag on another commit; the
 marketplace tag is waited for, never skipped. `scripts/release-build.sh` builds

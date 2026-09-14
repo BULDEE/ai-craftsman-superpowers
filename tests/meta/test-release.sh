@@ -45,6 +45,7 @@ build_fixture() {
         > "$FIXTURE/.claude-plugin/marketplace.json"
     printf '#!/usr/bin/env bash\nVERSION="9.9.9"\n' > "$FIXTURE/ci/craftsman-ci.sh"
     printf '# Fixture\n\n**Current version:** 9.9.9\n' > "$FIXTURE/CLAUDE.md"
+    printf 'name: craftsman\nversion: 9.9.9\nmanifest_version: 2\n' > "$FIXTURE/plugin.yaml"
     git -C "$FIXTURE" init -q
     git -C "$FIXTURE" config user.email t@example.com
     git -C "$FIXTURE" config user.name Test
@@ -93,6 +94,18 @@ git -C "$FIXTURE" tag craftsman--v9.9.9
 out="$(guard v9.9.9)"; rc=$?
 assert_exit_code "guard refuses a file left behind on the old version" 1 "$rc"
 assert_contains "guard names the drifted file" "$out" "ci/craftsman-ci.sh"
+
+# The Hermes manifest at the repository root carries its own version line and
+# is what `hermes plugins` reports. It was not on the tracked list, so 4.9.0
+# and 4.10.x shipped with plugin.yaml still saying 4.8.1.
+build_fixture
+printf 'name: craftsman\nversion: 9.9.8\nmanifest_version: 2\n' > "$FIXTURE/plugin.yaml"
+git -C "$FIXTURE" commit -qam "drift plugin.yaml"
+git -C "$FIXTURE" tag v9.9.9
+git -C "$FIXTURE" tag craftsman--v9.9.9
+out="$(guard v9.9.9)"; rc=$?
+assert_exit_code "guard refuses a Hermes manifest left on the old version" 1 "$rc"
+assert_contains "guard names plugin.yaml" "$out" "plugin.yaml"
 
 build_fixture
 printf '{"version": "9.9.8"}\n' > "$FIXTURE/.claude-plugin/plugin.json"

@@ -10,6 +10,7 @@
 #   - .claude-plugin/marketplace.json (2 occurrences)
 #   - ci/craftsman-ci.sh (VERSION=)
 #   - CLAUDE.md (Current version)
+#   - plugin.yaml (version:, the Hermes manifest `hermes plugins` reports)
 #
 # README badges are dynamic (shields.io github/v/release) since 3.8.0 and
 # tests/ci/test-adapters.sh mock reports are frozen fixtures - neither is
@@ -21,7 +22,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
-# --check reads the same four files through the same comparisons and writes
+# --check reads the same five files through the same comparisons and writes
 # nothing. The release workflow needs a verdict on version sync, and a second
 # implementation of "which files carry the version" is how CLAUDE.md drifted to
 # 3.7.0 in the first place: one list, two modes.
@@ -156,6 +157,13 @@ bump_file "${ROOT_DIR}/CLAUDE.md" \
     "Current version:.* ${CURRENT_VERSION}" \
     "Current version:** ${NEW_VERSION}" \
     "CLAUDE.md"
+
+# 5. plugin.yaml (Hermes manifest at the repository root). Anchored on the
+# line start so manifest_version: and api_version: are never touched.
+bump_file "${ROOT_DIR}/plugin.yaml" \
+    "^version: ${CURRENT_VERSION}" \
+    "version: ${NEW_VERSION}" \
+    "plugin.yaml"
 
 echo ""
 if [[ "$DRIFTED" -gt 0 ]]; then
