@@ -86,7 +86,7 @@ _check_warn_ts001() {
 _check_ts_structure() {
     local file="$1"
     if declare -F structural_check_file >/dev/null 2>&1; then
-        structural_check_file "$file" "ts"
+        structural_check_file "$file"
     fi
 }
 

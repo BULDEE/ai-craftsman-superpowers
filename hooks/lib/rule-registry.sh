@@ -120,6 +120,9 @@ rule_owner()            { _rule_field "$1" 4; }
 rule_text()             { _rule_field "$1" 5; }
 # The manifest said no marker may silence this rule (`never_ignorable: true`).
 rule_never_ignorable()  { [[ "$(_rule_field "$1" 6)" == "yes" ]]; }
+# The manifest said a test file demotes this rule to warn (`relaxed_in_tests:
+# true`): a 300-line fixture or a credential in a fixture is a fixture.
+rule_relaxed_in_tests() { [[ "$(_rule_field "$1" 7)" == "yes" ]]; }
 
 rule_is_known() {
     [[ -n "$(rule_owner "$1")" ]]

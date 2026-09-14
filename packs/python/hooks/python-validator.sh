@@ -97,9 +97,11 @@ _check_py005() {
     done < <(grep -nE 'def\s+\w+\(.*=\s*(\[\]|\{\}|set\(\))' "$file" 2>/dev/null | cut -d: -f1)
 }
 
-_PY_AST_CHECKS="${_PY_PACK_DIR}/../../../hooks/lib/python_ast_checks.py"
+_PY_AST_CHECKS="${_PY_PACK_DIR}/python_ast_checks.py"
 
-# PY006 and PY007 run their AST pass from hooks/lib/python_ast_checks.py rather
+# PY006 and PY007 run their AST pass from python_ast_checks.py, next to this
+# file: the pack owns its analyser. It lived in hooks/lib for two releases,
+# where the core carried a Python checker no other pack could use, rather
 # than from a heredoc: inline, they pushed this file past its structural budget
 # and put the logic beyond the reach of ruff and of the test suite.
 # The check name is passed lowercased by the caller rather than derived with

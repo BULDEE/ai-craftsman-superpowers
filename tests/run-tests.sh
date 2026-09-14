@@ -467,6 +467,7 @@ test_hook_inventory() {
     log_info "Testing hook inventory against hooks.json (content)"
 
     run_subtest "Hook inventory tests pass" "$SCRIPT_DIR/core/test-hook-inventory.sh" || true
+    run_subtest "No language literal in the core" "$SCRIPT_DIR/core/test-no-language-literals.sh" || true
     run_subtest "Documented claims match the code" "$SCRIPT_DIR/core/test-doc-claims.sh" || true
     run_subtest "Session state keys have writers" "$SCRIPT_DIR/core/test-session-state-keys.sh" || true
 }

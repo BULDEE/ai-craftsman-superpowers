@@ -177,6 +177,14 @@ if ! PYTHONPATH="$NOYAML" python3 -c 'import yaml' 2>/dev/null; then
     log_pass "control: the shim removes PyYAML from the compiler"
     with_yaml=$(python3 "$ROOT_DIR/hooks/lib/rule_registry.py" "$ROOT_DIR/rules/core.yml" | awk -F'\t' '$1 == "SEC001" {print $6}')
     without_yaml=$(PYTHONPATH="$NOYAML" python3 "$ROOT_DIR/hooks/lib/rule_registry.py" "$ROOT_DIR/rules/core.yml" | awk -F'\t' '$1 == "SEC001" {print $6}')
+    relaxed_with=$(python3 "$ROOT_DIR/hooks/lib/rule_registry.py" "$ROOT_DIR/rules/core.yml" | awk -F'\t' '$1 == "LOC001" {print $7}')
+    relaxed_without=$(PYTHONPATH="$NOYAML" python3 "$ROOT_DIR/hooks/lib/rule_registry.py" "$ROOT_DIR/rules/core.yml" | awk -F'\t' '$1 == "LOC001" {print $7}')
+    if [[ "$relaxed_with" == "yes" && "$relaxed_without" == "yes" ]]; then
+        log_pass "LOC001 compiles relaxed_in_tests=yes with and without PyYAML (column 7)"
+    else
+        log_fail "relaxed_in_tests depends on PyYAML or is not compiled" \
+            "with='$relaxed_with' without='$relaxed_without'"
+    fi
     if [[ "$with_yaml" == "yes" && "$without_yaml" == "yes" ]]; then
         log_pass "SEC001 compiles never_ignorable=yes with and without PyYAML"
     else
@@ -185,6 +193,43 @@ if ! PYTHONPATH="$NOYAML" python3 -c 'import yaml' 2>/dev/null; then
     fi
 else
     log_fail "control: the PyYAML shim did not take" "import yaml succeeded with the shim on PYTHONPATH"
+fi
+
+# =============================================================================
+# The engine holds no list of rules a test path relaxes
+# =============================================================================
+# `_RULES_TEST_RELAXED='LOC001 NEST001 ...'` was the one list of rule ids the
+# engine kept after #37, and a pack rule could not join it without an edit to
+# the engine. The manifest that owns the rule says `relaxed_in_tests: true`,
+# the registry compiles it, and the engine asks.
+echo ""
+echo "=== relaxed_in_tests is the manifest's call ==="
+if grep -q '_RULES_TEST_RELAXED=' "$ROOT_DIR/hooks/lib/rules-engine.sh"; then
+    log_fail "the engine holds no list of rules relaxed in tests" \
+        "_RULES_TEST_RELAXED is still declared in rules-engine.sh"
+else
+    log_pass "the engine holds no list of rules relaxed in tests"
+fi
+relaxed_ids=$(python3 "$ROOT_DIR/hooks/lib/rule_registry.py" "$ROOT_DIR/rules/core.yml" "$ROOT_DIR"/packs/*/pack.yml 2>/dev/null | awk -F'\t' '$7 == "yes" {print $1}' | sort | tr '\n' ' ')
+if [[ "$relaxed_ids" == "CTRL001 GOD001 LOC001 NEST001 PARAM001 SEC001 SEC002 " ]]; then
+    log_pass "the seven rules the engine used to list are the seven the manifests declare"
+else
+    log_fail "the seven rules the engine used to list are the seven the manifests declare" "got '$relaxed_ids'"
+fi
+# And the engine consumes it: a block rule declared relaxed resolves to warn
+# under tests/, one not declared stays block.
+RELAX_DIR="$(mktemp -d)"
+mkdir -p "$RELAX_DIR/tests"
+relax_out=$(cd "$RELAX_DIR" && CLAUDE_PLUGIN_DATA="$RELAX_DIR/data" bash -c "
+    source '$ROOT_DIR/hooks/lib/config.sh'
+    source '$ROOT_DIR/hooks/lib/rules-engine.sh'
+    rules_init '$RELAX_DIR' /nonexistent-global >/dev/null 2>&1
+    printf '%s %s' \"\$(rules_severity_for_file '$RELAX_DIR/tests/FooTest.php' SEC001)\" \"\$(rules_severity_for_file '$RELAX_DIR/tests/FooTest.php' PHP001)\"" 2>/dev/null)
+rm -rf "$RELAX_DIR"
+if [[ "$relax_out" == "warn block" ]]; then
+    log_pass "under tests/, a rule declared relaxed_in_tests resolves warn and one not declared stays block"
+else
+    log_fail "under tests/, a rule declared relaxed_in_tests resolves warn and one not declared stays block" "got '$relax_out'"
 fi
 
 test_summary

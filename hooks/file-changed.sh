@@ -5,7 +5,11 @@
 # Complements Write/Edit hooks - covers external changes (IDE, git).
 #
 # FileChanged is a supported Claude Code hook type (verified 2026-04-04).
-# Wired in hooks.json with matcher "*.php|*.ts|*.tsx" and async: true.
+# Wired in hooks.json on the common source roots (src/, app/, lib/, libs/,
+# packages/, apps/) and async: true. A FileChanged matcher lists literal
+# filenames or directories with a trailing slash; the glob it carried for four
+# releases ("*.php|*.ts|*.tsx") is not a form the event supports, so the hook
+# never fired for anything. The language is decided below, by the registry.
 #
 # TRIGGERS: FileChanged (async)
 # EXIT CODES: 0 always (non-blocking, monitoring only)

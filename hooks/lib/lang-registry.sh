@@ -193,6 +193,77 @@ lang_all_known_extensions() {
         "$_LANG_REGISTRY_KNOWN_FILE" 2>/dev/null | sort -u
 }
 
+# The same questions over the KNOWN registry: every installed pack, stack
+# filter or not. Discovery asks these, because "a pack claims this project's
+# marker but the stack excludes it" is exactly the mismatch worth reporting,
+# and the filtered registry cannot see it by construction.
+# Built from the manifests on disk when no caller initialised it, the way the
+# rule registry does: the session banner and the healthcheck run in the hook's
+# own shell while pack_loader_init ran in a subshell, so they read nothing
+# without this and reported "none installed" whatever was installed.
+_lang_known_autoinit() {
+    local root manifest manifests=()
+    root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+    for manifest in "$root"/packs/*/pack.yml; do
+        [[ -f "$manifest" ]] && manifests+=("$manifest")
+    done
+    [[ ${#manifests[@]} -gt 0 ]] || return 1
+    lang_registry_init_known "${manifests[@]}"
+}
+
+_lang_known_ready() {
+    if [[ -z "$_LANG_REGISTRY_KNOWN_FILE" ]]; then
+        _lang_known_autoinit >/dev/null 2>&1 || return 1
+    fi
+    [[ -n "$_LANG_REGISTRY_KNOWN_FILE" && -f "$_LANG_REGISTRY_KNOWN_FILE" ]]
+}
+
+# lang_known_for_file <path> → the language some installed pack claims for
+# the extension, stack filter or not. A validator running on the file already
+# means its language is enabled; what it asks here is a property of the
+# language (its dialect), not a stack decision.
+lang_known_for_file() {
+    local file="$1" base extension
+    _lang_known_ready || return 0
+    base="${file##*/}"
+    case "$base" in
+        *.*) extension="${base##*.}" ;;
+        *)   return 0 ;;
+    esac
+    awk -F'\t' -v ext="$extension" \
+        '$2 == "extensions" && $3 == ext { print $1; exit }' \
+        "$_LANG_REGISTRY_KNOWN_FILE" 2>/dev/null
+}
+
+lang_all_known_capability() {
+    local capability="$1"
+    _lang_known_ready || return 0
+    awk -F'\t' -v cap="$capability" '$2 == cap { print $3 }' \
+        "$_LANG_REGISTRY_KNOWN_FILE" 2>/dev/null | sort -u
+}
+
+lang_known_registered() {
+    _lang_known_ready || return 0
+    awk -F'\t' '{ print $1 }' "$_LANG_REGISTRY_KNOWN_FILE" 2>/dev/null | sort -u
+}
+
+lang_known_capability() {
+    local language="$1" capability="$2"
+    _lang_known_ready || return 0
+    awk -F'\t' -v lang="$language" -v cap="$capability" \
+        '$1 == lang && $2 == cap { print $3 }' "$_LANG_REGISTRY_KNOWN_FILE" 2>/dev/null
+}
+
+# lang_known_pack_name <language> → the name of the pack that declares it (the
+# basename of the pack directory the registry recorded). Empty when unknown.
+lang_known_pack_name() {
+    local language="$1" pack_dir
+    _lang_known_ready || return 0
+    pack_dir=$(awk -F'\t' -v lang="$language" '$1 == lang { print $4; exit }' \
+        "$_LANG_REGISTRY_KNOWN_FILE" 2>/dev/null)
+    [[ -n "$pack_dir" ]] && printf '%s' "${pack_dir##*/}"
+}
+
 lang_registered() {
     _lang_registry_ready || return 0
     awk -F'\t' '{ print $1 }' "$_LANG_REGISTRY_FILE" 2>/dev/null | sort -u

@@ -69,7 +69,7 @@ _check_php_structure() {
     local file="$1"
 
     if declare -F structural_check_file >/dev/null 2>&1; then
-        structural_check_file "$file" "php"
+        structural_check_file "$file"
     fi
 
     echo "$file" | grep -qE "Controller\.php$|/Controller/" 2>/dev/null \

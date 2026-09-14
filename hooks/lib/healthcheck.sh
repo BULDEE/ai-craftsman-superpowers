@@ -170,7 +170,7 @@ _hc_installed_servers() {
         server=$(lang_capability "$language" lsp 2>/dev/null)
         [[ -z "$server" ]] && continue
         command -v "$server" >/dev/null 2>&1 && printf ' %s(%s)' "$server" "$language"
-    done <<< "$(lang_registered 2>/dev/null)"
+    done <<< "$(lang_known_registered 2>/dev/null)"
 }
 
 hc_check_lsp() {
@@ -179,7 +179,10 @@ hc_check_lsp() {
     if [[ -n "$found" ]]; then
         _hc_record "lsp" "ok" "level-1.5 active:${found}"
     else
-        hints="none installed - Level 1.5 inactive; install the official LSP plugin for your stack (php-lsp, typescript-lsp, pyright-lsp, rust-analyzer-lsp) plus its server binary (PHP: npm i -g intelephense)"
+        # The servers come from the packs' `lsp` capability, so a pack added
+        # later names its own; the plugin side is Claude Code's official LSP
+        # plugin for that server.
+        hints="none installed - Level 1.5 inactive; install one of the language servers the packs declare ($(lang_all_known_capability lsp 2>/dev/null | tr '\n' ' ' | sed 's/ $//')) plus the official Claude Code LSP plugin for it"
         _hc_record "lsp" "warn" "$hints"
     fi
 }

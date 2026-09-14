@@ -11,13 +11,14 @@
 # "App" is only the Symfony skeleton's default root namespace. Hardcoding it
 # meant every project that renamed its root, and every package in a monorepo,
 # passed all three layer rules by construction. The root now comes from
-# composer.json (see config_php_namespace_root); "App" remains the fallback
+# composer.json (see php-namespace.sh); "App" remains the fallback
 # when there is no composer.json to read.
+# shellcheck source=./php-namespace.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/php-namespace.sh"
+
 _layer_ns_regex() {
     local file="$1" root
-    if declare -F config_php_namespace_root >/dev/null 2>&1; then
-        root=$(config_php_namespace_root "$(dirname "$file")")
-    fi
+    root=$(php_namespace_root "$(dirname "$file")")
     [[ -n "${root:-}" ]] || root="App"
     # The root is repository-supplied (a composer.json psr-4 key), so it is
     # data being spliced into a pattern. Escaping backslashes alone left every
