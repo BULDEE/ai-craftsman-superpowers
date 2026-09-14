@@ -60,11 +60,17 @@
 # `terminal` (sed -i, tee, a redirect) is invisible here by construction and
 # is what the conclusion gate's git-derived scope exists to catch.
 #
+# The third tool this hook reads is `terminal`, for one thing only: a `git
+# push` (and a `git commit` under strict) waits for the conclusion gate's pass
+# on the tree it would publish. See the terminal branch below and
+# terminal_gate.py. The matcher is a regex on tool_name
+# (https://hermes-agent.nousresearch.com/docs/user-guide/features/hooks).
+#
 # Install as a shell hook (Path 1, ~/.hermes/config.yaml), or set
 # `write_gate: on` in the plugin config (Path 0):
 #   hooks:
 #     pre_tool_call:
-#       - matcher: "write_file|patch"
+#       - matcher: "^(terminal|write_file|patch)$"
 #         command: "/opt/craftsman/adapters/hermes/pre-tool-call.sh"
 #         timeout: 30        # above the script's own 20s bound, so a kill is never mistaken for a pass
 #         fail_closed: true
@@ -126,6 +132,48 @@ command -v python3 >/dev/null 2>&1 || _bail_infra "python3 not found"
 source "${PLUGIN_ROOT}/hooks/lib/portable-timeout.sh" 2>/dev/null || true
 
 INPUT=$(cat)
+
+# The terminal half: a push waits for the conclusion.
+#
+# Between two conclusions the agent can `git commit` and `git push` through
+# `terminal`, which no craftsman hook saw: a violation the conclusion gate
+# would have refused was already on the remote, and a control cycle an order
+# of magnitude slower than the object it controls is an audit after the fact
+# (guardrail review, MUST-FIX 4). `git push` is refused, and `git commit`
+# under `strict`, unless the conclusion gate's last verdict is a pass on the
+# tree that would be published: pre-verify.sh records the verdict with the
+# tree it judged (terminal_gate.py), so a pass on one tree does not authorise
+# another, and with no verdict at all the push waits (ADR-0029: no verdict is
+# not a clean verdict). Anything that is not a push or a commit passes
+# untouched. Strictness is the workspace's own, as everywhere in this adapter.
+TOOL_NAME=$(printf '%s' "$INPUT" | python3 -c '
+import json, sys
+try:
+    print(json.load(sys.stdin).get("tool_name") or "")
+except (ValueError, TypeError, AttributeError):
+    pass
+' 2>/dev/null)
+if [[ "$TOOL_NAME" == "terminal" ]]; then
+    INSPECTED=$(printf '%s' "$INPUT" | python3 "$SCRIPT_DIR/terminal_gate.py" inspect 2>/dev/null) \
+        || _bail_file "terminal command could not be read"
+    GIT_VERB="${INSPECTED%% *}"
+    GIT_WORKSPACE="${INSPECTED#* }"
+    [[ "$GIT_VERB" == "push" || "$GIT_VERB" == "commit" ]] || exit 0
+    STRICTNESS="strict"
+    if [[ -d "$GIT_WORKSPACE" ]]; then
+        # shellcheck source=/dev/null
+        STRICTNESS=$(cd "$GIT_WORKSPACE" && source "$PLUGIN_ROOT/hooks/lib/config.sh" 2>/dev/null && config_strictness 2>/dev/null) || STRICTNESS="strict"
+        [[ -n "$STRICTNESS" ]] || STRICTNESS="strict"
+    fi
+    # Captured with an explicit || branch: a non-zero exit inside a command
+    # substitution would fire the ERR trap before the status is read, and the
+    # refusal would carry the "could not judge" message instead of its own.
+    JUDGED=0
+    REASON=$(python3 "$SCRIPT_DIR/terminal_gate.py" judge "$GIT_WORKSPACE" "$GIT_VERB" "$STRICTNESS" 2>/dev/null) || JUDGED=$?
+    [[ "$JUDGED" -eq 0 ]] && exit 0
+    [[ "$JUDGED" -eq 2 && -n "$REASON" ]] || _bail_file "terminal gate exited ${JUDGED} without a verdict"
+    _block "$REASON"
+fi
 
 # What the file WOULD contain, laid out under a mirror of its workspace so a
 # rule that reads the path (LAYER001 keys on /Domain/) sees the real one, and

@@ -187,12 +187,33 @@ shell wire (`tool_input`, the gateway's cwd of `/`, no cwd at all), the same
 refusals, the gate's own files refused, a fuzzy and a V4A patch judged on what
 they add.
 
-Path 1 users declare it as a shell hook instead:
+### The push waits for the conclusion
+
+Between two conclusions the agent can `git commit` and `git push` through
+`terminal`, which no craftsman hook saw: a violation the conclusion would
+have refused was already on the remote, and a control cycle an order of
+magnitude slower than the object it controls is an audit after the fact. So
+the same hook reads `terminal` for one thing: a `git push` (and a `git
+commit` under `strict`) is refused unless the conclusion gate's last verdict
+is a pass on the tree that would be published. `pre-verify.sh` records its
+verdict with the tree it judged (`<git-dir>/craftsman-verdict`, written by
+`terminal_gate.py`), so a pass on one tree does not authorise pushing
+another, and with no verdict at all the push waits: no verdict is not a clean
+verdict (ADR-0029). The refusal says which of the three it is (no verdict, a
+refused turn, a different tree) and what to do: finish the turn so the gate
+runs, fix what it reports, then push. `git status`, `git log`, and every
+command that is not a push or a commit pass untouched; a `git -C <repo>`
+names the repository when the gateway's cwd is not the task's, and a `cd`
+earlier in the same command line is followed. Under `moderate` and `relaxed`
+only the push waits.
+
+Path 1 users declare it as a shell hook instead. The matcher is a regex on
+`tool_name` ([Hermes hooks](https://hermes-agent.nousresearch.com/docs/user-guide/features/hooks)):
 
 ```yaml
 hooks:
   pre_tool_call:
-    - matcher: "write_file|patch"
+    - matcher: "^(terminal|write_file|patch)$"
       command: "/opt/craftsman/adapters/hermes/pre-tool-call.sh"
       timeout: 30        # above the script's own 20s bound, so a kill is never mistaken for a pass
       fail_closed: true
@@ -284,6 +305,15 @@ empty under both adapters, so a `strictness: relaxed` in the bot's home changes
 no verdict).
 Both reproduced before the in-turn guard existed, and both remain live outside
 it.
+
+**The push gate reads the command line, not the process tree.** `git push`
+inside `sh -c "..."`, a script the agent wrote and then ran, an alias, or a
+push made from outside the `terminal` tool is not seen. And the verdict file
+lives in the repository's git directory, writable by the agent's uid: an
+agent that forges a pass with the right tree id has evaded the gate on
+purpose, which is the retry budget the design refuses, not a bug it can
+close. The gate makes the honest loop (write, conclude, fix, push) the path
+of least resistance; it does not make the dishonest one impossible.
 
 The stock image runs as uid 0, so file permissions contain nobody. Containment
 needs one of:

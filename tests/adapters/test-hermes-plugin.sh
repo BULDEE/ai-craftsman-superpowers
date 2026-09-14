@@ -142,6 +142,25 @@ loose = pre_tool_call(tool_name="write_file",
 report("write_gate on: PHP001, PHP002 and PHP003 still wait for the conclusion (not refused here)", loose is None, repr(loose))
 report("write_gate on: a tool that is not a write passes untouched",
        pre_tool_call(tool_name="terminal", args={"command": "ls"}, task_id="s1", cwd=repo) is None)
+# The terminal half (guardrail review, MUST-FIX 4): a push between two
+# conclusions waits for the conclusion gate's pass on the tree it would
+# publish. The pass recorded above ("a fixed worktree releases the turn")
+# judged the committed tree, so pushing exactly that tree is allowed; commit
+# the file written since, and the tree HEAD would publish is one the
+# conclusion never saw.
+allowed = pre_tool_call(tool_name="terminal", args={"command": "git push origin main"}, task_id="s1", cwd=repo)
+report("write_gate on: git push of the tree the conclusion passed is allowed through the plugin",
+       allowed is None, repr(allowed))
+with open(os.path.join(repo, "src", "Unjudged.ts"), "w") as fh:
+    fh.write("export const unjudged = 1;\n")
+os.system("cd %s && git add -A >/dev/null 2>&1 && git -c user.email=t@t -c user.name=t commit -qm unjudged >/dev/null 2>&1" % repo)
+pushed = pre_tool_call(tool_name="terminal", args={"command": "git push origin main"}, task_id="s1", cwd=repo)
+report("write_gate on: git push of a tree the conclusion never judged is refused through the plugin too",
+       isinstance(pushed, dict) and pushed.get("action") == "block" and "different tree" in str(pushed.get("message")), repr(pushed))
+cp._WRITE_GATE_ON = False
+report("write_gate off: git push passes untouched, the conclusion gate alone governs",
+       pre_tool_call(tool_name="terminal", args={"command": "git push origin main"}, task_id="s1", cwd=repo) is None)
+cp._WRITE_GATE_ON = True
 
 # A patch is judged on the file as it WOULD be, not on the fragment.
 with open(os.path.join(repo, "src", "Domain", "Clean.php"), "w") as fh:

@@ -659,6 +659,7 @@ test_session_metrics() {
     run_subtest "Hermes pre_verify adapter tests pass" "$SCRIPT_DIR/adapters/test-hermes-pre-verify.sh" || true
     run_subtest "Host adapter parity tests pass" "$SCRIPT_DIR/adapters/test-parity.sh" || true
     run_subtest "Hermes native plugin tests pass" "$SCRIPT_DIR/adapters/test-hermes-plugin.sh" || true
+    run_subtest "Hermes terminal gate tests pass" "$SCRIPT_DIR/adapters/test-hermes-terminal-gate.sh" || true
     run_subtest "Doctrine export tests pass" "$SCRIPT_DIR/ci/test-doctrine-export.sh" || true
     run_subtest "Rule registry tests pass" "$SCRIPT_DIR/ci/test-rule-registry.sh" || true
     run_subtest "Ratchet CI parity tests pass" "$SCRIPT_DIR/ci/test-ratchet-ci.sh" || true

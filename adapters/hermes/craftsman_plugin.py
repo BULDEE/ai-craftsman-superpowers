@@ -252,14 +252,16 @@ def _run_write_gate(tool_name: str, args: Any, cwd: str) -> dict[str, Any] | Non
 
 
 def on_pre_tool_call(tool_name: str = "", args: Any = None, task_id: str = "", **kwargs: Any) -> dict[str, Any] | None:
-    """Refuse a write_file or patch whose content carries SEC001 or LAYER001.
+    """Refuse a write_file or patch whose content carries SEC001 or LAYER001,
+    and a terminal `git push` (or `git commit` under strict) the conclusion
+    gate has not passed on that tree.
 
     Opt-in through `write_gate: on`. Every other tool, and every other rule,
     passes untouched here and is judged at the conclusion. The gate's own
     failure is a block, never a silent pass: an operator who opted in asked
     for fail-closed on exactly these rules.
     """
-    if not _WRITE_GATE_ON or tool_name not in ("write_file", "patch"):
+    if not _WRITE_GATE_ON or tool_name not in ("write_file", "patch", "terminal"):
         return None
     # pre_tool_call carries no cwd of its own (hermes_cli/plugins.py hands
     # tool_name, args, task_id, session_id and ids); a `cwd` kwarg is the
