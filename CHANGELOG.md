@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The dogfood test walks every shipped script and judges it as a user's
+  file.** `tests/core/test-dogfood.sh` walked `hooks/`, `ci/`, `adapters/`,
+  `scripts/` and the packs' `hooks/`, and counted a finding as blocking
+  from its own list of advisory rules, a third copy of what the manifests
+  declare. It now resolves each finding through `rules_severity_for_file`,
+  honours a `craftsman-ignore` marker unless the rule is `never_ignorable`,
+  and walks `.github/scripts`, the packs' `scripts/`, `static-analysis/`
+  and `knowledge/canonical/`, and the root scripts as well; a shipped
+  `.sh` or `.py` outside that scope fails the test. The widening surfaced
+  seven functions over the structure thresholds in the Go and Rust packs
+  and the GitHub adapter (SH002, PY002, one PY001); each is split into
+  named helpers rather than marked. Seen red on a 30-line function added
+  to a newly walked directory.
+
 - **The ratchet is inert until a project opts in, and anchored on the
   file.** `ratchet.py check` on a file with no mark anywhere created a
   baseline next to the file; the hooks hid that behind a gate on

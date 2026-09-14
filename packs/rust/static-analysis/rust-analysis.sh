@@ -48,9 +48,11 @@ _pack_sa_rust_manifest() {
 }
 
 # The JSON filter, kept out of pack_sa_rust so the orchestration reads as the
-# five steps it is: probe, locate the crate, run, declare, filter.
-_pack_sa_rust_filter() {
-    python3 -c '
+# five steps it is: probe, locate the crate, run, declare, filter. Resolved
+# paths, not basenames: mod.rs, lib.rs and main.rs are the three most common
+# file names in a Rust workspace, so a suffix match attributes one crate
+# diagnostics that belong to another.
+_PACK_SA_RUST_FILTER_PY='
 import json, os, sys
 
 target = os.path.realpath(sys.argv[1])
@@ -67,12 +69,9 @@ for raw in sys.stdin:
     if not isinstance(message, dict):
         continue
     spans = message.get("spans") or []
-    primary = next((s for s in spans if s.get("is_primary")), None)
+    primary = next((span for span in spans if span.get("is_primary")), None)
     if not primary:
         continue
-    # Resolved paths, not basenames: mod.rs, lib.rs and main.rs are the three
-    # most common file names in a Rust workspace, so a suffix match attributes
-    # one crate diagnostics that belong to another.
     reported = primary.get("file_name") or ""
     if not os.path.isabs(reported):
         reported = os.path.join(root, reported)
@@ -80,9 +79,19 @@ for raw in sys.stdin:
         continue
     text = (message.get("message") or "clippy lint").replace("\n", " ")
     print("CLIPPY001:%s:%s" % (primary.get("line_start", 0), text))
-' "$1" "$2"
+'
+
+_pack_sa_rust_filter() {
+    python3 -c "$_PACK_SA_RUST_FILTER_PY" "$1" "$2"
 }
 
+# `unwrap_used` and `expect_used` are `restriction` lints: clippy ships them
+# off by default, so a run that did not ask for them says nothing about
+# RUST001 or RUST005. Declaring those covered anyway deleted the pack's
+# headline rule on every machine with clippy installed. They are requested
+# explicitly, and coverage is declared only after the run that asked. No
+# verdict is not a clean verdict: a timeout or a failed build leaves the
+# Level 1 rules to answer, which is what precedence_flush is for.
 pack_sa_rust() {
     local file="$1"
     [[ -f "$file" ]] || return 0
@@ -94,18 +103,11 @@ pack_sa_rust() {
     local absolute
     absolute="$(cd "$(dirname "$file")" && pwd)/$(basename "$file")"
 
-    # `unwrap_used` and `expect_used` are `restriction` lints: clippy ships them
-    # off by default, so a run that did not ask for them says nothing about
-    # RUST001 or RUST005. Declaring those covered anyway deleted the pack's
-    # headline rule on every machine with clippy installed. They are requested
-    # explicitly, and coverage is declared only after the run that asked.
     local output status=0
     output=$(sa_timeout "${SA_BUDGET_PROJECT_SECONDS:-30}" \
         cargo clippy --manifest-path "$manifest" --message-format=json --quiet \
         -- -W clippy::unwrap_used -W clippy::expect_used 2>/dev/null) || status=$?
 
-    # No verdict is not a clean verdict: a timeout or a failed build leaves the
-    # Level 1 rules to answer, which is what precedence_flush is for.
     [[ $status -eq 124 ]] && return 0
 
     if type precedence_declare_covered >/dev/null 2>&1; then
