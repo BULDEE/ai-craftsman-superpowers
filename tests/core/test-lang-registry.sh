@@ -489,6 +489,23 @@ else
     log_fail "literal_syntax is read by the ratchet" "with=$with_syntax without=$without_syntax"
 fi
 
+# A capability key the engine does not know is refused at compile time, by
+# name, and the whole language entry is dropped: `lang_registry.py` used to
+# skip it silently, so a pack could declare `fake_cap: [x]` and every test in
+# this file stayed green while CLAUDE.md claimed the opposite (architecture
+# review, MUST-FIX). A typo in `extensions` would have been a language that
+# validates nothing, with no word said.
+printf '    fake_cap: [x]\n' >> "$LS_DIR/packs/zed/pack.yml"
+unknown_key=$( python3 "$ROOT_DIR/hooks/lib/lang_registry.py" "$LS_DIR/packs/zed/pack.yml" 2>&1 >/dev/null )
+assert_contains "an unknown capability key is refused by name" "$unknown_key" "fake_cap"
+unknown_compiled=$( python3 "$ROOT_DIR/hooks/lib/lang_registry.py" "$LS_DIR/packs/zed/pack.yml" 2>/dev/null | grep -c "^zed" || true )
+if [[ "${unknown_compiled:-0}" -eq 0 ]]; then
+    log_pass "and the language entry carrying it is not compiled"
+else
+    log_fail "and the language entry carrying it is not compiled" "$unknown_compiled row(s) for zed"
+fi
+sed -i.bak '/fake_cap/d' "$LS_DIR/packs/zed/pack.yml"
+
 # An unknown grammar name is refused at compile time, by name, and the entry
 # is dropped rather than passed through. The compiler is asked directly: the
 # shell wrapper discards its stderr on purpose (a repository's manifest must

@@ -683,11 +683,22 @@ def _current_mark_for(entries: dict, path: str):
     return None
 
 
+# Inert until the project opts in: a new row for an unmarked file is right
+# inside an existing mark (born clean), a new mark file is an opt-in nobody
+# made. `check` used to create one next to the file, and the hooks hid that
+# behind a gate on the shell's directory, which is how a hook fired from a
+# subdirectory skipped the ratchet of a marked project entirely.
+def _no_mark(baseline_file: Path) -> bool:
+    return not baseline_file.is_file()
+
+
 def _cmd_check(args) -> int:
     file_path = Path(args[0])
     if _skipped(file_path):
         return 0
     baseline_file = _baseline_path(args)
+    if _no_mark(baseline_file):
+        return 0
     entries = load_baseline(baseline_file)
     current = _current_entry(file_path)
     if current is None:
@@ -730,6 +741,8 @@ def _cmd_update(args) -> int:
     if _skipped(file_path):
         return 0
     baseline_file = _baseline_path(args)
+    if _no_mark(baseline_file):
+        return 0
     entries = load_baseline(baseline_file)
     current = _current_entry(file_path)
     if current is None:

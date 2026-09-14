@@ -98,3 +98,12 @@ Rejected by ADR-0016: no dual-architecture period.
 
 - ADR-0007 (superseded), ADR-0010 (model tiering restored), ADR-0016 (clean break)
 - Skills documentation: https://code.claude.com/docs/en/skills
+
+## Amendment (2026-09-14): the pack `commands/` directories survive
+
+"The `commands/` directory is deleted" holds for the core. A pack may still
+ship `commands/*.md` (`packs/ai-ml/commands/` does, for `rag`, `mlops` and
+`agent-design`), and `pack-loader.sh` symlinks each into `skills/<name>/` at
+load time; the routing table reads the pack file directly before that sync
+(`_route_skill_file`). The `context: fork` and `allowed-tools:` rows of the
+migration table describe no file in the tree today; ADR-0028 records why.

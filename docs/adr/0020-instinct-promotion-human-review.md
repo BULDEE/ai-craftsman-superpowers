@@ -103,3 +103,17 @@ since this ADR produced a file the model never saw, and the test checked
 that the file existed rather than that the consumer loaded it. `approve` now
 writes to `.claude/skills/learned-<slug>/`, refuses any other depth by name,
 and SessionStart names the files left at the old one with the `mv` to make.
+
+## Amendment (2026-09-14): `scoped` has a writer, and the global tier is named
+
+The 2026-09-12 amendment counted `scoped` as a rejection while no front-end
+wrote it. `post-write-check.sh` writes it since 4.10.1 (#73): a rule gone
+from a write's findings because its severity resolved to `warn` or `ignore`
+for that file records `scoped`, and one the baseline mark held records
+`overridden`; only a rule still blocking that is now gone records `fixed`.
+
+The global promotion tier (`instincts.py promote`, `global-candidates`: a
+rule approved in two or more independent projects becomes a user-level skill
+under `~/.claude/skills/learned-global-<slug>/`) shipped without a home in
+this ADR. It is part of this decision: approval stays per project, and only
+agreement across projects earns a skill that follows the user.

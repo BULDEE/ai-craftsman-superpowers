@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The ratchet is inert until a project opts in, and anchored on the
+  file.** `ratchet.py check` on a file with no mark anywhere created a
+  baseline next to the file; the hooks hid that behind a gate on
+  `$PWD/.craftsman-baseline.json`, which was the other defect: the rule
+  baseline walks up from the file, the ratchet was anchored on the shell's
+  directory, so a hook fired from `src/` of a marked project skipped the
+  ratchet entirely (architecture review, MUST-FIX). `check` and `update`
+  now do nothing where no mark exists, and both front-ends gate on the mark
+  above the file (`rule_baseline_marked`), the same anchor the rule
+  baseline uses. Seen red both ways.
+
+- **`test-legacy-command.sh` asks the consumer.** The routing assertion
+  sourced three libraries into the suite's own shell and went red once in
+  thirteen full runs with an empty detail; it now reads the table from
+  `hooks/session-start.sh`, the process that injects it, and keeps the
+  output on failure.
+
+- **A capability key the engine does not read is refused at compile time.**
+  `lang_registry.py` skipped unknown keys silently, so a pack could declare
+  `fake_cap: [x]` under `languages:` and every suite stayed green while
+  CLAUDE.md claimed the opposite (architecture review); a typo in
+  `extensions` would have been a language that validates nothing. The
+  compiler now refuses the entry by name, listing the known keys, and
+  `tests/core/test-lang-registry.sh` asserts the refusal.
+
+### Changed
+
+- **Five ADRs amended to what shipped** (architecture review): ADR-0025
+  (no strictness wiring on the ratchet, loosening through `init --reason`,
+  no `--repair`, no duplication metric, the row schema), ADR-0017 (pack
+  `commands/` directories survive and are symlinked), ADR-0020 (`scoped`
+  has a writer since #73; the global promotion tier is named), ADR-0028
+  (the forking set is empty), ADR-0029 (`inject` on Hermes is trends only).
+
 ## [4.10.2] - 2026-09-14
 
 The rest of the whole-plugin review's blocking findings, every one seen red

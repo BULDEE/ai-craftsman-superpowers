@@ -791,11 +791,12 @@ scan_file() {
 
     # Structural ratchet parity (ADR-0025): identical check to the hook.
     # CI never writes the baseline; the pipeline is read-only.
-    if [[ -f "$PWD/.craftsman-baseline.json" ]] && command -v python3 >/dev/null 2>&1; then
+    # Anchored on the file, like the hook and the rule baseline (the mark above
+    # the file, not the pipeline's working directory).
+    if command -v python3 >/dev/null 2>&1 && { ! type rule_baseline_marked >/dev/null 2>&1 || rule_baseline_marked "$file"; }; then
         local ratchet_out ratchet_exit
         ratchet_exit=0
-        ratchet_out=$(python3 "$PLUGIN_ROOT/hooks/lib/ratchet.py" check "$file" \
-            --baseline "$PWD/.craftsman-baseline.json" 2>/dev/null) || ratchet_exit=$?
+        ratchet_out=$(python3 "$PLUGIN_ROOT/hooks/lib/ratchet.py" check "$file" 2>/dev/null) || ratchet_exit=$?
         if [[ $ratchet_exit -eq 1 && -n "$ratchet_out" ]]; then
             while IFS= read -r ratchet_line; do
                 [[ -z "$ratchet_line" ]] && continue

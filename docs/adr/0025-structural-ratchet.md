@@ -95,3 +95,24 @@ Use the Claude API or a local model to assess code quality; ratchet on the score
 - hooks/lib/ratchet.py: metric computation and baseline management
 - hooks/post-write-check.sh: ratchet integration in write-time validation
 - ci/craftsman-ci.sh: ratchet integration in CI enforcement
+
+## Amendment (2026-09-14): what shipped, against what was decided
+
+The decision stands: one committed, per-file, one-way mark. Four details of
+the design section describe a product that was not shipped, found by the
+architecture review of 2026-09-13, and this is the record rather than a
+rewrite of the decision.
+
+- "Block in strict, warn in moderate, silent in relaxed": `RATCHET001` is
+  declared `default_severity: warn` in `rules/core.yml` and resolves through
+  the rules engine like any rule; no strictness wiring of its own exists.
+- "Loosening is explicit: `craftsman-ignore: RATCHET`": the marker is not
+  read by the ratchet. Loosening is `ratchet.py init <file> --reason`, which
+  writes the new numbers into the mark where a reviewer sees them in the
+  diff (instrument 2, #59).
+- `ratchet init --repair`: never implemented; the mark is rebuilt by
+  `init` on the named files.
+- Duplication through jscpd or phpcpd: not implemented; the row carries no
+  duplication metric.
+- The row schema grew `reason`, `rules` (the rule baseline shares the row,
+  ADR-0025 and `rule_baseline.py`) and `instrument`.

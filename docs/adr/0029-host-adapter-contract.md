@@ -93,3 +93,11 @@ through `instincts.py approve`. Codification stays human-gated on every host.
   `gate` unimplementable as specified.
 - Instinct approval needs to synchronise across machines, which would reopen
   the projection-versus-record question that the panel closed here.
+
+## Amendment (2026-09-14): `inject` is half implemented on Hermes
+
+The Hermes adapter injects correction trends on the first turn
+(`craftsman_plugin.py`, `_resolve_trends`) and does not inject approved
+instincts. The contract row says both. Until the second half exists the
+adapter implements `inject` for trends only, and this line is the notice
+rather than a silent gap; the parity suite does not cover injection.
