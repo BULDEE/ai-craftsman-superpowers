@@ -130,3 +130,10 @@ citing section 2, and still clears `tests/core/test-turn-budget.sh`.
 - [ADR-0011: Context Fork Strategy](./0011-context-fork-strategy.md)
 - [ADR-0017: Skills over Commands](./0017-skills-over-commands.md)
 - [Claude Code: run skills in a subagent](https://code.claude.com/docs/en/skills#run-skills-in-a-subagent)
+
+## Amendment (2026-09-14): the forking set is empty
+
+"ADR-0011 still stands for `debug`, `refactor`, `plan` and `mlops`": none of
+the four declares `context: fork` today, and `tests/core/test-turn-budget.sh`
+refuses the field on any skill that delivers a verdict. ADR-0011 stands as
+the record of why forking was tried; no skill forks.

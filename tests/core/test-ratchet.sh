@@ -762,4 +762,34 @@ fi
 
 rm -rf "$INSTR"
 
+# --- Inert until the project opts in, and anchored on the file ----------------
+#
+# `ratchet.py check` on a file with no mark anywhere used to CREATE a baseline
+# next to the file (a new row for an unmarked file is right inside an existing
+# mark; a new mark file is an opt-in nobody made). The hooks hid that behind a
+# `$PWD/.craftsman-baseline.json` gate, which is the other defect: the rule
+# baseline walks up from the file, the ratchet was anchored on the shell's
+# directory, so a hook fired from `src/` of a marked project skipped the
+# ratchet entirely (architecture review, MUST-FIX).
+INERT=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-ratchet-inert.XXXXXX")
+mkdir -p "$INERT/src"
+printf 'x() {\n  if a; then b; fi\n}\n' > "$INERT/src/f.sh"
+( cd "$INERT/src" && python3 "$ROOT_DIR/hooks/lib/ratchet.py" check f.sh >/dev/null 2>&1; python3 "$ROOT_DIR/hooks/lib/ratchet.py" update f.sh >/dev/null 2>&1 )
+if [[ ! -e "$INERT/src/.craftsman-baseline.json" && ! -e "$INERT/.craftsman-baseline.json" ]]; then
+    log_pass "check and update on an unmarked project create no mark: inert until init"
+else
+    log_fail "check or update created a mark on an unmarked project" "$(ls -a "$INERT" "$INERT/src" | tr '\n' ' ')"
+fi
+( cd "$INERT" && git init -q && python3 "$ROOT_DIR/hooks/lib/ratchet.py" init >/dev/null 2>&1 )
+printf 'x() {\n  if a; then b; fi\n  if c; then d; fi\n  if e; then f; fi\n}\n' > "$INERT/src/f.sh"
+SUB_EXIT=0
+SUB_OUT=$( cd "$INERT/src" && echo "{\"tool_input\":{\"file_path\":\"$INERT/src/f.sh\"}}" \
+    | CLAUDE_PLUGIN_ROOT="$ROOT_DIR" CLAUDE_PLUGIN_OPTION_strictness=strict bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1 ) || SUB_EXIT=$?
+if echo "$SUB_OUT" | grep -q "RATCHET001"; then
+    log_pass "a hook fired from a subdirectory still finds the project's mark and reports the regression"
+else
+    log_fail "the ratchet is anchored on the file, not on the shell's directory" "exit=$SUB_EXIT out=$(echo "$SUB_OUT" | tr '\n' ' ' | cut -c1-120)"
+fi
+rm -rf "$INERT"
+
 test_summary

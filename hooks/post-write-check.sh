@@ -496,21 +496,22 @@ _validate_custom_rules "$FILE_PATH"
 # Structural ratchet (ADR-0025): a touched file may improve or stay equal,
 # never regress. Inert until the project opts in via `ratchet.py init`.
 # =============================================================================
-if [[ -f "$PWD/.craftsman-baseline.json" ]] && command -v python3 >/dev/null 2>&1; then
+# Anchored on the FILE, the way the rule baseline is: the mark is the one
+# above the file, not the one in the shell's directory. Gated on `$PWD`, a
+# hook fired from a subdirectory of a marked project skipped the ratchet.
+if command -v python3 >/dev/null 2>&1 && rule_baseline_marked "$FILE_PATH"; then
     # Capture with an explicit || branch: a non-zero exit inside a command
     # substitution would otherwise fire the fail-open ERR trap before we can
     # read the status, silently skipping the whole check.
     RATCHET_EXIT=0
-    RATCHET_OUT=$(python3 "${SCRIPT_DIR}/lib/ratchet.py" check "$FILE_PATH" \
-        --baseline "$PWD/.craftsman-baseline.json" 2>/dev/null) || RATCHET_EXIT=$?
+    RATCHET_OUT=$(python3 "${SCRIPT_DIR}/lib/ratchet.py" check "$FILE_PATH" 2>/dev/null) || RATCHET_EXIT=$?
     if [[ $RATCHET_EXIT -eq 1 && -n "$RATCHET_OUT" ]]; then
         while IFS= read -r ratchet_line; do
             [[ -z "$ratchet_line" ]] && continue
             add_violation "RATCHET001" "structural regression: ${ratchet_line#RATCHET001 }"
         done <<< "$RATCHET_OUT"
     elif [[ $RATCHET_EXIT -eq 0 ]]; then
-        python3 "${SCRIPT_DIR}/lib/ratchet.py" update "$FILE_PATH" \
-            --baseline "$PWD/.craftsman-baseline.json" >/dev/null 2>&1 || true
+        python3 "${SCRIPT_DIR}/lib/ratchet.py" update "$FILE_PATH" >/dev/null 2>&1 || true
     fi
 fi
 

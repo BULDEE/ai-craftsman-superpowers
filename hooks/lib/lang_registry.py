@@ -250,9 +250,25 @@ class _Indexer:
         for entry in _languages_of(manifest_path):
             self._index_language(entry)
 
+    # A key the engine does not read is refused, by name, and the entry with
+    # it: skipping it silently let a pack declare `fake_cap: [x]` with no word
+    # said, and a typo in `extensions` would have been a language that
+    # validates nothing. The known set is the contract.
+    def _refuse_unknown_keys(self, lang_id: str, entry: dict) -> bool:
+        unknown = sorted(k for k in entry if k != "id" and k not in KNOWN_CAPABILITIES)
+        if not unknown:
+            return False
+        sys.stderr.write(
+            f"craftsman: language '{lang_id}' declares '{', '.join(unknown)}', "
+            f"which the engine does not read (known: {', '.join(KNOWN_CAPABILITIES)}); "
+            "entry refused\n"
+        )
+        self.conflicts += 1
+        return True
+
     def _index_language(self, entry: dict) -> None:
         lang_id = str(entry.get("id") or "").strip()
-        if not lang_id:
+        if not lang_id or self._refuse_unknown_keys(lang_id, entry):
             return
         for capability in KNOWN_CAPABILITIES:
             if capability not in entry:

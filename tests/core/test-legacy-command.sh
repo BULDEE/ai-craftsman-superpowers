@@ -92,14 +92,21 @@ else
     log_fail "em-dash found in legacy.md"
 fi
 
-# --- Registered in the routing table ---
-source "$ROOT_DIR/hooks/lib/config.sh" 2>/dev/null || true
-source "$ROOT_DIR/hooks/lib/pack-loader.sh" 2>/dev/null || true
-source "$ROOT_DIR/hooks/lib/routing-table.sh" 2>/dev/null || true
-if routing_table 2>/dev/null | grep -q '/craftsman:legacy'; then
-    log_pass "legacy is in the routing table"
+# --- Registered in the routing table, as the consumer sees it ---
+#
+# Asked through hooks/session-start.sh, the process that injects the table,
+# rather than by sourcing three libraries into this suite's own shell: that
+# form went red once in thirteen full runs with an empty detail, and the
+# failing state could not be reproduced. Whatever the cause, the assertion is
+# about what a session receives, and the output is kept for the next time.
+ROUTE_HOME=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-legacy-route.XXXXXX")
+mkdir -p "$ROUTE_HOME/.claude" "$ROUTE_HOME/data"
+ROUTE_OUT=$( echo '{}' | HOME="$ROUTE_HOME" CLAUDE_PLUGIN_DATA="$ROUTE_HOME/data" bash "$ROOT_DIR/hooks/session-start.sh" 2>&1 )
+if printf '%s' "$ROUTE_OUT" | grep -q '/craftsman:legacy'; then
+    log_pass "legacy is in the routing table a session receives"
 else
-    log_fail "legacy should be registered in routing-table.sh"
+    log_fail "legacy should be in the routing table a session receives" "$(printf '%s' "$ROUTE_OUT" | tr '\n' ' ' | cut -c1-200)"
 fi
+rm -rf "$ROUTE_HOME"
 
 test_summary
