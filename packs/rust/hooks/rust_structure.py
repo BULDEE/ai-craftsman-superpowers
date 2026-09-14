@@ -97,25 +97,32 @@ def _char_literal_length(source: str, cursor: int) -> int:
     the scanner was counting. A char literal is `'x'`, `'\\n'`, `'\\u{1F600}'`:
     it always closes, and it closes within a bounded distance.
     """
-    # `find` on the closing quote is wrong for `'\''`: it stops on the escaped
-    # quote, leaves the real one behind, and that residue pairs with the next
-    # quote in the file. One stray `'\''` in a const then blanked everything
-    # after it and the file came back clean.
     if cursor + 1 >= len(source):
         return 0
     if source[cursor + 1] == "\\":
-        index = cursor + 2
-        if index < len(source) and source[index] == "u" and source[index + 1:index + 2] == "{":
-            index = source.find("}", index)
-            if index == -1:
-                return 0
-            index += 1
-        else:
-            index += 1
-        return index - cursor + 1 if source[index:index + 1] == "'" else 0
+        return _escaped_char_length(source, cursor)
     if source[cursor + 2:cursor + 3] == "'":
         return 3
     return 0
+
+
+def _escaped_char_length(source: str, cursor: int) -> int:
+    """`'\\n'` or `'\\u{1F600}'`: the escape decides where the closing quote is.
+
+    `find` on the closing quote is wrong for `'\\''`: it stops on the escaped
+    quote, leaves the real one behind, and that residue pairs with the next
+    quote in the file. One stray `'\\''` in a const then blanked everything
+    after it and the file came back clean.
+    """
+    index = cursor + 2
+    if index < len(source) and source[index] == "u" and source[index + 1:index + 2] == "{":
+        index = source.find("}", index)
+        if index == -1:
+            return 0
+        index += 1
+    else:
+        index += 1
+    return index - cursor + 1 if source[index:index + 1] == "'" else 0
 
 
 def _raw_string_length(source: str, cursor: int) -> int:
@@ -146,25 +153,33 @@ def _blank_comment(source: str, cursor: int, out: list) -> int:
         end = source.find("\n", cursor)
         end = length if end == -1 else end
     else:
-        # Rust nests block comments, unlike C. Stopping on the first `*/`
-        # handed the rest of a commented-out block back as live code, and
-        # rules fired on lines rustc never compiles.
-        depth, index = 0, cursor
-        while index < length - 1:
-            if source[index:index + 2] == "/*":
-                depth += 1
-                index += 2
-                continue
-            if source[index:index + 2] == "*/":
-                depth -= 1
-                index += 2
-                if depth == 0:
-                    break
-                continue
-            index += 1
-        end = index if depth == 0 else length
+        end = _block_comment_end(source, cursor)
     out.append(_blanked(source[cursor:end]))
     return end
+
+
+def _block_comment_end(source: str, cursor: int) -> int:
+    """Where the block comment opened at `cursor` closes, nesting counted.
+
+    Rust nests block comments, unlike C. Stopping on the first `*/` handed
+    the rest of a commented-out block back as live code, and rules fired on
+    lines rustc never compiles. An unclosed comment runs to the end.
+    """
+    length = len(source)
+    depth, index = 0, cursor
+    while index < length - 1:
+        if source[index:index + 2] == "/*":
+            depth += 1
+            index += 2
+            continue
+        if source[index:index + 2] == "*/":
+            depth -= 1
+            index += 2
+            if depth == 0:
+                break
+            continue
+        index += 1
+    return index if depth == 0 else length
 
 
 def blank_literals(source: str) -> str:
@@ -178,24 +193,26 @@ def blank_literals(source: str) -> str:
         if moved != -1:
             cursor = moved
             continue
-        if char == "r" and peek in ('"', "#"):
-            span = _raw_string_length(source, cursor)
-            if span:
-                out.append(_blanked(source[cursor:cursor + span]))
-                cursor += span
-                continue
+        span = _literal_span(source, cursor, char, peek)
+        if span:
+            out.append(_blanked(source[cursor:cursor + span]))
+            cursor += span
+            continue
         if char == '"':
             cursor = _blank_plain_string(source, cursor, out)
             continue
-        if char == "'":
-            span = _char_literal_length(source, cursor)
-            if span:
-                out.append(" " * span)
-                cursor += span
-                continue
         out.append(char)
         cursor += 1
     return "".join(out)
+
+
+def _literal_span(source: str, cursor: int, char: str, peek: str) -> int:
+    """The length of a raw string or a char literal at `cursor`, else 0."""
+    if char == "r" and peek in ('"', "#"):
+        return _raw_string_length(source, cursor)
+    if char == "'":
+        return _char_literal_length(source, cursor)
+    return 0
 
 
 def _blank_plain_string(source: str, cursor: int, out: list) -> int:
@@ -320,45 +337,39 @@ def _preamble(raw_lines, index):
     """
     collected = []
     cursor = index - 1
-    inside_attribute = False
-    inside_block_comment = False
-    while cursor >= 0:
-        stripped = raw_lines[cursor].strip()
-        if not stripped and not inside_block_comment:
-            break
-        if inside_block_comment:
-            # A `/** ... */` doc comment: the middle lines are prose and match
-            # nothing, so the walk stopped on them and the doc was never seen.
-            collected.append(raw_lines[cursor])
-            if stripped.startswith("/*"):
-                inside_block_comment = False
-            cursor -= 1
-            continue
-        if stripped.endswith("*/") and not stripped.startswith("/*"):
-            inside_block_comment = True
-            collected.append(raw_lines[cursor])
-            cursor -= 1
-            continue
-        if inside_attribute:
-            # Everything between `#[derive(` and its `)]` belongs to the
-            # attribute, and rustfmt puts one item per line in there.
-            collected.append(raw_lines[cursor])
-            if stripped.startswith("#["):
-                inside_attribute = False
-            cursor -= 1
-            continue
-        if stripped.endswith(")]") and not stripped.startswith("#["):
-            inside_attribute = True
-            collected.append(raw_lines[cursor])
-            cursor -= 1
-            continue
-        if (stripped.startswith("//") or stripped.startswith("#[")
-                or stripped.startswith("*") or stripped.startswith("/*")):
-            collected.append(raw_lines[cursor])
-            cursor -= 1
-            continue
-        break
+    span = {"block_comment": False, "attribute": False}
+    while cursor >= 0 and _preamble_takes(raw_lines[cursor].strip(), span):
+        collected.append(raw_lines[cursor])
+        cursor -= 1
     return "\n".join(reversed(collected))
+
+
+def _preamble_takes(stripped: str, span: dict) -> bool:
+    """Does this line belong to the preamble, given the span the walk is in.
+
+    A `/** ... */` doc comment: the middle lines are prose and match nothing,
+    so a walk keyed on line shape stopped on them and the doc was never seen.
+    Everything between `#[derive(` and its `)]` belongs to the attribute, and
+    rustfmt puts one item per line in there. Both spans are walked upward, so
+    a span opens on its closing line and closes on its opening one.
+    """
+    if span["block_comment"]:
+        if stripped.startswith("/*"):
+            span["block_comment"] = False
+        return True
+    if not stripped:
+        return False
+    if stripped.endswith("*/") and not stripped.startswith("/*"):
+        span["block_comment"] = True
+        return True
+    if span["attribute"]:
+        if stripped.startswith("#["):
+            span["attribute"] = False
+        return True
+    if stripped.endswith(")]") and not stripped.startswith("#["):
+        span["attribute"] = True
+        return True
+    return stripped.startswith(("//", "#[", "*", "/*"))
 
 
 def _unsafe_without_reason(line, number, preamble, findings):
@@ -426,6 +437,15 @@ def _matching_close(source: str, open_index: int) -> int:
     return len(source) - 1
 
 
+def _line_offsets(source: str) -> list:
+    """The character offset where each line starts."""
+    offsets, position = [], 0
+    for line in source.split("\n"):
+        offsets.append(position)
+        position += len(line) + 1
+    return offsets
+
+
 def test_line_range(source: str, raw: str) -> set:
     """Line numbers inside a `#[cfg(test)]` module or a `#[test]` function.
 
@@ -437,10 +457,7 @@ def test_line_range(source: str, raw: str) -> set:
     """
     inside: set = set()
     raw_lines = raw.split("\n")
-    offsets, position = [], 0
-    for line in source.split("\n"):
-        offsets.append(position)
-        position += len(line) + 1
+    offsets = _line_offsets(source)
     for index, raw_line in enumerate(raw_lines):
         if not TEST_ATTR_RE.match(raw_line):
             continue

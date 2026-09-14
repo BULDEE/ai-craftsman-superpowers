@@ -35,37 +35,36 @@ adapter_run() {
 # absent, and the Checks API behind these annotations states line numbers start
 # at 1. add_violation records line 0 for a file-level finding, so the property
 # is omitted rather than asserting a line outside the documented range.
-_gh_emit_annotations() {
-    python3 -c "
+# 'warning' is the only severity that maps below error. Anything else,
+# including one this renderer has not heard of, is reported at the blocking
+# rank: the three renderers used to disagree on that fallback, GitHub and
+# GitLab demoting it while Jenkins promoted it, so one report produced two
+# verdicts. A finding nobody can see is worse than one ranked too high.
+_GH_ANNOTATE_PY='
 import json, sys
 
 def esc_data(value):
-    return str(value).replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+    return str(value).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
 
 def esc_prop(value):
-    return esc_data(value).replace(':', '%3A').replace(',', '%2C')
+    return esc_data(value).replace(":", "%3A").replace(",", "%2C")
 
-for v in json.load(sys.stdin).get('violations', []):
-    path = str(v.get('file', ''))
-    path = path[2:] if path.startswith('./') else path
+def props_of(v):
+    path = str(v.get("file", ""))
+    path = path[2:] if path.startswith("./") else path
     try:
-        line = int(v.get('line', 0))
+        line = int(v.get("line", 0))
     except (TypeError, ValueError):
         line = 0
-    props = 'file=' + esc_prop(path)
-    if line >= 1:
-        props += ',line=%d' % line
-    # 'warning' is the only severity that maps below error. Anything else,
-    # including one this renderer has not heard of, is reported at the
-    # blocking rank: the three renderers used to disagree on that fallback,
-    # GitHub and GitLab demoting it while Jenkins promoted it, so one report
-    # produced two verdicts. A finding nobody can see is worse than one ranked
-    # too high.
-    cmd = 'warning' if v.get('severity') == 'warning' else 'error'
-    print('::%s %s::[%s] %s' % (cmd, props,
-                                esc_data(v.get('rule', '')),
-                                esc_data(v.get('message', ''))))
-" < "$1"
+    return "file=" + esc_prop(path) + (",line=%d" % line if line >= 1 else "")
+
+for v in json.load(sys.stdin).get("violations", []):
+    cmd = "warning" if v.get("severity") == "warning" else "error"
+    print("::%s %s::[%s] %s" % (cmd, props_of(v), esc_data(v.get("rule", "")), esc_data(v.get("message", ""))))
+'
+
+_gh_emit_annotations() {
+    python3 -c "$_GH_ANNOTATE_PY" < "$1"
 }
 
 adapter_annotate() {

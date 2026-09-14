@@ -31,99 +31,78 @@ reset_violations() {
 }
 
 # =============================================================================
-# Bash Self-Validation - Hook scripts (executable, must pass all rules)
+# Every shell and python file the plugin ships, under the gate it ships
+#
+# The scope used to be hooks/*.sh, hooks/lib/*.sh and hooks/lib/*.py: the
+# pipeline (ci/), the pack validators, the Hermes adapter and the scripts were
+# never self-validated, and the suite carried a hand-kept advisory list plus
+# an SH001 exemption of its own (architecture review, MUST-FIX). The gate is
+# the engine's: severity per file through rules_severity_for_file, a
+# file-level marker honoured unless the rule is never_ignorable, a baseline
+# mark honoured, the developer's global config ignored. Only `block` fails.
 # =============================================================================
-echo ""
-echo "=== Dogfood: Bash hook scripts (hooks/*.sh) ==="
+export CRAFTSMAN_GLOBAL_CONFIG_DIR=""
+source "$ROOT_DIR/hooks/lib/rules-engine.sh"
+rules_init "$ROOT_DIR" ""
 
-bash_total=0
-bash_pass=0
+_dogfood_files() {
+    {
+        find "$ROOT_DIR/hooks" "$ROOT_DIR/ci" "$ROOT_DIR/adapters" "$ROOT_DIR/scripts" "$ROOT_DIR/.github/scripts" \
+             "$ROOT_DIR"/packs/*/hooks "$ROOT_DIR"/packs/*/scripts "$ROOT_DIR"/packs/*/static-analysis \
+             "$ROOT_DIR"/packs/*/knowledge/canonical \
+            -type f \( -name '*.sh' -o -name '*.py' \) 2>/dev/null
+        find "$ROOT_DIR" -maxdepth 1 -type f \( -name '*.sh' -o -name '*.py' \) 2>/dev/null
+    } | grep -v '__pycache__' | sort
+}
 
-for file in "$ROOT_DIR"/hooks/*.sh; do
-    [[ ! -f "$file" ]] && continue
-    basename="$(basename "$file")"
-    reset_violations
-    pack_validate_bash "$file"
-    bash_total=$((bash_total + 1))
-    if [[ "$VIOLATION_COUNT" -eq 0 ]]; then
-        log_pass "bash self-validate: $basename"
-        bash_pass=$((bash_pass + 1))
-    else
-        log_fail "bash self-validate: $basename" "${VIOLATION_COUNT} violation(s)"
-    fi
-done
-
-# =============================================================================
-# Bash Self-Validation - Sourced libs (hooks/lib/*.sh)
-# Skip SH001 (no set -euo needed for sourced libs), check SH002-SH005
-# =============================================================================
-echo ""
-echo "=== Dogfood: Bash sourced libs (hooks/lib/*.sh) ==="
-
-for file in "$ROOT_DIR"/hooks/lib/*.sh; do
-    [[ ! -f "$file" ]] && continue
-    basename="$(basename "$file")"
-    reset_violations
-    pack_validate_bash "$file"
-
-    # Filter out SH001 violations (sourced libs are exempt by design)
-    local_violations=""
-    local_count=0
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        if [[ "$line" != SH001:* ]]; then
-            local_violations="${local_violations}${line}\n"
-            ((local_count++)) || true
-        fi
-    done < <(echo -e "$VIOLATIONS")
-
-    bash_total=$((bash_total + 1))
-    if [[ "$local_count" -eq 0 ]]; then
-        log_pass "bash self-validate (lib): $basename"
-        bash_pass=$((bash_pass + 1))
-    else
-        log_fail "bash self-validate (lib): $basename" "${local_count} violation(s) (excl. SH001)"
-    fi
-done
-
-# =============================================================================
-# Python Self-Validation - hooks/lib/*.py
-# =============================================================================
-echo ""
-echo "=== Dogfood: Python files (hooks/lib/*.py) ==="
-
-python_total=0
-python_pass=0
-
-# Advisory (warn-first) rules do not gate self-validation, mirroring the SH001
-# exemption for sourced libs: they ship as warnings by design (their
-# `default_severity: warn` in rules/core.yml and packs/symfony/pack.yml). A
-# file-level craftsman-ignore is honored too, matching the production gate.
-ADVISORY_RULES="NEST001 LOC001 GOD001 PARAM001 CTRL001"
-
-for file in "$ROOT_DIR"/hooks/lib/*.py; do
-    [[ ! -f "$file" ]] && continue
-    basename="$(basename "$file")"
-    reset_violations
-    pack_validate_python "$file"
-
-    blocking_count=0
+_dogfood_blocking() {
+    local file="$1" line rule severity count=0
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         rule="${line%%:*}"
-        case " $ADVISORY_RULES " in *" $rule "*) continue ;; esac
-        grep -qE "craftsman-ignore:[^#]*\b${rule}\b" "$file" 2>/dev/null && continue
-        ((blocking_count++)) || true
+        severity=$(rules_severity_for_file "$file" "$rule")
+        [[ "$severity" == "block" ]] || continue
+        if grep -qE "craftsman-ignore:[^#]*\b${rule}\b" "$file" 2>/dev/null \
+            && ! { type rule_never_ignorable >/dev/null 2>&1 && rule_never_ignorable "$rule"; }; then
+            continue
+        fi
+        rules_baseline_holds "$file" "$rule" "$severity" && continue
+        ((count++)) || true
+        DOGFOOD_DETAIL="${DOGFOOD_DETAIL}${line}; "
     done < <(echo -e "$VIOLATIONS")
+    printf '%s' "$count"
+}
 
-    python_total=$((python_total + 1))
-    if [[ "$blocking_count" -eq 0 ]]; then
-        log_pass "python self-validate: $basename"
-        python_pass=$((python_pass + 1))
+bash_total=0; bash_pass=0; python_total=0; python_pass=0
+while IFS= read -r file; do
+    [[ -f "$file" ]] || continue
+    relative="${file#"$ROOT_DIR"/}"
+    reset_violations
+    DOGFOOD_DETAIL=""
+    case "$file" in
+        *.sh) FILE_PATH="$file"; pack_validate_bash "$file"; bash_total=$((bash_total + 1)) ;;
+        *.py) FILE_PATH="$file"; pack_validate_python "$file"; python_total=$((python_total + 1)) ;;
+    esac
+    blocking=$(_dogfood_blocking "$file")
+    if [[ "$blocking" -eq 0 ]]; then
+        log_pass "self-validate: $relative"
+        case "$file" in *.sh) bash_pass=$((bash_pass + 1)) ;; *.py) python_pass=$((python_pass + 1)) ;; esac
     else
-        log_fail "python self-validate: $basename" "${blocking_count} violation(s) (excl. advisory + craftsman-ignore)"
+        log_fail "self-validate: $relative" "${blocking} blocking finding(s): ${DOGFOOD_DETAIL}"
     fi
-done
+done < <(_dogfood_files)
+
+# The scope is a claim about the tree: a directory that ships shell or python
+# and is not walked here is a directory the plugin's rules do not reach.
+UNWALKED=$(find "$ROOT_DIR" -type f \( -name '*.sh' -o -name '*.py' \) 2>/dev/null \
+    | grep -v -E "/(tests|examples|graphify-out|node_modules|\.git|__pycache__)/" \
+    | grep -v -E "^$ROOT_DIR/(hooks|ci|adapters|scripts|\.github/scripts|packs/[^/]+/(hooks|scripts|static-analysis|knowledge/canonical))/" \
+    | grep -v -E "^$ROOT_DIR/[^/]+\.(sh|py)$" || true)
+if [[ -z "$UNWALKED" ]]; then
+    log_pass "every shipped shell and python file is in the dogfood scope"
+else
+    log_fail "shipped files outside the dogfood scope" "$(echo "$UNWALKED" | sed "s|$ROOT_DIR/||" | tr '\n' ' ')"
+fi
 
 # =============================================================================
 # Summary

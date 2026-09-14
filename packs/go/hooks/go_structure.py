@@ -275,6 +275,18 @@ def _exported_docs(line, number, previous, group, findings):
     return False
 
 
+def _enter_named_function(line: str, state: dict) -> None:
+    """Only a NAMED function changes the enclosing context.
+
+    `go func() {` used to reset it, so every panic after a closure lost the
+    Must exemption and a blocking rule fired on exempt code.
+    """
+    func_match = FUNC_RE.search(line)
+    if func_match and func_match.group(1):
+        state["func"] = func_match.group(1)
+        state["named_results"] = has_named_results(line)
+
+
 def scan_lines(source: str, raw: str, package_main: bool,
                is_test: bool) -> list[tuple[str, str]]:
     """Code is read from the blanked text, comments from the raw text.
@@ -289,13 +301,7 @@ def scan_lines(source: str, raw: str, package_main: bool,
     group = False
     raw_lines = raw.split("\n")
     for number, line in enumerate(source.split("\n"), start=1):
-        func_match = FUNC_RE.search(line)
-        # Only a NAMED function changes the enclosing context. `go func() {`
-        # used to reset it, so every panic after a closure lost the Must
-        # exemption and a blocking rule fired on exempt code.
-        if func_match and func_match.group(1):
-            state["func"] = func_match.group(1)
-            state["named_results"] = has_named_results(line)
+        _enter_named_function(line, state)
         _panic_and_naked_return(line, number, state, package_main, is_test, findings)
         _discarded_errors(line, number, findings)
         if not is_test:

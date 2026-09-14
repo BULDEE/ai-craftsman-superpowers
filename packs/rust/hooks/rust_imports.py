@@ -30,7 +30,7 @@ def matching_uses(source: str, segments: list) -> list:
     # A comment mentioning infrastructure is not an import of it.
     code = re.sub(r"//[^\n]*", "", source)
     code = re.sub(r"/\*.*?\*/", "", code, flags=re.S)
-    pattern = re.compile(r"\b(%s)\b" % "|".join(re.escape(s) for s in segments))
+    pattern = re.compile(r"\b(%s)\b" % "|".join(re.escape(segment) for segment in segments))
     found = []
     for statement in USE_RE.findall(code):
         flat = " ".join(statement.split())

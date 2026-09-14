@@ -55,13 +55,16 @@ pack_sa_go() {
         precedence_declare_covered "GO006"
     fi
 
-    local package_dir
-    package_dir="$(dirname "$file")"
+    # It is asked for one package rather than ./... because this runs per
+    # file on a write, and a repository-wide pass is a CI concern, not a
+    # keystroke concern.
+    "$binary" "$(dirname "$file")" 2>/dev/null | _pack_sa_go_findings "$file"
+}
 
-    # errcheck reports `path:line:col\ttext`. It is asked for one package rather
-    # than ./... because this runs per file on a write, and a repository-wide
-    # pass is a CI concern, not a keystroke concern.
-    local line path lineno message
+# errcheck reports `path:line:col\ttext`, one line per finding; only the lines
+# about the written file become findings.
+_pack_sa_go_findings() {
+    local file="$1" line path lineno message
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         path="${line%%:*}"
@@ -70,5 +73,5 @@ pack_sa_go() {
         message="$(printf '%s' "$line" | cut -f2-)"
         [[ -z "$message" ]] && message="unchecked error"
         printf 'ERRCHECK001:%s:%s\n' "$lineno" "$message"
-    done < <("$binary" "$package_dir" 2>/dev/null)
+    done
 }
