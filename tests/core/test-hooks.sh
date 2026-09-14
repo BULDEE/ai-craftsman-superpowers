@@ -491,39 +491,57 @@ else
     log_fail "SessionStart should output valid JSON" "exit=$exit_code"
 fi
 
-# Test: Detects symfony (composer.json only)
+# Detection reads every pack's `entry_markers`, not two file names the engine
+# knew. The banner names the packs whose languages are present; the warning
+# compares pack names with the configured stack, and is silent under
+# `fullstack`.
 rm -f package.json
 echo '{}' > composer.json
 result=$(run_session_start)
 output="${result#*|}"
-if echo "$output" | grep -qi "symfony\|Stack: symfony"; then
-    log_pass "SessionStart detects composer.json project"
+if echo "$output" | grep -q "Detected: symfony"; then
+    log_pass "SessionStart detects the symfony pack from composer.json"
 else
-    log_fail "SessionStart should detect symfony" "$output"
+    log_fail "SessionStart should detect the symfony pack" "$output"
 fi
 rm -f composer.json
 
-# Test: Detects react (package.json only)
-rm -f composer.json
 echo '{}' > package.json
 result=$(run_session_start)
 output="${result#*|}"
-if echo "$output" | grep -qi "react\|Stack: react"; then
-    log_pass "SessionStart detects package.json project"
+if echo "$output" | grep -q "Detected: react"; then
+    log_pass "SessionStart detects the react pack from package.json"
 else
-    log_fail "SessionStart should detect react" "$output"
+    log_fail "SessionStart should detect the react pack" "$output"
 fi
 rm -f package.json
 
-# Test: Detects fullstack (both)
+# The case the literal detector could never see: a Go project.
+printf 'module example.com/x\n' > go.mod
+result=$(run_session_start)
+output="${result#*|}"
+if echo "$output" | grep -q "Detected: go"; then
+    log_pass "SessionStart detects the go pack from go.mod (a marker only the pack declares)"
+else
+    log_fail "SessionStart should detect the go pack from go.mod" "$output"
+fi
+rm -f go.mod
+
 echo '{}' > composer.json
 echo '{}' > package.json
 result=$(run_session_start)
 output="${result#*|}"
-if echo "$output" | grep -q "fullstack"; then
-    log_pass "SessionStart detects fullstack project"
+if echo "$output" | grep -q "Detected: react,symfony" && ! echo "$output" | grep -q "Warning: config says"; then
+    log_pass "SessionStart names both packs and warns of nothing under fullstack"
 else
-    log_fail "SessionStart should detect fullstack" "$output"
+    log_fail "SessionStart names both packs and warns of nothing under fullstack" "$output"
+fi
+result=$(CLAUDE_PLUGIN_OPTION_STACK=symfony run_session_start)
+output="${result#*|}"
+if echo "$output" | grep -q "config says 'symfony' but this project carries react"; then
+    log_pass "SessionStart warns when the stack names one pack and another pack's language is present"
+else
+    log_fail "SessionStart warns when the stack names one pack and another pack's language is present" "$output"
 fi
 rm -f composer.json package.json
 
@@ -834,11 +852,12 @@ if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 fc = d['hooks']['FileChanged'][0]
-assert fc.get('matcher') == '*.php|*.ts|*.tsx', f'Wrong matcher: {fc.get(\"matcher\")}'
+m = fc.get('matcher', '')
+assert m and '*' not in m and all(p.endswith('/') for p in m.split('|')), f'matcher must list directories: {m!r}'
 assert fc['hooks'][0].get('async') == True
 assert 'file-changed.sh' in fc['hooks'][0]['command']
 " 2>/dev/null; then
-    log_pass "FileChanged: async file-changed hook with *.php|*.ts|*.tsx matcher"
+    log_pass "FileChanged: async file-changed hook watching directories (the form the event supports)"
 else
     log_fail "FileChanged hook" "missing or invalid"
 fi

@@ -530,4 +530,46 @@ else
 fi
 rm -rf "$LS_DIR"
 
+# =============================================================================
+# metrics_dialect is the thing consumed
+# =============================================================================
+# The extractor accepted "php" and "ts" as spellings of a dialect, the two
+# validators passed their language name, and the `metrics_dialect` every pack
+# declares was read by nobody: the manifest could say anything. The extractor
+# now takes a dialect only, and structural_check_file asks the registry.
+echo ""
+echo "=== metrics_dialect is the thing consumed ==="
+dialect_refusal=$(python3 "$ROOT_DIR/hooks/lib/structural_metrics.py" "$ROOT_DIR/hooks/lib/structural.sh" php 2>&1 >/dev/null; echo "rc=$?")
+if echo "$dialect_refusal" | grep -q "rc=2" && echo "$dialect_refusal" | grep -q "not a metrics dialect"; then
+    log_pass "structural_metrics.py refuses a language name in place of a dialect (exit 2, named)"
+else
+    log_fail "structural_metrics.py refuses a language name in place of a dialect" "$dialect_refusal"
+fi
+if grep -qE 'structural_check_file "\$file" "(php|ts)"' "$ROOT_DIR"/packs/*/hooks/*.sh; then
+    log_fail "no validator names its language to the extractor" \
+        "$(grep -lE 'structural_check_file "\$file" "(php|ts)"' "$ROOT_DIR"/packs/*/hooks/*.sh | tr '\n' ' ')"
+else
+    log_pass "no validator names its language to the extractor: the registry decides the dialect"
+fi
+DIALECT_DIR="$(mktemp -d)"
+mkdir -p "$DIALECT_DIR/src"
+{
+    printf '<?php\nfinal class Big {\n    public function run(): void {\n'
+    for _ in $(seq 1 60); do printf '        $x = 1;\n'; done
+    printf '    }\n}\n'
+} > "$DIALECT_DIR/src/Big.php"
+dialect_findings=$(cd "$DIALECT_DIR" && CLAUDE_PLUGIN_DATA="$DIALECT_DIR/data" bash -c "
+    source '$ROOT_DIR/hooks/lib/config.sh'
+    source '$ROOT_DIR/hooks/lib/pack-loader.sh'
+    source '$ROOT_DIR/hooks/lib/structural.sh'
+    pack_loader_init >/dev/null 2>&1
+    add_violation() { printf '%s\n' \"\$1\"; }
+    structural_check_file '$DIALECT_DIR/src/Big.php'" 2>/dev/null)
+rm -rf "$DIALECT_DIR"
+if echo "$dialect_findings" | grep -q "LOC001"; then
+    log_pass "a 60-line PHP method reaches LOC001 through the dialect the symfony pack declares"
+else
+    log_fail "a 60-line PHP method reaches LOC001 through the dialect the symfony pack declares" "got '$dialect_findings'"
+fi
+
 test_summary

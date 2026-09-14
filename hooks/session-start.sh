@@ -166,19 +166,36 @@ exec python3 "${SCRIPT_DIR}/lib/conventions.py" "\${1:-analyze}" "\$PWD" "\${@:2
 WRAPPER
 chmod +x "${HOME}/.claude/craftsman-conventions.sh" 2>/dev/null || true
 
-# Detect project type from filesystem
-detect_project_type() {
-    local has_php=false has_ts=false
-    [[ -f "${PWD}/composer.json" ]] && has_php=true
-    [[ -f "${PWD}/package.json" ]] && has_ts=true
-    if $has_php && $has_ts; then echo "fullstack"
-    elif $has_php; then echo "symfony"
-    elif $has_ts; then echo "react"
-    else echo "other"
-    fi
+# The languages present in the working directory, one per line, from the
+# entry markers each pack declares (`entry_markers` in pack.yml). The engine
+# used to look for composer.json and package.json by name, so a Go, Rust or
+# Python project was "other" whatever its pack declared.
+# Over the KNOWN registry (every installed pack), which the readers build
+# from the manifests on disk: _init_packs runs in a subshell and its registry
+# does not reach this shell.
+detect_project_languages() {
+    local language marker
+    while IFS= read -r language; do
+        [[ -z "$language" ]] && continue
+        while IFS= read -r marker; do
+            [[ -n "$marker" && -f "${PWD}/${marker}" ]] || continue
+            printf '%s\n' "$language"
+            break
+        done <<< "$(lang_known_capability "$language" entry_markers)"
+    done <<< "$(lang_known_registered)"
 }
 
-DETECTED=$(detect_project_type)
+# The packs whose languages are present, by name. A stack setting that names
+# one pack while another pack's language is here is worth a warning; the
+# comparison is pack name to pack name, the only vocabulary both sides share.
+detect_project_packs() {
+    local language
+    while IFS= read -r language; do
+        [[ -z "$language" ]] && continue
+        lang_known_pack_name "$language"
+        echo
+    done <<< "$(detect_project_languages)" | sort -u | grep -v '^$'
+}
 STRICTNESS=$(config_strictness)
 STACK=$(config_stack)
 
@@ -186,7 +203,10 @@ STACK=$(config_stack)
 # language pack validates its files whatever the stack says, and the banner
 # printed OFF for a language whose files were being refused.
 PACK_STATUS=$(_init_packs 2>/dev/null || echo "PACKS:error")
-MSG="Craftsman active | Stack: ${STACK} | Strictness: ${STRICTNESS} | Metrics: initialized | ${PACK_STATUS}"
+DETECTED_PACKS=$(detect_project_packs 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
+MSG="Craftsman active | Stack: ${STACK}"
+[[ -n "$DETECTED_PACKS" ]] && MSG="${MSG} | Detected: ${DETECTED_PACKS// /,}"
+MSG="${MSG} | Strictness: ${STRICTNESS} | Metrics: initialized | ${PACK_STATUS}"
 
 # Correction learning: trends kept separate so the context budget can drop
 # them first (ADR-0021 priority order)
@@ -242,8 +262,16 @@ except Exception:
     fi
 fi
 
-if [[ "$DETECTED" != "other" && "$DETECTED" != "$STACK" ]]; then
-    WARNINGS="${WARNINGS} | Warning: detected '${DETECTED}' but config says '${STACK}'. Run /craftsman:setup to update."
+# Every detected pack the stack does not name is worth a warning: a stack set
+# to one pack while another pack's language is here is the mismatch. Under
+# `fullstack` nothing is excluded, so nothing is reported.
+OTHER_PACKS=""
+if [[ -n "$DETECTED_PACKS" && "$STACK" != "fullstack" ]]; then
+    for _pack in $DETECTED_PACKS; do
+        [[ "$_pack" == "$STACK" ]] && continue
+        OTHER_PACKS="${OTHER_PACKS:+$OTHER_PACKS, }${_pack}"
+    done
+    [[ -n "$OTHER_PACKS" ]] && WARNINGS="${WARNINGS} | Warning: config says '${STACK}' but this project carries ${OTHER_PACKS}. Run /craftsman:setup to update."
 fi
 
 # Auto-setup gate - check both global and project config

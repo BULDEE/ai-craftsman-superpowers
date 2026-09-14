@@ -148,8 +148,8 @@ def analyze(path, lang):
     # `lang` is a metrics dialect, not a language: 'php-like' or 'c-like'. Every
     # brace-delimited language shares one extractor, which is what lets a pack
     # get NEST/LOC/GOD/PARAM by declaring metrics_dialect: c-like and nothing
-    # else. 'php' and 'ts' are accepted as the pre-registry spellings.
-    func_name_re = FUNC_PHP_RE if lang in ('php', 'php-like') else FUNC_TS_NAMED_RE
+    # else. main() refuses anything that is not one of the two.
+    func_name_re = FUNC_PHP_RE if lang == 'php-like' else FUNC_TS_NAMED_RE
     cursor, length = 0, len(source)
     while cursor < length:
         char = source[cursor]
@@ -169,7 +169,7 @@ def _open_brace(source, pos, header_start, lang, func_name_re, stack, control_de
     if CLASS_RE.search(header):
         kind = 'class'
     elif func_name_re.search(header) or (
-        lang not in ('php', 'php-like') and ARROW_RE.search(header.rstrip())
+        lang != 'php-like' and ARROW_RE.search(header.rstrip())
     ):
         kind = 'func'
         match = func_name_re.search(header)
@@ -208,13 +208,22 @@ def _close_brace(source, pos, stack, control_depth, findings):
     return control_depth
 
 
+DIALECTS = frozenset(('php-like', 'c-like'))
+
+
 def main():
     if len(sys.argv) < 3:
         return
     path, lang = sys.argv[1], sys.argv[2]
+    if lang not in DIALECTS:
+        # A language name in place of its dialect was accepted for four
+        # releases, which is how the manifest's metrics_dialect went unread.
+        sys.stderr.write("structural_metrics: %r is not a metrics dialect (%s)\n"
+                         % (lang, ", ".join(sorted(DIALECTS))))
+        return 2
     for rule, message in analyze(path, lang):
         print('%s|%s' % (rule, message))
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

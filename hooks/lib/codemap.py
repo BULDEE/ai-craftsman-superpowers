@@ -19,7 +19,21 @@ except ImportError:
 
 SKIP_DIRS = {".git", "node_modules", "vendor", "dist", "build", ".idea",
              ".vscode", "__pycache__", ".ruff_cache", "coverage", ".next"}
-CODE_EXTS = {".php", ".ts", ".tsx", ".js", ".py", ".sh", ".go", ".rs", ".java", ".md", ".yml", ".yaml", ".json"}
+# Document and configuration types belong to no pack and are counted as
+# themselves. Code extensions come from the registry: a literal set here meant
+# a language a pack declared was invisible to the map, and one no pack knew was
+# counted anyway.
+DOC_EXTS = {".md", ".yml", ".yaml", ".json"}
+
+
+def _code_exts() -> set:
+    known = set()
+    if lang_registry_read is not None:
+        known = {"." + ext.lstrip(".") for ext in lang_registry_read.known_extensions()}
+    return known | DOC_EXTS
+
+
+CODE_EXTS = _code_exts()
 # Project markers come from the loaded packs, plus Make, which belongs to no
 # language. A literal table here meant a project whose pack declared its own
 # marker was reported as having no recognisable entry point.

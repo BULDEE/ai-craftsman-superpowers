@@ -521,10 +521,10 @@ jobs:
           # Deliberately excludes style rules (E7xx etc) - some of these
           # scripts use a compact style (semicolon-joined statements) on
           # purpose; style is a taste call for the maintainer, not a CI gate.
-          ruff check --select F,E9 hooks/lib/*.py
+          ruff check --select F,E9 hooks/lib/*.py packs/*/hooks/*.py
 
       - name: Run ruff (style, informational)
-        run: ruff check hooks/lib/*.py || echo "::warning::ruff found style issues (non-blocking) - see log above"
+        run: ruff check hooks/lib/*.py packs/*/hooks/*.py || echo "::warning::ruff found style issues (non-blocking) - see log above"
 
   python-floor:
     name: Python Floor (3.9)

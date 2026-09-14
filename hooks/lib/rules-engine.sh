@@ -635,7 +635,6 @@ _rules_find_override_directory() {
 # directory override in .craft-rules.yml still wins over this, since a project
 # that means it should be able to say so.
 _RULES_TEST_PATH_RE='(^|/)(tests?|spec|__tests__|__mocks__|fixtures?|factories)(/|$)'
-_RULES_TEST_RELAXED='LOC001 NEST001 PARAM001 GOD001 CTRL001 SEC001 SEC002'
 
 # Case-insensitive: the case of a directory name is not semantic, and the
 # regex missed the PSR-4 convention this plugin's own primary stack uses.
@@ -660,11 +659,12 @@ _rules_is_test_path() {
     return $matched
 }
 
+# Which rules a test path relaxes is the manifest's call (`relaxed_in_tests:
+# true` on the rule), read through the registry. The list this engine kept
+# was the one list of rule ids CLAUDE.md says it must not hold, and a pack
+# rule could not join it without an edit here.
 _rules_relaxed_in_tests() {
-    case " $_RULES_TEST_RELAXED " in
-        *" $1 "*) return 0 ;;
-    esac
-    return 1
+    type rule_relaxed_in_tests >/dev/null 2>&1 && rule_relaxed_in_tests "$1"
 }
 
 # rules_baseline_holds <file> <rule> <severity>

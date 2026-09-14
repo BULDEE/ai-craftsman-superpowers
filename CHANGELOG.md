@@ -22,6 +22,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The engine holds no list of languages, as CLAUDE.md has said since the
+  language registry: the `FileChanged` matcher carried a glob the event does
+  not support (`*.php|*.ts|*.tsx`, so the hook never fired; it now watches
+  the common source roots and the registry decides the language), the
+  session banner found only `composer.json` and `package.json` (it now reads
+  every pack's `entry_markers` and compares pack names), the codemap and the
+  write mirror kept their own extension and marker lists (they read the
+  registry), the metrics extractor took a language name in place of the
+  declared `metrics_dialect` (it takes a dialect only, and the symfony pack
+  declares `php-like`, which is what it always received), the engine kept
+  the one list of rule ids it says it must not hold (`relaxed_in_tests:
+  true` is declared on the rule, compiled as the registry's seventh column,
+  and asked through `rule_relaxed_in_tests`), and the PHP namespace reader
+  and the Python AST checker lived in `hooks/lib` (each is in its pack).
+  `tests/core/test-no-language-literals.sh` scans `hooks/` and `ci/` and
+  fails on any language name or extension outside a comment: fourteen hits
+  before, zero after, two of them kept on an explicit allowlist with a
+  backlog line each.
+- A baseline row had two owners with two cadences: the structural mark
+  tightened on every green pass, the rule counts were written once by
+  `craftsman-ci baseline` and never moved. Debt that was paid kept its
+  count, so the same debt coming back was reported as inherited on the very
+  write the ratchet refused as a regression. A green pass now tightens the
+  rule counts to what it observed (`rule_baseline.py tighten`), and a
+  `git mv` keeps the file's mark instead of photographing the renamed path
+  at whatever state the first write left it in.
+- Five session-state keys were read and written by nothing: `design_used`
+  (the design-pass exemption in the bias detector never fired; a
+  `/craftsman:design` prompt now sets it), `writes_count` (the
+  TaskCompleted evidence gate saw zero writes; it counts the session-writes
+  file), and `agent_invocations`, `team_type`, `completed_tasks`
+  (`sessions.agents_spawned` held `[]` on every row; it carries the agent
+  types the subagent gate records). The README rows saying the plugin
+  blocks a design decision now say it warns, which is what it does.
+- `ci/craftsman-ci.sh` exited 0 on a checkout missing `rules-engine.sh`,
+  `pack-loader.sh` or `precedence.sh`: it scanned nothing and reported
+  clean. The four libraries the gate is made of now load through one
+  function that exits 2 naming the missing file; the standalone severity
+  table and config parser, reachable only in that state, are gone.
+- Five published claims the code contradicted: the Level 2/3 budget
+  (15s per file, 30s per project, not `<2s`), `pre-push-verify.sh` warns and
+  does not gate, Levels 2 and 3 are off until `trust_project_tools`, all
+  eighteen `CRAFTSMAN_*` switches are named in SECURITY.md, and the rules
+  table in `docs/ci-integration.md` (13 of 66) is replaced by the export
+  command that prints the live list. `tests/core/test-doc-claims.sh` reads
+  the code first and the document second.
 - `plugin.yaml`, the Hermes manifest at the repository root, is now the fifth
   file `scripts/bump-version.sh` tracks, so `--check` and `release-guard.sh`
   refuse a release that leaves it behind. It was off the list, and 4.9.0 and

@@ -9,7 +9,7 @@ advisory defaults, so a pack shipping DART001 had nowhere to declare any of it.
 
 Output, one row per rule:
 
-    <id>\t<group>\t<default_severity>\t<owner>\t<text>\t<never_ignorable: yes|no>
+    <id>\t<group>\t<default_severity>\t<owner>\t<text>\t<never_ignorable: yes|no>\t<relaxed_in_tests: yes|no>
 
 Text comes last: it is the only field that may contain spaces, so a consumer can
 cut the first four columns without quoting rules.
@@ -212,9 +212,15 @@ class _Registry:
         # an ignore marker naming SEC001 used to pass a hardcoded secret on the
         # hook, the pipeline and the Hermes write gate alike.
         never_ignorable = "yes" if _is_true(entry.get("never_ignorable")) else "no"
+        # A rule a test path demotes to warn. Declared by the manifest that
+        # owns the rule, read by rules_severity_for_file through one predicate:
+        # the engine kept this as a list of seven ids, the one list of rules
+        # CLAUDE.md says it must not hold.
+        relaxed_in_tests = "yes" if _is_true(entry.get("relaxed_in_tests")) else "no"
         self._rows[rule_id] = [
             rule_id, group, self._severity_of(entry, rule_id), owner,
             str(entry.get("text") or rule_id), never_ignorable,
+            relaxed_in_tests,
         ]
 
     def flush(self) -> None:

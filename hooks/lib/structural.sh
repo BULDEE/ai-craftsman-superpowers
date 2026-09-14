@@ -14,11 +14,22 @@
 _STRUCTURAL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _STRUCTURAL_PY="${_STRUCTURAL_DIR}/structural_metrics.py"
 
+# The dialect comes from the registry (`metrics_dialect` in the pack.yml that
+# owns the file's language), never from the caller. The two validators used to
+# pass their language name, and the extractor accepted it as a spelling of the
+# dialect: the capability was declared in the manifest and read by nobody, so
+# the manifest could say anything. A language that declares no dialect gets no
+# structural metrics, which is what "declares none" means.
 structural_check_file() {
     local file="$1"
-    local lang="$2"
+    local lang="" language
     command -v python3 >/dev/null 2>&1 || return 0
     [[ -f "$_STRUCTURAL_PY" && -f "$file" ]] || return 0
+    declare -F lang_for_file >/dev/null 2>&1 || return 0
+    language=$(lang_for_file "$file")
+    [[ -n "$language" ]] || return 0
+    lang=$(lang_capability "$language" metrics_dialect)
+    [[ -n "$lang" ]] || return 0
 
     local line rule msg
     while IFS='|' read -r rule msg; do

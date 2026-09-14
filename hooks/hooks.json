@@ -97,7 +97,7 @@
     ],
     "FileChanged": [
       {
-        "matcher": "*.php|*.ts|*.tsx",
+        "matcher": "src/|app/|lib/|libs/|packages/|apps/",
         "hooks": [
           {
             "type": "command",

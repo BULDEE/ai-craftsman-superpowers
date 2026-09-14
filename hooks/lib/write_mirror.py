@@ -37,8 +37,30 @@ import shutil
 import sys
 
 WRITE_TOOLS = ("write_file", "patch", "Write", "Edit")
-WORKSPACE_MARKERS = (".git", ".craft-config.yml", "composer.json", "package.json",
-                     "pyproject.toml", "go.mod", "Cargo.toml")
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    import lang_registry_read
+except ImportError:  # pragma: no cover - the helper ships next to this file
+    lang_registry_read = None
+
+
+def _pack_markers() -> tuple:
+    """The entry markers every loaded pack declares, from the registry.
+
+    A literal list here named five languages' markers and would have missed
+    the sixth pack's; the registry is where a pack says what marks its root.
+    """
+    if lang_registry_read is None:
+        return ()
+    try:
+        return tuple(sorted(lang_registry_read.entry_markers()))
+    except Exception:  # noqa: BLE001 - a broken registry must not break the mirror
+        return ()
+
+
+ENGINE_MARKERS = (".git", ".craft-config.yml")
+WORKSPACE_MARKERS = ENGINE_MARKERS + _pack_markers()
 # The gate's own configuration, refused rather than judged. The names are the
 # engine's; a host adds its own paths through CRAFTSMAN_GATE_OWN_PATHS (space
 # separated, a trailing slash marks a directory), so this core helper names no
@@ -157,7 +179,9 @@ def _ancestors(directory: str) -> list:
     return chain
 
 
-ROOT_FILES = ("composer.json", "package.json", ".craftsman-baseline.json")
+# What a validator or a mark reads at the root for any file under it: the
+# packs' entry markers (a namespace root, a language marker) and the mark.
+ROOT_FILES = _pack_markers() + (".craftsman-baseline.json",)
 
 
 def _copy_roots(workspace: str, mirror: str) -> None:

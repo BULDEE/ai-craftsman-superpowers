@@ -34,7 +34,7 @@ languages:
       - vendor/bin/deptrac=LAYER001,LAYER002,LAYER003,LAYER004
     test_commands: ["phpunit", "vendor/bin/phpunit", "bin/phpunit"]
     lsp: "intelephense"
-    metrics_dialect: c-like
+    metrics_dialect: php-like
 
 rules:
   # Rules this pack owns: the wording and the default severity that the
@@ -74,6 +74,7 @@ rules:
       group: Structure
       text: "a Controller performs no persistence - move it into an Application UseCase"
       default_severity: warn
+      relaxed_in_tests: true
     - id: WARN-PHP001
       group: Advisory
       text: "four or more parameters - consider an object"
@@ -100,3 +101,4 @@ templates: ["templates/"]
 routes:
   - trigger: "Scaffold PHP entity, use case, repository"
     command: "/craftsman:scaffold"
+    relaxed_in_tests: true

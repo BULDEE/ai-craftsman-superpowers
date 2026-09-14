@@ -467,20 +467,6 @@ _resolve_config() {
     _ci_opt="${CLAUDE_PLUGIN_OPTION_STRICTNESS:-${CLAUDE_PLUGIN_OPTION_strictness:-}}"; [[ -n "$_ci_opt" ]] && STRICTNESS="$_ci_opt"
     _ci_opt="${CLAUDE_PLUGIN_OPTION_STACK:-${CLAUDE_PLUGIN_OPTION_stack:-}}"; [[ -n "$_ci_opt" ]] && STACK="$_ci_opt"
 }
-_php_enabled() {
-    case "$STACK" in
-        symfony|fullstack) return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
-_ts_enabled() {
-    case "$STACK" in
-        react|fullstack) return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
 # block|warn|ignore for this rule on this file, the same three values the hook
 # resolves. It used to be a boolean, which collapsed "ignore" into "warn": a
 # directory that had switched a rule off still had every finding printed in the
@@ -1294,7 +1280,8 @@ main() {
         {
             echo "craftsman-ci: no source file was found, so this is not a pass."
             echo "  scanned: ${SCAN_PATHS[*]}"
-            echo "  stack:   ${STACK} (php=$(_php_enabled && echo on || echo off), ts=$(_ts_enabled && echo on || echo off))"
+            echo "  stack:   ${STACK}"
+            echo "  languages: $(lang_registered | tr '\n' ' ')"
             echo "  Pass the source paths explicitly, or set stack: in .craft-config.yml."
         } >&2
         exit 2

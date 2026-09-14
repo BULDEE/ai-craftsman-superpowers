@@ -54,11 +54,13 @@ rules:
     text: "no hardcoded secret - read it from the environment or a vault"
     default_severity: block
     never_ignorable: true
+    relaxed_in_tests: true
   - id: SEC002
     group: Security
     text: "never eval or shell out with a value you did not author"
     default_severity: block
     never_ignorable: true
+    relaxed_in_tests: true
   - id: SEC003
     group: Security
     text: "no SQL built by concatenation or template literal - bind the parameters"
@@ -75,20 +77,24 @@ rules:
     group: Structure
     text: "a class spanning too many lines carries too many responsibilities"
     default_severity: warn
+    relaxed_in_tests: true
   - id: LOC001
     group: Structure
     text: "a function body past the limit is extracted"
     default_severity: warn
+    relaxed_in_tests: true
   - id: NEST001
     group: Structure
     text: "control flow nested three levels deep - use guard clauses"
     default_severity: warn
+    relaxed_in_tests: true
   - id: PARAM001
     group: Structure
     text: "more than three parameters - pass an object"
     default_severity: warn
   # Ships advisory while the metric core is validated against real work
   # (ADR-0025). Set `RATCHET001: block` in .craft-config.yml to opt in early.
+    relaxed_in_tests: true
   - id: RATCHET001
     group: Structure
     text: "structural metrics may improve, never regress"
