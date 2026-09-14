@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`never_ignorable` held only on machines with PyYAML.** The registry
+  compiler compared the manifest value to the boolean `True`; the fallback
+  reader, the only one on a machine without PyYAML (the macOS system
+  python, the CI runners), hands the string `true`, so SEC001, SEC002 and
+  SEC003 compiled as ignorable there and an ignore marker silenced a
+  secret on the hook, the pipeline and the Hermes write gate alike. The
+  parity suite was red in CI for six merges while green on a laptop with
+  PyYAML installed. The compiler now reads the YAML boolean whichever
+  reader produced it, and `tests/ci/test-rule-registry.sh` compiles the
+  core manifest with an import shim that removes PyYAML and asserts the
+  sixth column both ways. Seen red without the shim.
+
+- **CI on `main` is green again.** Besides the PyYAML defect above, the
+  dogfood merge left five files above their ratchet mark (`update` refuses
+  a growth; the marks are re-taken with a reason), and the Darwin
+  pre-write latency ceiling of 3.5x, set from one laptop when the gate
+  moved to the mirror, sat inside the macOS runner's noise (2.79x to 3.73x
+  on the same code). It is 5.0x, 1.35x over the worst reading and under
+  twice the fastest, the rule the file states.
+
 - **The dogfood test walks every shipped script and judges it as a user's
   file.** `tests/core/test-dogfood.sh` walked `hooks/`, `ci/`, `adapters/`,
   `scripts/` and the packs' `hooks/`, and counted a finding as blocking

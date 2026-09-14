@@ -161,4 +161,30 @@ else
         "SEC001 resolved to ignore because a third-party manifest said so - lowering a rule must stay in .craft-config.yml, which is reviewed user code"
 fi
 
+echo ""
+echo "=== never_ignorable survives the fallback parser ==="
+
+# PyYAML is optional: the macOS system python and the CI runners have none,
+# and the fallback reader hands `true` over as a string. The compiler compared
+# the value to the boolean True, so on every machine without PyYAML SEC001
+# compiled as ignorable and an ignore marker silenced a secret on the three
+# front-ends: the parity suite was red in CI for six merges while green on
+# a laptop with PyYAML. The shim below makes `import yaml` fail on purpose.
+NOYAML="$WORK/noyaml"
+mkdir -p "$NOYAML"
+printf 'raise ImportError("no pyyaml in this test")\n' > "$NOYAML/yaml.py"
+if ! PYTHONPATH="$NOYAML" python3 -c 'import yaml' 2>/dev/null; then
+    log_pass "control: the shim removes PyYAML from the compiler"
+    with_yaml=$(python3 "$ROOT_DIR/hooks/lib/rule_registry.py" "$ROOT_DIR/rules/core.yml" | awk -F'\t' '$1 == "SEC001" {print $6}')
+    without_yaml=$(PYTHONPATH="$NOYAML" python3 "$ROOT_DIR/hooks/lib/rule_registry.py" "$ROOT_DIR/rules/core.yml" | awk -F'\t' '$1 == "SEC001" {print $6}')
+    if [[ "$with_yaml" == "yes" && "$without_yaml" == "yes" ]]; then
+        log_pass "SEC001 compiles never_ignorable=yes with and without PyYAML"
+    else
+        log_fail "never_ignorable depends on PyYAML" \
+            "SEC001 6th column: with PyYAML '${with_yaml}', without '${without_yaml}' - the fallback reader hands a string and the compiler wants a boolean"
+    fi
+else
+    log_fail "control: the PyYAML shim did not take" "import yaml succeeded with the shim on PYTHONPATH"
+fi
+
 test_summary
