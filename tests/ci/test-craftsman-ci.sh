@@ -743,6 +743,53 @@ else
 fi
 
 # =============================================================================
+# The engine is not optional: a CI run without it refuses to give a verdict
+# =============================================================================
+# The libraries under hooks/lib ARE the gate. Sourced under `if [[ -f ]]`, a
+# checkout missing one of them scanned nothing and exited 0: the pipeline
+# reported clean on a repository it never judged. Each required library is
+# removed in turn from a copy of the plugin, and the run must exit 2 naming the
+# file. The control run, on the same copy with nothing removed, must still
+# report the clean fixture as clean, or the test proves only that a broken copy
+# is broken.
+ENGINE_COPY="$(mktemp -d)"
+for _dir in ci hooks packs rules; do
+    cp -R "$ROOT_DIR/$_dir" "$ENGINE_COPY/$_dir"
+done
+
+engine_control=$(bash "$ENGINE_COPY/ci/craftsman-ci.sh" "$FIXTURES_DIR/valid-entity.php" >/dev/null 2>&1; echo $?)
+if [[ "$engine_control" == "0" ]]; then
+    log_pass "control: the plugin copy reports the clean fixture as clean"
+else
+    log_fail "control: the plugin copy reports the clean fixture as clean" \
+        "got exit $engine_control, so the copy is broken and the removals below prove nothing"
+fi
+
+for _lib in config.sh rules-engine.sh pack-loader.sh precedence.sh; do
+    mv "$ENGINE_COPY/hooks/lib/$_lib" "$ENGINE_COPY/hooks/lib/$_lib.away"
+    engine_out=$(bash "$ENGINE_COPY/ci/craftsman-ci.sh" "$FIXTURES_DIR/valid-entity.php" 2>&1)
+    engine_rc=$?
+    mv "$ENGINE_COPY/hooks/lib/$_lib.away" "$ENGINE_COPY/hooks/lib/$_lib"
+    if [[ "$engine_rc" == "2" ]] && echo "$engine_out" | grep -q "$_lib"; then
+        log_pass "hooks/lib/$_lib missing: exit 2, and the message names the file"
+    else
+        log_fail "hooks/lib/$_lib missing must exit 2 naming the file" \
+            "got exit $engine_rc: $(echo "$engine_out" | head -1)"
+    fi
+done
+
+# The second severity authority is gone with the fail-open path: a standalone
+# table in the pipeline answers for rules the manifests own (#37).
+if grep -q "Standalone mode: self-contained config parsing" "$ROOT_DIR/ci/craftsman-ci.sh"; then
+    log_fail "the pipeline still carries a standalone config path" \
+        "a second authority for strictness, reachable only when the engine is absent, which now exits 2"
+else
+    log_pass "no standalone config path: strictness has one authority"
+fi
+
+rm -rf "$ENGINE_COPY"
+
+# =============================================================================
 # Summary
 # =============================================================================
 test_summary
