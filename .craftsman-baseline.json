@@ -227,6 +227,6 @@
 {"complexity":0,"fan_out":5,"file_lines":139,"ignores":0,"instrument":2,"max_fn_lines":1,"path":"tests/packs/test-structural.sh"},
 {"complexity":0,"fan_out":5,"file_lines":118,"ignores":0,"instrument":2,"max_fn_lines":1,"path":"tests/packs/test-symfony.sh"},
 {"complexity":2,"fan_out":2,"file_lines":421,"ignores":0,"instrument":2,"max_fn_lines":23,"path":"tests/perf/test-hook-latency.sh","reason":"four comment lines: the macOS runner readings the Darwin pre-write ceiling is set from"},
-{"complexity":30,"fan_out":1,"file_lines":871,"ignores":1,"instrument":2,"max_fn_lines":129,"path":"tests/run-tests.sh","reason":"state files named after the session, one resolver (review CR-3)"},
+{"complexity":30,"fan_out":1,"file_lines":872,"ignores":1,"instrument":2,"max_fn_lines":129,"path":"tests/run-tests.sh","reason":"one line: the doc-claims suite is wired into the runner"},
 {"complexity":0,"fan_out":0,"file_lines":344,"ignores":0,"instrument":2,"max_fn_lines":5,"path":"tests/templates/test-templates.sh"}
 ]

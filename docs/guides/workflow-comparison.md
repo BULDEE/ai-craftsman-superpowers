@@ -436,8 +436,8 @@ Maybe. Consider:
 ### "Do all agents need special models?"
 
 No. Agent model assignments are:
-- Team Lead: Sonnet
-- Team members: Sonnet  
+- Team Lead: Opus (`agents/team-lead.md`)
+- Team members: Sonnet, except `architect` and `legacy-surgeon`, which are Opus
 - Hooks validation: Haiku (fast, cheap)
 - You can downgrade non-critical agents to Haiku in team config
 

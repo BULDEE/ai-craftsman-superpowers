@@ -191,21 +191,21 @@ bash ci/craftsman-ci.sh --format text
 Advisory rules warn whatever the strictness is. Set `RULE: block` in
 `.craft-config.yml` to enforce one in a codebase that has no exception to it.
 
-| Rule | Language | Description | Default |
-|------|----------|-------------|---------|
-| `PHP001` | PHP | Missing `declare(strict_types=1)` | strictness |
-| `PHP002` | PHP | Non-final class (Doctrine entities exempt) | strictness |
-| `PHP003` | PHP | Public setter method | advisory |
-| `PHP004` | PHP | `new DateTime()` usage | strictness |
-| `PHP005` | PHP | Empty catch block | advisory |
-| `TS001` | TypeScript | `any` type usage | strictness |
-| `TS002` | TypeScript | Default export (framework files exempt) | advisory |
-| `TS003` | TypeScript | Non-null assertion `!` | advisory |
-| `LAYER001` | PHP/TS | Domain imports Infrastructure | strictness |
-| `LAYER002` | PHP | Domain imports Presentation | strictness |
-| `LAYER003` | PHP | Application imports Presentation | strictness |
-| `WARN-PHP001` | PHP | Method with 4+ parameters | advisory |
-| `WARN-TS001` | TypeScript | Function with 4+ parameters | advisory |
+The list of rules is not written here. It is compiled from `rules/core.yml`
+and every loaded pack's `pack.yml`, so a table in this file describes one
+installation on one day. This one listed thirteen rules while the registry
+compiled sixty-six, with no security, Python, Go, Rust or Shell rule among
+them, and readers took it for the scope of the gate.
+
+Print the rules your installation enforces, with the severity each one
+resolves to:
+
+```bash
+bash ci/craftsman-ci.sh export --target agents-md   # writes AGENTS.md
+```
+
+The same content goes to `.cursor/rules/craftsman.mdc` with `--target cursor`
+and to `.github/copilot-instructions.md` with `--target copilot`.
 
 The layer rules read the project's root namespace from `composer.json`
 (`autoload.psr-4`, preferring the entry mapped to `src/`) and fall back to
