@@ -468,6 +468,7 @@ test_hook_inventory() {
 
     run_subtest "Hook inventory tests pass" "$SCRIPT_DIR/core/test-hook-inventory.sh" || true
     run_subtest "Documented claims match the code" "$SCRIPT_DIR/core/test-doc-claims.sh" || true
+    run_subtest "Session state keys have writers" "$SCRIPT_DIR/core/test-session-state-keys.sh" || true
 }
 
 test_changed_only() {

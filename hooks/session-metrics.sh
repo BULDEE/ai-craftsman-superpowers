@@ -92,8 +92,7 @@ build_summary_message() {
     local parts=() part msg=""
     [[ "$BLOCKED" -gt 0 || "$WARNED" -gt 0 ]] && parts+=("${BLOCKED} violations blocked, ${WARNED} warnings")
     [[ "${AGENT_COUNT:-0}" -gt 0 ]] && parts+=("${AGENT_COUNT} agent invocation(s)")
-    [[ -n "$TEAM_TYPE" ]] && parts+=("team: ${TEAM_TYPE}")
-    [[ "${COMPLETED_TASKS_COUNT:-0}" -gt 0 ]] && parts+=("${COMPLETED_TASKS_COUNT} task(s) completed")
+    [[ -n "$AGENT_TYPES" ]] && parts+=("agents: ${AGENT_TYPES}")
     [[ ${#parts[@]} -eq 0 ]] && return 0
     for part in "${parts[@]}"; do
         [[ -n "$msg" ]] && msg="${msg} | "
@@ -107,18 +106,19 @@ WRITES_COUNT=$(count_session_writes)
 BLOCKED=$(count_violation_marker "blocked")
 WARNED=$(count_violation_marker "warned")
 
-# Extract agent usage count and team type from session state
+# Subagent usage, from the two keys subagent-quality-gate.sh writes on every
+# SubagentStop. The three keys read here before (agent_invocations, team_type,
+# completed_tasks) were written by no hook, which is why agents_spawned held []
+# on every session row ever recorded.
 AGENT_COUNT=0
-TEAM_TYPE=""
-COMPLETED_TASKS_COUNT=0
+AGENT_TYPES=""
 if [[ -f "$SESSION_STATE" ]]; then
     STATE_DATA=$(python3 "$SCRIPT_DIR/lib/session_state.py" read-session-metrics \
         "$SESSION_STATE" 2>/dev/null) || true
 
     if [[ -n "$STATE_DATA" ]]; then
         AGENT_COUNT=$(echo "$STATE_DATA" | sed -n '1p')
-        TEAM_TYPE=$(echo "$STATE_DATA" | sed -n '2p')
-        COMPLETED_TASKS_COUNT=$(echo "$STATE_DATA" | sed -n '3p')
+        AGENT_TYPES=$(echo "$STATE_DATA" | sed -n '2p')
     fi
 fi
 
@@ -129,15 +129,16 @@ fi
 # source in this hook for an agent's name, so it records the count it does
 # know rather than a name it does not.
 AGENTS_JSON="[]"
-if [[ "${AGENT_COUNT:-0}" -gt 0 ]]; then
+if [[ -n "$AGENT_TYPES" ]]; then
+    AGENTS_JSON=$(echo "$AGENT_TYPES" | tr ',' '\n' | jq -R . | jq -sc .)
+elif [[ "${AGENT_COUNT:-0}" -gt 0 ]]; then
     AGENTS_JSON="[{\"count\":${AGENT_COUNT}}]"
 fi
 
-# Build skills_used JSON array (include team type if used)
+# skills_used has no source in this hook: no event carries a skill name, and
+# inventing one from the team type wrote "team:" plus an empty string on every
+# row. It stays empty until a hook can name the skills a session used.
 SKILLS_JSON="[]"
-if [[ -n "$TEAM_TYPE" ]]; then
-    SKILLS_JSON="[\"team:${TEAM_TYPE}\"]"
-fi
 
 # Record session with agent/team stats and write exposure
 metrics_record_session "${SESSION_DURATION:-0}" "$SKILLS_JSON" "$AGENTS_JSON" "$BLOCKED" "$WARNED" "$WRITES_COUNT" 2>/dev/null || true

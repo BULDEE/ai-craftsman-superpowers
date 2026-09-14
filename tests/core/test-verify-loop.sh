@@ -14,6 +14,22 @@ mkdir -p "$FAKE_HOME/.claude"
 FAKE_STATE="$FAKE_HOME/state.json"
 printf '%s' "$FAKE_STATE" > "$FAKE_HOME/.claude/craftsman-session-state-path"
 
+# The write count is the session-writes file post-write-check.sh appends to,
+# never a key of the state JSON: the hook used to read a `writes_count` key no
+# hook ever wrote, so the gate saw zero writes and let every task through.
+export CLAUDE_PLUGIN_DATA="$FAKE_HOME/data"
+mkdir -p "$CLAUDE_PLUGIN_DATA"
+WRITES_FILE="$CLAUDE_PLUGIN_DATA/session-writes"
+
+set_writes() {
+    if [[ "$1" -eq 0 ]]; then
+        rm -f "$WRITES_FILE"
+    else
+        : > "$WRITES_FILE"
+        for _ in $(seq 1 "$1"); do echo 1 >> "$WRITES_FILE"; done
+    fi
+}
+
 gate() {
     local subject="$1" strictness="$2"
     echo "{\"task\":{\"subject\":\"$subject\"}}" | \
@@ -23,7 +39,8 @@ gate() {
 
 echo "=== TaskCompleted Evidence Gate ==="
 
-echo '{"verified": false, "writes_count": 5}' > "$FAKE_STATE"
+echo '{"verified": false}' > "$FAKE_STATE"
+set_writes 5
 EXIT_CODE=0
 gate "Implement user entity" strict >/dev/null || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 2 ]]; then
@@ -32,7 +49,8 @@ else
     log_fail "strict gate" "expected exit 2, got $EXIT_CODE"
 fi
 
-echo '{"verified": true, "writes_count": 5}' > "$FAKE_STATE"
+echo '{"verified": true}' > "$FAKE_STATE"
+set_writes 5
 EXIT_CODE=0
 gate "Implement user entity" strict >/dev/null || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 0 ]]; then
@@ -41,7 +59,8 @@ else
     log_fail "verified pass-through" "expected exit 0, got $EXIT_CODE"
 fi
 
-echo '{"verified": false, "writes_count": 5}' > "$FAKE_STATE"
+echo '{"verified": false}' > "$FAKE_STATE"
+set_writes 5
 OUTPUT=$(gate "Implement user entity" moderate)
 if echo "$OUTPUT" | jq -e '.systemMessage' >/dev/null 2>&1; then
     log_pass "moderate + unverified: warns via systemMessage, no block"
@@ -57,7 +76,8 @@ else
     log_fail "relaxed gate" "expected exit 0, got $EXIT_CODE"
 fi
 
-echo '{"verified": false, "writes_count": 5}' > "$FAKE_STATE"
+echo '{"verified": false}' > "$FAKE_STATE"
+set_writes 5
 EXIT_CODE=0
 gate "docs: update readme" strict >/dev/null || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 0 ]]; then
@@ -66,7 +86,8 @@ else
     log_fail "docs exemption" "expected exit 0, got $EXIT_CODE"
 fi
 
-echo '{"verified": false, "writes_count": 0}' > "$FAKE_STATE"
+echo '{"verified": false}' > "$FAKE_STATE"
+set_writes 0
 EXIT_CODE=0
 gate "Implement user entity" strict >/dev/null || EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 0 ]]; then
