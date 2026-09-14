@@ -46,7 +46,7 @@ whose names start with `agent-` are shell scripts that shell out to a headless
 | `session-start.sh` | SessionStart | Initialization, config and pack loading | Session state, bridge files |
 | `config-protection.sh` | PreToolUse | Refuses writes to tool configs and to the gate's machinery (Claude Code settings, the installed plugin); hands the gate's own `.craft-*` files to the user's permission prompt | None |
 | `pre-write-check.sh` | PreToolUse | The would-be file judged by the pack validators on a mirror under `$TMPDIR`, removed on exit | Rewrites the pending content (see below) |
-| `pre-push-verify.sh` | PreToolUse | Gates `git push` on a verified session | None |
+| `pre-push-verify.sh` | PreToolUse | Warns on `git push` from a session that never ran `/craftsman:verify`; the push is allowed | None |
 | `post-write-check.sh` | PostToolUse | Rule enforcement after write | Metrics DB |
 | `agent-ddd-verifier.sh` | PostToolUse | Semantic architecture check | Metrics DB |
 | `post-bash-test-verify.sh` | PostToolUse | Reads test results off a Bash run | Session state |
@@ -84,9 +84,31 @@ whose names start with `agent-` are shell scripts that shell out to a headless
   otherwise
 - ❌ Do NOT read environment variables beyond `$CLAUDE_PLUGIN_ROOT`,
   `$CLAUDE_PLUGIN_DATA`, `$CLAUDE_PLUGIN_OPTION_*`, `$HOME`, `$PWD`, `$TMPDIR`,
-  Claude Code's own `$CLAUDE_EFFORT`, and the plugin's documented `CRAFTSMAN_*`
-  switches (hook profile, disabled hooks, headless-verify guard, analyser
-  budgets, verify model, bias patterns dir, project root, metrics source)
+  Claude Code's own `$CLAUDE_EFFORT` and `$CLAUDE_CODE_SESSION_ID`, and the
+  `CRAFTSMAN_*` switches listed below. The list is the whole list:
+  `tests/core/test-doc-claims.sh` fails when the code reads one this document
+  does not name, because a partial list is read as the complete one.
+
+| Variable | What it changes |
+|----------|-----------------|
+| `CRAFTSMAN_BASE_REF` | The revision `--changed-only` diffs against |
+| `CRAFTSMAN_BIAS_PATTERNS_DIR` | Where the bias detector reads its lexicons |
+| `CRAFTSMAN_DATA_DIR` | Plugin data directory, when `CLAUDE_PLUGIN_DATA` is unset |
+| `CRAFTSMAN_DISABLED_HOOKS` | Hooks to skip, by script name |
+| `CRAFTSMAN_GATE_OWN_PATHS` | Extra paths config-protection treats as the gate's own |
+| `CRAFTSMAN_GLOBAL_CONFIG_DIR` | The directory holding the global `.craft-config.yml` |
+| `CRAFTSMAN_HEADLESS_VERIFY` | Guard that stops a headless `claude -p` re-entering the hooks |
+| `CRAFTSMAN_HOOK_DRY_RUN` | Hooks report what they would do and write nothing |
+| `CRAFTSMAN_HOOK_PROFILE` | Which hooks run at all (`full`, `minimal`) |
+| `CRAFTSMAN_LANG_REGISTRY` | Path to the compiled language registry |
+| `CRAFTSMAN_METRICS_SOURCE` | The `source` column written with each metric |
+| `CRAFTSMAN_NO_SQLITE_CLI` | Forces the Python SQLite path instead of the `sqlite3` binary |
+| `CRAFTSMAN_PRINT_PROJECT_HASH` | Prints the project hash and exits, for support |
+| `CRAFTSMAN_PROJECT_ROOT` | The project root, when it is not the working directory |
+| `CRAFTSMAN_RULE_REGISTRY` | Path to the compiled rule registry |
+| `CRAFTSMAN_SA_BUDGET_FILE` | Level 2/3 budget per file, in seconds (15) |
+| `CRAFTSMAN_SA_BUDGET_PROJECT` | Level 2/3 budget per project, in seconds (30) |
+| `CRAFTSMAN_VERIFY_MODEL` | The model the headless verification calls |
 
 ## Optional Features
 
@@ -110,7 +132,8 @@ indexed or cached, and no model is downloaded.
 
 | Feature | Default | Destination | Data sent |
 |---------|---------|-------------|-----------|
-| Regex + static analysis hooks (Level 1-3) | On | None | Nothing. Fully offline |
+| Regex hooks (Level 1) | On | None | Nothing. Fully offline |
+| Static analysis (Levels 2 and 3) | Off until `trust_project_tools: true` | None | Nothing. Runs the project's own analysers locally |
 | Headless Haiku verification | On (`agent_hooks: true`) | Anthropic API, through a `claude -p` subprocess | The content under review. Disable with `agent_hooks: false` |
 | Sentry context hook | Off (needs `sentry_org`/`sentry_project`) | Sentry API (via MCP, read-only) | File paths, to look up matching errors |
 
