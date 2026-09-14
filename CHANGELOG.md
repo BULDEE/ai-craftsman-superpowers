@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `plugin.yaml`, the Hermes manifest at the repository root, is now the fifth
+  file `scripts/bump-version.sh` tracks, so `--check` and `release-guard.sh`
+  refuse a release that leaves it behind. It was off the list, and 4.9.0 and
+  4.10.x shipped with `hermes plugins` reporting 4.8.1. The manifest is at
+  4.10.3 again and `tests/meta/test-release.sh` carries the drift fixture.
+
 ## [4.10.3] - 2026-09-14
 
 A security patch and the tail of the whole-plugin review. On a machine

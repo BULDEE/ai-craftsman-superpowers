@@ -9,7 +9,7 @@
 #
 # Refuses:
 #   - a tag that is not exactly v<x.y.z>
-#   - a tag whose version disagrees with the four tracked files
+#   - a tag whose version disagrees with the five tracked files
 #   - a craftsman--v<version> tag pointing at a different commit
 #
 # The marketplace tag is pushed by the same `claude plugin tag --push` as the
