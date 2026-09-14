@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   core manifest with an import shim that removes PyYAML and asserts the
   sixth column both ways. Seen red without the shim.
 
+- **CI on `main` is green again.** Besides the PyYAML defect above, the
+  dogfood merge left five files above their ratchet mark (`update` refuses
+  a growth; the marks are re-taken with a reason), and the Darwin
+  pre-write latency ceiling of 3.5x, set from one laptop when the gate
+  moved to the mirror, sat inside the macOS runner's noise (2.79x to 3.73x
+  on the same code). It is 5.0x, 1.35x over the worst reading and under
+  twice the fastest, the rule the file states.
+
 - **The dogfood test walks every shipped script and judges it as a user's
   file.** `tests/core/test-dogfood.sh` walked `hooks/`, `ci/`, `adapters/`,
   `scripts/` and the packs' `hooks/`, and counted a finding as blocking

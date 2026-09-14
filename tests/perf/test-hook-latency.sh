@@ -301,10 +301,14 @@ DIRTY_PAYLOAD="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"c
 # the would-be file through the pack validators on a mirror, the same
 # dispatch post-write runs: this laptop went from 1.91x to 2.64x. The 150ms
 # buy one set of detectors instead of a fork that let an Acme\ project through.
+# The 3.5x that came with it was set from the laptop alone and sat inside the
+# macOS runner's noise: four readings of the same code on macos-latest gave
+# 3.09x, 3.73x, 3.55x and 2.79x (ubuntu: 7.11x, 6.90x against 9.0x). 5.0x is
+# 1.35x over the worst of them and under twice the fastest (2 x 2.64x).
 _PERF_ENV="$(uname -s)"
 case "$_PERF_ENV" in
     Linux)  C_POST=9.5;  C_PRE=9.0;  C_BIAS=2.65; C_DIRTY=14 ;;
-    *)      C_POST=5.5;  C_PRE=3.5;  C_BIAS=1.8;  C_DIRTY=13.5 ;;
+    *)      C_POST=5.5;  C_PRE=5.0;  C_BIAS=1.8;  C_DIRTY=13.5 ;;
 esac
 echo "ceilings for ${_PERF_ENV}: post-write ${C_POST}x, pre-write ${C_PRE}x, bias ${C_BIAS}x, dirty ${C_DIRTY}x"
 
