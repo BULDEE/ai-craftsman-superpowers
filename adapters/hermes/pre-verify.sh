@@ -43,6 +43,7 @@ trap '_bail "aborted at line $LINENO"' ERR
 # agent.max_verify_nudges, the same argument that put this hook on pre_verify.
 _bail() {
     echo "craftsman/hermes: $1" >&2
+    _record_verdict fail
     python3 -c '
 import json, sys
 print(json.dumps({"decision": "block",
@@ -56,6 +57,16 @@ print(json.dumps({"decision": "block",
 ADAPTER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_ROOT="$(cd "$ADAPTER_DIR/../.." && pwd)"
 CRAFTSMAN_CI="${PLUGIN_ROOT}/ci/craftsman-ci.sh"
+
+# The verdict, with the tree it was given on, for the terminal gate: a `git
+# push` between two conclusions is refused unless the last conclusion passed
+# THIS tree (pre-tool-call.sh, terminal_gate.py). Written into the
+# repository's own git directory, one line, replaced on every conclusion;
+# a workspace that is not a repository has nothing to push and records none.
+_record_verdict() {
+    [[ -n "${CWD:-}" && -d "${CWD:-}" ]] || return 0
+    python3 "$ADAPTER_DIR/terminal_gate.py" record "$CWD" "$1" "${SESSION_ID:-}" >/dev/null 2>&1 || true
+}
 # A gate reads the workspace, never the operator's home: ~/.craft-config.yml
 # or ~/.claude/.craft-config.yml is writable by the uid the agent runs as,
 # outside any gated turn, and `strictness: relaxed` there degraded SEC001 to
@@ -71,6 +82,7 @@ INPUT=$(cat)
 # Emit a directive and stop. Both shapes are accepted upstream; the Claude-Code
 # one is used so the same verdict text serves this adapter and the Stop hook.
 _verdict() {
+    _record_verdict fail
     python3 -c '
 import json, sys
 print(json.dumps({"decision": "block", "reason": sys.argv[1]}, ensure_ascii=False))
@@ -99,6 +111,7 @@ elif value is not None:
 HINTED_PATHS=$(_field changed_paths)
 CODING=$(_field coding)
 CWD=$(_field cwd)
+SESSION_ID=$(_field session_id)
 ATTEMPT=$(_field attempt)
 [[ "$ATTEMPT" =~ ^[0-9]+$ ]] || ATTEMPT=0
 
@@ -187,7 +200,8 @@ done <<< "$(printf '%s\n%s\n' "$(_git_scope)" "$HINTED_PATHS")"
 
 [[ -n "${GATE_TOUCHED:-}" ]] && _verdict "This turn edits the craftsman gate's own configuration (${GATE_TOUCHED}). The gated party does not reconfigure the gate: revert that file and change the rules through a reviewed commit instead."
 
-[[ ${#SCAN_PATHS[@]} -gt 0 ]] || exit 0
+# A clean turn is a pass on this tree: nothing to judge, nothing refused.
+[[ ${#SCAN_PATHS[@]} -gt 0 ]] || { _record_verdict pass; exit 0; }
 
 # Hermes kills the hook at its configured timeout, and a kill is
 # indistinguishable from a pass. Bound it here so the adapter can say so.
@@ -250,10 +264,12 @@ elif advisory and attempt == 0:
     print("Non-blocking craftsman findings, consider them before concluding:\n" + "\n".join(lines))
 ' "$ATTEMPT" 2>/dev/null)
 
-[[ -n "$SUMMARY" ]] || exit 0
+[[ -n "$SUMMARY" ]] || { _record_verdict pass; exit 0; }
 MODE="${SUMMARY%%$'\n'*}"
 MESSAGE="${SUMMARY#*$'\n'}"
 [[ "$MODE" == "BLOCK" ]] && _verdict "$MESSAGE"
+# Advisory only: the turn may conclude, and so may the push.
+_record_verdict pass
 if [[ "$MODE" == "NUDGE" ]]; then
     python3 -c '
 import json, sys

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Hermes: a `git push` between two conclusions waits for the conclusion
+  gate. `adapters/hermes/pre-tool-call.sh` now reads `terminal` and refuses a
+  push (and a commit under `strict`) unless `pre-verify.sh`'s last verdict is
+  a pass on the tree that would be published; the verdict is recorded with
+  that tree (`terminal_gate.py`, `<git-dir>/craftsman-verdict`), so a pass on
+  one tree does not authorise another, and with no verdict at all the push
+  waits. The matcher becomes `^(terminal|write_file|patch)$`.
+  `tests/adapters/test-hermes-terminal-gate.sh` covers no verdict, a refused
+  turn, a pass, a different tree, a pipeline, `git -C`, and the two
+  strictness levels; every refusal was seen red before the branch existed.
+
 ### Fixed
 
 - `plugin.yaml`, the Hermes manifest at the repository root, is now the fifth
