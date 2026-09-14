@@ -113,6 +113,19 @@ def _parse_fallback(path: str) -> dict:
     return reader.done()
 
 
+def _is_true(value) -> bool:
+    """A YAML boolean, whichever reader produced it.
+
+    PyYAML hands the boolean True; the fallback reader, the only one on a
+    machine without PyYAML (the macOS system python, the CI runners), hands
+    the string. Comparing to True alone compiled SEC001 as ignorable on
+    every such machine, and a marker silenced a secret there.
+    """
+    if value is True:
+        return True
+    return str(value or "").strip().lower() in ("true", "yes", "on")
+
+
 def _emit(row: list) -> None:
     if any("\t" in str(field) or "\n" in str(field) for field in row):
         return
@@ -198,7 +211,7 @@ class _Registry:
         # owns the rule, read by every marker reader through one predicate:
         # an ignore marker naming SEC001 used to pass a hardcoded secret on the
         # hook, the pipeline and the Hermes write gate alike.
-        never_ignorable = "yes" if entry.get("never_ignorable") is True else "no"
+        never_ignorable = "yes" if _is_true(entry.get("never_ignorable")) else "no"
         self._rows[rule_id] = [
             rule_id, group, self._severity_of(entry, rule_id), owner,
             str(entry.get("text") or rule_id), never_ignorable,
