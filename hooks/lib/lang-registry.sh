@@ -218,6 +218,23 @@ _lang_known_ready() {
     [[ -n "$_LANG_REGISTRY_KNOWN_FILE" && -f "$_LANG_REGISTRY_KNOWN_FILE" ]]
 }
 
+# lang_known_for_file <path> → the language some installed pack claims for
+# the extension, stack filter or not. A validator running on the file already
+# means its language is enabled; what it asks here is a property of the
+# language (its dialect), not a stack decision.
+lang_known_for_file() {
+    local file="$1" base extension
+    _lang_known_ready || return 0
+    base="${file##*/}"
+    case "$base" in
+        *.*) extension="${base##*.}" ;;
+        *)   return 0 ;;
+    esac
+    awk -F'\t' -v ext="$extension" \
+        '$2 == "extensions" && $3 == ext { print $1; exit }' \
+        "$_LANG_REGISTRY_KNOWN_FILE" 2>/dev/null
+}
+
 lang_all_known_capability() {
     local capability="$1"
     _lang_known_ready || return 0
