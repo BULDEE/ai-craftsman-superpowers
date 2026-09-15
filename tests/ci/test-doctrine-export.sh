@@ -224,15 +224,19 @@ if [[ "$RC" -ne 0 ]] && grep -q "WITNESS-4" AGENTS.md; then
 else
     log_fail "ambiguous markers" "rc=$RC"
 fi
-# Line endings and mode outside the block are the user's.
+# Line endings and mode outside the block are the user's. The mode is read
+# GNU-first: BSD `stat -f '%Lp'` is a filesystem query on GNU that exits 0
+# with `  File: ...`, so the BSD-first fallback never ran on Linux (CI on
+# ubuntu-latest read an empty mode).
+_mode() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"; }
 printf '# CRLF notes\r\n\r\nWITNESS-5: keep my CRLF.\r\n' > AGENTS.md
 chmod 664 AGENTS.md
 bash "$CLI" export --target agents-md >/dev/null 2>&1
 if grep -q $'WITNESS-5: keep my CRLF.\r$' AGENTS.md && grep -q $'craftsman:doctrine:end -->\r$' AGENTS.md \
-    && [[ "$(stat -f '%Lp' AGENTS.md 2>/dev/null || stat -c '%a' AGENTS.md)" == "664" ]]; then
+    && [[ "$(_mode AGENTS.md)" == "664" ]]; then
     log_pass "a CRLF file keeps its line endings (block included) and its mode after the export"
 else
-    log_fail "CRLF and mode" "mode=$(stat -f '%Lp' AGENTS.md 2>/dev/null || stat -c '%a' AGENTS.md) $(head -c 60 AGENTS.md | od -c | head -2 | tr '\n' ' ')"
+    log_fail "CRLF and mode" "mode=$(_mode AGENTS.md) $(head -c 60 AGENTS.md | od -c | head -2 | tr '\n' ' ')"
 fi
 rm -f orphan.md
 rm -f AGENTS.md user-only.md after-one.md
