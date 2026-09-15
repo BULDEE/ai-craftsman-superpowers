@@ -10,7 +10,7 @@ effort: high
 
 - **Outcome**: a merge decision on the reviewed scope: APPROVE, REQUEST_CHANGES, or BLOCK, with every finding tied to a file and line.
 - **Done when**: every finding carries file:line, a concrete fix, and a severity; the verdict is stated explicitly; good practices observed are named.
-- **Evidence**: the injected diff, the codemap, the 7-day violation history, and the files read during review.
+- **Evidence**: the collected diff, codemap and 7-day violation history (`craftsman-context review`, each source with its status), and the files read during review.
 
 ## Scope Comes From the Conversation
 
@@ -26,6 +26,17 @@ conversation and the attachments. It reviewed what it could guess from
 See ADR-0028. Do not reintroduce `context: fork` here.
 
 ## Live Context
+
+The five lines below are filled in by Claude Code before this skill loads
+(its `!`command`` extension). On any other host they are literal text, and a
+review that treats them as data reviews nothing. So, first step everywhere:
+run `craftsman-context review` in the project directory (on the plugin's PATH
+under Claude Code; elsewhere `bash <plugin root>/bin/craftsman-context review`,
+the plugin root being two directories above this file) and read its output.
+It collects the same five sources from this installation's own helpers and
+marks each `available`, `empty`, `missing` or `failed` with the revision it
+describes. A source marked missing or failed is named as absent in the
+report; it is never assumed.
 
 - Codemap: !`bash ~/.claude/craftsman-codemap.sh 2>/dev/null | head -40 || echo "codemap unavailable"`
 - Working tree diff: !`git rev-parse --git-dir >/dev/null 2>&1 && git diff HEAD --stat 2>/dev/null | tail -30 || echo "no git context available"`
