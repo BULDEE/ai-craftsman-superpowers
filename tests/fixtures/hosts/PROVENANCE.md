@@ -58,7 +58,9 @@ Nothing else is edited. `hook-env.*.json` lists variable NAMES only.
   `agent_transcript_path` (the child's, under `<session>/subagents/`, the
   writes are there), plus `agent_id`, `agent_type`, `last_assistant_message`,
   `stop_hook_active`, `background_tasks`, `session_crons`. The transcripts
-  are kept with their `user` and `assistant` rows only, paths redacted.
+  are kept with their `user` and `assistant` rows only, paths redacted. One
+  more edit: a U+2014 in Claude Code's own Write tool-result text was
+  replaced by a colon (repository rule; no hook reads that string).
 
 ## codex/0.154.0
 
