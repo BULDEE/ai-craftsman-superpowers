@@ -52,6 +52,14 @@ Nothing else is edited. `hook-env.*.json` lists variable NAMES only.
     the model as a task notification and NO hook event fires, so a
     background test run stays pending (`pending_test_tasks`) until polled.
 
+- Third run (`subagent-stop.json` and the two transcripts): one `Agent`
+  spawn that wrote src/Domain/Order.php. `SubagentStop` carries
+  `transcript_path` (the PARENT's transcript, 0 writes) and
+  `agent_transcript_path` (the child's, under `<session>/subagents/`, the
+  writes are there), plus `agent_id`, `agent_type`, `last_assistant_message`,
+  `stop_hook_active`, `background_tasks`, `session_crons`. The transcripts
+  are kept with their `user` and `assistant` rows only, paths redacted.
+
 ## codex/0.154.0
 
 - Date: 2026-09-15. `codex --version`: `codex-cli 0.154.0`. Model reported in

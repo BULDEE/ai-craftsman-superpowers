@@ -590,4 +590,35 @@ fi
 unset CLAUDE_CODE_SESSION_ID
 rm -f "$WORK/src/Domain/Order.php" "$CLAUDE_PLUGIN_DATA"/session-*
 
+# =============================================================================
+# CR-126: the subagent gate judges the subagent's transcript, not the parent's
+# =============================================================================
+echo ""
+echo "--- subagent transcript ---"
+# The capture: a parent that wrote nothing spawned a child that wrote
+# src/Domain/Order.php through Write. The transcripts are fixtures; the file
+# is re-created on disk with the violation the child left.
+mkdir -p "$WORK/src/Domain"
+printf '<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\nclass Order\n{\n}\n' > "$WORK/src/Domain/Order.php"
+# The transcripts name the workspace too: bound to this one like the payload.
+for t in agent parent; do
+    sed "s|__WORKSPACE__|$WORK|g" "$ROOT_DIR/tests/fixtures/hosts/claude-code/2.1.272/subagent-stop.$t-transcript.jsonl" > "$WORK/$t-transcript.jsonl"
+done
+SA_PAYLOAD=$(host_fixture_with claude-code 2.1.272 subagent-stop "$WORK" \
+    "d['transcript_path'] = '$WORK/parent-transcript.jsonl'; d['agent_transcript_path'] = '$WORK/agent-transcript.jsonl'; d['session_id'] = 's126'")
+R=$(cd "$WORK" && printf '%s' "$SA_PAYLOAD" | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/subagent-quality-gate.sh" 2>&1); RC=$?
+if [[ "$RC" -eq 0 && "$R" == *additionalContext* && "$R" == *PHP002* && "$R" == *Order.php* ]]; then
+    log_pass "SubagentStop: the child's Write is found in agent_transcript_path and its PHP002 reaches the parent as context (parent transcript holds no write)"
+else
+    log_fail "subagent transcript" "rc=$RC out=$(printf '%s' "$R" | tr '\n' ' ' | cut -c1-200)"
+fi
+# the parent's transcript alone is never judged: with no agent transcript the gate has nothing
+R=$(cd "$WORK" && printf '%s' "$(host_fixture_with claude-code 2.1.272 subagent-stop "$WORK" "d['transcript_path'] = '$WORK/agent-transcript.jsonl'; d['agent_transcript_path'] = None; d['session_id'] = 's126'")" | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/subagent-quality-gate.sh" 2>&1); RC=$?
+if [[ "$RC" -eq 0 && "$R" != *PHP002* ]]; then
+    log_pass "SubagentStop without agent_transcript_path judges nothing, even when the parent transcript holds writes"
+else
+    log_fail "parent transcript not judged" "rc=$RC out=$(printf '%s' "$R" | tr '\n' ' ' | cut -c1-160)"
+fi
+rm -f "$WORK/src/Domain/Order.php"
+
 test_summary

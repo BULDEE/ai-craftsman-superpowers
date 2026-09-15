@@ -213,8 +213,10 @@ printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Wri
     "$SQG_DIR/Bad.php" > "$SQG_DIR/transcript.jsonl"
 
 SQG_EXIT=0
+# `agent_transcript_path` is the subagent's transcript; `transcript_path` on a
+# SubagentStop is the parent's (tests/fixtures/hosts/claude-code/*/subagent-stop.json).
 SQG_OUT=$(jq -n --arg t "$SQG_DIR/transcript.jsonl" \
-    '{agent_type:"backend-craftsman", transcript_path:$t, cwd:"/tmp"}' | \
+    '{agent_type:"backend-craftsman", agent_transcript_path:$t, transcript_path:"/nonexistent/parent.jsonl", cwd:"/tmp"}' | \
     CLAUDE_PLUGIN_DATA="$SQG_DATA" bash "$ROOT_DIR/hooks/subagent-quality-gate.sh" 2>/dev/null) || SQG_EXIT=$?
 
 if [[ $SQG_EXIT -eq 0 ]]; then

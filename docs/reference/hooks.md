@@ -21,7 +21,7 @@ The plugin uses Claude Code hooks to automatically enforce code quality rules. H
 | TaskCompleted | `task-completed-verify.sh` | Evidence gate: block a task from being marked complete without verification ([ADR-0023](../adr/0023-deterministic-verification-loop.md)) |
 | UserPromptSubmit | `bias-detector.sh` | Detect cognitive biases in prompts |
 | FileChanged | `file-changed.sh` | Track file modifications for correction learning |
-| SubagentStop | `subagent-quality-gate.sh` | Apply the quality gate to work produced by a subagent |
+| SubagentStop | `subagent-quality-gate.sh` | Apply the quality gate to work produced by a subagent | Reads `agent_transcript_path` (the subagent's transcript; `transcript_path` on this event is the parent's) and judges nothing when it is absent, which is the Codex case
 | PreCompact | `pre-compact-save.sh` | Persist session state before context compaction |
 | PostCompact | `post-compact-verify.sh` | Restore and re-verify state after compaction |
 | SessionEnd | `session-metrics.sh` | Record session summary to metrics database |
