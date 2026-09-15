@@ -47,9 +47,10 @@ from what the session actually offers, in this order:
    native teams (the section above).
 2. `spawn_agent` is available (Codex): the same composition, one
    `spawn_agent` per member with the matching `craftsman-<name>` role
-   (`craftsman-ci export --target codex-agents` writes the roles from the
-   shared `agents/*.md`; Codex loads `~/.codex/agents/` and a project's
-   `.codex/agents/`), each task the member's focus, then `wait_agent` and
+   (`craftsman-ci export --target codex-agents --into "$HOME/.codex/agents"`
+   writes the roles from the shared `agents/*.md`; on codex-cli 0.154.0 only
+   `~/.codex/agents/` was offered to `spawn_agent`, a project's
+   `.codex/agents/` was not), each task the member's focus, then `wait_agent` and
    consolidate. If the role is not offered, spawn the default role with the
    agent's mission pasted as the task; say which you did.
 3. Only an `Agent` (or equivalent single-dispatch) tool: parallel dispatch, one

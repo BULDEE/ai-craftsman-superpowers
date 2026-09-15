@@ -148,10 +148,11 @@ _doctrine_write_block() {
 # Written to the project's .codex/agents/ (documented); ~/.codex/agents/ is the
 # location observed loaded by `codex exec` 0.154.0, and the message says so.
 _doctrine_write_codex_agents() {
-    local here
+    local here into="${EXPORT_INTO:-.codex/agents}"
     here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    python3 "${CI_LIB_DIR:-$here}/agent_roles.py" codex "$here/../agents" .codex/agents --version "${VERSION:-unknown}" || return 1
-    echo "Codex loads ~/.codex/agents/ (observed) and a project's .codex/agents/ (documented): copy the craftsman-*.toml files there if the roles are not offered by spawn_agent."
+    python3 "${CI_LIB_DIR:-$here}/agent_roles.py" codex "$here/../agents" "$into" --version "${VERSION:-unknown}" || return 1
+    [[ "$into" == ".codex/agents" ]] && echo "On codex-cli 0.154.0 a project's .codex/agents/ was NOT offered to spawn_agent (documented, not observed); ~/.codex/agents/ was. To install there: craftsman-ci export --target codex-agents --into \"\$HOME/.codex/agents\""
+    return 0
 }
 
 _doctrine_write_agents_md() {

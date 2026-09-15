@@ -280,7 +280,16 @@ if diff -q role-one.toml .codex/agents/craftsman-architect.toml >/dev/null && gr
 else
     log_fail "codex-agents idempotence" "role changed or user role lost"
 fi
-rm -rf .codex role-one.toml
+# --into writes the roles where the caller says (the observed location is
+# ~/.codex/agents/; the test uses a private directory, never the real one)
+INTO="$WORK/user-codex/agents"
+bash "$CLI" export --target codex-agents --into "$INTO" >/dev/null 2>&1
+if [[ "$(ls "$INTO"/craftsman-*.toml 2>/dev/null | wc -l | tr -d ' ')" == "$ROLE_COUNT" ]]; then
+    log_pass "--into writes the same roles into the directory named"
+else
+    log_fail "--into" "$(ls "$INTO" 2>/dev/null | tr '\n' ' ')"
+fi
+rm -rf .codex role-one.toml "$WORK/user-codex"
 # Review of ff99dd5: a body with ''' round-trips exactly, and a pre-created
 # symlink in .codex/agents is refused, never written through.
 mkdir -p .codex/agents agents-probe

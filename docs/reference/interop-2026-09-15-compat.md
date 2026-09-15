@@ -25,7 +25,7 @@ Levels of proof, from weakest to strongest:
 | Test run grants/revokes verification evidence | **e2e**: PostToolUse = pass, PostToolUseFailure `Exit code N` = fail, background run pending until TaskOutput | captured: shell output is a bare string, **exit code not observable**, state `unknown`, nothing granted or revoked | documented: `tool_result.result_type` success/failure (no exit code) | n/a (`pre_verify` runs the suite itself) |
 | Session identity from the payload | e2e (SessionEnd finds its own files) | **e2e**: Codex launched from a Claude Code Bash tool inherits the parent's `CLAUDE_CODE_SESSION_ID` and still files under its own id | documented (`sessionId` / `session_id` translated) | existing |
 | Skills discovered (22) | existing | **captured** (`codex debug prompt-input`): symlinked SKILL.md absent, regular copy present; learned skill in `.agents/skills` listed | not measured | n/a |
-| Agents / roles | native | roles exported (`craftsman-ci export --target codex-agents`); `~/.codex/agents/` observed loaded, project `.codex/agents/` **not observed** under `codex exec --ephemeral` | documented as different profile formats, not projected | n/a |
+| Agents / roles | native | roles exported (`craftsman-ci export --target codex-agents [--into DIR]`); `~/.codex/agents/` observed offered to `spawn_agent`; project `.codex/agents/` **not offered** in three `codex exec` runs (ephemeral, persistent, project trusted via `-c`) | documented as different profile formats, not projected | n/a |
 | Review context (`craftsman-context review`) | injected lines kept | **e2e**: Codex ran the collector from the skill and returned the right verdict | not measured | n/a |
 | Semantic review backend | `claude -p` (existing) | **e2e**: `agent-ddd-verifier` through `codex exec`, one HAIKU_LAYER row, backend recorded | not implemented (no backend) | n/a |
 | Events loaded | 12 of 12 (documented) | 11 kinds, **not** TaskCompleted / PostToolUseFailure / FileChanged (generated schema) | documented list, not measured | n/a |
@@ -37,9 +37,12 @@ Levels of proof, from weakest to strongest:
 
 ## Open, with the action that closes each
 
-- Codex project-level `.codex/agents/` loading and a real `spawn_agent` of a
-  `craftsman-*` role: run `codex exec` in a repository holding the exported
-  roles WITHOUT `--ephemeral`, ask for `list_agents`, and keep the answer.
+- A real `spawn_agent` of a `craftsman-*` role: project-level `.codex/agents/`
+  was not offered in three `codex exec` runs on 0.154.0 (ephemeral,
+  persistent, project trusted), so the roles have to reach
+  `~/.codex/agents/` (`craftsman-ci export --target codex-agents --into
+  "$HOME/.codex/agents"`), which is the user's installation and was not
+  written by this campaign; run that, then ask a session for `list_agents`.
 - Codex plugin-bundled hook environment (`PLUGIN_ROOT`, options): only a
   project hook was captured; install the built archive as a Codex plugin and
   capture one PreToolUse.

@@ -90,7 +90,7 @@ Teammates using Copilot, Cursor, Codex, Gemini, or Antigravity cannot run crafts
 craftsman-ci export --target agents-md   # AGENTS.md (read by most agents)
 craftsman-ci export --target cursor      # .cursor/rules/craftsman.mdc
 craftsman-ci export --target copilot     # .github/copilot-instructions.md
-craftsman-ci export --target codex-agents  # .codex/agents/craftsman-<name>.toml, one role per agents/*.md
+craftsman-ci export --target codex-agents [--into "$HOME/.codex/agents"]  # craftsman-<name>.toml, one role per agents/*.md; only ~/.codex/agents/ was seen offered on codex-cli 0.154.0
 craftsman-ci export --target all
 ```
 
