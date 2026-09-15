@@ -197,6 +197,13 @@ if [[ "$CODEX_HOOKS_STATUS" == "warn" && "$CODEX_HOOKS" == "${DECLARED} handlers
 else
     log_fail "hc_check_hooks_declared" "codex=[$CODEX_HOOKS_STATUS $CODEX_HOOKS] claude=[$CLAUDE_HOOKS_STATUS $CLAUDE_HOOKS]"
 fi
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CRAFTSMAN_SESSION_HOST=mystery CLAUDE_PLUGIN_ROOT="$ROOT_DIR" hc_check_hooks_declared
+if [[ "${_HC_STATUSES[0]}" == "warn" && "${_HC_MESSAGES[0]}" == *"not recorded"* && "${_HC_MESSAGES[0]}" != *"every event"* ]]; then
+    log_pass "hc_check_hooks_declared: a host the matrix does not record warns; no evidence is never 'every event loads'"
+else
+    log_fail "hc_check_hooks_declared unknown host" "${_HC_STATUSES[0]} ${_HC_MESSAGES[0]}"
+fi
 # every declared event is accounted for on every host: loaded, or its lost function named
 UNACCOUNTED=$(python3 - "$ROOT_DIR" <<'PY'
 import json, sys

@@ -193,13 +193,20 @@ hc_check_hooks_declared() {
     events=$(jq -r '.hooks | keys | join(",")' "$manifest" 2>/dev/null)
     host="${CRAFTSMAN_SESSION_HOST:-}"
     [[ -z "$host" ]] && type host_detect >/dev/null 2>&1 && host=$(host_detect "")
-    missing=""
-    if [[ -f "$capabilities" ]] && jq -e --arg h "$host" '.hosts[$h]' "$capabilities" >/dev/null 2>&1; then
-        missing=$(jq -r --arg h "$host" --slurpfile m "$manifest" '
-            .event_functions as $f
-            | (($m[0].hooks | keys) - .hosts[$h].events_loaded)
-            | map(. + " (" + ($f[.] // "function not named") + ")")
-            | join("; ")' "$capabilities" 2>/dev/null)
+    # No evidence is not "every event loads": an unknown host, or a host the
+    # matrix does not record, is said so (review of 5cc64f4, F2).
+    if [[ ! -f "$capabilities" ]] || ! jq -e --arg h "$host" '.hosts[$h]' "$capabilities" >/dev/null 2>&1; then
+        _hc_record "hooks" "warn" "${declared} handlers declared on ${events}; which of them ${host:-this host} loads is not recorded in hooks/host-capabilities.json, so none is counted as active here"
+        return
+    fi
+    missing=$(jq -r --arg h "$host" --slurpfile m "$manifest" '
+        .event_functions as $f
+        | (($m[0].hooks | keys) - .hosts[$h].events_loaded)
+        | map(. + " (" + ($f[.] // "function not named") + ")")
+        | join("; ")' "$capabilities" 2>/dev/null) || missing="__query_failed__"
+    if [[ "$missing" == "__query_failed__" ]]; then
+        _hc_record "hooks" "warn" "${declared} handlers declared; the capability query failed, loaded events unknown"
+        return
     fi
     if [[ -n "$missing" ]]; then
         _hc_record "hooks" "warn" "${declared} handlers declared on ${events}; NOT loaded by ${host}: ${missing}. Trusted is the host's /hooks view, not measured here"
