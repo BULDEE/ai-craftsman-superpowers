@@ -108,6 +108,7 @@ whose names start with `agent-` are shell scripts that shell out to a headless
 | `CRAFTSMAN_RULE_REGISTRY` | Path to the compiled rule registry |
 | `CRAFTSMAN_SA_BUDGET_FILE` | Level 2/3 budget per file, in seconds (15) |
 | `CRAFTSMAN_SA_BUDGET_PROJECT` | Level 2/3 budget per project, in seconds (30) |
+| `CRAFTSMAN_SESSION_ID` | The session a hook bound from its payload's `session_id`; read by the helpers it spawns, exported by `session_files_bind`, never set by hand |
 | `CRAFTSMAN_VERIFY_MODEL` | The model the headless verification calls |
 
 ## Optional Features
