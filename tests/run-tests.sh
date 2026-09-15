@@ -686,6 +686,7 @@ test_session_metrics() {
     run_subtest "Rule registry tests pass" "$SCRIPT_DIR/ci/test-rule-registry.sh" || true
     run_subtest "Ratchet CI parity tests pass" "$SCRIPT_DIR/ci/test-ratchet-ci.sh" || true
     run_subtest "Release path tests pass" "$SCRIPT_DIR/meta/test-release.sh" || true
+    run_subtest "Fresh install from the built archive passes" "$SCRIPT_DIR/meta/test-fresh-install.sh" || true
     run_subtest "Turn budget delivery tests pass" "$SCRIPT_DIR/core/test-turn-budget.sh" || true
 
     run_subtest "Suite isolation audit" "$SCRIPT_DIR/core/test-suite-isolation.sh" || true

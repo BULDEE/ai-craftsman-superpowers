@@ -102,4 +102,18 @@ else
     log_fail "no document states a hook count hooks.json contradicts" "$stale"
 fi
 
+# Every handler carries a distinct statusMessage: the Codex hooks UI titles
+# rows "Hook N" (audit CR-117, a choice of that UI, not a manifest defect) and
+# shows statusMessage in the details and while running; Claude Code shows it
+# as the spinner text. Two handlers with the same message are one line of
+# UI the reader cannot tell apart.
+TOTAL_MSG=$(jq '[.hooks[][] | .hooks[] | .statusMessage // empty] | length' "$ROOT_DIR/hooks/hooks.json")
+DISTINCT_MSG=$(jq '[.hooks[][] | .hooks[] | .statusMessage // empty] | unique | length' "$ROOT_DIR/hooks/hooks.json")
+TOTAL_HANDLERS=$(jq '[.hooks[][] | .hooks[]] | length' "$ROOT_DIR/hooks/hooks.json")
+if [[ "$TOTAL_MSG" == "$TOTAL_HANDLERS" && "$DISTINCT_MSG" == "$TOTAL_HANDLERS" ]]; then
+    log_pass "every one of the $TOTAL_HANDLERS handlers carries a distinct statusMessage"
+else
+    log_fail "statusMessage" "handlers=$TOTAL_HANDLERS with message=$TOTAL_MSG distinct=$DISTINCT_MSG"
+fi
+
 test_summary
