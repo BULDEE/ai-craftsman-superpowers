@@ -273,7 +273,7 @@ bash ~/.claude/craftsman-instincts.sh candidates
 
 For each candidate, show the user the rule, confidence, occurrence count, ignored count, and evidence, then ask what to do. A rule is a candidate only when it was fixed MORE often than it was rejected (ignored or scoped), and a candidate whose rejections catch up is withdrawn from the list on the next refresh (#45). The confidence is a different statistic, the lower bound of the acceptance rate given the evidence (Wilson, 95%): it orders the list, more corrections rank higher, nothing saturates, so the first candidate listed is the one best supported by the data. Read it as an order, never as a bar.
 
-- **Approve** (generates `.claude/skills/learned-<rule>/SKILL.md` with provenance, loaded automatically as background knowledge):
+- **Approve** (generates `<skills dir>/learned-<rule>/SKILL.md` with provenance, loaded automatically as background knowledge; the directory is the host's: `$PWD/.claude/skills` on Claude Code, `$PWD/.agents/skills` on Codex, and the helper refuses any other depth):
   ```bash
   bash ~/.claude/craftsman-instincts.sh approve <id> "$PWD/.claude/skills"
   ```
@@ -295,10 +295,10 @@ bash ~/.claude/craftsman-instincts.sh global-candidates
 Present each candidate with its project count, then promote only on an explicit user decision:
 
 ```bash
-bash ~/.claude/craftsman-instincts.sh promote <RULE> "$HOME/.claude/skills"
+bash ~/.claude/craftsman-instincts.sh promote <RULE> "$HOME/.claude/skills"   # Codex: "$HOME/.agents/skills"
 ```
 
-This writes `~/.claude/skills/learned-global-<rule>/SKILL.md` (`user-invocable: false`), applied across all projects. The same rule as project scope holds: never promote automatically, and retirement is deleting the file.
+This writes `~/.claude/skills/learned-global-<rule>/SKILL.md` (or `~/.agents/skills/` for Codex; `user-invocable: false`), applied across all projects. The same rule as project scope holds: never promote automatically, and retirement is deleting the file.
 
 ### Step 11: Dashboard (`--dashboard`)
 

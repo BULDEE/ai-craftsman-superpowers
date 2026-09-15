@@ -259,33 +259,42 @@ def _safe_rule(rule: str) -> str:
 # it, but nothing stopped the directory itself from pointing anywhere writable.
 # A generated skill only means something inside the project or the user's own
 # Claude configuration; anywhere else is a write primitive, not a feature.
+# The directories a host reads project and user skills from, and from nowhere
+# deeper. Claude Code: .claude/skills/<name>/SKILL.md and ~/.claude/skills/,
+# measured with `claude -p --debug` (two project skills on disk, one at that
+# depth and one under .claude/skills/craftsman-learned/, loaded as
+# `project: 1`; four releases of approvals went to the second place). Codex:
+# .agents/skills/<name>/SKILL.md and ~/.agents/skills/, documented at
+# learn.chatgpt.com/docs/build-skills and listed by `codex debug prompt-input`
+# on 0.154.0; an approval into .claude/skills on a Codex machine was a file
+# Codex never loaded (audit CR-117, C5). A destination the consumer will never
+# read is refused, not written.
+HOST_SKILL_PARENTS = (".claude", ".agents")
+
+
 def _resolve_skills_dir(skills_dir: str) -> Path:
     target = Path(skills_dir).expanduser().resolve()
     allowed = [Path.cwd().resolve()]
     home = Path.home().resolve()
-    allowed.append(home / ".claude")
+    allowed.extend(home / parent for parent in HOST_SKILL_PARENTS)
     for root in allowed:
         if target == root or root in target.parents:
             break
     else:
-        print(f"error: refusing to write skills outside the project or ~/.claude: {target}",
+        print(f"error: refusing to write skills outside the project, ~/.claude or ~/.agents: {target}",
               file=sys.stderr)
         sys.exit(1)
-    # Claude Code loads a project skill from .claude/skills/<name>/SKILL.md and
-    # a user skill from ~/.claude/skills/<name>/SKILL.md, and from nowhere
-    # deeper: measured with `claude -p --debug`, two project skills on disk,
-    # one at that depth and one under .claude/skills/craftsman-learned/, loaded
-    # as `project: 1`. Four releases of approvals went to the second place.
-    # A destination the consumer will never read is refused, not written.
-    if target.name != "skills" or target.parent.name != ".claude":
-        print("error: Claude Code loads a skill from .claude/skills/<name>/SKILL.md "
-              f"(or ~/.claude/skills/<name>/), never from {target}: approve into "
-              "\"$PWD/.claude/skills\"", file=sys.stderr)
+    if target.name != "skills" or target.parent.name not in HOST_SKILL_PARENTS:
+        print("error: a host loads a skill from .claude/skills/<name>/SKILL.md (Claude Code) "
+              "or .agents/skills/<name>/SKILL.md (Codex), in the project or under $HOME, "
+              f"never from {target}: approve into \"$PWD/.claude/skills\" or \"$PWD/.agents/skills\"",
+              file=sys.stderr)
         sys.exit(1)
     return target
 
 
 SKILL_TEMPLATE = """---
+name: learned-{slug}
 description: Learned instinct for rule {rule}. This project corrected {rule} {occurrences} times across {distinct_files} files; apply the fix pattern proactively when writing matching code.
 user-invocable: false
 ---
@@ -320,6 +329,7 @@ def _render_skill(rule: str, summary: str, occurrences: int, distinct_files: int
     ) or "- (contexts not recorded)"
     return SKILL_TEMPLATE.format(
         rule=rule,
+        slug=_slugify(rule),
         occurrences=occurrences,
         distinct_files=distinct_files,
         confidence=confidence,
@@ -381,6 +391,7 @@ def reject(conn: sqlite3.Connection, instinct_id: int) -> None:
 
 
 GLOBAL_TEMPLATE = """---
+name: learned-global-{slug}
 description: Cross-project learned instinct for rule {rule}. Confirmed in {project_count} independent projects; apply the fix pattern proactively when writing matching code.
 user-invocable: false
 ---
@@ -433,6 +444,7 @@ def _cmd_promote(conn: sqlite3.Connection, args: list[str]) -> None:
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / "SKILL.md").write_text(GLOBAL_TEMPLATE.format(
         rule=rule,
+        slug=_slugify(rule),
         project_count=projects,
         occurrences=occurrences,
         pattern=_untrusted(summary) or f"See the {rule} rule definition in the active pack validators.",

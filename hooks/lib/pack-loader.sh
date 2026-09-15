@@ -498,19 +498,44 @@ _sync_symlink_type() {
 }
 
 # Pack workflows are flat .md files inside the pack; the plugin exposes them
-# as skills/<name>/SKILL.md symlinks (skill layout requires one dir per skill).
+# as skills/<name>/SKILL.md (skill layout requires one dir per skill). A COPY,
+# not a symlink: the Codex skill loader (0.154.0, `codex debug prompt-input`)
+# lists a regular SKILL.md and a symlinked directory, and skips a symlinked
+# SKILL.md file, so the three pack skills were absent from every Codex session
+# (audit CR-117, C5: 19 of 22). The copy is refreshed whenever it differs from
+# its source, and a sidecar names that source so the sweep above knows which
+# skill directories a pack owns. tests/core/test-pack-loader.sh refuses a copy
+# that diverges from its source.
+PACK_SKILL_SOURCE_FILE=".craftsman-pack-source"
 _sync_pack_skills() {
     local pack_dir="$1"
     local skills_root="$2"
     [[ ! -d "$pack_dir/commands" ]] && return
     for src_file in "$pack_dir/commands/"*.md; do
         [[ ! -f "$src_file" ]] && continue
-        local name rel_path
+        local name rel_path target
         name=$(basename "$src_file" .md)
+        target="$skills_root/$name/SKILL.md"
         mkdir -p "$skills_root/$name"
         rel_path=$(_pack_relpath "$skills_root/$name" "$src_file")
-        ln -sf "$rel_path" "$skills_root/$name/SKILL.md"
+        # A symlink left by an older version is replaced by the copy.
+        [[ -L "$target" ]] && rm -f -- "$target"
+        if ! cmp -s -- "$src_file" "$target" 2>/dev/null; then
+            cp -- "$src_file" "$target.tmp.$$" && mv -f -- "$target.tmp.$$" "$target"
+        fi
+        printf '%s\n' "$rel_path" > "$skills_root/$name/$PACK_SKILL_SOURCE_FILE"
     done
+}
+
+# Does this skill directory hold a pack's copy (sidecar naming a source under
+# packs/), or the symlink an older version left? Either is the pack's to sweep.
+_pack_owns_skill() {
+    local skill_md="$1" packs_dir="$2" sidecar source
+    _pack_owns_symlink "$skill_md" "$packs_dir" && return 0
+    sidecar="$(dirname "$skill_md")/$PACK_SKILL_SOURCE_FILE"
+    [[ -f "$sidecar" ]] || return 1
+    source=$(cd "$(dirname "$skill_md")" 2>/dev/null && cd "$(dirname "$(cat "$sidecar")")" 2>/dev/null && pwd) || return 0
+    [[ "$source" == "$packs_dir"/* ]]
 }
 
 # Does this symlink point at something inside the packs directory?
@@ -537,8 +562,8 @@ pack_sync_symlinks() {
         _pack_owns_symlink "$f" "$packs_dir" && rm -- "$f"
     done
     for f in "$root/skills/"*/SKILL.md; do
-        _pack_owns_symlink "$f" "$packs_dir" || continue
-        rm -- "$f"
+        _pack_owns_skill "$f" "$packs_dir" || continue
+        rm -f -- "$f" "$(dirname "$f")/$PACK_SKILL_SOURCE_FILE"
         # Only the directory this loop just emptied, never a core skill's.
         rmdir "$(dirname "$f")" 2>/dev/null || true
     done

@@ -34,9 +34,9 @@ Every mode (including `--quick`) ends with the observation step. The repository 
    ```
 2. On confirmation (automatic in `--quick` and `--refresh`), generate the project conventions skill:
    ```bash
-   bash ~/.claude/craftsman-conventions.sh generate "$PWD/.claude/skills"
+   bash ~/.claude/craftsman-conventions.sh generate "$PWD/.claude/skills"   # Codex reads "$PWD/.agents/skills" instead
    ```
-   This writes `.claude/skills/project-conventions/SKILL.md` (`user-invocable: false`, loaded as background knowledge, shareable via git, freely editable).
+   This writes `.claude/skills/project-conventions/SKILL.md` (`.agents/skills/...` on Codex; `user-invocable: false`, loaded as background knowledge, shareable via git, freely editable).
 3. Warm the codemap cache (review skills inject it as live context):
    ```bash
    bash ~/.claude/craftsman-codemap.sh >/dev/null

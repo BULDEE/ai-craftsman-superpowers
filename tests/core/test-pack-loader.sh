@@ -222,11 +222,49 @@ else
     log_fail "Symlink creation" "agents/my-agent.md symlink missing"
 fi
 
-if [[ -L "$SYMLINK_ROOT/skills/my-command/SKILL.md" ]]; then
-    log_pass "Skill symlink created for pack command: skills/my-command/SKILL.md"
+# A pack skill is a regular file, not a symlink: the Codex skill loader skips
+# a symlinked SKILL.md (measured with `codex debug prompt-input` on 0.154.0,
+# 19 of 22 skills listed), and every other host reads a plain file.
+printf -- '---\nname: my-command\n---\nv1\n' > "$SYMLINK_PACK_DIR/commands/my-command.md"
+CLAUDE_PLUGIN_ROOT="$SYMLINK_ROOT" pack_sync_symlinks
+if [[ -f "$SYMLINK_ROOT/skills/my-command/SKILL.md" && ! -L "$SYMLINK_ROOT/skills/my-command/SKILL.md" ]] \
+    && cmp -s "$SYMLINK_PACK_DIR/commands/my-command.md" "$SYMLINK_ROOT/skills/my-command/SKILL.md"; then
+    log_pass "Pack command materialised as a regular skills/my-command/SKILL.md identical to its source"
 else
-    log_fail "Symlink creation" "skills/my-command/SKILL.md symlink missing"
+    log_fail "Skill materialisation" "skills/my-command/SKILL.md missing, a symlink, or diverging"
 fi
+if [[ -f "$SYMLINK_ROOT/skills/my-command/.craftsman-pack-source" ]]; then
+    log_pass "the copy carries a sidecar naming its pack source"
+else
+    log_fail "Skill sidecar" ".craftsman-pack-source missing"
+fi
+# The copy follows its source, and a symlink left by an older version is replaced.
+printf -- '---\nname: my-command\n---\nv2\n' > "$SYMLINK_PACK_DIR/commands/my-command.md"
+CLAUDE_PLUGIN_ROOT="$SYMLINK_ROOT" pack_sync_symlinks
+if grep -q '^v2$' "$SYMLINK_ROOT/skills/my-command/SKILL.md"; then
+    log_pass "a changed pack command refreshes the copy on the next sync"
+else
+    log_fail "Skill refresh" "copy still holds the old content"
+fi
+rm -f "$SYMLINK_ROOT/skills/my-command/SKILL.md"
+ln -sf "../../../$(basename "$TEST_PACKS_DIR")/test-symlink/commands/my-command.md" "$SYMLINK_ROOT/skills/my-command/SKILL.md"
+CLAUDE_PLUGIN_ROOT="$SYMLINK_ROOT" pack_sync_symlinks
+if [[ -f "$SYMLINK_ROOT/skills/my-command/SKILL.md" && ! -L "$SYMLINK_ROOT/skills/my-command/SKILL.md" ]]; then
+    log_pass "a symlink left by an older version is replaced by the copy"
+else
+    log_fail "Legacy symlink replacement" "still a symlink"
+fi
+# A pack that goes away takes its skill directory with it, a core skill stays.
+mkdir -p "$SYMLINK_ROOT/skills/core-skill"; printf 'core\n' > "$SYMLINK_ROOT/skills/core-skill/SKILL.md"
+rm -f "$SYMLINK_PACK_DIR/commands/my-command.md"
+CLAUDE_PLUGIN_ROOT="$SYMLINK_ROOT" pack_sync_symlinks
+if [[ ! -e "$SYMLINK_ROOT/skills/my-command" && -f "$SYMLINK_ROOT/skills/core-skill/SKILL.md" ]]; then
+    log_pass "a removed pack command sweeps its copy and its directory; a core skill is untouched"
+else
+    log_fail "Skill sweep" "$(ls "$SYMLINK_ROOT/skills" | tr '\n' ' ')"
+fi
+touch "$SYMLINK_PACK_DIR/commands/my-command.md"
+CLAUDE_PLUGIN_ROOT="$SYMLINK_ROOT" pack_sync_symlinks
 
 # Symlinks must RESOLVE, not just exist. On BSD/macOS, realpath lacks
 # --relative-to: the old code silently produced empty-target symlinks
@@ -237,11 +275,6 @@ else
     log_fail "Agent symlink broken" "target: '$(readlink "$SYMLINK_ROOT/agents/my-agent.md")'"
 fi
 
-if [[ -e "$SYMLINK_ROOT/skills/my-command/SKILL.md" ]]; then
-    log_pass "Command symlink target resolves (non-empty, valid)"
-else
-    log_fail "Command symlink broken" "target: '$(readlink "$SYMLINK_ROOT/skills/my-command/SKILL.md")'"
-fi
 
 if [[ ! -e "$SYMLINK_ROOT/agents/stale-agent.md" ]]; then
     log_pass "Stale symlink cleaned by pack_sync_symlinks"
@@ -312,10 +345,10 @@ else
     log_fail "Integration: agent symlink creation" "agents/test-agent.md symlink missing"
 fi
 
-if [[ -L "$INTEG_ROOT/skills/test-cmd/SKILL.md" ]]; then
-    log_pass "Integration: pack skill symlink created in skills/test-cmd/"
+if [[ -f "$INTEG_ROOT/skills/test-cmd/SKILL.md" && ! -L "$INTEG_ROOT/skills/test-cmd/SKILL.md" ]]; then
+    log_pass "Integration: pack skill materialised in skills/test-cmd/"
 else
-    log_fail "Integration: pack skill symlink creation" "skills/test-cmd/SKILL.md symlink missing"
+    log_fail "Integration: pack skill materialisation" "skills/test-cmd/SKILL.md missing or a symlink"
 fi
 
 # =============================================================================
@@ -554,5 +587,31 @@ rm -rf "$CACHE_WORK"
 
 unset CLAUDE_PLUGIN_OPTION_stack 2>/dev/null || true
 rm -rf "$TEST_PACKS_DIR"
+
+# =============================================================================
+# The committed pack skills are their sources, byte for byte
+#
+# skills/<name>/SKILL.md for every packs/*/commands/<name>.md is a tracked
+# regular file (a fresh install has all 22 skills before any SessionStart, and
+# the Codex loader lists it), refreshed by pack_sync_symlinks. Committed, it
+# can drift from its source between two syncs: this check refuses the drift.
+# =============================================================================
+echo ""
+echo "=== Committed pack skills match their sources ==="
+DRIFT=""
+for src in "$ROOT_DIR"/packs/*/commands/*.md; do
+    [[ -f "$src" ]] || continue
+    name=$(basename "$src" .md)
+    copy="$ROOT_DIR/skills/$name/SKILL.md"
+    if [[ -L "$copy" ]]; then DRIFT="${DRIFT} ${name}(symlink)"
+    elif [[ ! -f "$copy" ]]; then DRIFT="${DRIFT} ${name}(missing)"
+    elif ! cmp -s "$src" "$copy"; then DRIFT="${DRIFT} ${name}(differs)"
+    fi
+done
+if [[ -z "$DRIFT" ]]; then
+    log_pass "every pack command has an identical regular skills/<name>/SKILL.md"
+else
+    log_fail "pack skill copies drift from their sources" "run pack_sync_symlinks:${DRIFT}"
+fi
 
 test_summary
