@@ -34,8 +34,12 @@ _session_files_dir() {
 
 # The id, cleaned to what a filename may carry: a hook input is untrusted data
 # and this string becomes part of a path.
+# The environment fallback names the INNERMOST host's session: CODEX_SESSION_ID
+# (set in a Codex Bash tool, measured equal to the hook payload's session_id on
+# 0.154.0) before CLAUDE_CODE_SESSION_ID, which a Codex session started from a
+# Claude Code Bash tool inherits from its parent (challenge review, F5).
 _session_files_id() {
-    local id="${1:-${CRAFTSMAN_SESSION_ID:-${CLAUDE_CODE_SESSION_ID:-}}}"
+    local id="${1:-${CRAFTSMAN_SESSION_ID:-${CODEX_SESSION_ID:-${CLAUDE_CODE_SESSION_ID:-}}}}"
     printf '%s' "$id" | tr -cd 'A-Za-z0-9_-' | cut -c1-64
 }
 

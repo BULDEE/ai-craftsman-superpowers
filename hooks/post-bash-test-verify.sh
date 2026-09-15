@@ -41,11 +41,22 @@ TOOL=$(printf '%s' "$DECODED" | jq -r '.tool // empty')
 #
 # run-tests.sh stays here because it is this plugin's own runner, not any
 # language's: it belongs to the engine, and no pack should have to claim it.
-# The runner has to be INVOKED: at the start of the command, after a `;`, `&&`,
-# `||`, `|` or `(`, through a runner launcher (npx, poetry run, python -m) or
-# with a path in front (./bin/pytest). `echo pytest` and `cat docs/pytest-notes.md`
-# matched the bare word and granted evidence for a run nobody made (review of
-# e372e85, F3).
+# The runner has to be INVOKED: it STARTS a command, optionally behind a
+# launcher (npx, poetry run, python -m) or a path (./bin/pytest). `echo pytest`
+# and `cat docs/pytest-notes.md` matched the bare word (review of e372e85, F3),
+# and `echo 'python -m pytest -q'` matched the launcher inside a quoted string
+# (challenge review of e2acf22, F4): the pattern is anchored at the start of
+# the command it is tested against, which _last_command extracts.
+_runner_names() {
+    local pattern="run-tests\\.sh" command
+    while IFS= read -r command; do
+        [[ -z "$command" ]] && continue
+        [[ ! "$command" =~ ^[A-Za-z0-9_./\ -]+$ ]] && continue
+        pattern="${pattern}|$(printf '%s' "$command" | sed 's/[.]/\\./g')"
+    done <<< "$(lang_all_capability test_commands 2>/dev/null)"
+    printf '(%s)' "$pattern"
+}
+
 _test_command_pattern() {
     local pattern="run-tests\\.sh" command
     while IFS= read -r command; do
@@ -55,7 +66,7 @@ _test_command_pattern() {
         [[ ! "$command" =~ ^[A-Za-z0-9_./\ -]+$ ]] && continue
         pattern="${pattern}|$(printf '%s' "$command" | sed 's/[.]/\\./g')"
     done <<< "$(lang_all_capability test_commands 2>/dev/null)"
-    printf '(^|[;&|(]|(npx|bunx|poetry run|pipenv run|uv run|python3? -m|php|bash|sh|time|env) )[[:space:]]*([^[:space:]]*/)?(%s)([[:space:]]|$)' "$pattern"
+    printf '^[[:space:]]*((npx|bunx|poetry run|pipenv run|uv run|python3? -m|php|time|env) )?([^[:space:]'"'"'"]*/)?(%s)([[:space:]]|$)' "$pattern"
 }
 
 # This session's file, named by the payload's session_id (lib/session-files.sh).
@@ -82,7 +93,8 @@ source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/pack-loader.sh"
 pack_loader_init
 
-if ! echo "$COMMAND" | grep -qE "$(_test_command_pattern)"; then
+# Cheap pre-filter: no runner name anywhere, nothing to decide.
+if ! echo "$COMMAND" | grep -qE "$(_runner_names)"; then
     exit 0
 fi
 

@@ -314,27 +314,38 @@ def handle_read_session_metrics(arguments: list[str]) -> None:
     print(','.join(agent_types))
 
 
-def _resolve_session_state_path() -> str:
-    """Resolve session-state.json path via the bridge file written by session-start.sh.
-
-    The bridge file is the single source of truth, ensuring skills running in the
-    Bash tool (without CLAUDE_PLUGIN_DATA) use the same path as hooks.
-    """
+def _shared_state_path() -> str:
+    """The shared session-state.json, from the bridge file session-start.sh
+    writes for skills in the Bash tool (without CLAUDE_PLUGIN_DATA), else the
+    default data directory."""
     bridge = os.path.expanduser('~/.claude/craftsman-session-state-path')
     if os.path.isfile(bridge):
         with open(bridge) as bridge_file:
-            shared = bridge_file.read().strip()
-    else:
-        shared = os.path.join(
-            os.environ.get('CLAUDE_PLUGIN_DATA', os.path.expanduser('~/.claude/plugins/data/craftsman')),
-            'session-state.json',
-        )
-    # The bridge names the shared file; this session's own sits beside it,
-    # named by the id the hook bound from its payload (CRAFTSMAN_SESSION_ID,
-    # see hooks/lib/session-files.sh) or, for a skill in the Bash tool, by
-    # CLAUDE_CODE_SESSION_ID.
-    session_id = re.sub(r'[^A-Za-z0-9_-]', '',
-                        os.environ.get('CRAFTSMAN_SESSION_ID') or os.environ.get('CLAUDE_CODE_SESSION_ID', ''))[:64]
+            return bridge_file.read().strip()
+    return os.path.join(
+        os.environ.get('CLAUDE_PLUGIN_DATA', os.path.expanduser('~/.claude/plugins/data/craftsman')),
+        'session-state.json',
+    )
+
+
+def _environment_session_id() -> str:
+    """The id the hook bound from its payload (CRAFTSMAN_SESSION_ID, see
+    hooks/lib/session-files.sh) or, for a skill in a host's Bash tool, the
+    INNERMOST host's variable: CODEX_SESSION_ID (measured equal to the hook
+    payload's session_id on codex-cli 0.154.0) before CLAUDE_CODE_SESSION_ID,
+    because a Codex session started from a Claude Code Bash tool inherits the
+    Claude one and the verify wrapper then granted the evidence to the parent
+    Claude session (challenge review of e2acf22, F5)."""
+    raw = (os.environ.get('CRAFTSMAN_SESSION_ID')
+           or os.environ.get('CODEX_SESSION_ID')
+           or os.environ.get('CLAUDE_CODE_SESSION_ID', ''))
+    return re.sub(r'[^A-Za-z0-9_-]', '', raw)[:64]
+
+
+def _resolve_session_state_path() -> str:
+    """This session's state file: the shared file's directory, the bound id."""
+    shared = _shared_state_path()
+    session_id = _environment_session_id()
     if not session_id:
         return shared
     return os.path.join(os.path.dirname(shared), f'session-state-{session_id}.json')

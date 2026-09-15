@@ -298,18 +298,25 @@ ROOT_FILES = _pack_markers() + (".craftsman-baseline.json",)
 
 
 def _copy_roots(workspace: str, mirror: str) -> None:
-    """The workspace files a validator or a mark reads for any file under it."""
+    """The workspace files a validator or a mark reads for any file under it.
+
+    A file the patch itself writes is the patch's version, not the workspace's:
+    a patch moving the PSR-4 root in composer.json AND adding a Domain
+    violation was judged with the old root (challenge review of e2acf22, F2).
+    """
     for name in ROOT_FILES:
         source = os.path.join(workspace, name)
-        if os.path.isfile(source):
-            shutil.copy(source, os.path.join(mirror, name))
+        destination = os.path.join(mirror, name)
+        if os.path.isfile(source) and not os.path.exists(destination):
+            shutil.copy(source, destination)
 
 
 def _copy_rules(workspace: str, mirror: str, directory: str) -> None:
     for name in (".craft-config.yml", ".craft-rules.yml"):
         source = os.path.join(workspace, directory, name)
-        if os.path.isfile(source):
-            shutil.copy(source, os.path.join(mirror, directory, name))
+        destination = os.path.join(mirror, directory, name)
+        if os.path.isfile(source) and not os.path.exists(destination):
+            shutil.copy(source, destination)
 
 
 def _resolve(path: str, hint: str) -> tuple:
@@ -399,11 +406,15 @@ def _listing(payload: dict) -> str:
         changes = changes_of(payload, paths_only=True)
     except ValueError as error:
         return "UNREADABLE\t" + str(error)
+    # Real paths: a symlink `alias.ts` pointing at .craft-rules.yml listed as
+    # alias.ts, and the config gate read its basename and let the write
+    # through it (challenge review of e2acf22, F1). The mirror already judges
+    # the resolved target; the listing names it too.
     rows = []
     for change in changes:
-        row = change.op + "\t" + os.path.abspath(change.path)
+        row = change.op + "\t" + os.path.realpath(change.path)
         if change.new_path:
-            row += "\t" + os.path.abspath(change.new_path)
+            row += "\t" + os.path.realpath(change.new_path)
         rows.append(row)
     return "\n".join(rows)
 

@@ -113,10 +113,23 @@ fi
 # the exports run from the installed tree
 ( cd "$PROJ" && printf '# Team\n\nWITNESS keep\n' > AGENTS.md && bash "$INSTALL/ci/craftsman-ci.sh" export --target agents-md >/dev/null 2>&1 && bash "$INSTALL/ci/craftsman-ci.sh" export --target codex-agents >/dev/null 2>&1 )
 ROLES=$(ls "$PROJ/.codex/agents/"craftsman-*.toml 2>/dev/null | wc -l | tr -d ' ')
-if grep -q "WITNESS keep" "$PROJ/AGENTS.md" && grep -q "craftsman:doctrine:begin" "$PROJ/AGENTS.md" && [[ "$ROLES" -ge 6 ]]; then
-    log_pass "the doctrine block and $ROLES Codex roles export from the installed tree, the team's AGENTS.md text kept"
+PACK_AGENTS=$(ls "$INSTALL"/packs/*/agents/*.md 2>/dev/null | wc -l | tr -d ' ')
+CORE_AGENTS=$(find "$INSTALL/agents" -maxdepth 1 -name "*.md" -type f | wc -l | tr -d ' ')
+# F8 (challenge review): a fresh tree has no pack symlinks under agents/, and
+# the export produced the core six only; the packs' agents come from the packs.
+if grep -q "WITNESS keep" "$PROJ/AGENTS.md" && grep -q "craftsman:doctrine:begin" "$PROJ/AGENTS.md" && [[ "$ROLES" == "$((CORE_AGENTS + PACK_AGENTS))" && "$ROLES" -ge 12 ]]; then
+    log_pass "the doctrine block and $ROLES Codex roles (core $CORE_AGENTS + packs $PACK_AGENTS) export from the installed tree with no prior sync, the team's AGENTS.md text kept"
 else
-    log_fail "installed exports" "roles=$ROLES $(head -3 "$PROJ/AGENTS.md" | tr '\n' '|')"
+    log_fail "installed exports" "roles=$ROLES core=$CORE_AGENTS packs=$PACK_AGENTS $(head -3 "$PROJ/AGENTS.md" | tr '\n' '|')"
+fi
+# F7 (challenge review): the role's bootstrap named ${CLAUDE_PLUGIN_ROOT}, a
+# variable a Codex role's shell does not have; exit 127 on the first command.
+BOOT=$(grep -m1 -oE 'bash "[^"]*dispatch-context.sh"' "$PROJ/.codex/agents/craftsman-architect.toml")
+RC=0; ( cd "$PROJ" && env -u CLAUDE_PLUGIN_ROOT bash -c "$BOOT" >/dev/null 2>&1 ) || RC=$?
+if [[ "$BOOT" == *"$INSTALL/hooks/lib/dispatch-context.sh"* && "$RC" -ne 127 ]]; then
+    log_pass "the exported role's bootstrap names the installed tree and runs from another project (rc=$RC, not 127)"
+else
+    log_fail "role bootstrap" "boot=[$BOOT] rc=$RC"
 fi
 
 # agent_hooks reaches its consumer from the installed tree (fake claude records the call)

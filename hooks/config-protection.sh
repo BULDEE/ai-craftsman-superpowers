@@ -90,6 +90,11 @@ _deny() {
 ASK_FILE=""
 while IFS= read -r FILE_PATH; do
     [[ -z "$FILE_PATH" ]] && continue
+    # The file the write REACHES: a symlink `alias.ts` pointing at
+    # .craft-rules.yml carried the relaxation through this gate by its own
+    # basename (challenge review of e2acf22, F1). One python start, and only
+    # when the path is a link.
+    [[ -L "$FILE_PATH" ]] && FILE_PATH=$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$FILE_PATH" 2>/dev/null || printf '%s' "$FILE_PATH")
     if _gate_own_machinery "$FILE_PATH"; then
         _deny "$FILE_PATH" "${FILE_PATH} is the gate's own machinery (a host's hook wiring or the installed plugin). Ask the user to change it." \
             "${FILE_PATH} is the quality gate's own machinery (a host's hook wiring or the installed plugin). A session does not rewrite the gate it runs under; ask the user to change it."
@@ -128,7 +133,9 @@ is_protected_config() {
 
 PROTECTED=""
 while IFS= read -r FILE_PATH; do
-    [[ -n "$FILE_PATH" ]] && is_protected_config "$FILE_PATH" && PROTECTED="$(basename "$FILE_PATH")" && break
+    [[ -z "$FILE_PATH" ]] && continue
+    [[ -L "$FILE_PATH" ]] && FILE_PATH=$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$FILE_PATH" 2>/dev/null || printf '%s' "$FILE_PATH")
+    is_protected_config "$FILE_PATH" && PROTECTED="$(basename "$FILE_PATH")" && break
 done <<< "$FILE_PATHS"
 [[ -z "$PROTECTED" ]] && exit 0
 BASENAME="$PROTECTED"

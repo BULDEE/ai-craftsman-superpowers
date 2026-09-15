@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
 """Project the plugin's agents as Codex role files.
 
-Usage: agent_roles.py codex <agents dir> <output dir> [--version V]
+Usage: agent_roles.py codex <agents dir> <output dir> [--version V] [--root DIR] [--extra DIR ...]
+
+`--root` is the installed plugin's absolute path: the agents' bootstrap lines
+read `bash "${CLAUDE_PLUGIN_ROOT}/hooks/lib/dispatch-context.sh"`, a variable
+Claude Code sets and a Codex role's shell does not have, so the exported role
+exited 127 on its first command (challenge review of e2acf22, F7); the path is
+substituted at export. `--extra` names further agent directories, the loaded
+packs' `agents/`: a fresh clone has no pack symlinks under agents/ and exported
+six roles instead of twelve (F8).
 
 An agent is one Markdown file with YAML frontmatter and a body (agents/*.md).
 The mission text is shared; what differs per host is the envelope. Codex reads
@@ -49,6 +57,18 @@ def _frontmatter(text: str) -> tuple:
     return fields, text[match.end():]
 
 
+ROOT_VARIABLES = ("${CLAUDE_PLUGIN_ROOT}", "$CLAUDE_PLUGIN_ROOT")
+
+
+def _resolve_root(body: str, root: str) -> str:
+    """The installed plugin's path where the body says the host's variable."""
+    if not root:
+        return body
+    for variable in ROOT_VARIABLES:
+        body = body.replace(variable, root)
+    return body
+
+
 def _basic(text: str) -> str:
     """A TOML multi-line basic string. Basic, not literal, for both fields: a
     literal string cannot hold `\'\'\'`, and the escape the first cut inserted
@@ -57,10 +77,11 @@ def _basic(text: str) -> str:
     return '"""\n' + text.replace("\\", "\\\\").replace('"""', '""\\"') + '"""'
 
 
-def render(source_path: str, version: str) -> tuple:
+def render(source_path: str, version: str, root: str = "") -> tuple:
     with open(source_path, encoding="utf-8") as handle:
         text = handle.read()
     fields, body = _frontmatter(text)
+    body = _resolve_root(body, root)
     name = fields.get("name") or os.path.splitext(os.path.basename(source_path))[0]
     if not re.fullmatch(r"[A-Za-z0-9_-]+", name):
         raise ValueError(f"{source_path}: agent name {name!r} is not a role name")
@@ -77,8 +98,8 @@ def render(source_path: str, version: str) -> tuple:
     return f"craftsman-{name}.toml", role
 
 
-def _write_role(agents_dir: str, out_dir: str, entry: str, version: str) -> None:
-    file_name, role = render(os.path.join(agents_dir, entry), version)
+def _write_role(agents_dir: str, out_dir: str, entry: str, version: str, root: str = "") -> None:
+    file_name, role = render(os.path.join(agents_dir, entry), version, root)
     target = os.path.join(out_dir, file_name)
     if os.path.islink(target):
         raise OSError(f"{target} is a symlink; refusing to write through it")
@@ -105,25 +126,51 @@ def _output_dir_ok(out_dir: str) -> str:
     return ""
 
 
+def _options(argv: list) -> dict:
+    options = {"version": "unknown", "root": "", "extra": []}
+    index = 4
+    while index < len(argv):
+        flag, value = argv[index], argv[index + 1] if index + 1 < len(argv) else ""
+        if flag == "--version":
+            options["version"] = value
+        elif flag == "--root":
+            options["root"] = os.path.realpath(value) if value else ""
+        elif flag == "--extra":
+            options["extra"].append(value)
+        index += 2
+    return options
+
+
+def _sources(agents_dir: str, extra: list) -> list:
+    """(directory, file) for every agent, core first, one per name."""
+    seen, sources = set(), []
+    for directory in [agents_dir] + [candidate for candidate in extra if os.path.isdir(candidate)]:
+        for entry in sorted(os.listdir(directory)):
+            if entry.endswith(".md") and entry not in seen and os.path.isfile(os.path.join(directory, entry)):
+                seen.add(entry)
+                sources.append((directory, entry))
+    return sources
+
+
 def main(argv: list) -> int:
     if len(argv) < 4 or argv[1] != "codex":
         sys.stderr.write(__doc__)
         return 2
     agents_dir, out_dir = argv[2], argv[3]
-    version = argv[5] if len(argv) > 5 and argv[4] == "--version" else "unknown"
+    options = _options(argv)
     os.makedirs(out_dir, exist_ok=True)
     refusal = _output_dir_ok(out_dir)
     if refusal:
         sys.stderr.write(f"error: {refusal}\n")
         return 1
-    entries = [entry for entry in sorted(os.listdir(agents_dir)) if entry.endswith(".md")]
+    sources = _sources(agents_dir, options["extra"])
     try:
-        for entry in entries:
-            _write_role(agents_dir, out_dir, entry, version)
+        for directory, entry in sources:
+            _write_role(directory, out_dir, entry, options["version"], options["root"])
     except OSError as error:
         sys.stderr.write(f"error: {error}\n")
         return 1
-    print(f"wrote {len(entries)} Codex role file(s) to {out_dir} (craftsman-*.toml; spawn them by name, e.g. craftsman-architect)")
+    print(f"wrote {len(sources)} Codex role file(s) to {out_dir} (craftsman-*.toml; spawn them by name, e.g. craftsman-architect)")
     return 0
 
 

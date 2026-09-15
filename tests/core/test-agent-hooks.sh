@@ -605,6 +605,15 @@ if [[ "$UPPER" == "not-called" && "$DEFAULT_ON" == "called" && "$GLOBAL_OFF" == 
 else
     log_fail "agent_hooks consumer" "option-false=$UPPER default=$DEFAULT_ON global-false=$GLOBAL_OFF"
 fi
+# F9 (challenge review): a global file saved with CRLF said false and was read as "false\r"
+printf 'hooks:\r\n  agent_hooks: false\r\n' > "$AH_DIR/global/.craft-config.yml"
+CRLF_OFF=$(_ah_run)
+rm -f "$AH_DIR/global/.craft-config.yml"
+if [[ "$CRLF_OFF" == "not-called" ]]; then
+    log_pass "F9: hooks.agent_hooks: false in a CRLF global file stops the call too"
+else
+    log_fail "F9 CRLF config" "$CRLF_OFF"
+fi
 # a repository cannot switch the machine's model calls off
 rm -f "$AH_DIR/global/.craft-config.yml"
 printf 'hooks:\n  agent_hooks: false\n' > "$AH_DIR/proj/.craft-config.yml"
@@ -654,5 +663,25 @@ FOURTH=$(sqlite3 "$C6_DIR/data/metrics.db" "select verdict from haiku_runs order
 CLOSED=$(sqlite3 "$C6_DIR/data/metrics.db" "select count(*) from corrections where source='haiku'")
 [[ "$FOURTH" == "clean" && "$CLOSED" -ge 1 ]] && log_pass "control: the exact CLEAN token on the changed file is clean and closes the earlier finding" || log_fail "control clean" "verdict=$FOURTH closed=$CLOSED"
 rm -rf "$C6_DIR"
+
+echo ""
+echo "=== the DDD verifier reviews a Codex apply_patch too ==="
+# F6 (challenge review): the callback exited on a missing file_path, so no
+# Codex write was ever reviewed. Same fake CLI witness as above.
+F6_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-f6.XXXXXX")
+mkdir -p "$F6_DIR/bin" "$F6_DIR/proj/src/Domain" "$F6_DIR/data"
+printf '#!/bin/sh\necho invoked >> "%s/calls"\necho CLEAN\n' "$F6_DIR" > "$F6_DIR/bin/claude"; chmod +x "$F6_DIR/bin/claude"
+printf '<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\nfinal class Order\n{\n}\n' > "$F6_DIR/proj/src/Domain/Order.php"
+( cd "$F6_DIR/proj" && git init -q . && git add -A && git commit -qm base ) >/dev/null 2>&1
+PATCH=$(printf '*** Begin Patch\n*** Update File: %s/src/Domain/Order.php\n@@\n final class Order\n {\n+    public function total(): int { return 0; }\n }\n*** End Patch' "$F6_DIR/proj")
+( cd "$F6_DIR/proj" && python3 -c 'import json,sys; print(json.dumps({"session_id":"f6","turn_id":"t","model":"m","hook_event_name":"PostToolUse","tool_name":"apply_patch","tool_input":{"command":sys.argv[1]},"tool_response":"Exit code: 0","cwd":sys.argv[2]}))' "$PATCH" "$F6_DIR/proj" \
+    | env -u CRAFTSMAN_HEADLESS_VERIFY -u CLAUDE_EFFORT PATH="$F6_DIR/bin:$PATH" CLAUDE_PLUGIN_ROOT="$ROOT_DIR" CLAUDE_PLUGIN_DATA="$F6_DIR/data" \
+          CLAUDE_PLUGIN_OPTION_STACK=fullstack CLAUDE_PLUGIN_OPTION_AGENT_HOOKS=true bash "$ROOT_DIR/hooks/agent-ddd-verifier.sh" >/dev/null 2>&1 )
+if [[ -f "$F6_DIR/calls" ]]; then
+    log_pass "F6: a Codex apply_patch PostToolUse reaches the DDD verifier, which reviews the patched file"
+else
+    log_fail "F6 apply_patch review" "no model call made"
+fi
+rm -rf "$F6_DIR"
 
 test_summary

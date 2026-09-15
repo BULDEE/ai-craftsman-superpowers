@@ -30,6 +30,25 @@ pack_loader_init
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 
+# A Codex apply_patch names its files in the patch, not in file_path, and this
+# hook exited before any review on every Codex write (challenge review of
+# e2acf22, F6). Like post-write-check.sh: one run per landed source file, the
+# strictest verdict wins, capped so one patch cannot buy ten model calls.
+if [[ -z "$FILE_PATH" && "$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)" == "apply_patch" ]]; then
+    PATCH_FILES=$(printf '%s' "$INPUT" | python3 "${SCRIPT_DIR}/lib/write_mirror.py" --list 2>/dev/null \
+        | awk -F'\t' '$1 != "delete" && $1 != "UNREADABLE" {print (NF >= 3 ? $3 : $2)}' | head -3)
+    [[ -z "$PATCH_FILES" ]] && exit 0
+    CHILD_RC=0
+    while IFS= read -r written; do
+        [[ -z "$written" || ! -f "$written" ]] && continue
+        rc=0
+        printf '%s' "$INPUT" | jq --arg fp "$written" '.tool_name = "Write" | .tool_input = {file_path: $fp}' \
+            | bash "$0" || rc=$?
+        [[ "$rc" -eq 2 ]] && CHILD_RC=2
+    done <<< "$PATCH_FILES"
+    exit "$CHILD_RC"
+fi
+
 [[ -z "$FILE_PATH" || ! -f "$FILE_PATH" ]] && exit 0
 
 EXT="${FILE_PATH##*.}"

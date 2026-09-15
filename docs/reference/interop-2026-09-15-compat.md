@@ -31,8 +31,8 @@ Levels of proof, from weakest to strongest:
 | Events loaded | 12 of 12 (documented) | 11 kinds, **not** TaskCompleted / PostToolUseFailure / FileChanged (generated schema) | documented list, not measured | n/a |
 | Subagent gate | captured (`agent_transcript_path`) | null transcript: judges nothing (stated) | not measured | n/a |
 | Sentry request at Stop | captured Stop payload; handoff on next prompt | captured Stop payload | not measured | n/a |
-| `agent_hooks: false` reaches the consumer | e2e (fake CLI records the call) | via the global file (no plugin options) | via the global file | n/a |
-| Fresh install from the built archive | e2e (`tests/meta/test-fresh-install.sh`) | same tree | same tree | same tree |
+| `agent_hooks: false` reaches the consumer | script direct (a fake CLI on PATH records the call; not a model-driven run) | via the global file (no plugin options), same witness | via the global file | n/a |
+| Fresh install from the built archive | script direct from the extracted archive (`tests/meta/test-fresh-install.sh`); native import, trust and activation in the host not exercised | same tree | same tree | same tree |
 | Delivery of a background finding | asyncRewake on exit 2 | at the next safe point, no wake of an idle session (documented) | `additionalContext` (documented) | conclusion gate |
 
 ## Independent verification (2026-09-15, on d08e0ec)
@@ -53,6 +53,23 @@ as clean and closing earlier findings, a poisoned empty registry cache trusted
 for a month, the Copilot adapter defaulting to Claude Code's data tree, the
 standalone CI test reading the developer's real HOME, mixed line endings
 normalised, and a raw `patch` body listed as touching nothing.
+
+## Challenge review (2026-09-15, external, on e2acf22): BLOCK, nine findings
+
+`docs/reference/challenge-interop-2026-09-15.md` (with probes under
+`challenge-interop-2026-09-15-evidence/`) reproduced against the real
+`apply_patch` and the real hooks: F1 a symlink `alias.ts` onto
+`.craft-rules.yml` relaxing a rule through both gates; F2 a patch renaming the
+PSR-4 root judged with the old `composer.json`; F3 `@@ anchor` placing the
+hunk ON the anchor line where the applier places it UNDER; F4 `echo 'python
+-m pytest'` granting evidence; F5 the verify wrapper in a nested Codex Bash
+tool granting the evidence to the parent Claude session; F6 the DDD verifier
+exiting on every `apply_patch`; F7 exported roles naming
+`${CLAUDE_PLUGIN_ROOT}`; F8 six roles from a fresh clone; F9 `agent_hooks:
+false` ignored in a CRLF global file. All nine reproduced and fixed with a
+witness that was red before (the commit after e2acf22); the fixtures for F1,
+F2 and F3 are the reviewer's own. Two matrix rows above are reworded from
+"e2e" to "script direct" at its request.
 
 ## Open, with the action that closes each
 

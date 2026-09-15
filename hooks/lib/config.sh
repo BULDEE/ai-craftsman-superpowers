@@ -311,7 +311,7 @@ _config_parse_nested_yml_value() {
     awk -v section="$section" -v key="$key" '
         $0 ~ "^" section ":" { in_section = 1; next }
         /^[a-zA-Z]/ { in_section = 0 }
-        in_section && $1 == key ":" { gsub(/["'"'"']/, "", $2); print $2; exit }
+        in_section && $1 == key ":" { gsub(/["'"'"'\r]/, "", $2); print $2; exit }
     ' "$file" 2>/dev/null
 }
 
@@ -370,7 +370,7 @@ _config_parse_nested_inline_list() {
         /^[a-zA-Z]/ { in_section = 0 }
         in_section && $1 == key ":" {
             sub(/^[^:]*:[[:space:]]*/, "")
-            gsub(/[\[\]"'"'"' ]/, "")
+            gsub(/[\[\]"'"'"' \r]/, "")
             print
             exit
         }

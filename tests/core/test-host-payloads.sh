@@ -529,6 +529,17 @@ else
     log_fail "C3 compound commands" "grant=$COMPOUND_GRANT revoke-kept=$COMPOUND_REVOKE rc_and=$RC_AND rc_cd=$RC_CD cd_grant=$CD_GRANT"
 fi
 
+# F4 (challenge review): the launcher inside a quoted string is not an invocation
+echo '{"verified": false}' > "$STATE"
+for quoted in "echo 'python -m pytest -q'" "echo \"npx jest\"" "git commit -m 'run pytest later'"; do
+    _verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.python-tests-passed "; d['tool_input']['command'] = \"$quoted\"")"
+done
+if [[ "$(_flag)" == "false" ]]; then
+    log_pass "F4: a runner or launcher quoted inside echo or a commit message grants nothing"
+else
+    log_fail "F4 quoted runner" "verified=$(_flag)"
+fi
+
 # an interruption is neither a pass nor a failure
 echo '{"verified": true}' > "$STATE"
 _verify "$(_as_test claude-code 2.1.272 post-tool-use-failure.bash.exit1-tests-failed "; d['is_interrupt'] = True")"; RC=$?
@@ -590,6 +601,23 @@ if [[ "$A_V" == "true" && "$C_V" == "false" ]]; then
 else
     log_fail "verified attribution" "A=$A_V C=$C_V"
 fi
+# F5 (challenge review): the verify wrapper called from a Codex Bash tool
+# inherits the parent Claude session's CLAUDE_CODE_SESSION_ID; the evidence
+# went to the parent. The innermost host's variable wins.
+echo '{"verified": false}' > "$CLAUDE_PLUGIN_DATA/session-state-parent-C.json"
+echo '{"verified": false}' > "$CLAUDE_PLUGIN_DATA/session-state-child-X.json"
+( unset CRAFTSMAN_SESSION_ID; HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID=parent-C CODEX_SESSION_ID=child-X python3 "$ROOT_DIR/hooks/lib/session_state.py" set-verified >/dev/null 2>&1 )
+P_V=$(python3 "$ROOT_DIR/hooks/lib/session_state.py" check-flag "$CLAUDE_PLUGIN_DATA/session-state-parent-C.json" verified)
+X_V=$(python3 "$ROOT_DIR/hooks/lib/session_state.py" check-flag "$CLAUDE_PLUGIN_DATA/session-state-child-X.json" verified)
+if [[ "$P_V" == "false" && "$X_V" == "true" ]]; then
+    log_pass "F5: set-verified from a Codex Bash tool nested in a Claude session grants the evidence to the Codex session (CODEX_SESSION_ID), not the parent"
+else
+    log_fail "F5 nested wrapper identity" "parent=$P_V child=$X_V"
+fi
+( unset CRAFTSMAN_SESSION_ID CODEX_SESSION_ID; HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID=parent-C python3 "$ROOT_DIR/hooks/lib/session_state.py" set-verified >/dev/null 2>&1 )
+[[ "$(python3 "$ROOT_DIR/hooks/lib/session_state.py" check-flag "$CLAUDE_PLUGIN_DATA/session-state-parent-C.json" verified)" == "true" ]] && log_pass "control: in a plain Claude Code Bash tool the wrapper still grants to the Claude session" || log_fail "F5 control" "claude alone not granted"
+rm -f "$CLAUDE_PLUGIN_DATA"/session-state-parent-C.json "$CLAUDE_PLUGIN_DATA"/session-state-child-X.json
+
 # F6 (review of 421ca76): the ~/.claude bridge is Claude Code's. A Codex
 # SessionStart must not repoint it at its data directory.
 mkdir -p "$FAKE_HOME/.claude"
@@ -743,5 +771,56 @@ if [[ "${R%%|*}" == "2" && "${R#*|}" == *'"deny"'* ]]; then
 else
     log_fail "G6 raw patch body" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
 fi
+
+# =============================================================================
+# Challenge review of e2acf22 (external, 2026-09-15): F1, F2, F3
+# =============================================================================
+echo ""
+echo "--- challenge review: symlink alias, patched root, anchor scope ---"
+# F1: a symlink named like a source file pointing at the gate's own config
+ln -sf "$WORK/src/Domain/.craft-rules.yml" "$WORK/alias.ts" 2>/dev/null; mkdir -p "$WORK/src/Domain"; printf 'rules:\n  LAYER001: block\n' > "$WORK/src/Domain/.craft-rules.yml"; ln -sf "$WORK/src/Domain/.craft-rules.yml" "$WORK/alias.ts"
+R=$(_run config-protection.sh "$(host_fixture_with codex 0.154.0 pre-tool-use.apply_patch.multifile-move "$WORK" "d['tool_name']='Write'; d['tool_input']=dict(file_path='$WORK/alias.ts', content='rules: ignore')")")
+R2=$(_run config-protection.sh "$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$WORK" "d['tool_input']['file_path'] = '$WORK/alias.ts'; d['tool_input']['content'] = 'rules:\\n  LAYER001: ignore\\n'")")
+if [[ "${R%%|*}" == "2" && "${R#*|}" == *'"deny"'* && "${R2#*|}" == *'"ask"'* ]]; then
+    log_pass "F1: a write through a symlink named alias.ts that points at .craft-rules.yml is judged by the file it reaches (deny on Codex, ask on Claude Code)"
+else
+    log_fail "F1 symlink alias" "codex rc=${R%%|*} [$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-80)] claude=[$(printf '%s' "${R2#*|}" | tr '\n' ' ' | cut -c1-80)]"
+fi
+_add_file_patch "$WORK/alias.ts" "rules:
+  LAYER001: ignore" > "$WORK/alias.patch"
+R=$(_run config-protection.sh "$(_codex_pre "$WORK/alias.patch")")
+[[ "${R%%|*}" == "2" ]] && log_pass "F1: the same write through a Codex apply_patch is denied" || log_fail "F1 alias via patch" "rc=${R%%|*}"
+rm -f "$WORK/alias.ts" "$WORK/src/Domain/.craft-rules.yml"
+# F2: a patch that renames the PSR-4 root (App -> Acme) AND adds a Domain
+# violation in the new namespace: judged with the OLD composer.json, the layer
+# rule did not recognise Acme\Infrastructure and passed (challenge review of
+# e2acf22, F2; the reviewer's own fixture, paths relative to cwd).
+python3 - "$WORK" > "$WORK/root.patch" <<'PY'
+import json, sys; w = sys.argv[1]
+old = open(f"{w}/composer.json").read().rstrip("\n")
+new = json.dumps({"autoload": {"psr-4": {"Acme\\": "src/"}}})
+content = "<?php\ndeclare(strict_types=1);\nnamespace Acme\\Domain;\nuse Acme\\Infrastructure\\Persistence\\OrderRepository;\nfinal class Order\n{\n}"
+print("*** Begin Patch\n*** Update File: composer.json\n@@\n-" + old + "\n+" + new + "\n*** Add File: src/Domain/AcmeOrder.php\n" + "\n".join("+" + l for l in content.split("\n")) + "\n*** End Patch")
+PY
+R=$(cd "$WORK" && _run pre-write-check.sh "$(_codex_pre "$WORK/root.patch")")
+if [[ "${R%%|*}" == "2" && "${R#*|}" == *LAYER001* ]]; then
+    log_pass "F2: a patch renaming the PSR-4 root and adding an Acme\\Domain -> Acme\\Infrastructure import is judged with the PATCHED composer.json (LAYER001 before the write)"
+else
+    log_fail "F2 patched root" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-200)"
+fi
+# F3: `@@ pass` above a docstring `pass`: the hunk sits UNDER the anchor, as the real applier reads it
+printf 'def f():\n    """\n    pass\n    """\n    pass\n' > "$WORK/src/anchored.py"
+python3 - "$WORK" > "$WORK/anchor.patch" <<'PY'
+import sys; w = sys.argv[1]
+print("\n".join(["*** Begin Patch", f"*** Update File: {w}/src/anchored.py", "@@     pass", "-    pass", "+    return 1", "*** End Patch"]))
+PY
+M=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-mirror.XXXXXX")
+_codex_pre "$WORK/anchor.patch" | python3 "$ROOT_DIR/hooks/lib/write_mirror.py" "$M" >/dev/null 2>&1
+if [[ "$(sed -n '3p' "$M/src/anchored.py")" == "    pass" && "$(sed -n '5p' "$M/src/anchored.py")" == "    return 1" ]]; then
+    log_pass "F3: an @@ anchor scopes the hunk to the lines UNDER it: the docstring pass stays, the code pass changes"
+else
+    log_fail "F3 anchor scope" "$(cat "$M/src/anchored.py" 2>/dev/null | tr '\n' '|')"
+fi
+rm -rf "$M" "$WORK/src/anchored.py"
 
 test_summary

@@ -148,9 +148,17 @@ _doctrine_write_block() {
 # Written to the project's .codex/agents/ (documented); ~/.codex/agents/ is the
 # location observed loaded by `codex exec` 0.154.0, and the message says so.
 _doctrine_write_codex_agents() {
-    local here into="${EXPORT_INTO:-.codex/agents}"
+    local here root into="${EXPORT_INTO:-.codex/agents}" pack extra=()
     here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    python3 "${CI_LIB_DIR:-$here}/agent_roles.py" codex "$here/../agents" "$into" --version "${VERSION:-unknown}" || return 1
+    root="$(cd "$here/.." && pwd)"
+    # The loaded packs' agents, from the packs themselves: the symlinks under
+    # agents/ exist only after a SessionStart synced them (F8).
+    if type pack_loaded >/dev/null 2>&1; then
+        while IFS= read -r pack; do
+            [[ -n "$pack" && -d "$root/packs/$pack/agents" ]] && extra+=(--extra "$root/packs/$pack/agents")
+        done <<< "$(pack_loaded 2>/dev/null)"
+    fi
+    python3 "${CI_LIB_DIR:-$here}/agent_roles.py" codex "$root/agents" "$into" --version "${VERSION:-unknown}" --root "$root" ${extra[@]+"${extra[@]}"} || return 1
     [[ "$into" == ".codex/agents" ]] && echo "On codex-cli 0.154.0 a project's .codex/agents/ was NOT offered to spawn_agent (documented, not observed); ~/.codex/agents/ was. To install there: craftsman-ci export --target codex-agents --into \"\$HOME/.codex/agents\""
     return 0
 }

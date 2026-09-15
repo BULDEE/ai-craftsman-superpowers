@@ -142,12 +142,27 @@ def _tail_index(src: list, before: list, start: int) -> int:
 
 
 def _hunk_position(src: list, hunk: dict, before: list, cursor: int) -> int:
-    """The index the hunk replaces from, or -1 when it cannot be placed."""
-    start = cursor
-    if hunk["anchor"]:
-        start = _anchor_index(src, hunk["anchor"], cursor)
-        if start < 0:
-            return -1
+    """The index the hunk replaces from, or -1 when it cannot be placed.
+
+    An `@@ anchor` names the line the hunk sits UNDER: the hunk is located
+    strictly after it, and when the anchor text occurs several times the first
+    occurrence under which the hunk fits wins. The first cut located the hunk
+    from the anchor line itself, so `@@ pass` above a docstring `pass` edited
+    the docstring where the real applier edited the code (challenge review of
+    e2acf22, F3).
+    """
+    if not hunk["anchor"]:
+        return _positioned(src, hunk, before, cursor)
+    anchored = _anchor_index(src, hunk["anchor"], cursor)
+    while anchored >= 0:
+        position = _positioned(src, hunk, before, anchored + 1)
+        if position >= 0:
+            return position
+        anchored = _anchor_index(src, hunk["anchor"], anchored + 1)
+    return -1
+
+
+def _positioned(src: list, hunk: dict, before: list, start: int) -> int:
     if not before:
         return len(src) if hunk["eof"] else start
     if hunk["eof"]:

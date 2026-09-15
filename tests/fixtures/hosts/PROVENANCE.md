@@ -98,6 +98,14 @@ Nothing else is edited. `hook-env.*.json` lists variable NAMES only.
   - `SessionStart` has `source: "startup"`; `Stop` has `stop_hook_active` and
     `last_assistant_message`; `SessionEnd` has `reason: "other"`.
 
+- Bash tool environment of a Codex session (fourth run, `codex exec`, shell
+  command `env`): `CODEX_SESSION_ID`, `CODEX_THREAD_ID` (equal, and equal to
+  the SessionStart payload's `session_id`), `CODEX_VERSION`, `CODEX_SANDBOX`,
+  `CODEX_SANDBOX_NETWORK_DISABLED`, `CODEX_CI`, `CODEX_MANAGED_BY_NPM`,
+  `CODEX_MANAGED_PACKAGE_ROOT`, plus every `CLAUDE_*` of the parent Claude
+  Code session this run was launched from. A skill in a Codex Bash tool can
+  name its own session; a hook cannot rely on the environment.
+
 ## Not captured (open)
 
 - A Codex PLUGIN-bundled hook's environment (only a project hook was run).
