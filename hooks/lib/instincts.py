@@ -274,19 +274,14 @@ HOST_SKILL_PARENTS = (".claude", ".agents")
 
 def _resolve_skills_dir(skills_dir: str) -> Path:
     target = Path(skills_dir).expanduser().resolve()
-    allowed = [Path.cwd().resolve()]
-    home = Path.home().resolve()
-    allowed.extend(home / parent for parent in HOST_SKILL_PARENTS)
-    for root in allowed:
-        if target == root or root in target.parents:
-            break
-    else:
-        print(f"error: refusing to write skills outside the project, ~/.claude or ~/.agents: {target}",
-              file=sys.stderr)
-        sys.exit(1)
-    if target.name != "skills" or target.parent.name not in HOST_SKILL_PARENTS:
+    roots = (Path.cwd().resolve(), Path.home().resolve())
+    allowed = [root / parent / "skills" for root in roots for parent in HOST_SKILL_PARENTS]
+    # Exactly these four directories, not "anything named .claude/skills": a
+    # nested project/x/.agents/skills passed the name test and is a place no
+    # host reads (review of ff99dd5, F4).
+    if target not in allowed:
         print("error: a host loads a skill from .claude/skills/<name>/SKILL.md (Claude Code) "
-              "or .agents/skills/<name>/SKILL.md (Codex), in the project or under $HOME, "
+              "or .agents/skills/<name>/SKILL.md (Codex), at the project root or under $HOME, "
               f"never from {target}: approve into \"$PWD/.claude/skills\" or \"$PWD/.agents/skills\"",
               file=sys.stderr)
         sys.exit(1)

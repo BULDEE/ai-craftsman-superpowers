@@ -50,7 +50,9 @@ fi
 DATA_DIR="${DATA_DIR:-${HOME}/.claude/plugins/data/craftsman}"
 if [[ -f "$PLUGIN_ROOT/hooks/lib/codemap.py" ]]; then
     RC=0
-    OUT=$(python3 "$PLUGIN_ROOT/hooks/lib/codemap.py" "$PWD" 2>/dev/null | head -40) || RC=$?
+    # awk drains its input where head would close the pipe early, and a
+    # producer killed by SIGPIPE read as "failed" under pipefail (review, F3).
+    OUT=$(python3 "$PLUGIN_ROOT/hooks/lib/codemap.py" "$PWD" 2>/dev/null | awk 'NR <= 40') || RC=$?
     _section "Codemap" "$(_status_of "$OUT" "$RC")" "$PLUGIN_ROOT/hooks/lib/codemap.py"
     [[ -n "$OUT" ]] && printf '%s\n' "$OUT"
 else
@@ -62,7 +64,7 @@ if _git_ok; then
     RC=0; OUT=$(git diff HEAD --stat 2>/dev/null | tail -30) || RC=$?
     _section "Working tree diff (stat)" "$(_status_of "$OUT" "$RC")" "against $REVISION"
     [[ -n "$OUT" ]] && printf '%s\n' "$OUT"
-    RC=0; OUT=$(git diff HEAD 2>/dev/null | head -400) || RC=$?
+    RC=0; OUT=$(git diff HEAD 2>/dev/null | awk 'NR <= 400') || RC=$?
     _section "Changed hunks" "$(_status_of "$OUT" "$RC")" "first 400 lines"
     [[ -n "$OUT" ]] && printf '%s\n' "$OUT"
     RC=0; OUT=$(git log --oneline -10 2>/dev/null) || RC=$?

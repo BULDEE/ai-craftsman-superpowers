@@ -514,6 +514,16 @@ if [[ "$DEEP_RC" != "0" && ! -d "$INJ_DIR/.agents/skills/deeper" ]]; then
 else
     log_fail "Codex depth refusal" "rc=$DEEP_RC"
 fi
+# Exactly the four host directories: a nested project/x/.agents/skills passed
+# the name test and is a place no host reads (review of ff99dd5, F4).
+sqlite3 "$INJ_DB" "INSERT INTO instincts(id,project_hash,rule,pattern_summary,occurrences,distinct_files,confidence,status,created_at,reviewed_at) VALUES(32,'p1','PY004','x',5,3,0.95,'candidate',datetime('now'),NULL);" 2>/dev/null
+NESTED_RC=0
+(cd "$INJ_DIR" && python3 "$INSTINCTS" approve "$INJ_DB" 32 "$INJ_DIR/nested/.agents/skills") >/dev/null 2>&1 || NESTED_RC=$?
+if [[ "$NESTED_RC" != "0" && ! -d "$INJ_DIR/nested" ]]; then
+    log_pass "a .agents/skills nested below the project root is refused: only the root and \$HOME are read"
+else
+    log_fail "nested skills dir" "rc=$NESTED_RC"
+fi
 if grep -q '^name: ' "$INJ_SKILL"; then
     log_pass "the Claude destination's skill carries the same name field (valid for both hosts)"
 else

@@ -111,6 +111,16 @@ if printf '%s' "$OUT" | grep -q '^### Changed hunks \[empty\]'; then
 else
     log_fail "collector clean repo" "$(printf '%s' "$OUT" | grep '^### Changed' )"
 fi
+# a diff longer than the 400-line window is still available (the producer is
+# drained; head closed the pipe and pipefail read SIGPIPE as failed, review F3)
+( cd "$CTX_REPO" && for i in $(seq 1 3000); do echo "line $i"; done > src/big.ts && git add src/big.ts && git commit -qm big && for i in $(seq 1 3000); do echo "changed $i"; done > src/big.ts )
+OUT=$(cd "$CTX_REPO" && HOME="$CTX_HOME" CLAUDE_PLUGIN_DATA="$WORK/ctx-empty-data" bash "$CTX" review 2>&1)
+if printf '%s' "$OUT" | grep -q '^### Changed hunks \[available\]' && [[ "$(printf '%s' "$OUT" | grep -c '^[-+]changed\|^[-+]line')" -le 400 ]]; then
+    log_pass "a 6000-line diff is delivered as available and truncated to the window, not read as failed"
+else
+    log_fail "large diff" "$(printf '%s' "$OUT" | grep '^### Changed')"
+fi
+( cd "$CTX_REPO" && git checkout -q -- . )
 # a broken helper is failed, not silently absent
 CTX_COPY="$WORK/ctx-plugin"; mkdir -p "$CTX_COPY/bin" "$CTX_COPY/hooks/lib"
 cp "$CTX" "$CTX_COPY/bin/craftsman-context"; printf 'import sys\nsys.exit(3)\n' > "$CTX_COPY/hooks/lib/codemap.py"

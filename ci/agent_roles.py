@@ -25,6 +25,7 @@ import hashlib
 import os
 import re
 import sys
+import tempfile
 
 FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n", re.S)
 
@@ -48,13 +49,11 @@ def _frontmatter(text: str) -> tuple:
     return fields, text[match.end():]
 
 
-def _literal(text: str) -> str:
-    """A TOML multi-line literal string: no escapes, so `'''` inside is the one thing to avoid."""
-    return "'''\n" + text.replace("'''", "''\\'").rstrip("\n") + "\n'''"
-
-
 def _basic(text: str) -> str:
-    """A TOML multi-line basic string for the description (escapes honoured)."""
+    """A TOML multi-line basic string. Basic, not literal, for both fields: a
+    literal string cannot hold `\'\'\'`, and the escape the first cut inserted
+    for it stayed in the decoded text (review of ff99dd5, F2). Basic strings
+    round-trip any body through their escapes."""
     return '"""\n' + text.replace("\\", "\\\\").replace('"""', '""\\"') + '"""'
 
 
@@ -72,10 +71,21 @@ def render(source_path: str, version: str) -> tuple:
         "# Regenerate with the export; edit the source agent instead of this file.",
         f'name = "craftsman-{name}"',
         f"description = {_basic(description)}",
-        f"developer_instructions = {_literal(body.strip())}",
+        f"developer_instructions = {_basic(body.strip())}",
         "",
     ])
     return f"craftsman-{name}.toml", role
+
+
+def _write_role(agents_dir: str, out_dir: str, entry: str, version: str) -> None:
+    file_name, role = render(os.path.join(agents_dir, entry), version)
+    target = os.path.join(out_dir, file_name)
+    if os.path.islink(target):
+        raise OSError(f"{target} is a symlink; refusing to write through it")
+    handle_fd, tmp = tempfile.mkstemp(dir=out_dir, prefix=file_name + ".")
+    with os.fdopen(handle_fd, "w", encoding="utf-8") as handle:
+        handle.write(role)
+    os.replace(tmp, target)
 
 
 def main(argv: list) -> int:
@@ -85,17 +95,23 @@ def main(argv: list) -> int:
     agents_dir, out_dir = argv[2], argv[3]
     version = argv[5] if len(argv) > 5 and argv[4] == "--version" else "unknown"
     os.makedirs(out_dir, exist_ok=True)
-    written = 0
-    for entry in sorted(os.listdir(agents_dir)):
-        if not entry.endswith(".md"):
-            continue
-        file_name, role = render(os.path.join(agents_dir, entry), version)
-        target = os.path.join(out_dir, file_name)
-        with open(target + ".tmp", "w", encoding="utf-8") as handle:
-            handle.write(role)
-        os.replace(target + ".tmp", target)
-        written += 1
-    print(f"wrote {written} Codex role file(s) to {out_dir} (craftsman-*.toml; spawn them by name, e.g. craftsman-architect)")
+    # The output directory lives in the project, so a repository can have
+    # pre-created any name in it: a symlinked directory, or a symlinked
+    # `craftsman-x.toml.tmp` the first cut opened for writing and so truncated
+    # whatever it pointed at (review of ff99dd5, F1). The directory must be a
+    # real directory, the temporary file is created exclusively, and a target
+    # that is a symlink is refused rather than followed.
+    if os.path.islink(out_dir) or not os.path.isdir(out_dir):
+        sys.stderr.write(f"error: {out_dir} is not a real directory; refusing to write roles through it\n")
+        return 1
+    entries = [entry for entry in sorted(os.listdir(agents_dir)) if entry.endswith(".md")]
+    try:
+        for entry in entries:
+            _write_role(agents_dir, out_dir, entry, version)
+    except OSError as error:
+        sys.stderr.write(f"error: {error}\n")
+        return 1
+    print(f"wrote {len(entries)} Codex role file(s) to {out_dir} (craftsman-*.toml; spawn them by name, e.g. craftsman-architect)")
     return 0
 
 

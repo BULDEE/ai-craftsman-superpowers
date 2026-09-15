@@ -281,6 +281,39 @@ else
     log_fail "codex-agents idempotence" "role changed or user role lost"
 fi
 rm -rf .codex role-one.toml
+# Review of ff99dd5: a body with ''' round-trips exactly, and a pre-created
+# symlink in .codex/agents is refused, never written through.
+mkdir -p .codex/agents agents-probe
+printf -- "---\nname: probe\ndescription: probe with \"\"\" and '''\n---\nBody with '''three''' apostrophes, a back\\\\slash and \"\"\"quotes\"\"\".\n" > agents-probe/probe.md
+python3 "$ROOT_DIR/ci/agent_roles.py" codex agents-probe .codex/agents >/dev/null 2>&1
+if python3 - <<'PYCHECK'
+import tomllib, sys
+role = tomllib.load(open(".codex/agents/craftsman-probe.toml", "rb"))
+body = role["developer_instructions"]
+sys.exit(0 if "'''three'''" in body and 'back\\slash' in body and '"""quotes"""' in body and '"""' in role["description"] else 1)
+PYCHECK
+then
+    log_pass "a body holding ''', a backslash and triple quotes decodes byte for byte"
+else
+    log_fail "TOML round trip" "$(grep -c "''" .codex/agents/craftsman-probe.toml) apostrophe lines; $(python3 -c 'import tomllib;print(repr(tomllib.load(open(".codex/agents/craftsman-probe.toml","rb"))["developer_instructions"][:80]))' 2>&1)"
+fi
+VICTIM="$WORK/victim.txt"; printf 'keep\n' > "$VICTIM"
+rm -f .codex/agents/craftsman-probe.toml
+ln -s "$VICTIM" .codex/agents/craftsman-probe.toml
+RC=0; python3 "$ROOT_DIR/ci/agent_roles.py" codex agents-probe .codex/agents >/dev/null 2>&1 || RC=$?
+if [[ "$RC" -ne 0 && "$(cat "$VICTIM")" == "keep" && -L .codex/agents/craftsman-probe.toml ]]; then
+    log_pass "a symlinked role file is refused and its target is untouched"
+else
+    log_fail "symlinked role target" "rc=$RC victim=$(cat "$VICTIM")"
+fi
+rm -rf .codex/agents; ln -s "$WORK/elsewhere" .codex/agents; mkdir -p "$WORK/elsewhere"
+RC=0; python3 "$ROOT_DIR/ci/agent_roles.py" codex agents-probe .codex/agents >/dev/null 2>&1 || RC=$?
+if [[ "$RC" -ne 0 && -z "$(ls "$WORK/elsewhere")" ]]; then
+    log_pass "a symlinked .codex/agents directory is refused, nothing written through it"
+else
+    log_fail "symlinked roles dir" "rc=$RC wrote: $(ls "$WORK/elsewhere" | tr '\n' ' ')"
+fi
+rm -rf .codex agents-probe "$WORK/elsewhere"
 
 cd "$PREV_PWD"
 rm -rf "$WORK"
