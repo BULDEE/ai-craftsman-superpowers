@@ -329,11 +329,21 @@ _record_violation_metric() {
 # neither. An already-advisory finding is left alone: there is nothing to
 # demote, and rewriting its message would say "not blocking" about something
 # that never blocked.
+# Every Level 1 finding the validators produced on this write, one line per
+# occurrence, whatever severity it resolves to and whether or not a mark holds
+# it. Tallied before precedence, so a finding an analyser answers for still
+# counts as observed; skipped during the analysers' turn and the flush, which
+# re-enter this funnel with what was already tallied. Read once, on a green
+# pass, to tighten the file's rule counts to what the pass saw.
+RULES_OBSERVED=""
+
 add_violation() {
     local rule="$1"
     local message="$2"
     local file_path="${3:-$FILE_PATH}"
     local ignored=0
+
+    [[ "${_PRECEDENCE_HIGHER_LEVEL:-0}" != "1" ]] && RULES_OBSERVED="${RULES_OBSERVED}${rule}"$'\n'
 
     if precedence_defers "$rule" "$file_path"; then
         precedence_hold "$rule" "$file_path" "0" "$message"
@@ -512,6 +522,24 @@ if command -v python3 >/dev/null 2>&1 && rule_baseline_marked "$FILE_PATH"; then
         done <<< "$RATCHET_OUT"
     elif [[ $RATCHET_EXIT -eq 0 ]]; then
         python3 "${SCRIPT_DIR}/lib/ratchet.py" update "$FILE_PATH" >/dev/null 2>&1 || true
+        # The same pass, the same direction, for the rule half of the row: a
+        # count only ever goes down to what this pass observed. Written once
+        # by `craftsman-ci baseline` and never moved, the counts kept holding
+        # debt that had been paid, and the same debt coming back was reported
+        # as inherited on the very write the ratchet refused as a regression.
+        # The registry names the Level 1 rules, the ones a pass evaluates in
+        # full; a clean write reaches this point without any rule lookup, so
+        # it is made ready here rather than assumed.
+        _rules_observed_args=()
+        while IFS= read -r _observed_line; do
+            [[ -z "$_observed_line" ]] && continue
+            _rules_observed_args+=("${_observed_line##* }=${_observed_line%% *}")
+        done <<< "$(printf '%s' "$RULES_OBSERVED" | sort | uniq -c | awk '{print $1, $2}')"
+        if _rule_registry_ready; then
+            python3 "${SCRIPT_DIR}/lib/rule_baseline.py" tighten "$FILE_PATH" \
+                --registry "$_RULE_REGISTRY_FILE" \
+                ${_rules_observed_args[@]+"${_rules_observed_args[@]}"} >/dev/null 2>&1 || true
+        fi
     fi
 fi
 

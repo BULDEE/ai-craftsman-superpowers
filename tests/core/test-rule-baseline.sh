@@ -955,4 +955,133 @@ else
     log_fail "an explicit strictness still wins over the default" "got '$explicit'"
 fi
 
+# =============================================================================
+# One row, one cadence: debt paid on a green pass stays paid
+# =============================================================================
+# The structural mark tightens on every green pass (ratchet update); the rule
+# counts were written by `craftsman-ci baseline` and never moved again. So a
+# file whose debt was paid kept its count, and the next regression to the same
+# rule was reported as "already present at the baseline, not blocking" on the
+# very write the ratchet refused as a regression: two verdicts, one file, one
+# write. Measured on a 62-line function fixed to 7 and regrown to 72.
+#
+# The green pass now tightens the rule counts to what it observed, so the
+# regression that follows is new debt and blocks.
+PAID="$WORK/paid"
+mkdir -p "$PAID/src/Domain"
+paid_hook() {
+    printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \
+        "$PAID/src/Domain/Paid.php" "$PAID" \
+        | ( cd "$PAID" && bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1 )
+}
+paid_recorded() {
+    ( cd "$PAID" && python3 "$ROOT_DIR/hooks/lib/rule_baseline.py" get "src/Domain/Paid.php" "$1" 2>/dev/null )
+}
+# Eight lines at the mark, so the fix below (which adds the declaration the
+# mark lacked) does not grow the file: the structural ratchet refuses a longer
+# file, and a refused write is not the green pass this scenario is about.
+cat > "$PAID/src/Domain/Paid.php" <<'PHP'
+<?php
+
+namespace App\Domain;
+
+class Paid {
+    public function total($amount) { return $amount * 2; }
+}
+
+PHP
+( cd "$PAID" && git init -q && git add -A && bash "$ROOT_DIR/ci/craftsman-ci.sh" baseline src ) >/dev/null 2>&1
+
+if [[ "$(paid_recorded PHP001)" == "1" ]]; then
+    log_pass "paid: the mark records the inherited PHP001"
+else
+    log_fail "paid: the mark records the inherited PHP001" "got '$(paid_recorded PHP001)'"
+fi
+
+# Write 1: the debt is paid.
+cat > "$PAID/src/Domain/Paid.php" <<'PHP'
+<?php
+declare(strict_types=1);
+namespace App\Domain;
+final class Paid {
+    public function total(int $amount): int { return $amount * 2; }
+}
+PHP
+paid_green="$(paid_hook; echo "rc=$?")"
+if echo "$paid_green" | grep -q "rc=0"; then
+    log_pass "paid: the clean rewrite passes"
+else
+    log_fail "paid: the clean rewrite passes" "$(echo "$paid_green" | tail -3)"
+fi
+
+if [[ "$(paid_recorded PHP001)" == "0" ]]; then
+    log_pass "paid: a green pass tightens the rule count to what it observed (PHP001 1 -> 0)"
+else
+    log_fail "paid: a green pass tightens the rule count to what it observed" \
+        "PHP001 still recorded at '$(paid_recorded PHP001)' after a pass that saw none"
+fi
+
+# Write 2: the same debt comes back. It is new now.
+cat > "$PAID/src/Domain/Paid.php" <<'PHP'
+<?php
+namespace App\Domain;
+final class Paid {
+    public function total(int $amount): int { return $amount * 2; }
+}
+PHP
+paid_back="$(paid_hook; echo "rc=$?")"
+if echo "$paid_back" | grep -q "rc=2" && ! echo "$paid_back" | grep -q "already present at the baseline"; then
+    log_pass "paid: debt that was paid and comes back blocks as new"
+else
+    log_fail "paid: debt that was paid and comes back blocks as new" \
+        "$(echo "$paid_back" | grep -E 'PHP001|rc=' | head -3)"
+fi
+
+# The tightening never raises a count: a rule that fires MORE than recorded on
+# a green pass (advisory, so the pass is still green) keeps its recorded count.
+PHP003_RECORDED="$(paid_recorded PHP002)"
+if [[ "$PHP003_RECORDED" == "0" ]]; then
+    log_pass "paid: PHP002 was tightened with PHP001 on the same pass"
+else
+    log_fail "paid: PHP002 was tightened with PHP001 on the same pass" "got '$PHP003_RECORDED'"
+fi
+
+# --- A renamed file keeps its mark ------------------------------------------
+# `check` photographs a path it has no row for ("born clean", right for a file
+# that did not exist). After `git mv` that made the renamed file re-marked at
+# whatever state the first write left it in: a regression adopted as the mark.
+# The rename is read from the index, so the row moves and the regression is
+# judged against the mark the file had.
+( cd "$PAID" && git add -A && git -c user.email=t@t -c user.name=t commit -qm m && git mv src/Domain/Paid.php src/Domain/Moved.php ) >/dev/null 2>&1
+# Clean on every rule, so the only finding is the structural one: a blocking
+# PHP001 would own the message and hide the warning this assertion reads.
+cat > "$PAID/src/Domain/Moved.php" <<'PHP'
+<?php
+declare(strict_types=1);
+namespace App\Domain;
+final class Moved {
+    public function total(int $amount): int { return $amount * 2; }
+    public function twice(int $amount): int { return $amount * 4; }
+    public function thrice(int $amount): int { return $amount * 6; }
+    public function again(int $amount): int { return $amount * 8; }
+    public function more(int $amount): int { return $amount * 10; }
+}
+PHP
+moved_out="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \
+    "$PAID/src/Domain/Moved.php" "$PAID" \
+    | ( cd "$PAID" && bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1 ))"
+if echo "$moved_out" | grep -q "RATCHET001"; then
+    log_pass "paid: a renamed file is judged against the mark it had (RATCHET001 on the regression)"
+else
+    log_fail "paid: a renamed file is judged against the mark it had" \
+        "no RATCHET001: $(echo "$moved_out" | grep -E 'RATCHET|PHP001|BLOCK|WARN' | head -3)"
+fi
+if grep -q '"src/Domain/Moved.php"' "$PAID/.craftsman-baseline.json" 2>/dev/null \
+    && ! grep -q '"src/Domain/Paid.php"' "$PAID/.craftsman-baseline.json" 2>/dev/null; then
+    log_pass "paid: the row moved with the file, the old path has none"
+else
+    log_fail "paid: the row moved with the file, the old path has none" \
+        "rows: $(grep -o '"path":"[^"]*"' "$PAID/.craftsman-baseline.json" | tr '\n' ' ')"
+fi
+
 test_summary

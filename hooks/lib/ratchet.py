@@ -22,6 +22,7 @@ loop and in CI from the same code path (zero drift).
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -683,6 +684,41 @@ def _current_mark_for(entries: dict, path: str):
     return None
 
 
+# A renamed file keeps its mark. "Born clean" is right for a file that did
+# not exist; a `git mv` is the same file under a new path, and photographing
+# it as new adopted whatever state the first write after the rename left it
+# in, which is the one loosening the ratchet is built to refuse. The rename is
+# read from the index, where `git mv` puts it, so the old row moves to the new
+# path and the comparison is made against it. A plain `mv` with no `git add`
+# is not visible here and the file is born clean, as before.
+def _renamed_from(path: str):
+    repository = _repository_of(Path(path))
+    if repository is None:
+        return None
+    try:
+        listing = subprocess.run(
+            ["git", "-C", str(repository), "diff", "--cached", "--name-status", "-M"],
+            capture_output=True, text=True, check=False, timeout=5,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for line in listing.splitlines():
+        fields = line.split("\t")
+        if len(fields) == 3 and fields[0].startswith("R") and fields[2] == path:
+            return fields[1]
+    return None
+
+
+def _mark_moved_from_rename(entries: dict, path: str):
+    old_path = _renamed_from(path)
+    if old_path is None or old_path not in entries:
+        return None
+    moved = dict(entries.pop(old_path))
+    moved["path"] = path
+    entries[path] = moved
+    return _current_mark_for(entries, path)
+
+
 # Inert until the project opts in: a new row for an unmarked file is right
 # inside an existing mark (born clean), a new mark file is an opt-in nobody
 # made. `check` used to create one next to the file, and the hooks hid that
@@ -690,6 +726,21 @@ def _current_mark_for(entries: dict, path: str):
 # subdirectory skipped the ratchet of a marked project entirely.
 def _no_mark(baseline_file: Path) -> bool:
     return not baseline_file.is_file()
+
+
+# The mark a check compares against: the row for the path, else the row of
+# the path it was renamed from (moved, and saved as moved), else none, in
+# which case the file is born clean and its current measure becomes the row.
+def _mark_to_check_against(entries: dict, current: dict, baseline_file: Path):
+    known = _current_mark_for(entries, current["path"])
+    if known is None:
+        known = _mark_moved_from_rename(entries, current["path"])
+        if known is not None:
+            save_baseline(baseline_file, entries)
+    if known is None:
+        entries[current["path"]] = current
+        save_baseline(baseline_file, entries)
+    return known
 
 
 def _cmd_check(args) -> int:
@@ -703,10 +754,8 @@ def _cmd_check(args) -> int:
     current = _current_entry(file_path)
     if current is None:
         return 0
-    known = _current_mark_for(entries, current["path"])
+    known = _mark_to_check_against(entries, current, baseline_file)
     if known is None:
-        entries[current["path"]] = current
-        save_baseline(baseline_file, entries)
         return 0
     regressions = [
         (name, known[name], current[name])
@@ -747,7 +796,13 @@ def _cmd_update(args) -> int:
     current = _current_entry(file_path)
     if current is None:
         return 0
-    known = entries.get(current["path"], current)
+    # Only `init` creates a row. `update` used to adopt the current measure as
+    # the mark of a path that had none, which is how a `git mv` re-marked a
+    # file at whatever state the first write after the rename left it in: the
+    # one loosening the ratchet is built to refuse.
+    known = entries.get(current["path"])
+    if known is None:
+        return 0
     entries[current["path"]] = _tightened(known, current)
     save_baseline(baseline_file, entries)
     return 0

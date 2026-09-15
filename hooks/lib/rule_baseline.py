@@ -309,7 +309,91 @@ def _cmd_record(args) -> int:
     return 0
 
 
-COMMANDS = {"get": _cmd_get, "counts": _cmd_counts, "record": _cmd_record}
+def _registry_rules(args: list) -> set:
+    """The rule ids the registry compiled, from the TSV the caller names.
+
+    A rule the registry knows is a Level 1 rule: its validator runs on every
+    pass over a file of its language, so a count of zero on a pass is an
+    observation. A code the registry does not know belongs to an analyser that
+    may not have run (budget, trust, a missing binary), and a zero for it says
+    nothing. With no registry in the environment nothing is eligible, which is
+    the safe answer: a count that is not tightened is a count that still holds.
+    """
+    path = os.environ.get("CRAFTSMAN_RULE_REGISTRY", "")
+    if "--registry" in args:
+        index = args.index("--registry")
+        path = args[index + 1] if index + 1 < len(args) else ""
+    if not path:
+        return set()
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return {line.split("\t", 1)[0] for line in handle if not line.startswith("__")}
+    except OSError:
+        return set()
+
+
+def _observed_counts(args: list) -> dict:
+    counts = {}
+    for item in args:
+        rule, sep, value = item.partition("=")
+        if sep and rule and value.isdigit():
+            counts[rule] = int(value)
+    return counts
+
+
+def _tightened_rules(recorded: dict, observed: dict, eligible: set) -> dict:
+    """Each eligible count goes down to what the pass observed, never up."""
+    tightened = {}
+    for rule, count in recorded.items():
+        if rule not in eligible:
+            tightened[rule] = count
+            continue
+        lower = min(count, observed.get(rule, 0))
+        if lower > 0:
+            tightened[rule] = lower
+    return tightened
+
+
+def _row_for(args: list):
+    """The baseline, its rows and the row for args[0], anchored on the file."""
+    if "--baseline" not in args:
+        anchor = _anchor_for_file(args[0])
+        if anchor is not None:
+            set_project_root(anchor)
+    baseline_file = _baseline_path(args)
+    entries = load_baseline(baseline_file)
+    key = _key_for(args[0])
+    return baseline_file, entries, (entries.get(key) if key else None)
+
+
+def _cmd_tighten(args) -> int:
+    """`tighten <file> [RULE=COUNT ...]`: a green pass moves the rule counts.
+
+    The structural half of the row tightens on every green pass (ratchet.py
+    update); the rule half was written once, by `craftsman-ci baseline`, and
+    never moved again. So a file whose debt was paid kept its count, and the
+    same debt coming back was reported as "already present at the baseline"
+    on the very write the ratchet refused as a regression. One row, one
+    cadence: the counts follow the pass that observed them, downward only.
+    A rule the pass did not mention was observed zero times.
+    """
+    if not args:
+        sys.stderr.write("rule_baseline: tighten needs a file\n")
+        return 1
+    baseline_file, entries, entry = _row_for(args)
+    recorded = entry.get("rules") if isinstance(entry, dict) else None
+    if not isinstance(recorded, dict) or not recorded:
+        return 0
+    tightened = _tightened_rules(recorded, _observed_counts(args[1:]), _registry_rules(args))
+    if tightened == recorded:
+        return 0
+    entry["rules"] = tightened
+    save_baseline(baseline_file, entries)
+    return 0
+
+
+COMMANDS = {"get": _cmd_get, "counts": _cmd_counts, "record": _cmd_record,
+            "tighten": _cmd_tighten}
 
 
 def main() -> int:
