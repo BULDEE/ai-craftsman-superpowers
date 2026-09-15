@@ -48,65 +48,82 @@ def _int(value) -> int | None:
         return None
 
 
-def decode(payload: dict) -> dict:
-    event = payload.get("hook_event_name") or ""
-    tool = payload.get("tool_name") or ""
+def _result(payload: dict) -> dict:
     args = payload.get("tool_input") if isinstance(payload.get("tool_input"), dict) else {}
     command = args.get("command") if isinstance(args.get("command"), str) else None
-    response = payload.get("tool_response")
-    result = {"state": "unknown", "exit_code": None, "command": command, "task_id": None,
-              "tool": tool, "event": event, "why": "no rule matched this event shape"}
+    return {"state": "unknown", "exit_code": None, "command": command, "task_id": None,
+            "tool": payload.get("tool_name") or "", "event": payload.get("hook_event_name") or "",
+            "why": "no rule matched this event shape"}
 
-    def done(state, code=None, why="", task_id=None):
-        result.update(state=state, exit_code=code, why=why, task_id=task_id)
-        return result
 
+def _verdict(result: dict, state: str, code=None, why: str = "", task_id=None) -> dict:
+    result.update(state=state, exit_code=code, why=why, task_id=task_id)
+    return result
+
+
+def _from_exit_code(result: dict, code: int, why: str, task_id=None) -> dict:
+    return _verdict(result, "succeeded" if code == 0 else "failed", code, why, task_id)
+
+
+def _decode_failure(result: dict, payload: dict) -> dict:
+    error = payload.get("error") if isinstance(payload.get("error"), str) else ""
+    if payload.get("is_interrupt") is True:
+        return _verdict(result, "interrupted", None, "PostToolUseFailure with is_interrupt")
+    match = EXIT_CODE_RE.search(error)
+    if match:
+        return _from_exit_code(result, int(match.group(1)), "PostToolUseFailure error names the exit code")
+    return _verdict(result, "failed", None, "PostToolUseFailure without an exit code in error")
+
+
+def _decode_task_output(result: dict, response: dict, args: dict) -> dict:
+    task = response.get("task") if isinstance(response.get("task"), dict) else {}
+    task_id = task.get("task_id") or args.get("task_id")
+    status = task.get("status")
+    code = _int(task.get("exitCode"))
+    if status == "completed" and code is not None:
+        return _from_exit_code(result, code, "TaskOutput task completed with exitCode", task_id)
+    if status in ("running", "pending"):
+        return _verdict(result, "running", None, "TaskOutput task still running", task_id)
+    if status in ("killed", "cancelled", "canceled"):
+        return _verdict(result, "interrupted", code, f"TaskOutput task {status}", task_id)
+    return _verdict(result, "unknown", code, f"TaskOutput status {status!r} without a usable exitCode", task_id)
+
+
+def _decode_object(result: dict, response: dict) -> dict:
+    task_id = response.get("backgroundTaskId")
+    if task_id:
+        return _verdict(result, "running", None, "Bash started in the background; result arrives on TaskOutput", task_id)
+    if response.get("interrupted") is True:
+        return _verdict(result, "interrupted", None, "tool_response.interrupted")
+    code = _int(response.get("exit_code", response.get("exitCode")))
+    if code is not None:
+        return _from_exit_code(result, code, "tool_response carries an exit code")
+    if "stdout" in response or "stderr" in response:
+        return _verdict(result, "succeeded", 0, "Claude Code PostToolUse for a Bash command: a non-zero exit is a PostToolUseFailure, not this event")
+    return _verdict(result, "unknown", None, "object tool_response without exit code or stdout")
+
+
+def _decode_string(result: dict, response: str) -> dict:
+    match = EXIT_CODE_RE.search(response)
+    if match:
+        return _from_exit_code(result, int(match.group(1)), "string tool_response names the exit code")
+    return _verdict(result, "unknown", None, "string tool_response without an exit code (Codex shell output); the exit code is not observable on this host")
+
+
+def decode(payload: dict) -> dict:
+    result = _result(payload)
+    event, tool, response = result["event"], result["tool"], payload.get("tool_response")
+    args = payload.get("tool_input") if isinstance(payload.get("tool_input"), dict) else {}
     if event == "PostToolUseFailure":
-        error = payload.get("error") if isinstance(payload.get("error"), str) else ""
-        if payload.get("is_interrupt") is True:
-            return done("interrupted", None, "PostToolUseFailure with is_interrupt")
-        match = EXIT_CODE_RE.search(error)
-        if match:
-            code = int(match.group(1))
-            return done("failed" if code != 0 else "succeeded", code, "PostToolUseFailure error names the exit code")
-        return done("failed", None, "PostToolUseFailure without an exit code in error")
-
+        return _decode_failure(result, payload)
     if event and event != "PostToolUse":
-        return done("unknown", None, f"{event} carries no command result")
-
+        return _verdict(result, "unknown", None, f"{event} carries no command result")
     if tool == "TaskOutput" and isinstance(response, dict):
-        task = response.get("task") if isinstance(response.get("task"), dict) else {}
-        task_id = task.get("task_id") or args.get("task_id")
-        status = task.get("status")
-        code = _int(task.get("exitCode"))
-        if status == "completed" and code is not None:
-            return done("succeeded" if code == 0 else "failed", code, "TaskOutput task completed with exitCode", task_id)
-        if status in ("running", "pending"):
-            return done("running", None, "TaskOutput task still running", task_id)
-        if status in ("killed", "cancelled", "canceled"):
-            return done("interrupted", code, f"TaskOutput task {status}", task_id)
-        return done("unknown", code, f"TaskOutput status {status!r} without a usable exitCode", task_id)
-
+        return _decode_task_output(result, response, args)
     if isinstance(response, dict):
-        task_id = response.get("backgroundTaskId")
-        if task_id:
-            return done("running", None, "Bash started in the background; result arrives on TaskOutput", task_id)
-        if response.get("interrupted") is True:
-            return done("interrupted", None, "tool_response.interrupted")
-        code = _int(response.get("exit_code", response.get("exitCode")))
-        if code is not None:
-            return done("succeeded" if code == 0 else "failed", code, "tool_response carries an exit code")
-        if "stdout" in response or "stderr" in response:
-            return done("succeeded", 0, "Claude Code PostToolUse for a Bash command: a non-zero exit is a PostToolUseFailure, not this event")
-        return done("unknown", None, "object tool_response without exit code or stdout")
-
+        return _decode_object(result, response)
     if isinstance(response, str):
-        match = EXIT_CODE_RE.search(response)
-        if match:
-            code = int(match.group(1))
-            return done("succeeded" if code == 0 else "failed", code, "string tool_response names the exit code")
-        return done("unknown", None, "string tool_response without an exit code (Codex shell output); the exit code is not observable on this host")
-
+        return _decode_string(result, response)
     return result
 
 

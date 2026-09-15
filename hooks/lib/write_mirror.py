@@ -52,6 +52,7 @@ try:
     import lang_registry_read
 except ImportError:  # pragma: no cover - the helper ships next to this file
     lang_registry_read = None
+import v4a_patch
 
 
 def _pack_markers() -> tuple:
@@ -184,161 +185,42 @@ class Change:
         return self.new_path or self.path
 
 
-V4A_BEGIN, V4A_END = "*** Begin Patch", "*** End Patch"
-V4A_ADD, V4A_DELETE, V4A_UPDATE, V4A_MOVE = "*** Add File: ", "*** Delete File: ", "*** Update File: ", "*** Move to: "
-V4A_EOF = "*** End of File"
+def _absolute(path: str | None, cwd: str) -> str | None:
+    if path is None:
+        return None
+    return path if os.path.isabs(path) or not cwd else os.path.join(cwd, path)
 
 
-def parse_v4a(text: str) -> list:
-    """The V4A grammar as Codex 0.154.0 sends it, into (op, path, new_path, hunks or lines).
-
-    Add File carries `+` lines; Update File carries `@@` hunks of ` `/`-`/`+`
-    lines and an optional Move to; Delete File carries nothing. Anything the
-    grammar does not name raises ValueError: an unread patch is not a pass,
-    the caller refuses it.
-    """
-    lines = text.split("\n")
-    if not lines or lines[0].strip() != V4A_BEGIN:
-        raise ValueError("not a V4A patch: missing '*** Begin Patch'")
-    entries: list = []
-    i = 1
-    while i < len(lines):
-        line = lines[i]
-        if line.strip() == V4A_END:
-            return entries
-        if line.startswith(V4A_ADD):
-            path, i, body = line[len(V4A_ADD):].strip(), i + 1, []
-            while i < len(lines) and not lines[i].startswith("*** "):
-                if not lines[i].startswith("+"):
-                    raise ValueError(f"Add File {path}: line without '+' prefix")
-                body.append(lines[i][1:])
-                i += 1
-            entries.append(("add", path, None, body))
-            continue
-        if line.startswith(V4A_DELETE):
-            entries.append(("delete", line[len(V4A_DELETE):].strip(), None, []))
-            i += 1
-            continue
-        if line.startswith(V4A_UPDATE):
-            path, new_path, i = line[len(V4A_UPDATE):].strip(), None, i + 1
-            if i < len(lines) and lines[i].startswith(V4A_MOVE):
-                new_path, i = lines[i][len(V4A_MOVE):].strip(), i + 1
-            # A hunk is {"anchor": text after "@@" or "", "eof": bool, "lines": [...]}.
-            # The anchor names the line the hunk sits under, End of File pins
-            # it to the tail: both decide WHICH occurrence changes, and a
-            # mirror that ignored them edited the first match (review, F4).
-            hunks: list = []
-            while i < len(lines) and not (lines[i].startswith("*** ") and not lines[i].startswith(V4A_EOF)):
-                if lines[i].startswith("@@"):
-                    hunks.append({"anchor": lines[i][2:].strip(), "eof": False, "lines": []})
-                elif lines[i].startswith(V4A_EOF):
-                    if hunks:
-                        hunks[-1]["eof"] = True
-                elif lines[i][:1] in (" ", "-", "+"):
-                    if not hunks:
-                        hunks.append({"anchor": "", "eof": False, "lines": []})
-                    hunks[-1]["lines"].append(lines[i])
-                elif lines[i] == "":
-                    if hunks:
-                        hunks[-1]["lines"].append(" ")
-                else:
-                    raise ValueError(f"Update File {path}: unreadable hunk line {lines[i]!r}")
-                i += 1
-            entries.append(("move" if new_path else "update", path, new_path, hunks))
-            continue
-        raise ValueError(f"unreadable patch line {line!r}")
-    raise ValueError("not a V4A patch: missing '*** End Patch'")
+def _current_text(target: str) -> str:
+    try:
+        with open(target, encoding="utf-8", errors="replace") as handle:
+            return handle.read()
+    except OSError:
+        return ""
 
 
-def _locate(src: list, before: list, start: int, end: int) -> int:
-    """First index in [start, end) where `before` matches, exact first, then
-    ignoring trailing whitespace, then surrounding whitespace: the three passes
-    Codex's own applier tolerates, so a patch it would land is one we judge."""
-    for normalise in (lambda l: l, str.rstrip, str.strip):
-        window = [normalise(l) for l in before]
-        for at in range(start, end - len(before) + 1):
-            if [normalise(l) for l in src[at:at + len(before)]] == window:
-                return at
-    return -1
-
-
-def apply_hunks(current: str, hunks: list) -> str | None:
-    """The file after the hunks, or None when a hunk cannot be placed.
-
-    None is a refusal, not a fallback: a hunk that deletes a suppression
-    comment and does not locate would otherwise be judged on its added lines
-    alone, which is nothing (review, F2). The caller refuses the patch and
-    says which hunk.
-    """
-    src = current.split("\n")
-    out: list = []
-    cursor = 0
-    for hunk in hunks:
-        lines = hunk["lines"]
-        before = [l[1:] for l in lines if l[:1] in (" ", "-")]
-        after = [l[1:] for l in lines if l[:1] in (" ", "+")]
-        start = cursor
-        if hunk["anchor"]:
-            anchored = next((at for at in range(cursor, len(src)) if src[at].strip() == hunk["anchor"]), -1)
-            if anchored < 0:
-                return None
-            start = anchored
-        if not before:
-            at = len(src) if hunk["eof"] else start
-            out.extend(src[cursor:at])
-            out.extend(after)
-            cursor = at
-            continue
-        if hunk["eof"]:
-            at = len(src) - len(before)
-            while at >= start and src[at:] and _locate(src, before, at, len(src)) != at:
-                at -= 1
-            # A trailing "" from a final newline is part of the tail.
-            if at < start or _locate(src, before, at, len(src)) != at:
-                tail = len(src) - 1 if src and src[-1] == "" else len(src)
-                at = tail - len(before)
-                if at < start or _locate(src, before, at, tail) != at:
-                    return None
-        else:
-            at = _locate(src, before, start, len(src))
-            if at < 0:
-                return None
-        out.extend(src[cursor:at])
-        out.extend(after)
-        cursor = at + len(before)
-    out.extend(src[cursor:])
-    return "\n".join(out)
-
-
-def _patch_changes(command: str, cwd: str) -> list:
-    """Every file a Codex apply_patch would touch, with its would-be content.
+def _patch_change(entry: tuple, cwd: str) -> Change:
+    """One (op, path, new_path, body) entry as the Change it amounts to.
 
     Raises ValueError for a hunk that cannot be placed: the caller refuses.
     """
-    changes = []
-    for op, path, new_path, body in parse_v4a(command):
-        target = path if os.path.isabs(path) else os.path.join(cwd, path) if cwd else path
-        new_target = None
-        if new_path:
-            new_target = new_path if os.path.isabs(new_path) else os.path.join(cwd, new_path) if cwd else new_path
-        if op == "add":
-            # Patch lines are lines: the file ends with a newline, and a
-            # validator reading it with `while read` sees the last one too
-            # (review, F1).
-            changes.append(Change("add", target, None, "\n".join(body) + "\n" if body else ""))
-        elif op == "delete":
-            changes.append(Change("delete", target))
-        else:
-            try:
-                with open(target, encoding="utf-8", errors="replace") as handle:
-                    current = handle.read()
-            except OSError:
-                current = ""
-            applied = apply_hunks(current, body)
-            if applied is None:
-                raise ValueError(f"a hunk of Update File {path} does not match the file as it is; re-read it and rewrite the patch")
-            changes.append(Change(op, target, new_target, applied))
-    return changes
+    op, path, new_path, body = entry
+    target, new_target = _absolute(path, cwd), _absolute(new_path, cwd)
+    if op == "add":
+        # Patch lines are lines: the file ends with a newline, and a validator
+        # reading it with `while read` sees the last one too (review, F1).
+        return Change("add", target, None, "\n".join(body) + "\n" if body else "")
+    if op == "delete":
+        return Change("delete", target)
+    applied = v4a_patch.apply_hunks(_current_text(target), body)
+    if applied is None:
+        raise ValueError(f"a hunk of Update File {path} does not match the file as it is; re-read it and rewrite the patch")
+    return Change(op, target, new_target, applied)
+
+
+def _patch_changes(command: str, cwd: str) -> list:
+    """Every file a Codex apply_patch would touch, with its would-be content."""
+    return [_patch_change(entry, cwd) for entry in v4a_patch.parse(command)]
 
 
 def changes_of(payload: dict) -> list:
@@ -424,53 +306,69 @@ def _resolve(path: str, hint: str) -> tuple:
     return target, workspace, os.path.relpath(target, workspace)
 
 
-def _placement(payload: dict, mirror: str) -> str:
-    """The lines the shell half reads, or "" for a call this gate does not judge."""
+UNJUDGED_RELATIVE = "UNJUDGED a relative path with no workspace to resolve it against; write an absolute path"
+
+
+def _tool_of(payload: dict, args: dict) -> str:
     tool = payload.get("tool_name") or ""
-    args = _arguments(payload)
-    if not tool:
-        # A Claude Code payload with no tool name (the suites build them that
-        # way): the fields say which write it is.
-        tool = "Edit" if "old_string" in args else "Write"
-    if tool not in WRITE_TOOLS:
-        return ""
+    if tool:
+        return tool
+    # A Claude Code payload with no tool name (the suites build them that
+    # way): the fields say which write it is.
+    return "Edit" if "old_string" in args else "Write"
+
+
+def _changes_or_line(payload: dict, tool: str, args: dict, hint: str) -> tuple:
+    """(changes, "") or ([], <line to print>) for a call the mirror cannot judge."""
     if _is_v4a(args):
-        return "UNJUDGED a V4A patch (mode: patch) is not read by the write gate; use write_file or a replace-mode patch (old_string/new_string)"
-    hint = str(payload.get("cwd") or "")
+        return [], "UNJUDGED a V4A patch (mode: patch) is not read by the write gate; use write_file or a replace-mode patch (old_string/new_string)"
     if tool == "apply_patch":
         try:
-            changes = changes_of(payload)
+            return changes_of(payload), ""
         except ValueError as error:
-            return f"UNJUDGED the apply_patch body could not be read ({error}); rewrite the patch"
-        if not changes:
-            return ""
-    else:
-        path = args.get("path") or args.get("file_path")
-        if not path:
-            return ""
-        if not os.path.isabs(str(path)) and not hint:
-            return "UNJUDGED a relative path with no workspace to resolve it against; write an absolute path"
-        changes = changes_of(payload)
-    # One mirror root per workspace. Two packages of a monorepo each holding
-    # src/example.ts landed on the same mirror path and the second overwrote
-    # the first (review, F5); a single-change payload keeps the plain form
-    # the Hermes gate reads.
+            return [], f"UNJUDGED the apply_patch body could not be read ({error}); rewrite the patch"
+    path = args.get("path") or args.get("file_path")
+    if not path:
+        return [], ""
+    if not os.path.isabs(str(path)) and not hint:
+        return [], UNJUDGED_RELATIVE
+    return changes_of(payload), ""
+
+
+def _mirror_roots(mirror: str, resolved: list) -> dict:
+    """One mirror root per workspace. Two packages of a monorepo each holding
+    src/example.ts landed on the same mirror path and the second overwrote the
+    first (review, F5); a single workspace keeps the plain form the Hermes gate
+    reads."""
+    workspaces = sorted({workspace for _, _, workspace, _ in resolved})
+    if len(workspaces) == 1:
+        return {workspaces[0]: mirror}
+    return {workspace: os.path.join(mirror, f"ws{number}") for number, workspace in enumerate(workspaces)}
+
+
+def _placement(payload: dict, mirror: str) -> str:
+    """The lines the shell half reads, or "" for a call this gate does not judge."""
+    args = _arguments(payload)
+    tool = _tool_of(payload, args)
+    if tool not in WRITE_TOOLS:
+        return ""
+    hint = str(payload.get("cwd") or "")
+    changes, line = _changes_or_line(payload, tool, args, hint)
+    if line or not changes:
+        return line
     resolved = []
     for change in changes:
         if not os.path.isabs(change.destination) and not hint:
-            return "UNJUDGED a relative path with no workspace to resolve it against; write an absolute path"
+            return UNJUDGED_RELATIVE
         resolved.append((change,) + _resolve(change.destination, hint))
-    workspaces = sorted({workspace for _, _, workspace, _ in resolved})
-    roots = {ws: (mirror if len(workspaces) == 1 else os.path.join(mirror, f"ws{n}")) for n, ws in enumerate(workspaces)}
+    roots = _mirror_roots(mirror, resolved)
     lines = []
     for change, target, workspace, relative in resolved:
         if _touches_gate(relative):
             lines.append("GATE " + relative)
-            continue
-        if change.content is None:
-            continue
-        _place(roots[workspace], workspace, relative, change.content)
-        lines.append("MIRROR " + os.path.relpath(os.path.join(roots[workspace], relative), mirror))
+        elif change.content is not None:
+            _place(roots[workspace], workspace, relative, change.content)
+            lines.append("MIRROR " + os.path.relpath(os.path.join(roots[workspace], relative), mirror))
     return "\n".join(lines)
 
 
