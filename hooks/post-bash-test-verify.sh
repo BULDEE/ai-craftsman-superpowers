@@ -41,6 +41,11 @@ TOOL=$(printf '%s' "$DECODED" | jq -r '.tool // empty')
 #
 # run-tests.sh stays here because it is this plugin's own runner, not any
 # language's: it belongs to the engine, and no pack should have to claim it.
+# The runner has to be INVOKED: at the start of the command, after a `;`, `&&`,
+# `||`, `|` or `(`, through a runner launcher (npx, poetry run, python -m) or
+# with a path in front (./bin/pytest). `echo pytest` and `cat docs/pytest-notes.md`
+# matched the bare word and granted evidence for a run nobody made (review of
+# e372e85, F3).
 _test_command_pattern() {
     local pattern="run-tests\\.sh" command
     while IFS= read -r command; do
@@ -50,7 +55,7 @@ _test_command_pattern() {
         [[ ! "$command" =~ ^[A-Za-z0-9_./\ -]+$ ]] && continue
         pattern="${pattern}|$(printf '%s' "$command" | sed 's/[.]/\\./g')"
     done <<< "$(lang_all_capability test_commands 2>/dev/null)"
-    printf '(%s)' "$pattern"
+    printf '(^|[;&|(]|(npx|bunx|poetry run|pipenv run|uv run|python3? -m|php|bash|sh|time|env) )[[:space:]]*([^[:space:]]*/)?(%s)([[:space:]]|$)' "$pattern"
 }
 
 # This session's file, named by the payload's session_id (lib/session-files.sh).
@@ -84,9 +89,11 @@ fi
 case "$STATE" in
     running)
         # Started in the background: remembered so the TaskOutput that ends
-        # it can be read as this command's result.
+        # it can be read as this command's result. One entry per task: a poll
+        # that reports "still running" is the same task, and appending it
+        # again evicted the other pending tasks (review of e372e85, F4).
         [[ -z "$TASK_ID" ]] && exit 0
-        python3 "$LIB_DIR/session_state.py" append "$SESSION_STATE" pending_test_tasks \
+        python3 "$LIB_DIR/session_state.py" list-upsert "$SESSION_STATE" pending_test_tasks task_id \
             "$(jq -n --arg id "$TASK_ID" --arg c "$COMMAND" '{task_id: $id, command: $c}')" 20 2>/dev/null || true
         exit 0
         ;;
@@ -98,6 +105,10 @@ case "$STATE" in
         exit 0
         ;;
 esac
+
+# A task that ended is consumed: polling its result again must not grant the
+# evidence a later failure revoked (review of e372e85, F5).
+[[ "$TOOL" == "TaskOutput" ]] && python3 "$LIB_DIR/session_state.py" list-remove "$SESSION_STATE" pending_test_tasks task_id "$TASK_ID" 2>/dev/null || true
 
 CURRENT=$(python3 "$LIB_DIR/session_state.py" check-flag "$SESSION_STATE" verified 2>/dev/null || echo "false")
 

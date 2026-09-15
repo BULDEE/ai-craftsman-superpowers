@@ -134,6 +134,31 @@ def handle_append(arguments: list[str]) -> None:
     write_state_atomically(state_path, state)
 
 
+def handle_list_upsert(arguments: list[str]) -> None:
+    """list-upsert <file> <list_key> <field> <item json> [max]: replace the entry
+    whose <field> equals the item's, else append; the list is capped at max."""
+    state_path, list_key, field, item = arguments[0], arguments[1], arguments[2], json.loads(arguments[3])
+    max_entries = int(arguments[4]) if len(arguments) > 4 else None
+    state = read_state(state_path)
+    entries = state.setdefault(list_key, [])
+    entries[:] = [entry for entry in entries if not (isinstance(entry, dict) and entry.get(field) == item.get(field))]
+    entries.append(item)
+    if max_entries and len(entries) > max_entries:
+        entries[:] = entries[-max_entries:]
+    write_state_atomically(state_path, state)
+
+
+def handle_list_remove(arguments: list[str]) -> None:
+    """list-remove <file> <list_key> <field> <value>: drop every entry whose <field> equals <value>."""
+    state_path, list_key, field, value = arguments[0], arguments[1], arguments[2], arguments[3]
+    state = read_state(state_path)
+    entries = state.get(list_key)
+    if not isinstance(entries, list):
+        return
+    entries[:] = [entry for entry in entries if not (isinstance(entry, dict) and entry.get(field) == value)]
+    write_state_atomically(state_path, state)
+
+
 def handle_increment(arguments: list[str]) -> None:
     state_path, counter_key = arguments[0], arguments[1]
     state = read_state(state_path)
@@ -339,6 +364,8 @@ COMMAND_HANDLERS = {
     'write': handle_write,
     'merge': handle_merge,
     'append': handle_append,
+    'list-upsert': handle_list_upsert,
+    'list-remove': handle_list_remove,
     'increment': handle_increment,
     'check-flag': handle_check_flag,
     'record-violation': handle_record_violation,

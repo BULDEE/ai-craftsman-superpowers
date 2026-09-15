@@ -205,6 +205,36 @@ if grep -q "WITNESS-C" .github/copilot-instructions.md && grep -q 'craftsman:doc
 else
     log_fail "copilot preservation" "$(head -3 .github/copilot-instructions.md | tr '\n' '|')"
 fi
+
+# Review of 95c431e: an orphan begin marker paired with the end of the block
+# the first export appended, and the second export deleted everything between
+# them. Malformed markers are refused, never guessed.
+printf '# Notes\n\n<!-- craftsman:doctrine:begin version=old -->\nWITNESS-3: orphan begin, keep me.\n' > AGENTS.md
+cp AGENTS.md orphan.md
+RC=0; bash "$CLI" export --target agents-md >/dev/null 2>/tmp/orphan.err || RC=$?
+if [[ "$RC" -ne 0 ]] && diff -q orphan.md AGENTS.md >/dev/null && grep -q "marker" /tmp/orphan.err; then
+    log_pass "a begin marker without its end refuses the export and leaves the file untouched"
+else
+    log_fail "orphan begin" "rc=$RC $(head -3 AGENTS.md | tr '\n' '|') err=$(cat /tmp/orphan.err | head -1)"
+fi
+printf '<!-- craftsman:doctrine:end -->\n# Notes\n<!-- craftsman:doctrine:begin version=old -->\nWITNESS-4\n<!-- craftsman:doctrine:end -->\n' > AGENTS.md
+RC=0; bash "$CLI" export --target agents-md >/dev/null 2>&1 || RC=$?
+if [[ "$RC" -ne 0 ]] && grep -q "WITNESS-4" AGENTS.md; then
+    log_pass "two end markers refuse the export and keep the text"
+else
+    log_fail "ambiguous markers" "rc=$RC"
+fi
+# Line endings and mode outside the block are the user's.
+printf '# CRLF notes\r\n\r\nWITNESS-5: keep my CRLF.\r\n' > AGENTS.md
+chmod 664 AGENTS.md
+bash "$CLI" export --target agents-md >/dev/null 2>&1
+if grep -q $'WITNESS-5: keep my CRLF.\r$' AGENTS.md && grep -q $'craftsman:doctrine:end -->\r$' AGENTS.md \
+    && [[ "$(stat -f '%Lp' AGENTS.md 2>/dev/null || stat -c '%a' AGENTS.md)" == "664" ]]; then
+    log_pass "a CRLF file keeps its line endings (block included) and its mode after the export"
+else
+    log_fail "CRLF and mode" "mode=$(stat -f '%Lp' AGENTS.md 2>/dev/null || stat -c '%a' AGENTS.md) $(head -c 60 AGENTS.md | od -c | head -2 | tr '\n' ' ')"
+fi
+rm -f orphan.md
 rm -f AGENTS.md user-only.md after-one.md
 
 cd "$PREV_PWD"

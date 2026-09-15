@@ -60,15 +60,22 @@ fi
 # can find the same state file that hooks use.
 # The bridge file is intentionally placed outside the plugin data directory
 # so it is independent of the plugin slug and survives renames.
+# The bridge is Claude Code's: its skills run in the Bash tool and read it.
+# Another host starting later must not repoint it at its own data directory,
+# or a Claude skill's set-verified lands where that Claude session's hooks
+# never look (review of 421ca76, F6).
+source "${SCRIPT_DIR}/lib/host.sh"
+_session_host=$(host_detect "$INPUT")
 SESSION_STATE_PATH="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
-printf '%s' "$SESSION_STATE_PATH" > "${HOME}/.claude/craftsman-session-state-path" 2>/dev/null || true
+_writes_claude_bridge() { [[ "$_session_host" != "codex" ]]; }
+_writes_claude_bridge && { printf '%s' "$SESSION_STATE_PATH" > "${HOME}/.claude/craftsman-session-state-path" 2>/dev/null || true; }
 
 # Same bridge for the metrics database. Without it the reporting skills fall
 # back to the plugin-slug-less default and read a database no hook has written
 # since the slug changed: /craftsman:metrics reported 114 violations while the
 # live database held 14222, and concluded the hooks had stopped writing.
 METRICS_DB_PATH="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db"
-printf '%s' "$METRICS_DB_PATH" > "${HOME}/.claude/craftsman-metrics-db-path" 2>/dev/null || true
+_writes_claude_bridge && { printf '%s' "$METRICS_DB_PATH" > "${HOME}/.claude/craftsman-metrics-db-path" 2>/dev/null || true; }
 
 # Record session start epoch. SessionEnd input has no duration field
 # (only session_id/transcript_path/cwd/reason), so session-metrics.sh

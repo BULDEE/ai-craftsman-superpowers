@@ -19,14 +19,18 @@
 # =============================================================================
 
 host_detect() {
-    local input="${1:-}" tool prompt_id turn_id
+    local input="${1:-}" mark
     if [[ -n "$input" ]]; then
-        tool=$(printf '%s' "$input" | jq -r '.tool_name // empty' 2>/dev/null)
-        [[ "$tool" == "apply_patch" ]] && { echo codex; return 0; }
-        prompt_id=$(printf '%s' "$input" | jq -r '.prompt_id // empty' 2>/dev/null)
-        [[ -n "$prompt_id" ]] && { echo claude-code; return 0; }
-        turn_id=$(printf '%s' "$input" | jq -r 'if has("turn_id") and has("model") then "y" else "" end' 2>/dev/null)
-        [[ "$turn_id" == "y" ]] && { echo codex; return 0; }
+        # Measured on every captured event of both hosts (tests/fixtures/hosts):
+        # Codex carries `model` on every event but SessionEnd and a null
+        # `transcript_path` on all of them; Claude Code carries `prompt_id` on
+        # every event but SessionStart and a string `transcript_path` on all.
+        mark=$(printf '%s' "$input" | jq -r '
+            if .tool_name == "apply_patch" or has("model") then "codex"
+            elif has("prompt_id") or (.transcript_path | type) == "string" then "claude-code"
+            elif has("transcript_path") and .transcript_path == null then "codex"
+            else "" end' 2>/dev/null)
+        [[ -n "$mark" ]] && { echo "$mark"; return 0; }
     fi
     [[ "${CLAUDECODE:-}" == "1" || -n "${CLAUDE_CODE_SESSION_ID:-}" ]] && { echo claude-code; return 0; }
     [[ -n "${PLUGIN_ROOT:-}" && -z "${CLAUDE_PROJECT_DIR:-}" ]] && { echo codex; return 0; }

@@ -104,10 +104,15 @@ def _decode_object(result: dict, response: dict) -> dict:
 
 
 def _decode_string(result: dict, response: str) -> dict:
-    match = EXIT_CODE_RE.search(response)
-    if match:
-        return _from_exit_code(result, int(match.group(1)), "string tool_response names the exit code")
-    return _verdict(result, "unknown", None, "string tool_response without an exit code (Codex shell output); the exit code is not observable on this host")
+    """A string response is Codex. apply_patch's starts with "Exit code: N" and
+    is the tool's own report; a shell command's is its stdout, which may say
+    anything ("Exit code 0" in a test log is not an exit code), so it is never
+    parsed (review of e372e85, F2)."""
+    if result["tool"] == "apply_patch":
+        match = EXIT_CODE_RE.match(response)
+        if match:
+            return _from_exit_code(result, int(match.group(1)), "apply_patch report names the exit code")
+    return _verdict(result, "unknown", None, "string tool_response is command output without an exit code (Codex shell); the exit code is not observable on this host")
 
 
 def decode(payload: dict) -> dict:

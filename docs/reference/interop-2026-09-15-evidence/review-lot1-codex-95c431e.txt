@@ -1,0 +1,37 @@
+VERDICT: CHANGES_REQUIRED
+REVISION: 95c431e042c8b66d282908c00bf954930480e46b
+
+FINDINGS:
+
+1. blocking, ci/doctrine-export.sh:148: An unmatched begin marker causes user-text deletion on the second export. Evidence: “text.find(end, begin.end())” pairs the original unmatched begin with the end of the newly appended block; “text[:begin.start()] + block + text[after:]” then removes everything between them. In-memory execution of the actual splice preserved “WITNESS: keep me” on export one and deleted it on export two. The same occurs with an end marker before the unmatched begin. Reject malformed or ambiguous marker layouts before writing.
+
+2. major, hooks/lib/tool_result.py:103: Codex stdout can fabricate success or failure. Evidence: the string-response branch runs “EXIT_CODE_RE.search(response)” and returns “succeeded” or “failed”. PROVENANCE.md establishes that this string is command output, without an observable exit status. A captured Codex payload with stdout “Exit code 0\nFAILED test_checkout\n” decoded as succeeded; stdout containing a diagnostic “Exit code 1” decoded as failed. Keep Codex Bash string responses unknown regardless of their text.
+
+3. major, hooks/post-bash-test-verify.sh:80: Mentioning a test runner grants verification without running tests. Evidence: “grep -qE "$(_test_command_pattern)"” searches the whole command, and the pattern includes unanchored “pytest”. Both “echo pytest” and “cat docs/pytest-notes.md” match. A successful Claude Code PostToolUse therefore reaches “set-verified” at line 122. Conversely, a failed documentation lookup can revoke evidence. Recognize actual runner invocation rather than matching arbitrary command text.
+
+4. major, hooks/post-bash-test-verify.sh:89: Repeated polling evicts unrelated unfinished tests. Evidence: every “running” event appends to pending_test_tasks with limit 20; session_state.py uses “entries.append(item)” followed by “entries[:] = entries[-max_entries:]”. Starting A and B, then polling running B nineteen times, leaves twenty B entries and removes A. A subsequent failing completion for A is ignored by the empty-command return at line 72, preserving earlier verification. Upsert by task ID and retain unresolved tasks without duplicate-driven eviction.
+
+5. major, hooks/post-bash-test-verify.sh:70: Completed tasks remain eligible to grant evidence repeatedly. Evidence: lookup searches all pending_test_tasks, while the completion paths never remove the matching entry. Scenario: background task A succeeds, a later test run fails and revokes verification, then another TaskOutput poll retrieves A’s old successful result. Line 122 grants verification again without a new passing run. Consume terminal task results so repeated retrieval cannot restore stale evidence.
+
+6. major, hooks/pre-push-verify.sh:32: Hooks and Claude Code skills can now resolve different directories after another host starts. Evidence: hooks use “session_file session-state.json”, but session-start.sh:64 still overwrites the shared ~/.claude/craftsman-session-state-path, and session_state.py:298 reads that bridge for the skill wrapper. With Claude data directory /claude-data and a later Codex bridge pointing to /codex-data, the actual Python resolver returned /codex-data/session-state-claude-C.json; Claude hooks resolve /claude-data/session-state-claude-C.json. The skill reports verification successfully while its hooks see no evidence. Make bridge and wrapper resolution session-specific.
+
+7. minor, ci/doctrine-export.sh:145: Export changes line endings outside its owned block. Evidence: “open(path, encoding="utf-8")” enables universal-newline conversion, then the entire decoded text is rewritten. An in-memory CRLF file lost every CRLF, including user text before and after the block. Preserve original newline bytes when reading and splicing.
+
+8. minor, ci/doctrine-export.sh:160: Atomic replacement discards existing permissions. Evidence: “tempfile.mkstemp(...)” followed by “os.replace(tmp, path)” has no permission-copy step. The installed Python implementation creates the temporary file with “_os.open(file, flags, 0o600)”. Consequently, an existing group-readable instruction file becomes owner-only. Preserve the original mode on the replacement file.
+
+COMMANDS RUN:
+
+- cat diff.patch: read first; covers 5a4da92..HEAD.
+- git log, git show e372e85, git diff --stat, git rev-parse HEAD: verified commit scope and reviewed revision.
+- cat, nl, sed and rg over scoped hooks, helpers, manifests, skills and PROVENANCE.md: inspected event contracts, session consumers and export logic.
+- rg against MEMORY.md: no relevant interop entries found.
+- python3 -B -c, read-only fixture decoding: captured Claude outcomes decoded correctly; captured Codex Bash responses decoded unknown.
+- Python in-memory probes using actual decoder, append handler and splice code: reproduced stdout misclassification, pending-task eviction, malformed-marker deletion and CRLF conversion.
+- Read-only grep, jq and Bash probes: unrelated commands matched; jq preserved numeric zero; explicit exit 2 survived the ERR trap; unknown task lookup returned empty.
+- Read-only session-resolution probes: payload ID overrides environment, no-payload fallback works, traversal characters are stripped, shared-bridge directory mismatch reproduced.
+- Initial Python heredoc invocation: sandbox rejected the shell’s temporary-file creation; rerun successfully with python3 -B -c.
+- Final git status --short: another worker’s hooks/lib/pack-loader.sh modification appeared during review. I made no changes.
+
+NOT VERIFIED:
+
+No test suites or live host sessions were run. End-to-end hook execution, concurrent event ordering, filesystem replacement behavior, and large DOCTRINE_BLOCK environment limits were not exercised. Permission loss was established from source, without writing files. Uncommitted pack-loader changes and the previously addressed apply_patch reader were excluded.

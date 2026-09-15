@@ -92,10 +92,20 @@ H1=$(CLAUDECODE=1 CLAUDE_CODE_SESSION_ID=parent host_detect "$(host_fixture code
 H2=$(CLAUDECODE=1 CLAUDE_CODE_SESSION_ID=parent host_detect "$(host_fixture codex 0.154.0 pre-tool-use.bash "$WORK")")
 H3=$(host_detect "$(host_fixture claude-code 2.1.272 pre-tool-use.write "$WORK")")
 H4=$(env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID -u PLUGIN_ROOT bash -c "source '$ROOT_DIR/hooks/lib/host.sh'; host_detect '{\"tool_input\":{\"file_path\":\"/x\"}}'")
-if [[ "$H1" == codex && "$H2" == codex && "$H3" == claude-code && "$H4" == unknown ]]; then
-    log_pass "host_detect: Codex payloads are Codex under a Claude environment; Claude is Claude; anonymous is unknown"
+# every captured event of both hosts, under the other host's environment
+H_MISS=""
+for f in "$ROOT_DIR"/tests/fixtures/hosts/codex/*/*.json; do
+    [[ "$f" == *hook-env* ]] && continue
+    [[ "$(CLAUDECODE=1 CLAUDE_CODE_SESSION_ID=parent host_detect "$(cat "$f")")" == codex ]] || H_MISS="$H_MISS codex:$(basename "$f")"
+done
+for f in "$ROOT_DIR"/tests/fixtures/hosts/claude-code/*/*.json; do
+    [[ "$f" == *hook-env* ]] && continue
+    [[ "$(env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID PLUGIN_ROOT=/p bash -c "source '$ROOT_DIR/hooks/lib/host.sh'; host_detect \"\$(cat '$f')\"")" == claude-code ]] || H_MISS="$H_MISS claude:$(basename "$f")"
+done
+if [[ "$H1" == codex && "$H2" == codex && "$H3" == claude-code && "$H4" == unknown && -z "$H_MISS" ]]; then
+    log_pass "host_detect: every captured event names its host under the other host's environment; anonymous is unknown"
 else
-    log_fail "host_detect" "apply_patch=$H1 bash=$H2 write=$H3 anonymous=$H4"
+    log_fail "host_detect" "apply_patch=$H1 bash=$H2 write=$H3 anonymous=$H4 missed:$H_MISS"
 fi
 
 # --- control: the Claude Code Write fixture is refused pre-write ------------
@@ -436,6 +446,8 @@ if [[ "$RC" -eq 0 && "$MID" == "false" && "$RC2" -eq 0 && "$(_flag)" == "true" ]
 else
     log_fail "background run resolves on TaskOutput" "rc=$RC mid=$MID rc2=$RC2 verified=$(_flag) err=$VERIFY_ERR"
 fi
+# a completed task is consumed (F5 below), so the failing run is a new background start
+_verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.run-in-background "; d['tool_response']['backgroundTaskId'] = 'task-A'")"
 _verify "$(host_fixture_with claude-code 2.1.272 post-tool-use.task-output.completed "$WORK" "d['session_id'] = 's119'; d['tool_response']['task']['task_id'] = 'task-A'; d['tool_response']['task']['exitCode'] = 1")"; RC=$?
 if [[ "$RC" -eq 2 && "$(_flag)" == "false" ]]; then
     log_pass "a TaskOutput ending the same task with exitCode 1 revokes the evidence"
@@ -447,6 +459,55 @@ if [[ "$RC" -eq 0 && "$(_flag)" == "false" ]]; then
     log_pass "a TaskOutput for a task no test command started is ignored"
 else
     log_fail "unknown TaskOutput ignored" "rc=$RC verified=$(_flag)"
+fi
+
+# Review of e372e85 (Codex, read-only): four ways the evidence could be wrong.
+# F2: Codex stdout saying "Exit code 0" is still stdout.
+echo '{"verified": false}' > "$STATE"
+_verify "$(_as_test codex 0.154.0 post-tool-use.bash.python-tests-passed "; d['tool_response'] = 'Exit code 0\\nFAILED test_checkout\\n'")"; RC=$?
+if [[ "$RC" -eq 0 && "$(_flag)" == "false" ]]; then
+    log_pass "F2: a Codex shell output that happens to say 'Exit code 0' grants nothing"
+else
+    log_fail "F2 Codex stdout parsed" "rc=$RC verified=$(_flag)"
+fi
+# F3: the runner must be invoked, not mentioned.
+echo '{"verified": false}' > "$STATE"
+for mention in "echo pytest" "cat docs/pytest-notes.md" "grep pytest README.md"; do
+    _verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.python-tests-passed "; d['tool_input']['command'] = \"$mention\"")"
+done
+MENTION_V=$(_flag)
+INVOKE_MISS=""
+for invoke in "pytest -q" "cd api && pytest" "./bin/pytest" "python -m pytest tests/" "npx jest"; do
+    echo '{"verified": false}' > "$STATE"
+    _verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.python-tests-passed "; d['tool_input']['command'] = \"$invoke\"")"
+    [[ "$(_flag)" == "true" ]] || INVOKE_MISS="${INVOKE_MISS} [$invoke]"
+done
+if [[ "$MENTION_V" == "false" && -z "$INVOKE_MISS" ]]; then
+    log_pass "F3: mentioning a runner grants nothing; invoking it (bare, after &&, by path, via python -m, via npx) does"
+else
+    log_fail "F3 runner invocation" "mention-granted=$MENTION_V missed=${INVOKE_MISS:-none}"
+fi
+# F4: polling a running task does not evict the other pending tasks.
+echo '{"verified": false}' > "$STATE"
+_verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.run-in-background "; d['tool_response']['backgroundTaskId'] = 'task-A'")"
+for _ in $(seq 1 25); do
+    _verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.run-in-background "; d['tool_response']['backgroundTaskId'] = 'task-B'")"
+done
+PENDING=$(python3 "$ROOT_DIR/hooks/lib/session_state.py" read "$STATE" pending_test_tasks '[]' | jq -r '[.[].task_id] | sort | join(",")')
+if [[ "$PENDING" == "task-A,task-B" ]]; then
+    log_pass "F4: twenty-five 'still running' events for B leave one entry each for A and B"
+else
+    log_fail "F4 pending eviction" "pending=$PENDING"
+fi
+# F5: a completed task is consumed; polling it again restores nothing.
+_verify "$(host_fixture_with claude-code 2.1.272 post-tool-use.task-output.completed "$WORK" "d['session_id'] = 's119'; d['tool_response']['task']['task_id'] = 'task-A'")"
+AFTER_A=$(_flag)
+python3 "$ROOT_DIR/hooks/lib/session_state.py" merge "$STATE" verified false
+_verify "$(host_fixture_with claude-code 2.1.272 post-tool-use.task-output.completed "$WORK" "d['session_id'] = 's119'; d['tool_response']['task']['task_id'] = 'task-A'")"
+if [[ "$AFTER_A" == "true" && "$(_flag)" == "false" ]]; then
+    log_pass "F5: a task's result grants evidence once; re-reading it after a revocation grants nothing"
+else
+    log_fail "F5 stale task result" "after=$AFTER_A replayed=$(_flag)"
 fi
 
 # an interruption is neither a pass nor a failure
@@ -509,6 +570,22 @@ if [[ "$A_V" == "true" && "$C_V" == "false" ]]; then
     log_pass "verification evidence lands in the payload's session, never in the environment's"
 else
     log_fail "verified attribution" "A=$A_V C=$C_V"
+fi
+# F6 (review of 421ca76): the ~/.claude bridge is Claude Code's. A Codex
+# SessionStart must not repoint it at its data directory.
+mkdir -p "$FAKE_HOME/.claude"
+printf '%s' "/claude-data/session-state.json" > "$FAKE_HOME/.claude/craftsman-session-state-path"
+_start "$START_A"
+if [[ "$(cat "$FAKE_HOME/.claude/craftsman-session-state-path")" == "/claude-data/session-state.json" ]]; then
+    log_pass "F6: a Codex SessionStart leaves the Claude Code bridge file alone"
+else
+    log_fail "F6 bridge repointed" "$(cat "$FAKE_HOME/.claude/craftsman-session-state-path")"
+fi
+_start "$START_C"
+if [[ "$(cat "$FAKE_HOME/.claude/craftsman-session-state-path")" == "$CLAUDE_PLUGIN_DATA/session-state.json" ]]; then
+    log_pass "F6: a Claude Code SessionStart still writes the bridge for its skills"
+else
+    log_fail "F6 Claude bridge" "$(cat "$FAKE_HOME/.claude/craftsman-session-state-path")"
 fi
 unset CLAUDE_CODE_SESSION_ID
 rm -f "$WORK/src/Domain/Order.php" "$CLAUDE_PLUGIN_DATA"/session-*

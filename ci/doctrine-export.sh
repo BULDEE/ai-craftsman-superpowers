@@ -132,36 +132,15 @@ _doctrine_block() {
 }
 
 # _doctrine_write_block <file> <body>: the file with its craftsman block
-# replaced, appended or created; the rest of the file byte for byte. The
+# replaced, appended or created; the rest of the file byte for byte, its line
+# endings and its mode included. A begin marker without its end, or an end
+# before its begin, is refused rather than guessed: the first cut paired an
+# orphan begin with the end of the block it had just appended and deleted
+# everything between them on the second export (review of 95c431e, F1). The
 # splice is python because BSD awk refuses a multi-line -v string.
 _doctrine_write_block() {
     local file="$1" body="$2"
-    DOCTRINE_BLOCK="$(_doctrine_block "$body")" python3 - "$file" "$DOCTRINE_END" <<'PY'
-import os, re, sys, tempfile
-path, end = sys.argv[1], sys.argv[2]
-block = os.environ["DOCTRINE_BLOCK"].rstrip("\n") + "\n"
-begin_re = re.compile(r"^<!-- craftsman:doctrine:begin.*$", re.M)
-if os.path.isfile(path):
-    with open(path, encoding="utf-8") as handle:
-        text = handle.read()
-    begin = begin_re.search(text)
-    end_at = text.find(end, begin.end()) if begin else -1
-    if begin and end_at >= 0:
-        after = end_at + len(end)
-        if text[after:after + 1] == "\n":
-            after += 1
-        text = text[:begin.start()] + block + text[after:]
-    else:
-        if text and not text.endswith("\n"):
-            text += "\n"
-        text += ("\n" if text else "") + block
-else:
-    text = block
-fd, tmp = tempfile.mkstemp(dir=os.path.dirname(os.path.abspath(path)) or ".", prefix=os.path.basename(path) + ".")
-with os.fdopen(fd, "w", encoding="utf-8") as handle:
-    handle.write(text)
-os.replace(tmp, path)
-PY
+    DOCTRINE_BLOCK="$(_doctrine_block "$body")" python3 "${CI_LIB_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}/doctrine_splice.py" "$file" "$DOCTRINE_END"
 }
 
 # doctrine_export <target> - writes the instruction file(s) for a harness.
