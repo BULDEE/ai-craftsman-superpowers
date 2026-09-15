@@ -7,9 +7,9 @@
 set -uo pipefail
 
 # Gate: skip entirely if agent hooks are disabled
-if [[ "${CLAUDE_PLUGIN_OPTION_AGENT_HOOKS:-${CLAUDE_PLUGIN_OPTION_agent_hooks:-true}}" == "false" ]]; then
-    exit 0
-fi
+_agent_hooks_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${_agent_hooks_dir}/lib/config.sh"
+config_agent_hooks_enabled || exit 0
 
 # Gate: skip if Sentry is not configured
 if [[ -z "${CLAUDE_PLUGIN_OPTION_SENTRY_ORG:-${CLAUDE_PLUGIN_OPTION_sentry_org:-}}" ]]; then

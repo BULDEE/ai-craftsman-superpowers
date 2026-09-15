@@ -160,6 +160,34 @@ else
     log_fail "the count is about something" "locked=${expected_locked} total=${expected_total}"
 fi
 
+# The host row says what this host can observe, per capability, instead of
+# hiding it in one score (research CR-131, R11). The facts are the captured
+# ones: Codex sends no shell exit code and ignores `ask`.
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CRAFTSMAN_SESSION_HOST=codex hc_check_host
+CODEX_MSG="${_HC_MESSAGES[0]}"
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CRAFTSMAN_SESSION_HOST=claude-code hc_check_host
+CLAUDE_MSG="${_HC_MESSAGES[0]}"
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CRAFTSMAN_SESSION_HOST=mystery hc_check_host
+UNKNOWN_STATUS="${_HC_STATUSES[0]}"
+if [[ "$CODEX_MSG" == *"NOT observable"* && "$CODEX_MSG" == *"ask unsupported"* && "$CODEX_MSG" == *".agents/skills"* \
+    && "$CLAUDE_MSG" == *"observable"* && "$CLAUDE_MSG" != *"NOT observable"* && "$CLAUDE_MSG" == *".claude/skills"* \
+    && "$UNKNOWN_STATUS" == "warn" ]]; then
+    log_pass "hc_check_host: Codex and Claude Code rows state exit-code observability, ask support and the skills directory; an unknown host warns"
+else
+    log_fail "hc_check_host" "codex=[$CODEX_MSG] claude=[$CLAUDE_MSG] unknown=$UNKNOWN_STATUS"
+fi
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CLAUDE_PLUGIN_ROOT="$ROOT_DIR" hc_check_hooks_declared
+DECLARED=$(jq '[.hooks[][] | .hooks[]] | length' "$ROOT_DIR/hooks/hooks.json")
+if [[ "${_HC_MESSAGES[0]}" == "${DECLARED} handlers declared on "* && "${_HC_MESSAGES[0]}" == *"not measured here"* ]]; then
+    log_pass "hc_check_hooks_declared: states the declared count and that loaded/trusted is the host's view, not a measurement"
+else
+    log_fail "hc_check_hooks_declared" "${_HC_MESSAGES[0]}"
+fi
+
 echo ""
 echo "Results: ${TESTS_PASSED} passed, ${TESTS_FAILED} failed"
 [[ $TESTS_FAILED -eq 0 ]] && exit 0 || exit 1

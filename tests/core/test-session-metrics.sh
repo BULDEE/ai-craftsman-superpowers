@@ -238,7 +238,11 @@ CARRY_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-carry.XXXXXX")
 printf 'blocked\nblocked\n' > "$CARRY_DIR/session-violations"
 printf '1\n1\n' > "$CARRY_DIR/session-writes"
 
-echo '{}' | CLAUDE_PLUGIN_DATA="$CARRY_DIR" CLAUDE_PLUGIN_ROOT="$ROOT_DIR" \
+# Under a private HOME: session-start.sh writes the ~/.claude bridge and
+# wrapper files, and this call used to leave the developer's real bridge
+# pointing at this temporary directory (found by the healthcheck, 2026-09-15).
+mkdir -p "$CARRY_DIR/home/.claude"
+echo '{}' | HOME="$CARRY_DIR/home" CLAUDE_PLUGIN_DATA="$CARRY_DIR" CLAUDE_PLUGIN_ROOT="$ROOT_DIR" \
     bash "$ROOT_DIR/hooks/session-start.sh" >/dev/null 2>&1
 
 LEFTOVER=$(( $(wc -l < "$CARRY_DIR/session-violations" 2>/dev/null || echo 0) \

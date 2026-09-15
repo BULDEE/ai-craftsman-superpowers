@@ -66,6 +66,7 @@ fi
 # never look (review of 421ca76, F6).
 source "${SCRIPT_DIR}/lib/host.sh"
 _session_host=$(host_detect "$INPUT")
+export CRAFTSMAN_SESSION_HOST="$_session_host"
 SESSION_STATE_PATH="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
 _writes_claude_bridge() { [[ "$_session_host" != "codex" ]]; }
 _writes_claude_bridge && { printf '%s' "$SESSION_STATE_PATH" > "${HOME}/.claude/craftsman-session-state-path" 2>/dev/null || true; }

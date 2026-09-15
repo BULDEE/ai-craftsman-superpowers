@@ -49,7 +49,12 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
   `"${CLAUDE_PLUGIN_OPTION_AGENT_HOOKS:-${CLAUDE_PLUGIN_OPTION_agent_hooks:-true}}"`,
   exported spelling first; a test that sets only the lowercase form proves
   nothing about the consumer, which is how `agent_hooks: false` did nothing
-  for four releases.
+  for four releases. The agent hooks read `config_agent_hooks_enabled`, which
+  also honours `hooks: agent_hooks: false` in the GLOBAL `.craft-config.yml`
+  (a host without plugin options, Codex, has no other switch; a repository
+  may not decide whether the machine spends model calls). The witness is a
+  fake `claude` on PATH that records the call (`tests/core/test-agent-hooks.sh`):
+  an exit 0 proves nothing, a hook with nothing to do exits 0 too.
 - All commands MUST have `description`, `effort` in frontmatter. `effort` is Claude Code's own frontmatter key, not project metadata: it overrides the session effort level, so only `low`, `medium`, `high`, `xhigh`, `max` are valid.
 - Templates MUST have: top-level heading, `## Mission` section, `## Context Files` section.
 - An agent that declares `maxTurns` MUST carry a `## Turn Budget` section ending

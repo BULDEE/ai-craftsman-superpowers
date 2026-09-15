@@ -15,9 +15,9 @@ set -uo pipefail
 # spelling is what this plugin's own tests and CI export, and for four
 # releases it was the only one read, so `agent_hooks: false` never reached
 # this line. The exported form is read first.
-if [[ "${CLAUDE_PLUGIN_OPTION_AGENT_HOOKS:-${CLAUDE_PLUGIN_OPTION_agent_hooks:-true}}" == "false" ]]; then
-    exit 0
-fi
+_agent_hooks_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${_agent_hooks_dir}/lib/config.sh"
+config_agent_hooks_enabled || exit 0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/hook-profile.sh"

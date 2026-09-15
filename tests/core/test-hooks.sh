@@ -730,11 +730,13 @@ else
     log_fail "Stop hook group" "expected final-review asyncRewake, no ddd-verifier"
 fi
 
-# Test: DDD verifier script has agent_hooks gate
-if grep -q 'CLAUDE_PLUGIN_OPTION_agent_hooks' "$ROOT_DIR/hooks/agent-ddd-verifier.sh" 2>/dev/null; then
-    log_pass "DDD verifier script contains agent_hooks gate"
+# Test: DDD verifier script has the agent_hooks gate, through the one resolver
+# (config_agent_hooks_enabled reads the exported option, then the global
+# file; tests/core/test-agent-hooks.sh proves the call is not made).
+if grep -q 'config_agent_hooks_enabled || exit 0' "$ROOT_DIR/hooks/agent-ddd-verifier.sh" 2>/dev/null; then
+    log_pass "DDD verifier script gates on config_agent_hooks_enabled"
 else
-    log_fail "DDD verifier gate" "missing CLAUDE_PLUGIN_OPTION_agent_hooks check"
+    log_fail "DDD verifier gate" "missing config_agent_hooks_enabled gate"
 fi
 
 # Test: Sentry context in Stop hook (moved from PostToolUse for latency reduction)

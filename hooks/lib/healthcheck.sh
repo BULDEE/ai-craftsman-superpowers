@@ -156,6 +156,41 @@ hc_check_session_bridge() {
     _hc_record "session-bridge" "ok" "$target"
 }
 
+# The host this session runs under, and what the plugin can observe there.
+# One number ("9/11") hid the loss of the main gate (research CR-131, R11);
+# this row says, per capability, whether it is measured on this host. The
+# facts are the captured ones (tests/fixtures/hosts/PROVENANCE.md): Codex
+# sends no exit code for a shell command and ignores the `ask` decision,
+# Claude Code sends both. `CRAFTSMAN_SESSION_HOST` is set by session-start.sh
+# from its payload; a skill running later reads the environment instead.
+hc_check_host() {
+    local host="${CRAFTSMAN_SESSION_HOST:-}"
+    if [[ -z "$host" ]] && type host_detect >/dev/null 2>&1; then
+        host=$(host_detect "")
+    fi
+    case "$host" in
+        claude-code)
+            _hc_record "host" "ok" "claude-code: test exit codes observable (verification loop live), PreToolUse ask honoured, skills read from .claude/skills" ;;
+        codex)
+            _hc_record "host" "ok" "codex: shell exit codes NOT observable (a test run grants and revokes nothing), PreToolUse ask unsupported (gate config denied instead), skills read from .agents/skills" ;;
+        *)
+            _hc_record "host" "warn" "unknown host: capabilities not qualified; gates run, ask is treated as unsupported" ;;
+    esac
+}
+
+# Declared is not loaded, loaded is not triggered. hooks.json declares N
+# handlers; whether the host loaded each one is not visible from inside a hook
+# (Codex shows it in /hooks, Claude Code in /hooks), so this row states the
+# declared count and the events this session has evidence of, and nothing
+# more.
+hc_check_hooks_declared() {
+    local manifest="${CLAUDE_PLUGIN_ROOT:-$(pwd)}/hooks/hooks.json" declared events
+    [[ -f "$manifest" ]] || { _hc_record "hooks" "error" "hooks.json missing"; return; }
+    declared=$(jq '[.hooks[][] | .hooks[]] | length' "$manifest" 2>/dev/null || echo "?")
+    events=$(jq -r '.hooks | keys | join(",")' "$manifest" 2>/dev/null)
+    _hc_record "hooks" "ok" "${declared} handlers declared on ${events}; loaded and trusted is the host's /hooks view, not measured here"
+}
+
 # --- Aggregate ---
 
 # Level 1.5 semantic validation (ADR-0019, amended): report which language
@@ -218,6 +253,8 @@ hc_run_all() {
 
     hc_check_system_deps
     hc_check_node
+    hc_check_host
+    hc_check_hooks_declared
     hc_check_config
     hc_check_packs
     hc_check_skills

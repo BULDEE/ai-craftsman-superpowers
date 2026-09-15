@@ -568,4 +568,51 @@ fi
 
 rm -rf "$TEL_DIR"
 
+echo ""
+echo "=== agent_hooks reaches the consumer: the call is not made ==="
+# Exit 0 proves nothing (a hook with nothing to do also exits 0). The consumer
+# of `agent_hooks` is the hook that spends a model call, so the witness is a
+# fake `claude` on PATH that records being invoked. Unguarded on purpose:
+# CRAFTSMAN_HEADLESS_VERIFY is the recursion lock, and setting it here would
+# silence the very path under test.
+AH_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-agent-hooks.XXXXXX")
+mkdir -p "$AH_DIR/bin" "$AH_DIR/global" "$AH_DIR/proj/src/Domain" "$AH_DIR/data"
+printf '#!/bin/sh\necho invoked >> "%s/calls"\necho "CLEAN"\n' "$AH_DIR" > "$AH_DIR/bin/claude"; chmod +x "$AH_DIR/bin/claude"
+printf '<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\nfinal class Order\n{\n}\n' > "$AH_DIR/proj/src/Domain/Order.php"
+( cd "$AH_DIR/proj" && git init -q . && git add -A && git commit -qm base ) >/dev/null 2>&1
+_ah_run() { # runs the verifier with the given env assignments
+    rm -f "$AH_DIR/calls"
+    ( cd "$AH_DIR/proj" && printf '{"session_id":"ah","prompt_id":"p","tool_name":"Write","tool_input":{"file_path":"%s"}}' "$AH_DIR/proj/src/Domain/Order.php" \
+        | env -u CRAFTSMAN_HEADLESS_VERIFY -u CLAUDE_PLUGIN_OPTION_agent_hooks -u CLAUDE_PLUGIN_OPTION_AGENT_HOOKS -u CLAUDE_EFFORT \
+              PATH="$AH_DIR/bin:$PATH" CLAUDE_PLUGIN_ROOT="$ROOT_DIR" CLAUDE_PLUGIN_DATA="$AH_DIR/data" CLAUDE_PLUGIN_OPTION_STACK=fullstack \
+              CRAFTSMAN_GLOBAL_CONFIG_DIR="$AH_DIR/global" "$@" bash "$ROOT_DIR/hooks/agent-ddd-verifier.sh" >/dev/null 2>&1 )
+    [[ -f "$AH_DIR/calls" ]] && echo called || echo not-called
+}
+CONTROL=$(_ah_run CLAUDE_PLUGIN_OPTION_AGENT_HOOKS=true)
+if [[ "$CONTROL" == "called" ]]; then
+    log_pass "control: with agent hooks on, the DDD verifier invokes the model CLI"
+else
+    log_fail "control: verifier invokes the CLI" "$CONTROL"
+fi
+UPPER=$(_ah_run CLAUDE_PLUGIN_OPTION_AGENT_HOOKS=false)
+DEFAULT_ON=$(_ah_run)
+printf 'hooks:\n  agent_hooks: false\n' > "$AH_DIR/global/.craft-config.yml"
+GLOBAL_OFF=$(_ah_run)
+if [[ "$UPPER" == "not-called" && "$DEFAULT_ON" == "called" && "$GLOBAL_OFF" == "not-called" ]]; then
+    log_pass "agent_hooks=false stops the call: as the exported plugin option, and as hooks.agent_hooks in the global file (a host without plugin options)"
+else
+    log_fail "agent_hooks consumer" "option-false=$UPPER default=$DEFAULT_ON global-false=$GLOBAL_OFF"
+fi
+# a repository cannot switch the machine's model calls off
+rm -f "$AH_DIR/global/.craft-config.yml"
+printf 'hooks:\n  agent_hooks: false\n' > "$AH_DIR/proj/.craft-config.yml"
+PROJECT_OFF=$(_ah_run)
+rm -f "$AH_DIR/proj/.craft-config.yml"
+if [[ "$PROJECT_OFF" == "called" ]]; then
+    log_pass "a project .craft-config.yml cannot turn the agent hooks off (global only, like hooks.disabled)"
+else
+    log_fail "project agent_hooks asymmetry" "$PROJECT_OFF"
+fi
+rm -rf "$AH_DIR"
+
 test_summary
