@@ -1,0 +1,11 @@
+{
+  "hook_event_name": "PreToolUse",
+  "session_id": "copilot-doc-1",
+  "timestamp": "2026-09-15T00:00:00Z",
+  "cwd": "__WORKSPACE__",
+  "tool_name": "create",
+  "tool_input": {
+    "path": "__WORKSPACE__/src/Domain/Order.php",
+    "file_text": "<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\nuse App\\Infrastructure\\Persistence\\DoctrineOrderRepository;\nclass Order\n{\n}\n"
+  }
+}

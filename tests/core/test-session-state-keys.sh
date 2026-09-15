@@ -33,7 +33,7 @@ written_keys.update(re.findall(r"state\[['\"]([a-z_]+)['\"]\]\s*=", lib))
 written_keys.update(re.findall(r"state\.setdefault\(['\"]([a-z_]+)['\"]", lib))
 
 def scan(path, text):
-    for verb in ('increment', 'append', 'merge', 'set'):
+    for verb in ('increment', 'append', 'merge', 'set', 'list-upsert', 'list-remove'):
         for key in re.findall(r'session_state\.py"?\s+%s\s+"[^"]*"\s+([a-z_]+)' % verb, text):
             written_keys.add(key)
     for verb in ('check-flag', 'read'):

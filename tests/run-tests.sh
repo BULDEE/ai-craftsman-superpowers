@@ -560,6 +560,27 @@ test_config_protection() {
     run_subtest "Config-protection tests pass" "$SCRIPT_DIR/core/test-config-protection.sh" || true
 }
 
+test_host_payloads() {
+    echo ""
+    log_info "Testing host payload contracts on real captures (functional)"
+
+    run_subtest "Host payload contract tests pass" "$SCRIPT_DIR/core/test-host-payloads.sh" || true
+}
+
+test_copilot_adapter() {
+    echo ""
+    log_info "Testing the Copilot adapter on the documented contract (functional)"
+
+    run_subtest "Copilot adapter tests pass" "$SCRIPT_DIR/adapters/test-copilot.sh" || true
+}
+
+test_review_backend() {
+    echo ""
+    log_info "Testing the semantic review backend port (functional)"
+
+    run_subtest "Review backend tests pass" "$SCRIPT_DIR/core/test-review-backend.sh" || true
+}
+
 test_security_invariants() {
     echo ""
     log_info "Testing security invariants (functional)"
@@ -665,6 +686,7 @@ test_session_metrics() {
     run_subtest "Rule registry tests pass" "$SCRIPT_DIR/ci/test-rule-registry.sh" || true
     run_subtest "Ratchet CI parity tests pass" "$SCRIPT_DIR/ci/test-ratchet-ci.sh" || true
     run_subtest "Release path tests pass" "$SCRIPT_DIR/meta/test-release.sh" || true
+    run_subtest "Fresh install from the built archive passes" "$SCRIPT_DIR/meta/test-fresh-install.sh" || true
     run_subtest "Turn budget delivery tests pass" "$SCRIPT_DIR/core/test-turn-budget.sh" || true
 
     run_subtest "Suite isolation audit" "$SCRIPT_DIR/core/test-suite-isolation.sh" || true
@@ -830,6 +852,9 @@ main() {
         test_observation
         test_instincts
         test_config_protection
+        test_host_payloads
+        test_review_backend
+        test_copilot_adapter
         test_security_invariants
         test_config_resolution
         test_bias_detector

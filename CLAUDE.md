@@ -13,7 +13,7 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
 - Hook command output MUST be valid JSON (`jq -n` pattern).
 - Semantic verification runs in headless Haiku subprocesses via `hooks/lib/haiku-verify.sh` (never native agent/prompt hook types: no option gating, see ADR-0018). Always guard with `CRAFTSMAN_HEADLESS_VERIFY`.
 - The `metrics-query.py` helper MUST be used for all SQLite writes (parameterized queries). NEVER use string interpolation in SQL.
-- Session state is one file PER SESSION, `session-state-<id>.json`, resolved by `hooks/lib/session-files.sh` from `CLAUDE_CODE_SESSION_ID` (set by Claude Code in hook and Bash tool subprocesses alike; the shared `session-state.json` is the fallback with no id). Never hardcode the shared path: one shared file let a session's end delete another's pending findings and one project's patterns surface in another. All writes MUST use atomic writes (`tempfile.mkstemp() + os.rename()`). Known TOCTOU window between read and rename when multiple async hooks fire simultaneously - acceptable at current hook frequencies but do not add file-locking without benchmarking first.
+- Session state is one file PER SESSION, `session-state-<id>.json`, resolved by `hooks/lib/session-files.sh`. The id is the payload's `session_id`, bound once per hook with `session_files_bind "$INPUT"` right after `INPUT=$(cat)`; `CLAUDE_CODE_SESSION_ID` is the fallback for skills in the Bash tool, which have no payload. Never the environment first: a hook process inherits its parent's environment whole, and a Codex session started from a Claude Code Bash tool carries that Claude session's id (`tests/fixtures/hosts/codex/*/hook-env.project-hooks.json`), so env-first naming filed Codex's writes under the Claude session. The shared `session-state.json` is the fallback with no id at all. Never hardcode the shared path: one shared file let a session's end delete another's pending findings and one project's patterns surface in another. All writes MUST use atomic writes (`tempfile.mkstemp() + os.rename()`). Known TOCTOU window between read and rename when multiple async hooks fire simultaneously - acceptable at current hook frequencies but do not add file-locking without benchmarking first.
 - CI adapters follow the `adapter_detect/run/annotate/comment/exit` interface.
 - The engine holds no list of languages. A pack declares its own in `pack.yml`
   under `languages:` (`extensions`, `validators`, `static_analysis`,
@@ -49,7 +49,12 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
   `"${CLAUDE_PLUGIN_OPTION_AGENT_HOOKS:-${CLAUDE_PLUGIN_OPTION_agent_hooks:-true}}"`,
   exported spelling first; a test that sets only the lowercase form proves
   nothing about the consumer, which is how `agent_hooks: false` did nothing
-  for four releases.
+  for four releases. The agent hooks read `config_agent_hooks_enabled`, which
+  also honours `hooks: agent_hooks: false` in the GLOBAL `.craft-config.yml`
+  (a host without plugin options, Codex, has no other switch; a repository
+  may not decide whether the machine spends model calls). The witness is a
+  fake `claude` on PATH that records the call (`tests/core/test-agent-hooks.sh`):
+  an exit 0 proves nothing, a hook with nothing to do exits 0 too.
 - All commands MUST have `description`, `effort` in frontmatter. `effort` is Claude Code's own frontmatter key, not project metadata: it overrides the session effort level, so only `low`, `medium`, `high`, `xhigh`, `max` are valid.
 - Templates MUST have: top-level heading, `## Mission` section, `## Context Files` section.
 - An agent that declares `maxTurns` MUST carry a `## Turn Budget` section ending
@@ -131,9 +136,10 @@ packs/              → Loadable language packs (7 packs)
 ci/                 → CI pipeline integration; ci/adapters/ = CI providers
 adapters/           → host agent runtimes (a different axis from ci/adapters/)
   hermes/           → Nous Research Hermes: pre_verify hook, Claude Code wrapper
+  copilot/          → GitHub Copilot CLI/cloud: envelope translator, gate and post hooks (documented contract, no surface qualified yet)
 ```
 
-Three front-ends over one core: `hooks/` for Claude Code, `ci/craftsman-ci.sh`
+Four front-ends over one core: `hooks/` for Claude Code, `ci/craftsman-ci.sh`
 for pipelines, `adapters/<host>/` for other agent runtimes. The rules engine,
 the packs and `knowledge/` are shared, and the parity tests fail when two
 front-ends disagree on a severity. A fourth front-end is an adapter, never a

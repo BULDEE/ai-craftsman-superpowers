@@ -1,0 +1,15 @@
+{
+  "session_id": "01a0a47b-7f66-7522-a1fa-6d94ae7cafbf",
+  "turn_id": "01a0a47b-7fe7-7301-a880-4bdf88865d13",
+  "transcript_path": null,
+  "cwd": "__WORKSPACE__",
+  "hook_event_name": "PostToolUse",
+  "model": "gpt-6-astra",
+  "permission_mode": "default",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "printf 'line1\\nline2\\n'; exit 3"
+  },
+  "tool_response": "line1\nline2\n",
+  "tool_use_id": "exec-75fb20af-edc1-4bc0-af6c-620c9ee94765"
+}

@@ -20,6 +20,31 @@
 # own pinned snapshot.
 HAIKU_VERIFY_MODEL="${CRAFTSMAN_VERIFY_MODEL:-claude-haiku-4-5-20251001}"
 
+# Which CLI answers a semantic review. The layer was `claude -p` and nothing
+# else, so on a machine without that CLI it vanished in silence (audit CR-117,
+# C8). The backend is a boundary: CRAFTSMAN_REVIEW_BACKEND, else
+# `review: backend:` in the global .craft-config.yml, else auto (claude-cli
+# when `claude` is on PATH, codex-cli when `codex` is, else none). A backend
+# is a transport for one prompt and one reply; the prompts, the shape filter
+# on the reply and the telemetry are shared, and the verdict of the
+# deterministic gate never depends on any of this.
+semantic_backend() {
+    local backend="${CRAFTSMAN_REVIEW_BACKEND:-}"
+    if [[ -z "$backend" ]] && type _config_resolve_nested >/dev/null 2>&1; then
+        backend=$(_config_resolve_nested "review" "backend" "auto")
+    fi
+    case "${backend:-auto}" in
+        claude-cli|codex-cli|none) printf '%s' "$backend" ;;
+        *)
+            if command -v claude >/dev/null 2>&1; then printf 'claude-cli'
+            elif command -v codex >/dev/null 2>&1; then printf 'codex-cli'
+            else printf 'none'; fi ;;
+    esac
+}
+
+# The backend the last haiku_verify used, for the run row.
+SEMANTIC_BACKEND_USED=""
+
 # Can a verification happen at all, before anything is paid for.
 #
 # A hook that loads the metrics database to record an outcome pays ~200ms for
@@ -28,12 +53,21 @@ HAIKU_VERIFY_MODEL="${CRAFTSMAN_VERIFY_MODEL:-claude-haiku-4-5-20251001}"
 # answers no, which keeps the cost on the runs that produce something.
 haiku_verify_possible() {
     [[ "${CLAUDE_EFFORT:-}" == "low" ]] && return 1
-    command -v claude >/dev/null 2>&1
+    local backend
+    backend=$(semantic_backend)
+    # Remembered here, in the caller's shell: haiku_verify runs inside a
+    # command substitution, and an assignment made there dies with it.
+    SEMANTIC_BACKEND_USED="$backend"
+    case "$backend" in
+        claude-cli) command -v claude >/dev/null 2>&1 ;;
+        codex-cli)  command -v codex >/dev/null 2>&1 ;;
+        *) return 1 ;;
+    esac
 }
 
 # haiku_verify <prompt>
-# Prints the model's reply on stdout. Returns 1 (silently) when the claude
-# CLI is unavailable or the subprocess fails: callers degrade to no-op.
+# Prints the model's reply on stdout. Returns 1 (silently) when the backend is
+# unavailable or the subprocess fails: callers degrade to no-op.
 haiku_verify() {
     local prompt="$1"
     # Advisory layer only. Hooks receive the session effort level (v2.1.128+,
@@ -43,6 +77,15 @@ haiku_verify() {
     # dial, or the hook and CI front-ends would answer differently for the
     # same file. tests/core/test-gate-independence.sh enforces both sides.
     [[ "${CLAUDE_EFFORT:-}" == "low" ]] && return 1
+    SEMANTIC_BACKEND_USED=$(semantic_backend)
+    case "$SEMANTIC_BACKEND_USED" in
+        claude-cli) _semantic_claude_cli "$prompt" ;;
+        codex-cli)  _semantic_codex_cli "$prompt" ;;
+        *) return 1 ;;
+    esac
+}
+
+_semantic_claude_cli() {
     command -v claude >/dev/null 2>&1 || return 1
     # The subprocess fires SessionStart and SessionEnd like any session, and
     # this plugin's two hooks used to reset and delete the REAL session's
@@ -54,11 +97,34 @@ haiku_verify() {
     # because a verifier has no business running the operator's own hooks.
     # `--bare` would skip every hook but never reads OAuth, which is how most
     # operators are signed in.
-    CRAFTSMAN_HEADLESS_VERIFY=1 claude -p "$prompt" \
+    CRAFTSMAN_HEADLESS_VERIFY=1 claude -p "$1" \
         --model "$HAIKU_VERIFY_MODEL" \
         --allowedTools "Read,Grep,Glob" \
         --settings '{"disableAllHooks": true}' \
         --max-turns 8 2>/dev/null || return 1
+}
+
+# codex exec, read-only sandbox, no persisted session, the final message as
+# the reply (`--json` is an event stream, not a verdict). The model is Codex's
+# default unless CRAFTSMAN_VERIFY_MODEL_CODEX names one: the Claude model id
+# above is not a name Codex knows. CRAFTSMAN_HEADLESS_VERIFY reaches the child
+# Codex session's hooks through the environment it inherits whole
+# (tests/fixtures/hosts/PROVENANCE.md), which is what keeps this plugin's own
+# hooks in that session from recording a review as a session.
+_semantic_codex_cli() {
+    command -v codex >/dev/null 2>&1 || return 1
+    local reply rc=0
+    reply=$(mktemp "${TMPDIR:-/tmp}/craftsman-review.XXXXXX") || return 1
+    CRAFTSMAN_HEADLESS_VERIFY=1 codex exec \
+        --sandbox read-only --ephemeral --skip-git-repo-check \
+        ${CRAFTSMAN_VERIFY_MODEL_CODEX:+-m "$CRAFTSMAN_VERIFY_MODEL_CODEX"} \
+        --output-last-message "$reply" - <<< "$1" >/dev/null 2>&1 || rc=$?
+    if [[ "$rc" -ne 0 || ! -s "$reply" ]]; then
+        rm -f "$reply"
+        return 1
+    fi
+    cat "$reply"
+    rm -f "$reply"
 }
 
 # haiku_findings <verdict-body>

@@ -36,40 +36,27 @@ command -v jq >/dev/null 2>&1 || false
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)
 
-# Exit silently if no file path
-[[ -z "$FILE_PATH" ]] && exit 0
+# A Write/Edit names its file here. A Codex apply_patch names its files inside
+# `tool_input.command` and has no `file_path`: exiting on the missing field
+# waved every patch through (audit CR-117, C1). The mirror helper reads both
+# shapes; only a call that names no file at all is not this gate's.
+[[ -z "$FILE_PATH" && "$TOOL_NAME" != "apply_patch" ]] && exit 0
 
-# What the file WOULD contain. A Write carries it as `content`; an Edit
-# carries `old_string`/`new_string`, and reading `content` alone let every
-# Edit through the gate untouched while the same text through Write was
-# refused (guardrail review). The would-be file is the current one with the
-# edit applied; when the anchor is absent, Claude Code refuses the Edit itself
-# and what the gate can still judge is what the edit adds, never nothing.
-# A Write's content is read with jq, no interpreter start on the common path;
-# the Edit case pays one python3 start, which is what applying the edit costs.
+# The whole content a write carries, when it carries one. It feeds the PHP001
+# auto-fix below and nothing else: the would-be file the validators judge is
+# laid out by the mirror helper, for every shape (a Write, an Edit applied to
+# the file on disk, a patch), so the edit branch that used to be computed here
+# fed nobody. Read with jq, no interpreter start on the common path.
 FILE_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.content // empty' 2>/dev/null || true)
-[[ -z "$FILE_CONTENT" && "$TOOL_NAME" == "Edit" ]] && FILE_CONTENT=$(printf '%s' "$INPUT" | python3 -c '
-import json, sys
-payload = json.load(sys.stdin)
-args = payload.get("tool_input") or {}
-old, new = args.get("old_string"), args.get("new_string")
-if not isinstance(old, str) or not isinstance(new, str):
-    sys.exit(0)
-try:
-    current = open(args.get("file_path", ""), encoding="utf-8", errors="replace").read()
-except OSError:
-    current = ""
-if old and old in current:
-    sys.stdout.write(current.replace(old, new) if args.get("replace_all") else current.replace(old, new, 1))
-else:
-    sys.stdout.write(new)
-' 2>/dev/null || true)
 
-# Only check source files, as declared by the loaded packs
+# Only check source files, as declared by the loaded packs. A patch is
+# filtered per file below, since it may name several languages at once.
 pack_loader_init
-EXT="${FILE_PATH##*.}"
-LANG_ID=$(lang_for_file "$FILE_PATH")
-[[ -z "$LANG_ID" ]] && exit 0
+LANG_ID=""
+if [[ -n "$FILE_PATH" ]]; then
+    LANG_ID=$(lang_for_file "$FILE_PATH")
+    [[ -z "$LANG_ID" ]] && exit 0
+fi
 
 VIOLATIONS=""
 VIOLATION_COUNT=0
@@ -95,12 +82,29 @@ MIRROR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-pre-write.XXXXXX")
 trap 'rm -rf "$MIRROR"' EXIT
 # A relative file_path is relative to the session's working directory, which
 # is this hook's; the helper is told, since the payload does not carry it.
-PLACED=$(printf '%s' "$INPUT" | jq --arg cwd "$PWD" '. + {cwd: $cwd}' 2>/dev/null \
-    | python3 "${SCRIPT_DIR}/lib/write_mirror.py" "$MIRROR" 2>/dev/null || true)
-case "$PLACED" in
-    MIRROR\ *) MIRROR_FILE="$MIRROR/${PLACED#MIRROR }" ;;
-    *) exit 0 ;;   # not a write this gate judges (config-protection.sh owns the gate's own files)
-esac
+PLACED=$(printf '%s' "$INPUT" | jq --arg cwd "$PWD" '. + {cwd: (.cwd // $cwd)}' 2>/dev/null \
+    | python3 "${SCRIPT_DIR}/lib/write_mirror.py" "$MIRROR" 2>/dev/null); PLACED_RC=$?
+# A helper that crashed placed nothing, and nothing is not a pass (ADR-0029;
+# review F3: `|| true` here let a missing python3 wave every write through).
+if [[ "$PLACED_RC" -ne 0 ]]; then
+    echo "🚫 BLOCKED by AI Craftsman - the pre-write gate could not lay out the would-be file (write_mirror.py exit ${PLACED_RC}). Retry the write once; if it repeats, the gate needs attention, not the write." >&2
+    jq -n --arg rc "$PLACED_RC" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: ("the pre-write gate could not lay out the would-be file (write_mirror.py exit " + $rc + "); retry once, then report the gate")}}'
+    exit 2
+fi
+# One `MIRROR <relative path>` per would-be file (one for a Write/Edit, any
+# number for a patch). GATE lines are config-protection.sh's to refuse. An
+# UNJUDGED line is a write this gate could not read (an unplaceable hunk, a
+# relative path with no workspace) and is refused here, with the reason: an
+# unread mutation is not a pass.
+UNJUDGED=$(printf '%s\n' "$PLACED" | awk '/^UNJUDGED /{print substr($0, 10); exit}')
+if [[ -n "$UNJUDGED" ]]; then
+    echo "🚫 BLOCKED by AI Craftsman - the write cannot be judged before it lands: ${UNJUDGED}" >&2
+    jq -n --arg why "$UNJUDGED" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: ("the write cannot be judged before it lands: " + $why)}}'
+    exit 2
+fi
+MIRROR_FILES=$(printf '%s\n' "$PLACED" | awk '/^MIRROR /{print substr($0, 8)}')
+[[ -z "$MIRROR_FILES" ]] && exit 0
+MIRROR_FILE_COUNT=$(printf '%s\n' "$MIRROR_FILES" | grep -c .)
 
 # Same order as post-write's add_violation: severity for THIS file, an
 # explicit ignore leaves, a marker the rule allows silences, a baseline mark
@@ -125,8 +129,10 @@ _pre_emit() {
     if rules_baseline_holds "$MIRROR_FILE" "$rule" "$severity"; then
         severity="warn"; message="${message} (already present at the baseline, not blocking)"
     fi
-    case " $BLOCKING_RULES " in *" $rule "*) return 0 ;; esac
-    [[ "$severity" == "block" ]] && BLOCKING_RULES="$BLOCKING_RULES $rule"
+    case " $BLOCKING_RULES " in *" ${MIRROR_REL}:${rule} "*) return 0 ;; esac
+    [[ "$severity" == "block" ]] && BLOCKING_RULES="$BLOCKING_RULES ${MIRROR_REL}:${rule}"
+    # A patch names several files: the finding says which one.
+    [[ "$MIRROR_FILE_COUNT" -gt 1 ]] && message="${message} [${MIRROR_REL#ws[0-9]*/}]"
     VIOLATIONS="${VIOLATIONS}${rule}: ${message}\n"
     ((VIOLATION_COUNT++)) || true
 }
@@ -134,8 +140,14 @@ add_violation() { _pre_emit "$1" "$2"; }
 add_warning()   { _pre_emit "$1" "$2"; }
 metrics_record_violation() { :; }
 FILE_PATH_REAL="$FILE_PATH"
-FILE_PATH="$MIRROR_FILE"
-pack_dispatch_file "$MIRROR_FILE"
+while IFS= read -r MIRROR_REL; do
+    [[ -z "$MIRROR_REL" ]] && continue
+    MIRROR_FILE="$MIRROR/$MIRROR_REL"
+    LANG_ID=$(lang_for_file "$MIRROR_FILE")
+    [[ -z "$LANG_ID" ]] && continue
+    FILE_PATH="$MIRROR_FILE"
+    pack_dispatch_file "$MIRROR_FILE"
+done <<< "$MIRROR_FILES"
 FILE_PATH="$FILE_PATH_REAL"
 
 local_should_block=false
@@ -149,7 +161,9 @@ local_should_block=false
 # rule asked not to be policed on it, and a fix nobody asked for is policing.
 # =============================================================================
 
-if [[ $VIOLATION_COUNT -eq 1 && "$TOOL_NAME" == "Write" && "$LANG_ID" == "php" && "$local_should_block" == true ]] \
+# A call that carries the whole file is a write, whatever the host names it
+# (Write, write_file, Grok's `write`); the fix rewrites `content` in place.
+if [[ $VIOLATION_COUNT -eq 1 && -n "$FILE_CONTENT" && "$LANG_ID" == "php" && "$local_should_block" == true ]] \
    && [[ "$VIOLATIONS" == PHP001* ]] \
    && echo "$FILE_CONTENT" | head -1 | grep -q "^<?php" 2>/dev/null; then
     FIXED_CONTENT=$(printf '%s\n' "$FILE_CONTENT" | awk 'NR==1 && $0 ~ /^<\?php/ {print; print ""; print "declare(strict_types=1);"; next} {print}')
@@ -178,12 +192,17 @@ if [[ $VIOLATION_COUNT -gt 0 ]]; then
         done <<< "$(echo -e "$VIOLATIONS")"
         echo "Fix these before writing. Use // craftsman-ignore: <RULE_ID> to suppress." >&2
 
-        # Structured JSON on stdout (consumed by Claude AI)
+        # Structured JSON on stdout. Exit 2 is the refusal on every host; the
+        # deny is stated as well, since a host that reads the JSON before the
+        # exit code (Codex) must not read an advisory additionalContext as
+        # the whole verdict.
         jq -n --arg v "$(echo -e "$VIOLATIONS")" \
                --arg c "$VIOLATION_COUNT" \
         '{
             hookSpecificOutput: {
                 hookEventName: "PreToolUse",
+                permissionDecision: "deny",
+                permissionDecisionReason: ("BLOCKED before write: " + $c + " violation(s):\n" + $v + "\nFix the code before writing."),
                 additionalContext: ("BLOCKED before write: " + $c + " violation(s):\n" + $v + "\nFix the code before writing.")
             }
         }'

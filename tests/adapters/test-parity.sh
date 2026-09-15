@@ -54,6 +54,29 @@ print(json.dumps({"tool_name": "write_file", "args": {"path": sys.argv[1], "cont
     printf '%s|%s' "$out" "$rc"
 }
 
+# The Copilot adapter, on the documented PascalCase envelope (`create` for a
+# Write): stdout|rc, like the Hermes write gate.
+COPILOT_PRE="$ROOT_DIR/adapters/copilot/pre-tool-use.sh"
+COPILOT_POST="$ROOT_DIR/adapters/copilot/post-tool-use.sh"
+_copilot_pre() {
+    local out rc
+    out=$(python3 -c '
+import json, sys
+print(json.dumps({"hook_event_name": "PreToolUse", "session_id": "cp1", "timestamp": "2026-09-15T00:00:00Z", "cwd": sys.argv[3],
+                  "tool_name": "create", "tool_input": {"path": sys.argv[1], "file_text": sys.argv[2]}}))' \
+        "$1" "$2" "$WORK" | bash "$COPILOT_PRE" 2>/dev/null); rc=$?
+    printf '%s|%s' "$out" "$rc"
+}
+_copilot_post() {
+    local out rc
+    out=$(python3 -c '
+import json, sys
+print(json.dumps({"hook_event_name": "PostToolUse", "session_id": "cp1", "timestamp": "2026-09-15T00:00:00Z", "cwd": sys.argv[2],
+                  "tool_name": "create", "tool_input": {"path": sys.argv[1]}, "tool_result": {"result_type": "success", "text_result_for_llm": ""}}))' \
+        "$1" "$WORK" | bash "$COPILOT_POST" 2>/dev/null); rc=$?
+    printf '%s|%s' "$out" "$rc"
+}
+
 _ci_rules_for() {
     bash "$ROOT_DIR/ci/craftsman-ci.sh" --format json "$1" 2>/dev/null | python3 -c '
 import json, sys
@@ -78,6 +101,7 @@ import json, sys
 print(json.dumps({"tool_input": {"file_path": sys.argv[1], "content": sys.argv[2]}}))' \
     "$PHP_FILE" "$PHP_CONTENT" | bash "$ROOT_DIR/hooks/pre-write-check.sh" 2>&1) || RC=$?
 GATE_OUT=$(_write_gate "$PHP_FILE" "$PHP_CONTENT")
+COPILOT_OUT=$(_copilot_pre "$PHP_FILE" "$PHP_CONTENT")
 printf '%s' "$PHP_CONTENT" > "$PHP_FILE"
 CI_OUT=$(_ci_rules_for "src/Domain/User/User.php")
 HERMES_OUT=$(_hermes)
@@ -85,10 +109,11 @@ if [[ "$RC" -eq 2 ]] && printf '%s' "$HOOK_OUT" | grep -q "LAYER001" \
     && printf '%s' "$CI_OUT" | grep -q "^LAYER001 critical" \
     && printf '%s' "$HERMES_OUT" | grep -q '"decision"' \
     && printf '%s' "$HERMES_OUT" | grep -q "LAYER001" \
-    && [[ "${GATE_OUT##*|}" == "2" ]] && printf '%s' "${GATE_OUT%|*}" | grep -q "LAYER001"; then
-    log_pass "LAYER001 blocks identically in hooks, CI, Hermes and the Hermes write gate"
+    && [[ "${GATE_OUT##*|}" == "2" ]] && printf '%s' "${GATE_OUT%|*}" | grep -q "LAYER001" \
+    && [[ "${COPILOT_OUT##*|}" == "2" ]] && printf '%s' "${COPILOT_OUT%|*}" | grep -q '"deny"'; then
+    log_pass "LAYER001 blocks identically in hooks, CI, Hermes, the Hermes write gate and the Copilot adapter"
 else
-    log_fail "LAYER001 parity" "hook rc=$RC ci=[$CI_OUT] hermes=[$HERMES_OUT] gate=[$GATE_OUT]"
+    log_fail "LAYER001 parity" "hook rc=$RC ci=[$CI_OUT] hermes=[$HERMES_OUT] gate=[$GATE_OUT] copilot=[$COPILOT_OUT]"
 fi
 _clean
 
@@ -99,13 +124,15 @@ HOOK_OUT=$(printf '{"tool_input":{"file_path":"%s"}}' "$WORK/src/Bad.ts" \
     | bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1) || RC=$?
 CI_OUT=$(_ci_rules_for "src/Bad.ts")
 HERMES_OUT=$(_hermes)
+COPILOT_OUT=$(_copilot_post "$WORK/src/Bad.ts")
 if [[ "$RC" -eq 2 ]] && printf '%s' "$HOOK_OUT" | grep -q "TS001" \
     && printf '%s' "$CI_OUT" | grep -q "^TS001 critical" \
     && printf '%s' "$HERMES_OUT" | grep -q '"decision"' \
-    && printf '%s' "$HERMES_OUT" | grep -q "TS001"; then
-    log_pass "TS001 blocks identically in hooks, CI and Hermes"
+    && printf '%s' "$HERMES_OUT" | grep -q "TS001" \
+    && [[ "${COPILOT_OUT##*|}" == "2" ]] && printf '%s' "${COPILOT_OUT%|*}" | grep -q "TS001"; then
+    log_pass "TS001 blocks identically in hooks, CI, Hermes and the Copilot adapter"
 else
-    log_fail "TS001 parity" "hook rc=$RC ci=[$CI_OUT] hermes=[$HERMES_OUT]"
+    log_fail "TS001 parity" "hook rc=$RC ci=[$CI_OUT] hermes=[$HERMES_OUT] copilot=[$COPILOT_OUT]"
 fi
 _clean
 
@@ -140,13 +167,15 @@ HERMES_OUT=$(_hermes)
 mkdir -p "$WORK/relaxed/Domain"
 printf 'rules:\n  TS001: ignore\n  LAYER001: warn\n' > "$WORK/relaxed/.craft-rules.yml"
 GATE_OUT=$(_write_gate "$WORK/relaxed/Domain/Legacy.php" "$PHP_CONTENT")
+COPILOT_OUT=$(_copilot_post "$WORK/relaxed/Bad.ts")
 if [[ "$RC" -eq 0 ]] \
     && ! printf '%s' "$CI_OUT" | grep -q "^TS001" \
     && [[ -z "$HERMES_OUT" ]] \
-    && [[ "${GATE_OUT##*|}" == "0" && -z "${GATE_OUT%|*}" ]]; then
-    log_pass "a directory .craft-rules.yml relaxation holds in hooks, CI, Hermes and the Hermes write gate"
+    && [[ "${GATE_OUT##*|}" == "0" && -z "${GATE_OUT%|*}" ]] \
+    && [[ "${COPILOT_OUT##*|}" == "0" ]] && ! printf '%s' "${COPILOT_OUT%|*}" | grep -q "TS001"; then
+    log_pass "a directory .craft-rules.yml relaxation holds in hooks, CI, Hermes, the Hermes write gate and the Copilot adapter"
 else
-    log_fail "relaxation parity" "hook rc=$RC ci=[$CI_OUT] hermes=[$HERMES_OUT] gate=[$GATE_OUT]"
+    log_fail "relaxation parity" "hook rc=$RC ci=[$CI_OUT] hermes=[$HERMES_OUT] gate=[$GATE_OUT] copilot=[$COPILOT_OUT]"
 fi
 _clean
 
@@ -246,7 +275,7 @@ _clean
 UNCOVERED=""
 for dir in "$ROOT_DIR"/adapters/*/; do
     case "$(basename "$dir")" in
-        hermes) ;;
+        hermes|copilot) ;;
         *) UNCOVERED="${UNCOVERED}$(basename "$dir") " ;;
     esac
 done

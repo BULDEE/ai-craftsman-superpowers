@@ -1,0 +1,10 @@
+{
+  "hook_event_name": "PreToolUse",
+  "session_id": "copilot-doc-4",
+  "timestamp": "2026-09-15T00:00:00Z",
+  "cwd": "__WORKSPACE__",
+  "tool_name": "bash",
+  "tool_input": {
+    "command": "pytest -q"
+  }
+}

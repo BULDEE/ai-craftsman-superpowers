@@ -160,6 +160,70 @@ else
     log_fail "the count is about something" "locked=${expected_locked} total=${expected_total}"
 fi
 
+# The host row says what this host can observe, per capability, instead of
+# hiding it in one score (research CR-131, R11). The facts are the captured
+# ones: Codex sends no shell exit code and ignores `ask`.
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CRAFTSMAN_SESSION_HOST=codex hc_check_host
+CODEX_MSG="${_HC_MESSAGES[0]}"
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CRAFTSMAN_SESSION_HOST=claude-code hc_check_host
+CLAUDE_MSG="${_HC_MESSAGES[0]}"
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CRAFTSMAN_SESSION_HOST=mystery hc_check_host
+UNKNOWN_STATUS="${_HC_STATUSES[0]}"
+if [[ "$CODEX_MSG" == *"NOT observable"* && "$CODEX_MSG" == *"ask unsupported"* && "$CODEX_MSG" == *".agents/skills"* \
+    && "$CLAUDE_MSG" == *"observable"* && "$CLAUDE_MSG" != *"NOT observable"* && "$CLAUDE_MSG" == *".claude/skills"* \
+    && "$UNKNOWN_STATUS" == "warn" ]]; then
+    log_pass "hc_check_host: Codex and Claude Code rows state exit-code observability, ask support and the skills directory; an unknown host warns"
+else
+    log_fail "hc_check_host" "codex=[$CODEX_MSG] claude=[$CLAUDE_MSG] unknown=$UNKNOWN_STATUS"
+fi
+# Declared is not loaded: hooks/host-capabilities.json says which events each
+# host loads (Codex 0.154.0: not TaskCompleted, PostToolUseFailure, FileChanged,
+# from its own generated schema), and a handler on an event the host does not
+# load is named with the function it carries, never counted as active.
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CRAFTSMAN_SESSION_HOST=codex CLAUDE_PLUGIN_ROOT="$ROOT_DIR" hc_check_hooks_declared
+CODEX_HOOKS="${_HC_MESSAGES[0]}"; CODEX_HOOKS_STATUS="${_HC_STATUSES[0]}"
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CRAFTSMAN_SESSION_HOST=claude-code CLAUDE_PLUGIN_ROOT="$ROOT_DIR" hc_check_hooks_declared
+CLAUDE_HOOKS="${_HC_MESSAGES[0]}"; CLAUDE_HOOKS_STATUS="${_HC_STATUSES[0]}"
+DECLARED=$(jq '[.hooks[][] | .hooks[]] | length' "$ROOT_DIR/hooks/hooks.json")
+if [[ "$CODEX_HOOKS_STATUS" == "warn" && "$CODEX_HOOKS" == "${DECLARED} handlers declared on "* \
+    && "$CODEX_HOOKS" == *"NOT loaded by codex: FileChanged"* && "$CODEX_HOOKS" == *"PostToolUseFailure (failed tool tracking"* && "$CODEX_HOOKS" == *"TaskCompleted (evidence gate"* \
+    && "$CLAUDE_HOOKS_STATUS" == "ok" && "$CLAUDE_HOOKS" == *"every event is one claude-code loads"* ]]; then
+    log_pass "hc_check_hooks_declared: on Codex the three unloaded events are named with the function each loses; on Claude Code every event loads"
+else
+    log_fail "hc_check_hooks_declared" "codex=[$CODEX_HOOKS_STATUS $CODEX_HOOKS] claude=[$CLAUDE_HOOKS_STATUS $CLAUDE_HOOKS]"
+fi
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CRAFTSMAN_SESSION_HOST=mystery CLAUDE_PLUGIN_ROOT="$ROOT_DIR" hc_check_hooks_declared
+if [[ "${_HC_STATUSES[0]}" == "warn" && "${_HC_MESSAGES[0]}" == *"not recorded"* && "${_HC_MESSAGES[0]}" != *"every event"* ]]; then
+    log_pass "hc_check_hooks_declared: a host the matrix does not record warns; no evidence is never 'every event loads'"
+else
+    log_fail "hc_check_hooks_declared unknown host" "${_HC_STATUSES[0]} ${_HC_MESSAGES[0]}"
+fi
+# every declared event is accounted for on every host: loaded, or its lost function named
+UNACCOUNTED=$(python3 - "$ROOT_DIR" <<'PY'
+import json, sys
+root = sys.argv[1]
+declared = set(json.load(open(f"{root}/hooks/hooks.json"))["hooks"])
+caps = json.load(open(f"{root}/hooks/host-capabilities.json"))
+missing = []
+for host, spec in caps["hosts"].items():
+    for event in declared - set(spec["events_loaded"]):
+        if event not in caps["event_functions"]:
+            missing.append(f"{host}:{event}")
+print(" ".join(missing))
+PY
+)
+if [[ -z "$UNACCOUNTED" ]]; then
+    log_pass "host-capabilities.json accounts for every declared event on every host (loaded, or the lost function named)"
+else
+    log_fail "host-capabilities.json" "declared events with no loaded entry and no named function: $UNACCOUNTED"
+fi
+
 echo ""
 echo "Results: ${TESTS_PASSED} passed, ${TESTS_FAILED} failed"
 [[ $TESTS_FAILED -eq 0 ]] && exit 0 || exit 1

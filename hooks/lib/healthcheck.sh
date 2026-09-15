@@ -156,6 +156,73 @@ hc_check_session_bridge() {
     _hc_record "session-bridge" "ok" "$target"
 }
 
+# The host this session runs under, and what the plugin can observe there.
+# One number ("9/11") hid the loss of the main gate (research CR-131, R11);
+# this row says, per capability, whether it is measured on this host. The
+# facts are the captured ones (tests/fixtures/hosts/PROVENANCE.md): Codex
+# sends no exit code for a shell command and ignores the `ask` decision,
+# Claude Code sends both. `CRAFTSMAN_SESSION_HOST` is set by session-start.sh
+# from its payload; a skill running later reads the environment instead.
+# What the host can do is read from the matrix, never from a case per host:
+# the case here knew Claude Code and Codex, and a Grok session (captured
+# 2026-09-15) was reported "unknown host" while the same file already said
+# what Copilot could not do. A host absent from the matrix is unqualified and
+# said so; one present is described by what was measured for it.
+hc_check_host() {
+    local host="${CRAFTSMAN_SESSION_HOST:-}" capabilities="${CLAUDE_PLUGIN_ROOT:-$(pwd)}/hooks/host-capabilities.json" row
+    if [[ -z "$host" ]] && type host_detect >/dev/null 2>&1; then
+        host=$(host_detect "")
+    fi
+    row=$(jq -r --arg h "$host" '
+        .hosts[$h] // empty
+        | [ $h + " " + (.version // "?"),
+            (if .exit_code_observable then "test exit codes observable (verification loop live)" else "shell exit codes NOT observable (a test run grants and revokes nothing)" end),
+            (if .ask_supported then "PreToolUse ask honoured" else "PreToolUse ask unsupported (gate config denied instead)" end),
+            ("skills read from " + (.skills_dir // "?")) ]
+        | .[0] + ": " + (.[1:] | join(", "))' "$capabilities" 2>/dev/null)
+    if [[ -n "$row" ]]; then
+        _hc_record "host" "ok" "$row"
+    else
+        _hc_record "host" "warn" "${host:-unknown} host: capabilities not qualified in hooks/host-capabilities.json; gates run, ask is treated as unsupported"
+    fi
+}
+
+# Declared is not loaded, loaded is not triggered. hooks.json declares N
+# handlers on M events; which of those events the host loads is measured per
+# host in hooks/host-capabilities.json (Codex 0.154.0 loads 11 of the 12 kinds
+# this plugin declares on: not TaskCompleted, PostToolUseFailure or
+# FileChanged, audit CR-117 C10). A handler on an event the host does not load
+# is named here with the function it carries, so a declaration ignored never
+# counts as an active function. Triggered is this session's evidence only.
+hc_check_hooks_declared() {
+    local root="${CLAUDE_PLUGIN_ROOT:-$(pwd)}" manifest capabilities host declared events missing
+    manifest="$root/hooks/hooks.json"; capabilities="$root/hooks/host-capabilities.json"
+    [[ -f "$manifest" ]] || { _hc_record "hooks" "error" "hooks.json missing"; return; }
+    declared=$(jq '[.hooks[][] | .hooks[]] | length' "$manifest" 2>/dev/null || echo "?")
+    events=$(jq -r '.hooks | keys | join(",")' "$manifest" 2>/dev/null)
+    host="${CRAFTSMAN_SESSION_HOST:-}"
+    [[ -z "$host" ]] && type host_detect >/dev/null 2>&1 && host=$(host_detect "")
+    # No evidence is not "every event loads": an unknown host, or a host the
+    # matrix does not record, is said so (review of 5cc64f4, F2).
+    if [[ ! -f "$capabilities" ]] || ! jq -e --arg h "$host" '.hosts[$h]' "$capabilities" >/dev/null 2>&1; then
+        _hc_record "hooks" "warn" "${declared} handlers declared on ${events}; which of them ${host:-this host} loads is not recorded in hooks/host-capabilities.json, so none is counted as active here"
+        return
+    fi
+    missing=$(jq -r --arg h "$host" --slurpfile m "$manifest" '
+        .event_functions as $f
+        | (($m[0].hooks | keys) - .hosts[$h].events_loaded)
+        | map(. + " (" + ($f[.] // "function not named") + ")")
+        | join("; ")' "$capabilities" 2>/dev/null) || missing="__query_failed__"
+    if [[ "$missing" == "__query_failed__" ]]; then
+        _hc_record "hooks" "warn" "${declared} handlers declared; the capability query failed, loaded events unknown"
+        return
+    fi
+    if [[ -n "$missing" ]]; then
+        _hc_record "hooks" "warn" "${declared} handlers declared on ${events}; NOT loaded by ${host}: ${missing}. Trusted is the host's /hooks view, not measured here"
+    else
+        _hc_record "hooks" "ok" "${declared} handlers declared on ${events}; every event is one ${host:-this host} loads. Trusted is the host's /hooks view, not measured here"
+    fi
+}
 # --- Aggregate ---
 
 # Level 1.5 semantic validation (ADR-0019, amended): report which language
@@ -218,6 +285,8 @@ hc_run_all() {
 
     hc_check_system_deps
     hc_check_node
+    hc_check_host
+    hc_check_hooks_declared
     hc_check_config
     hc_check_packs
     hc_check_skills

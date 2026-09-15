@@ -28,8 +28,11 @@ _lang_registry_builder() {
     printf '%s' "$_LANG_REGISTRY_BUILDER"
 }
 
+# The same default the other data readers use (session-files.sh, metrics-db.sh):
+# this one said ~/.claude/craftsman, so a hook without CLAUDE_PLUGIN_DATA read a
+# registry nobody else wrote (independent verification, 2026-09-15).
 _lang_registry_cache_dir() {
-    local base="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/craftsman}"
+    local base="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
     mkdir -p "$base" 2>/dev/null || true
     printf '%s' "$base"
 }
@@ -47,6 +50,10 @@ _lang_registry_is_stale() {
     local cache="$1"
     shift
     [[ ! -f "$cache" ]] && return 0
+    # An empty cache is a compile that failed once and was kept: rebuilt, not
+    # trusted (independent verification, 2026-09-15: zero-line caches from a
+    # failed run disabled every pack validator for a month).
+    [[ ! -s "$cache" ]] && return 0
     local manifest
     for manifest in "$@"; do
         [[ -f "$manifest" && "$manifest" -nt "$cache" ]] && return 0
@@ -64,8 +71,14 @@ _lang_registry_build_cache() {
 
     if _lang_registry_is_stale "$cache" "$@"; then
         if command -v python3 >/dev/null 2>&1; then
-            python3 "$(_lang_registry_builder)" "$@" > "${cache}.tmp" 2>/dev/null
-            mv -f "${cache}.tmp" "$cache" 2>/dev/null || rm -f "${cache}.tmp"
+            # Only a compile that succeeded AND produced rows replaces the
+            # cache; a failure is said once and leaves the previous cache.
+            if python3 "$(_lang_registry_builder)" "$@" > "${cache}.tmp" 2>/dev/null && [[ -s "${cache}.tmp" ]]; then
+                mv -f "${cache}.tmp" "$cache" 2>/dev/null || rm -f "${cache}.tmp"
+            else
+                rm -f "${cache}.tmp"
+                echo "craftsman: the language registry could not be compiled from the pack manifests; the previous registry stays in use" >&2
+            fi
         else
             # No python3: an empty registry disables every pack validator, and
             # a silent pass is exactly the failure mode this file exists to

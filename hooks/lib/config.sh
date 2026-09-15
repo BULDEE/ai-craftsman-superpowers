@@ -48,6 +48,32 @@ config_global_dir() {
     printf '%s' "${CRAFTSMAN_GLOBAL_CONFIG_DIR-${HOME}/.claude}"
 }
 
+# The one global file, from the one resolver. Four readers spelled the path
+# out and so ignored CRAFTSMAN_GLOBAL_CONFIG_DIR: a gate that had cleared the
+# global layer still read trust_project_tools from it.
+config_global_file() {
+    local dir
+    dir=$(config_global_dir)
+    [[ -n "$dir" ]] && printf '%s/.craft-config.yml' "$dir"
+}
+
+# Are the four agent hooks (headless model calls) on? The plugin option is one
+# way to say no, and the only way a test exercised; a host without plugin
+# options (Codex, tests/fixtures/hosts/PROVENANCE.md) had none, so the machine
+# owner can also say `hooks: agent_hooks: false` in the global file. Global
+# only, like `hooks: disabled`: a repository may not decide whether the
+# machine spends model calls.
+config_agent_hooks_enabled() {
+    local option="${CLAUDE_PLUGIN_OPTION_AGENT_HOOKS:-${CLAUDE_PLUGIN_OPTION_agent_hooks:-}}"
+    [[ "$option" == "false" ]] && return 1
+    [[ -n "$option" ]] && return 0
+    local file value
+    file=$(config_global_file)
+    [[ -n "$file" && -f "$file" ]] || return 0
+    value=$(_config_parse_nested_yml_value "hooks" "agent_hooks" "$file")
+    [[ "$value" != "false" ]]
+}
+
 _config_resolve() {
     local key="$1"
     local default="$2"
@@ -194,8 +220,9 @@ config_packs_dir() {
 # other level (regex rules, layer rules, security rules, the ratchet) is ours
 # and keeps working untouched.
 config_trust_project_tools() {
-    local config_file="${HOME}/.claude/.craft-config.yml"
-    [[ -f "$config_file" ]] || return 1
+    local config_file
+    config_file=$(config_global_file)
+    [[ -n "$config_file" && -f "$config_file" ]] || return 1
     # Read in-shell. This was grep | head | awk | tr | tr: five processes to
     # answer one boolean, on a hook that runs on every write.
     #
@@ -233,8 +260,9 @@ config_trust_project_tools() {
 }
 
 config_external_packs() {
-    local config_file="${HOME}/.claude/.craft-config.yml"
-    [[ ! -f "$config_file" ]] && return
+    local config_file
+    config_file=$(config_global_file)
+    [[ -z "$config_file" || ! -f "$config_file" ]] && return
 
     # Matched in-shell, one process for the whole file.
     #
@@ -283,7 +311,7 @@ _config_parse_nested_yml_value() {
     awk -v section="$section" -v key="$key" '
         $0 ~ "^" section ":" { in_section = 1; next }
         /^[a-zA-Z]/ { in_section = 0 }
-        in_section && $1 == key ":" { gsub(/["'"'"']/, "", $2); print $2; exit }
+        in_section && $1 == key ":" { gsub(/["'"'"'\r]/, "", $2); print $2; exit }
     ' "$file" 2>/dev/null
 }
 
@@ -293,8 +321,10 @@ _config_resolve_nested() {
     if [[ -f "$PWD/.craft-config.yml" ]]; then
         value=$(_config_parse_nested_yml_value "$section" "$key" "$PWD/.craft-config.yml")
     fi
-    if [[ -z "$value" && -f "${HOME}/.claude/.craft-config.yml" ]]; then
-        value=$(_config_parse_nested_yml_value "$section" "$key" "${HOME}/.claude/.craft-config.yml")
+    local global_file
+    global_file=$(config_global_file)
+    if [[ -z "$value" && -n "$global_file" && -f "$global_file" ]]; then
+        value=$(_config_parse_nested_yml_value "$section" "$key" "$global_file")
     fi
     [[ -n "$value" ]] && echo "$value" || echo "$default"
 }
@@ -325,9 +355,10 @@ config_max_learned_skills() {
 # may not decide whether they run. Only the machine owner can, in
 # ~/.claude/.craft-config.yml or through CRAFTSMAN_DISABLED_HOOKS.
 config_hooks_disabled_csv() {
-    local raw=""
-    if [[ -f "${HOME}/.claude/.craft-config.yml" ]]; then
-        raw=$(_config_parse_nested_inline_list "hooks" "disabled" "${HOME}/.claude/.craft-config.yml")
+    local raw="" global_file
+    global_file=$(config_global_file)
+    if [[ -n "$global_file" && -f "$global_file" ]]; then
+        raw=$(_config_parse_nested_inline_list "hooks" "disabled" "$global_file")
     fi
     echo "$raw"
 }
@@ -339,7 +370,7 @@ _config_parse_nested_inline_list() {
         /^[a-zA-Z]/ { in_section = 0 }
         in_section && $1 == key ":" {
             sub(/^[^:]*:[[:space:]]*/, "")
-            gsub(/[\[\]"'"'"' ]/, "")
+            gsub(/[\[\]"'"'"' \r]/, "")
             print
             exit
         }

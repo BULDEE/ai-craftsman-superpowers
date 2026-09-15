@@ -730,11 +730,13 @@ else
     log_fail "Stop hook group" "expected final-review asyncRewake, no ddd-verifier"
 fi
 
-# Test: DDD verifier script has agent_hooks gate
-if grep -q 'CLAUDE_PLUGIN_OPTION_agent_hooks' "$ROOT_DIR/hooks/agent-ddd-verifier.sh" 2>/dev/null; then
-    log_pass "DDD verifier script contains agent_hooks gate"
+# Test: DDD verifier script has the agent_hooks gate, through the one resolver
+# (config_agent_hooks_enabled reads the exported option, then the global
+# file; tests/core/test-agent-hooks.sh proves the call is not made).
+if grep -q 'config_agent_hooks_enabled || exit 0' "$ROOT_DIR/hooks/agent-ddd-verifier.sh" 2>/dev/null; then
+    log_pass "DDD verifier script gates on config_agent_hooks_enabled"
 else
-    log_fail "DDD verifier gate" "missing CLAUDE_PLUGIN_OPTION_agent_hooks check"
+    log_fail "DDD verifier gate" "missing config_agent_hooks_enabled gate"
 fi
 
 # Test: Sentry context in Stop hook (moved from PostToolUse for latency reduction)
@@ -833,16 +835,22 @@ fi
 echo ""
 echo "=== New Hook Events Tests ==="
 
-# Test: PostToolUseFailure event wired with async
+# Test: PostToolUseFailure event wired with async. Two handlers: the failure
+# tracker, and the test verifier, because a Bash command that exits non-zero
+# is this event on Claude Code and never a PostToolUse (the fixture
+# post-tool-use-failure.bash.exit1-tests-failed.json); the verifier's
+# regression path needs asyncRewake to wake the session from here.
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 hooks = d['hooks']['PostToolUseFailure'][0]['hooks']
-assert len(hooks) == 1
-assert hooks[0].get('async') == True, 'Expected async: true'
+assert len(hooks) == 2
+assert all(h.get('async') == True for h in hooks), 'Expected async: true'
 assert 'tool-failure-tracker.sh' in hooks[0]['command']
+assert 'post-bash-test-verify.sh' in hooks[1]['command']
+assert hooks[1].get('asyncRewake') == True, 'the regression exit 2 must rewake'
 " 2>/dev/null; then
-    log_pass "PostToolUseFailure: async tool-failure-tracker hook"
+    log_pass "PostToolUseFailure: async tool-failure-tracker and post-bash-test-verify (asyncRewake) hooks"
 else
     log_fail "PostToolUseFailure hook" "missing or invalid"
 fi

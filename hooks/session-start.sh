@@ -40,8 +40,11 @@ _init_packs() {
     fi
 }
 
-# Consume stdin (may be empty or JSON)
-cat > /dev/null 2>&1 || true
+# The payload names the session; this hook's files are named after it (see
+# lib/session-files.sh: the environment may carry another session's id).
+INPUT=$(cat 2>/dev/null) || INPUT=""
+source "${SCRIPT_DIR}/lib/session-files.sh"
+session_files_bind "$INPUT"
 
 # Python3 availability check - skip python-dependent features if missing
 HAS_PYTHON3=true
@@ -57,21 +60,28 @@ fi
 # can find the same state file that hooks use.
 # The bridge file is intentionally placed outside the plugin data directory
 # so it is independent of the plugin slug and survives renames.
+# The bridge is Claude Code's: its skills run in the Bash tool and read it.
+# Another host starting later must not repoint it at its own data directory,
+# or a Claude skill's set-verified lands where that Claude session's hooks
+# never look (review of 421ca76, F6).
+source "${SCRIPT_DIR}/lib/host.sh"
+_session_host=$(host_detect "$INPUT")
+export CRAFTSMAN_SESSION_HOST="$_session_host"
 SESSION_STATE_PATH="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
-printf '%s' "$SESSION_STATE_PATH" > "${HOME}/.claude/craftsman-session-state-path" 2>/dev/null || true
+_writes_claude_bridge() { [[ "$_session_host" != "codex" ]]; }
+_writes_claude_bridge && { printf '%s' "$SESSION_STATE_PATH" > "${HOME}/.claude/craftsman-session-state-path" 2>/dev/null || true; }
 
 # Same bridge for the metrics database. Without it the reporting skills fall
 # back to the plugin-slug-less default and read a database no hook has written
 # since the slug changed: /craftsman:metrics reported 114 violations while the
 # live database held 14222, and concluded the hooks had stopped writing.
 METRICS_DB_PATH="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db"
-printf '%s' "$METRICS_DB_PATH" > "${HOME}/.claude/craftsman-metrics-db-path" 2>/dev/null || true
+_writes_claude_bridge && { printf '%s' "$METRICS_DB_PATH" > "${HOME}/.claude/craftsman-metrics-db-path" 2>/dev/null || true; }
 
 # Record session start epoch. SessionEnd input has no duration field
 # (only session_id/transcript_path/cwd/reason), so session-metrics.sh
 # derives duration and its violation-count window from this marker.
 _CRAFTSMAN_DATA_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
-source "${SCRIPT_DIR}/lib/session-files.sh"
 printf '%s' "$(date +%s)" > "$(session_file session-start-ts)" 2>/dev/null || true
 # Sessions that ended without a SessionEnd (a crash, a kill) leave their files
 # behind; a week later nobody will resume them.

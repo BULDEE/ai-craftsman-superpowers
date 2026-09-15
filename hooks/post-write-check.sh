@@ -198,9 +198,75 @@ trap 'metrics_violations_queue_flush 2>/dev/null' EXIT
 # Init pack loader (discovers and sources pack validators)
 pack_loader_init
 
-# Read tool input from stdin (JSON from Claude Code)
+# Read tool input from stdin (JSON from the host)
 INPUT=$(cat)
+session_files_bind "$INPUT"
+SESSION_STATE=$(session_file session-state.json)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
+
+# A Codex apply_patch names its files inside `tool_input.command`, any number
+# of them, and has no `file_path`; reading that field alone validated nothing
+# after a patch landed (audit CR-117, C1). The files are on disk by now, so
+# each one is judged as the Write it amounts to: this script re-runs itself
+# once per written file with the same payload and the file named, and the
+# verdict is the strictest child's. The per-file logic below stays the one
+# path, and the metrics rows carry the same session and tool_use ids.
+if [[ -z "$FILE_PATH" && "$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)" == "apply_patch" ]]; then
+    LISTING=$(printf '%s' "$INPUT" | python3 "${SCRIPT_DIR}/lib/write_mirror.py" --list 2>/dev/null); LISTING_RC=$?
+    if [[ "$LISTING_RC" -ne 0 || "$LISTING" == UNREADABLE* ]]; then
+        # The write has landed and cannot be undone here; what can be said is
+        # that it was not validated, loudly (review F6).
+        echo "🚫 AI Craftsman could not read the patch that just landed (${LISTING#UNREADABLE	}); its files were NOT validated. Run the validation on them explicitly." >&2
+        exit 2
+    fi
+    PATCH_FILES=$(printf '%s' "$LISTING" | awk -F'\t' '$1 != "delete" {print (NF >= 3 ? $3 : $2)}')
+    [[ -z "$PATCH_FILES" ]] && exit 0
+    CHILD_RC=0
+    CHILD_OUT=""
+    while IFS= read -r written; do
+        [[ -z "$written" || ! -f "$written" ]] && continue
+        rc=0
+        out=$(printf '%s' "$INPUT" | jq --arg fp "$written" '.tool_name = "Write" | .tool_input = {file_path: $fp}' \
+            | bash "$0") || rc=$?
+        # 2 is a verdict; any other failure is a child that could not judge,
+        # and no verdict is not a clean verdict (review F6).
+        if [[ "$rc" -ne 0 && "$rc" -ne 2 ]]; then
+            echo "🚫 AI Craftsman could not validate ${written} after the patch landed (exit ${rc})." >&2
+            CHILD_RC=2
+        fi
+        [[ "$rc" -eq 2 ]] && CHILD_RC=2
+        [[ -n "$out" ]] && CHILD_OUT="${CHILD_OUT}${out}"$'\n'
+    done <<< "$PATCH_FILES"
+    if [[ "$CHILD_RC" -eq 2 ]]; then
+        exit 2
+    fi
+    # One JSON object for the host: the children's messages, joined. The
+    # children print pretty JSON, so the stream is decoded object by object,
+    # not line by line (review F7).
+    [[ -n "$CHILD_OUT" ]] && printf '%s' "$CHILD_OUT" | python3 -c '
+import json, sys
+text = sys.stdin.read()
+decoder = json.JSONDecoder()
+bodies, at = [], 0
+while at < len(text):
+    while at < len(text) and text[at].isspace():
+        at += 1
+    if at >= len(text):
+        break
+    try:
+        obj, end = decoder.raw_decode(text, at)
+    except ValueError:
+        break
+    at = end
+    body = (obj.get("hookSpecificOutput") or {}).get("additionalContext") or obj.get("systemMessage")
+    if body:
+        bodies.append(body)
+if bodies:
+    text = "\n".join(bodies)
+    print(json.dumps({"systemMessage": text, "hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": text}}))
+'
+    exit 0
+fi
 
 # Refuse the characters that are dangerous where the path is interpolated,
 # rather than allow-listing an alphabet. The allowlist excluded [ ] ( ) + , and
@@ -217,11 +283,12 @@ fi
 # Exit silently if no file path or file doesn't exist
 [[ -z "$FILE_PATH" || ! -f "$FILE_PATH" ]] && exit 0
 
-# Write/Edit exposure counter: one line per validated write. Read by
-# session-metrics.sh at SessionEnd into sessions.writes_count (denominator
-# for violations-per-write benchmarks). Append is atomic enough for hook
-# concurrency; no locking needed.
-echo "1" >> "$(session_file session-writes)" 2>/dev/null || true
+# Write/Edit exposure log: one line per validated write, the path written.
+# session-metrics.sh counts the lines at SessionEnd into sessions.writes_count
+# and task-completed-verify.sh counts them as evidence of work; the Stop-time
+# Sentry hook reads the paths, since a Stop payload names no file (audit
+# CR-117, C11). Append is atomic enough for hook concurrency; no locking.
+printf '%s\n' "$FILE_PATH" >> "$(session_file session-writes)" 2>/dev/null || true
 
 # Get file extension
 EXT="${FILE_PATH##*.}"

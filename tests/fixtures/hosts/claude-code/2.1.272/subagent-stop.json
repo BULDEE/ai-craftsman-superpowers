@@ -1,0 +1,15 @@
+{
+  "session_id": "e5f8d0cc-9788-4683-b0e1-8666466192f4",
+  "transcript_path": "__HOME__/.claude/projects/-private-tmp-claude-501--Users-woprrr-Dev-claude-ai-craftsman-superpowers-b2a2ee5c-aa20-40c5-9619-3de33b67a297-scratchpad-claude-capture3-proj/e5f8d0cc-9788-4683-b0e1-8666466192f4.jsonl",
+  "cwd": "__WORKSPACE__",
+  "prompt_id": "811b7d92-20b5-4187-a4b1-fe9fd074dfe1",
+  "permission_mode": "bypassPermissions",
+  "agent_id": "a7225b7489b139727",
+  "agent_type": "general-purpose",
+  "hook_event_name": "SubagentStop",
+  "stop_hook_active": false,
+  "agent_transcript_path": "__HOME__/.claude/projects/-private-tmp-claude-501--Users-woprrr-Dev-claude-ai-craftsman-superpowers-b2a2ee5c-aa20-40c5-9619-3de33b67a297-scratchpad-claude-capture3-proj/e5f8d0cc-9788-4683-b0e1-8666466192f4/subagents/agent-a7225b7489b139727.jsonl",
+  "last_assistant_message": "Done.",
+  "background_tasks": [],
+  "session_crons": []
+}

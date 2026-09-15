@@ -1,0 +1,15 @@
+{
+  "session_id": "01a0a47a-55c7-7243-9eee-16b3154dc245",
+  "turn_id": "01a0a47a-568a-7943-9bb7-1ff11778599a",
+  "transcript_path": null,
+  "cwd": "__WORKSPACE__",
+  "hook_event_name": "PostToolUse",
+  "model": "gpt-6-astra",
+  "permission_mode": "default",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "false"
+  },
+  "tool_response": "",
+  "tool_use_id": "exec-6a860e6e-0ec0-44d1-82ac-f3ceadbc56cb"
+}

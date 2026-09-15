@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# =============================================================================
+# craftsman-context - collect a review's live context, and say what is missing
+#
+# Usage: craftsman-context review            (from the project directory)
+#
+# The challenge skill used to inject this context through Claude Code's
+# `!`command`` frontmatter extension. On any other host those expressions stay
+# literal text, and the skill then reasoned about a diff, a codemap and a
+# history it never received (audit CR-117, C7). This command collects the same
+# sources explicitly, bounded, and marks each one `available`, `empty`,
+# `missing` or `failed` with the revision it describes, so a review says what
+# it did not see instead of assuming it saw everything.
+#
+# Helpers are resolved from THIS installation (the directory above bin/), never
+# from ~/.claude: the wrapper written there belongs to whichever host started
+# last. Invokable as a bare command in the Claude Code Bash tool (the plugin's
+# bin/ is on PATH there); elsewhere, by path.
+# =============================================================================
+set -uo pipefail
+
+PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+MODE="${1:-review}"
+[[ "$MODE" == "review" ]] || { echo "Usage: craftsman-context review" >&2; exit 2; }
+
+_section() { # <title> <status> [detail]
+    printf '\n### %s [%s]%s\n' "$1" "$2" "${3:+: $3}"
+}
+
+_git_ok() { git rev-parse --git-dir >/dev/null 2>&1; }
+
+_status_of() { # <output> <rc> -> available|empty|failed
+    if [[ "$2" -ne 0 ]]; then echo failed
+    elif [[ -z "$1" ]]; then echo empty
+    else echo available; fi
+}
+
+REVISION=$(_git_ok && git rev-parse --short HEAD 2>/dev/null || echo "no-git")
+DIRTY=""
+_git_ok && [[ -n "$(git status --porcelain 2>/dev/null)" ]] && DIRTY=" (working tree dirty)"
+printf '## Live Context (collected %s, revision %s%s, cwd %s)\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$REVISION" "$DIRTY" "$PWD"
+
+# --- codemap: this installation's helper, cached per project -----------------
+# The data directory: the host's variable in a hook, the Claude Code bridge
+# file for a skill in its Bash tool (where no variable is set), else the default.
+DATA_DIR="${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-}}"
+if [[ -z "$DATA_DIR" && -f "${HOME}/.claude/craftsman-metrics-db-path" ]]; then
+    DATA_DIR=$(dirname "$(cat "${HOME}/.claude/craftsman-metrics-db-path")")
+fi
+DATA_DIR="${DATA_DIR:-${HOME}/.claude/plugins/data/craftsman}"
+if [[ -f "$PLUGIN_ROOT/hooks/lib/codemap.py" ]]; then
+    RC=0
+    # awk drains its input where head would close the pipe early, and a
+    # producer killed by SIGPIPE read as "failed" under pipefail (review, F3).
+    OUT=$(python3 "$PLUGIN_ROOT/hooks/lib/codemap.py" "$PWD" 2>/dev/null | awk 'NR <= 40') || RC=$?
+    _section "Codemap" "$(_status_of "$OUT" "$RC")" "$PLUGIN_ROOT/hooks/lib/codemap.py"
+    [[ -n "$OUT" ]] && printf '%s\n' "$OUT"
+else
+    _section "Codemap" "missing" "no codemap.py under $PLUGIN_ROOT/hooks/lib"
+fi
+
+# --- git: diff, hunks, history ----------------------------------------------
+if _git_ok; then
+    RC=0; OUT=$(git diff HEAD --stat 2>/dev/null | tail -30) || RC=$?
+    _section "Working tree diff (stat)" "$(_status_of "$OUT" "$RC")" "against $REVISION"
+    [[ -n "$OUT" ]] && printf '%s\n' "$OUT"
+    RC=0; OUT=$(git diff HEAD 2>/dev/null | awk 'NR <= 400') || RC=$?
+    _section "Changed hunks" "$(_status_of "$OUT" "$RC")" "first 400 lines"
+    [[ -n "$OUT" ]] && printf '%s\n' "$OUT"
+    RC=0; OUT=$(git log --oneline -10 2>/dev/null) || RC=$?
+    _section "Recent commits" "$(_status_of "$OUT" "$RC")" "last 10"
+    [[ -n "$OUT" ]] && printf '%s\n' "$OUT"
+else
+    _section "Working tree diff (stat)" "missing" "not a git repository"
+    _section "Changed hunks" "missing" "not a git repository"
+    _section "Recent commits" "missing" "not a git repository"
+fi
+
+# --- metrics: the 7-day violation history ------------------------------------
+DB="$DATA_DIR/metrics.db"
+if [[ -f "$DB" ]] && command -v sqlite3 >/dev/null 2>&1; then
+    RC=0
+    OUT=$(sqlite3 "$DB" "SELECT rule, COUNT(*) FROM violations WHERE timestamp > datetime('now', '-7 days') GROUP BY rule ORDER BY 2 DESC LIMIT 5;" 2>/dev/null) || RC=$?
+    _section "Top violations (7 days)" "$(_status_of "$OUT" "$RC")" "$DB"
+    [[ -n "$OUT" ]] && printf '%s\n' "$OUT"
+elif [[ -f "$DB" ]]; then
+    _section "Top violations (7 days)" "failed" "sqlite3 not installed"
+else
+    _section "Top violations (7 days)" "missing" "no metrics database at $DB"
+fi
+exit 0

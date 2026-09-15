@@ -1,0 +1,12 @@
+{
+  "session_id": "27215959-64e3-4f49-a36b-90d9789338fa",
+  "transcript_path": "__HOME__/.claude/projects/-private-tmp-claude-501--Users-woprrr-Dev-claude-ai-craftsman-superpowers-b2a2ee5c-aa20-40c5-9619-3de33b67a297-scratchpad-claude-capture-proj/27215959-64e3-4f49-a36b-90d9789338fa.jsonl",
+  "cwd": "__WORKSPACE__",
+  "prompt_id": "e4125674-b484-4d15-ada2-31c987f2c15c",
+  "permission_mode": "bypassPermissions",
+  "hook_event_name": "Stop",
+  "stop_hook_active": false,
+  "last_assistant_message": "All steps executed:\n1. ✓ Order.php created (non-final, 5 lines, strict types)\n2. ✓ Existing.php edited (ping() method added)\n3. ✓ printf command ran, exit code 3\n4. ✓ python3 command ran, output \"2 passed\"\n5. ✓ sleep 8 background task completed, output \"slow-done\"",
+  "background_tasks": [],
+  "session_crons": []
+}

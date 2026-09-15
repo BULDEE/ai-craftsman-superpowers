@@ -11,14 +11,18 @@ source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
 FAKE_HOME="/tmp/craftsman-verify-loop-$$"
 mkdir -p "$FAKE_HOME/.claude"
-FAKE_STATE="$FAKE_HOME/state.json"
-printf '%s' "$FAKE_STATE" > "$FAKE_HOME/.claude/craftsman-session-state-path"
 
 # The write count is the session-writes file post-write-check.sh appends to,
 # never a key of the state JSON: the hook used to read a `writes_count` key no
 # hook ever wrote, so the gate saw zero writes and let every task through.
 export CLAUDE_PLUGIN_DATA="$FAKE_HOME/data"
 mkdir -p "$CLAUDE_PLUGIN_DATA"
+# A hook names its state file after its payload's session_id under
+# CLAUDE_PLUGIN_DATA (lib/session-files.sh); the ~/.claude bridge is read by
+# skills in the Bash tool only. The payloads here carry no session_id, so the
+# shared file is the one.
+FAKE_STATE="$CLAUDE_PLUGIN_DATA/session-state.json"
+printf '%s' "$FAKE_STATE" > "$FAKE_HOME/.claude/craftsman-session-state-path"
 WRITES_FILE="$CLAUDE_PLUGIN_DATA/session-writes"
 
 set_writes() {
@@ -102,9 +106,20 @@ echo "=== Test-Failure Revocation (post-bash-test-verify) ==="
 DATA_DIR="$FAKE_HOME/plugin-data"
 mkdir -p "$DATA_DIR"
 
+# The shapes Claude Code sends (tests/fixtures/hosts/claude-code): a passing
+# run is a PostToolUse whose tool_response has stdout and no exit code; a
+# failing run is a PostToolUseFailure whose `error` starts with "Exit code N".
+# The suite used to send `tool_result.exit_code`, a field no host sends, and
+# so validated the reader that turned every real passing run into a
+# regression (audit CR-117, C2).
 run_verify_hook() {
-    local exit_code="$1"
-    echo "{\"tool_input\":{\"command\":\"npm test\"},\"tool_result\":{\"exit_code\":$exit_code}}" | \
+    local exit_code="$1" payload
+    if [[ "$exit_code" == "0" ]]; then
+        payload='{"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"npm test"},"tool_response":{"stdout":"12 passing","stderr":"","interrupted":false,"isImage":false}}'
+    else
+        payload="{\"hook_event_name\":\"PostToolUseFailure\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"npm test\"},\"error\":\"Exit code $exit_code\\n1 failing\",\"is_interrupt\":false}"
+    fi
+    echo "$payload" | \
         HOME="$FAKE_HOME" CLAUDE_PLUGIN_DATA="$DATA_DIR" \
         bash "$ROOT_DIR/hooks/post-bash-test-verify.sh" 2>&1
 }
