@@ -4,7 +4,7 @@
   "cwd": "__WORKSPACE__",
   "workspaceRoot": "__WORKSPACE__/",
   "timestamp": "2026-09-15T19:35:05.346798+00:00",
-  "transcriptPath": "/Users/__USER__/.grok/sessions/__WORKSPACE_ENCODED__/01a0a690-b3fd-7863-a3fa-772ebc20c6fb/updates.jsonl",
+  "transcriptPath": "__HOME__/.grok/sessions/__WORKSPACE_ENCODED__/01a0a690-b3fd-7863-a3fa-772ebc20c6fb/updates.jsonl",
   "permissionMode": "bypassPermissions",
   "toolName": "run_terminal_command",
   "toolUseId": "call-09a1b3a4-613f-41a6-9082-14f926387ca2-1",
@@ -93,7 +93,7 @@
     "timed_out": false,
     "description": "Print pytest version via python3",
     "current_dir": "__WORKSPACE__",
-    "output_file": "/Users/__USER__/.grok/sessions/__WORKSPACE_ENCODED__/01a0a690-b3fd-7863-a3fa-772ebc20c6fb/terminal/call-09a1b3a4-613f-41a6-9082-14f926387ca2-1.log",
+    "output_file": "__HOME__/.grok/sessions/__WORKSPACE_ENCODED__/01a0a690-b3fd-7863-a3fa-772ebc20c6fb/terminal/call-09a1b3a4-613f-41a6-9082-14f926387ca2-1.log",
     "total_bytes": 69
   },
   "toolInputTruncated": false,
@@ -102,7 +102,7 @@
   "isBackgrounded": false,
   "hook_event_name": "PostToolUse",
   "session_id": "01a0a690-b3fd-7863-a3fa-772ebc20c6fb",
-  "transcript_path": "/Users/__USER__/.grok/sessions/__WORKSPACE_ENCODED__/01a0a690-b3fd-7863-a3fa-772ebc20c6fb/updates.jsonl",
+  "transcript_path": "__HOME__/.grok/sessions/__WORKSPACE_ENCODED__/01a0a690-b3fd-7863-a3fa-772ebc20c6fb/updates.jsonl",
   "permission_mode": "bypassPermissions",
   "tool_name": "run_terminal_command",
   "tool_input": {
@@ -190,7 +190,7 @@
     "timed_out": false,
     "description": "Print pytest version via python3",
     "current_dir": "__WORKSPACE__",
-    "output_file": "/Users/__USER__/.grok/sessions/__WORKSPACE_ENCODED__/01a0a690-b3fd-7863-a3fa-772ebc20c6fb/terminal/call-09a1b3a4-613f-41a6-9082-14f926387ca2-1.log",
+    "output_file": "__HOME__/.grok/sessions/__WORKSPACE_ENCODED__/01a0a690-b3fd-7863-a3fa-772ebc20c6fb/terminal/call-09a1b3a4-613f-41a6-9082-14f926387ca2-1.log",
     "total_bytes": 69
   },
   "tool_use_id": "call-09a1b3a4-613f-41a6-9082-14f926387ca2-1",

@@ -27,8 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   documented contract, surfaces still to qualify; a fresh install from the
   built archive is tested; every handler carries a `statusMessage`.
   Fixtures under `tests/fixtures/hosts/` are captured from the real CLIs with
-  their provenance; `docs/reference/interop-2026-09-15-compat.md` says what
-  is proven, by which instrument, on which version.
+  their provenance (`tests/fixtures/hosts/PROVENANCE.md`), which also records
+  what each host was seen NOT to do.
 
 - Grok 1.0.30 as a host, measured (audit of 2026-09-15): the write gates
   judge its `write` and `search_replace` tools (they exited 0 in silence on
@@ -42,9 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`WRITE_TOOL_KINDS`), and the pre-write gate no longer branches on a tool
   name. What Grok does NOT do is recorded too: it discovers a plugin's
   `hooks/hooks.json` and loads none of its handlers (headless, project plugin
-  enabled; `docs/reference/interop-2026-09-15-evidence/grok-plugin-hooks-1.0.30.md`),
-  so on Grok the engine runs only from a project or global hooks file, and
-  "compatible Grok" is not claimed.
+  enabled; `tests/fixtures/hosts/PROVENANCE.md`), so on Grok the engine runs
+  only from a project or global hooks file, and "compatible Grok" is not
+  claimed.
 
 - Hermes: a `git push` between two conclusions waits for the conclusion
   gate. `adapters/hermes/pre-tool-call.sh` now reads `terminal` and refuses a

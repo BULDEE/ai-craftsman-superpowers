@@ -8,7 +8,7 @@
 # Codex transport is `codex exec` in a read-only ephemeral session, and every
 # run row names the backend that answered. The CLIs here are fakes on PATH
 # that record how they were called; the real consumer is exercised separately
-# (docs/reference/interop-2026-09-15-evidence).
+# (review of lot 4, 2026-09-15).
 # =============================================================================
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

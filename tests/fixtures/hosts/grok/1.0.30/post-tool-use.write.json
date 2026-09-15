@@ -4,7 +4,7 @@
   "cwd": "__WORKSPACE__",
   "workspaceRoot": "__WORKSPACE__/",
   "timestamp": "2026-09-15T18:47:53.464313+00:00",
-  "transcriptPath": "/Users/__USER__/.grok/sessions/__WORKSPACE_ENCODED__/01a0a665-8855-7300-9fdf-ffa228ea318d/updates.jsonl",
+  "transcriptPath": "__HOME__/.grok/sessions/__WORKSPACE_ENCODED__/01a0a665-8855-7300-9fdf-ffa228ea318d/updates.jsonl",
   "permissionMode": "bypassPermissions",
   "toolName": "write",
   "toolUseId": "call-5eee357a-32a4-4dfd-adf3-e49ef91b7fff-0",
@@ -41,7 +41,7 @@
   "isBackgrounded": false,
   "hook_event_name": "PostToolUse",
   "session_id": "01a0a665-8855-7300-9fdf-ffa228ea318d",
-  "transcript_path": "/Users/__USER__/.grok/sessions/__WORKSPACE_ENCODED__/01a0a665-8855-7300-9fdf-ffa228ea318d/updates.jsonl",
+  "transcript_path": "__HOME__/.grok/sessions/__WORKSPACE_ENCODED__/01a0a665-8855-7300-9fdf-ffa228ea318d/updates.jsonl",
   "permission_mode": "bypassPermissions",
   "tool_name": "write",
   "tool_input": {

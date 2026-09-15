@@ -15,7 +15,7 @@ outside the repository; the files here are the same objects with two
 redactions, applied uniformly:
 
 - the capture workspace path becomes `__WORKSPACE__`
-- any `/Users/<name>` becomes `/Users/__USER__`
+- any `/Users/<name>` becomes `__HOME__`
 
 Nothing else is edited. `hook-env.*.json` lists variable NAMES only.
 
@@ -154,8 +154,17 @@ Nothing else is edited. `hook-env.*.json` lists variable NAMES only.
     `~/.claude/settings.json` handlers, the project `.grok/hooks` handlers
     once trusted. Not a single handler from any Claude plugin, craftsman
     included, although `grok inspect` lists `hooks/hooks.json` of six plugins
-    as `file plugin: <name>`. Not trusted, project hooks are silently skipped
-    (run 5: `search_replace` landed, no project row).
+    as `file plugin: <name>`. Same with this branch exposed as a PROJECT
+    plugin (`.grok/plugins/craftsman`, `grok inspect`: "craftsman (project,
+    enabled) 22 skills, 1 agents, hooks"): a `write` of an invalid Domain
+    class landed, and the `--debug` log read `plugin discovered
+    name=craftsman scope=project ... has_hooks=true`, then `hooks: discovery
+    complete total_hooks=0` on the plugin layer and `loaded hooks
+    hook_count=10` (6 global, 4 project). A one-hook control plugin could not
+    be validated: a new project plugin is auto-added to the disabled list and
+    `grok plugin enable` does not know project plugins. Headless `-p` only.
+    Not trusted, project hooks are silently skipped (run 5: `search_replace`
+    landed, no project row).
   - `SessionStart` carries `source: "new"` and no transcript path.
   - Hook environment (its hooks guide, 1.0.30): `GROK_HOOK_EVENT`,
     `GROK_HOOK_NAME`, `GROK_SESSION_ID`, `GROK_WORKSPACE_ROOT`; plugin hooks
