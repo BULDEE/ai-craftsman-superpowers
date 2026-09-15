@@ -11,12 +11,13 @@ The plugin uses Claude Code hooks to automatically enforce code quality rules. H
 | Event | Hook | Purpose |
 |-------|------|---------|
 | SessionStart | `session-start.sh` | Initialization, config loading, first-run detection |
-| PreToolUse | `config-protection.sh` | Refuse writes that would tamper with plugin configuration |
-| PreToolUse | `pre-write-check.sh` | Judge the would-be file **before** it lands, through the same pack validators post-write runs, on a mirror of the workspace |
+| PreToolUse | `config-protection.sh` | Refuse writes that would tamper with plugin configuration; reads a Write/Edit `file_path` or every file a Codex `apply_patch` names |
+| PreToolUse | `pre-write-check.sh` | Judge the would-be file **before** it lands, through the same pack validators post-write runs, on a mirror of the workspace; a multi-file patch is judged file by file and refused as a whole |
 | PreToolUse | `pre-push-verify.sh` | Validate git push commands for safety |
-| PostToolUse | `post-write-check.sh` | Validate file **after** write (all rules) |
-| PostToolUse | `post-bash-test-verify.sh` | Read recorded test runs; a failing run revokes verification evidence |
+| PostToolUse | `post-write-check.sh` | Validate file **after** write (all rules); one run per file for a Codex `apply_patch` |
+| PostToolUse | `post-bash-test-verify.sh` | A passing test run (Bash, or the TaskOutput that ends a background run) grants verification evidence; the result is decoded per host by `lib/tool_result.py`, and a host whose event carries no exit code (Codex) grants and revokes nothing. A background run the model never polls with TaskOutput fires no hook event and stays pending |
 | PostToolUseFailure | `tool-failure-tracker.sh` | Record failed tool calls for correction learning |
+| PostToolUseFailure | `post-bash-test-verify.sh` | A failing test run is this event on Claude Code (`error: "Exit code N"`); it revokes the evidence and, after a green run, wakes the session |
 | TaskCompleted | `task-completed-verify.sh` | Evidence gate: block a task from being marked complete without verification ([ADR-0023](../adr/0023-deterministic-verification-loop.md)) |
 | UserPromptSubmit | `bias-detector.sh` | Detect cognitive biases in prompts |
 | FileChanged | `file-changed.sh` | Track file modifications for correction learning |

@@ -226,4 +226,92 @@ else
     log_fail "captured patch listing" "$(printf '%s' "$R" | tr '\n\t' ' >' | cut -c1-200)"
 fi
 
+# =============================================================================
+# CR-119: a test run is what the host said about it, not a field nobody sends
+# =============================================================================
+echo ""
+echo "--- test results decoded per host ---"
+FAKE_HOME="$WORK/home"; mkdir -p "$FAKE_HOME"   # no bridge file: state lives under CLAUDE_PLUGIN_DATA
+STATE="$CLAUDE_PLUGIN_DATA/session-state.json"
+_verify() { # payload -> rc ; stderr kept in VERIFY_ERR
+    local rc=0
+    VERIFY_ERR=$(printf '%s' "$1" | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/post-bash-test-verify.sh" 2>&1 >/dev/null) || rc=$?
+    return $rc
+}
+_flag() { python3 "$ROOT_DIR/hooks/lib/session_state.py" check-flag "$STATE" verified; }
+_as_test() { host_fixture_with "$1" "$2" "$3" "$WORK" "d['tool_input']['command'] = 'pytest -q'${4:-}"; }
+
+# control: a passing run on Claude Code grants the evidence
+echo '{"verified": false}' > "$STATE"
+_verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.python-tests-passed)"; RC=$?
+if [[ "$RC" -eq 0 && "$(_flag)" == "true" ]]; then
+    log_pass "control: a Claude Code PostToolUse for a passing test command sets verified"
+else
+    log_fail "control: passing run sets verified" "rc=$RC verified=$(_flag) err=$VERIFY_ERR"
+fi
+
+# a failing run is a PostToolUseFailure: revoked, and a regression wakes the session
+_verify "$(_as_test claude-code 2.1.272 post-tool-use-failure.bash.exit1-tests-failed)"; RC=$?
+if [[ "$RC" -eq 2 && "$(_flag)" == "false" && "$VERIFY_ERR" == *REGRESSED* ]]; then
+    log_pass "a Claude Code PostToolUseFailure (Exit code 1) after green revokes verified and reports the regression"
+else
+    log_fail "failure revokes" "rc=$RC verified=$(_flag) err=$VERIFY_ERR"
+fi
+
+# C2 as reproduced by the audit: a passing run on Codex carries no exit code.
+# It must grant nothing AND revoke nothing.
+echo '{"verified": true}' > "$STATE"
+_verify "$(_as_test codex 0.154.0 post-tool-use.bash.python-tests-passed)"; RC=$?
+if [[ "$RC" -eq 0 && "$(_flag)" == "true" && "$VERIFY_ERR" != *REGRESSED* ]]; then
+    log_pass "a Codex PostToolUse (string output, no exit code) leaves verified=true standing: no invented regression"
+else
+    log_fail "Codex unknown result is not a regression" "rc=$RC verified=$(_flag) err=$VERIFY_ERR"
+fi
+echo '{"verified": false}' > "$STATE"
+_verify "$(_as_test codex 0.154.0 post-tool-use.bash.python-tests-passed)"; RC=$?
+if [[ "$RC" -eq 0 && "$(_flag)" == "false" && "$VERIFY_ERR" == *"no exit code"* ]]; then
+    log_pass "the same Codex event grants no evidence either, and says why"
+else
+    log_fail "Codex unknown result grants nothing" "rc=$RC verified=$(_flag) err=$VERIFY_ERR"
+fi
+_verify "$(_as_test codex 0.154.0 post-tool-use.bash.exit3-with-output)"; RC=$?
+if [[ "$RC" -eq 0 && "$(_flag)" == "false" ]]; then
+    log_pass "a Codex run that exited 3 (output only on the wire) is unknown, not a verdict"
+else
+    log_fail "Codex exit 3 unobservable" "rc=$RC verified=$(_flag) err=$VERIFY_ERR"
+fi
+
+# a background run resolves on TaskOutput, tied by task id
+echo '{"verified": false}' > "$STATE"
+_verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.run-in-background "; d['tool_response']['backgroundTaskId'] = 'task-A'")"; RC=$?
+MID=$(_flag)
+_verify "$(host_fixture_with claude-code 2.1.272 post-tool-use.task-output.completed "$WORK" "d['tool_response']['task']['task_id'] = 'task-A'; d['tool_input']['task_id'] = 'task-A'")"; RC2=$?
+if [[ "$RC" -eq 0 && "$MID" == "false" && "$RC2" -eq 0 && "$(_flag)" == "true" ]]; then
+    log_pass "a run_in_background test run grants nothing until its TaskOutput completes with exitCode 0"
+else
+    log_fail "background run resolves on TaskOutput" "rc=$RC mid=$MID rc2=$RC2 verified=$(_flag) err=$VERIFY_ERR"
+fi
+_verify "$(host_fixture_with claude-code 2.1.272 post-tool-use.task-output.completed "$WORK" "d['tool_response']['task']['task_id'] = 'task-A'; d['tool_response']['task']['exitCode'] = 1")"; RC=$?
+if [[ "$RC" -eq 2 && "$(_flag)" == "false" ]]; then
+    log_pass "a TaskOutput ending the same task with exitCode 1 revokes the evidence"
+else
+    log_fail "TaskOutput failure revokes" "rc=$RC verified=$(_flag) err=$VERIFY_ERR"
+fi
+_verify "$(host_fixture_with claude-code 2.1.272 post-tool-use.task-output.completed "$WORK" "d['tool_response']['task']['task_id'] = 'never-seen'")"; RC=$?
+if [[ "$RC" -eq 0 && "$(_flag)" == "false" ]]; then
+    log_pass "a TaskOutput for a task no test command started is ignored"
+else
+    log_fail "unknown TaskOutput ignored" "rc=$RC verified=$(_flag)"
+fi
+
+# an interruption is neither a pass nor a failure
+echo '{"verified": true}' > "$STATE"
+_verify "$(_as_test claude-code 2.1.272 post-tool-use-failure.bash.exit1-tests-failed "; d['is_interrupt'] = True")"; RC=$?
+if [[ "$RC" -eq 0 && "$(_flag)" == "true" ]]; then
+    log_pass "an interrupted test run (is_interrupt) changes nothing"
+else
+    log_fail "interrupted run" "rc=$RC verified=$(_flag) err=$VERIFY_ERR"
+fi
+
+
 test_summary

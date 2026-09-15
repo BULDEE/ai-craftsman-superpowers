@@ -1,0 +1,27 @@
+{
+  "session_id": "0f7d23b2-7b81-4360-8a55-a4d6c2145245",
+  "transcript_path": "/Users/__USER__/.claude/projects/-private-tmp-claude-501--Users-woprrr-Dev-claude-ai-craftsman-superpowers-b2a2ee5c-aa20-40c5-9619-3de33b67a297-scratchpad-claude-capture2-proj/0f7d23b2-7b81-4360-8a55-a4d6c2145245.jsonl",
+  "cwd": "__WORKSPACE__",
+  "prompt_id": "0ddc4556-90a0-4b58-8c1a-d3bc1d9d9445",
+  "permission_mode": "bypassPermissions",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "TaskOutput",
+  "tool_input": {
+    "task_id": "bord2a10b",
+    "block": true,
+    "timeout": 15000
+  },
+  "tool_response": {
+    "retrieval_status": "success",
+    "task": {
+      "task_id": "bord2a10b",
+      "task_type": "local_bash",
+      "status": "completed",
+      "description": "Run sleep and echo in background for 6 seconds",
+      "output": "bg-done\n\n[exited with code 0]\n",
+      "exitCode": 0
+    }
+  },
+  "tool_use_id": "toolu_01KboKdtvaRtw95nM3PVwwwF",
+  "duration_ms": 1717
+}

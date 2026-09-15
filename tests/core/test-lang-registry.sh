@@ -316,9 +316,12 @@ export CLAUDE_PLUGIN_DATA="$TMPDIR_BASE/plugin-data"
 mkdir -p "$CLAUDE_PLUGIN_DATA"
 FAILURE_LOG="$CLAUDE_PLUGIN_DATA/test-failures.log"
 
-# run_failing_test <command> - feed a failed Bash run to the verification hook
+# run_failing_test <command> - feed a failed Bash run to the verification hook,
+# in the shape Claude Code sends one (a PostToolUseFailure whose `error` names
+# the exit code; tests/fixtures/hosts/claude-code). The `tool_result.exit_code`
+# this used to send is a field no host sends.
 run_failing_test() {
-    printf '{"tool_name":"Bash","tool_input":{"command":"%s"},"tool_result":{"exit_code":1}}' "$1" \
+    printf '{"hook_event_name":"PostToolUseFailure","tool_name":"Bash","tool_input":{"command":"%s"},"error":"Exit code 1\\nFAILED","is_interrupt":false}' "$1" \
         | bash "$ROOT_DIR/hooks/post-bash-test-verify.sh" >/dev/null 2>&1
     return 0
 }

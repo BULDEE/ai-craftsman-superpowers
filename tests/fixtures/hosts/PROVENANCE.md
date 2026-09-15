@@ -37,6 +37,20 @@ Nothing else is edited. `hook-env.*.json` lists variable NAMES only.
   - Hook env carries `CLAUDECODE=1`, `CLAUDE_CODE_SESSION_ID`,
     `CLAUDE_PROJECT_DIR`; the payload carries `prompt_id` and
     `transcript_path`.
+- Second run, same day and command, hooks on `PostToolUse` and
+  `PostToolUseFailure` with an empty matcher (raw sha256 first 16: post
+  `51efa5d78d7ad158`, failure `6c849bbbdc87e491`). Observed:
+  - A Bash command exiting 1 or 127 is a `PostToolUseFailure` with
+    `error: "Exit code N\n<output>"` and `is_interrupt: false`; there is no
+    PostToolUse for it. The exit code lives in that string and nowhere else.
+  - A `run_in_background` Bash returns `backgroundTaskId` at once; the result
+    arrives later as a `TaskOutput` PostToolUse whose `tool_response.task`
+    carries `task_id`, `status: "completed"`, `exitCode` and `output`, and NOT
+    the command: only the task id ties the two events together. A third run
+    (real hooks, a fake `pytest` in the project) showed the limit: when the
+    model does not poll with TaskOutput, the background task's end reaches
+    the model as a task notification and NO hook event fires, so a
+    background test run stays pending (`pending_test_tasks`) until polled.
 
 ## codex/0.154.0
 

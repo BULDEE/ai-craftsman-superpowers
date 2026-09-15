@@ -102,9 +102,20 @@ echo "=== Test-Failure Revocation (post-bash-test-verify) ==="
 DATA_DIR="$FAKE_HOME/plugin-data"
 mkdir -p "$DATA_DIR"
 
+# The shapes Claude Code sends (tests/fixtures/hosts/claude-code): a passing
+# run is a PostToolUse whose tool_response has stdout and no exit code; a
+# failing run is a PostToolUseFailure whose `error` starts with "Exit code N".
+# The suite used to send `tool_result.exit_code`, a field no host sends, and
+# so validated the reader that turned every real passing run into a
+# regression (audit CR-117, C2).
 run_verify_hook() {
-    local exit_code="$1"
-    echo "{\"tool_input\":{\"command\":\"npm test\"},\"tool_result\":{\"exit_code\":$exit_code}}" | \
+    local exit_code="$1" payload
+    if [[ "$exit_code" == "0" ]]; then
+        payload='{"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"npm test"},"tool_response":{"stdout":"12 passing","stderr":"","interrupted":false,"isImage":false}}'
+    else
+        payload="{\"hook_event_name\":\"PostToolUseFailure\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"npm test\"},\"error\":\"Exit code $exit_code\\n1 failing\",\"is_interrupt\":false}"
+    fi
+    echo "$payload" | \
         HOME="$FAKE_HOME" CLAUDE_PLUGIN_DATA="$DATA_DIR" \
         bash "$ROOT_DIR/hooks/post-bash-test-verify.sh" 2>&1
 }

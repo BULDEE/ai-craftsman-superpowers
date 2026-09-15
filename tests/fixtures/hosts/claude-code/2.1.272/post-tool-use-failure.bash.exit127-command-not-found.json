@@ -1,0 +1,17 @@
+{
+  "session_id": "0f7d23b2-7b81-4360-8a55-a4d6c2145245",
+  "transcript_path": "/Users/__USER__/.claude/projects/-private-tmp-claude-501--Users-woprrr-Dev-claude-ai-craftsman-superpowers-b2a2ee5c-aa20-40c5-9619-3de33b67a297-scratchpad-claude-capture2-proj/0f7d23b2-7b81-4360-8a55-a4d6c2145245.jsonl",
+  "cwd": "__WORKSPACE__",
+  "prompt_id": "0ddc4556-90a0-4b58-8c1a-d3bc1d9d9445",
+  "permission_mode": "bypassPermissions",
+  "hook_event_name": "PostToolUseFailure",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "pytest -q",
+    "description": "Run pytest in quiet mode"
+  },
+  "tool_use_id": "toolu_01J4eWrpNH1ZsVRcT9NBSePd",
+  "error": "Exit code 127\n(eval):1: command not found: pytest",
+  "is_interrupt": false,
+  "duration_ms": 28
+}

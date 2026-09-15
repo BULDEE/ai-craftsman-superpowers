@@ -314,10 +314,16 @@ def _resolve_session_state_path() -> str:
 
 
 def handle_set_verified(arguments: list[str]) -> None:
-    """Set verified=true in session state. Resolves path via bridge file automatically."""
+    """Set verified=true in session state.
+
+    The path is the argument when given (the hook already resolved this
+    session's file from the payload it received); otherwise it is resolved
+    from the bridge file and the environment, for skills running in the Bash
+    tool.
+    """
     import datetime
 
-    state_path = _resolve_session_state_path()
+    state_path = arguments[0] if arguments else _resolve_session_state_path()
     state = read_state(state_path)
     state['verified'] = True
     state['verified_at'] = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')

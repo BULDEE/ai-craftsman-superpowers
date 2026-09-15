@@ -52,7 +52,7 @@
         ]
       },
       {
-        "matcher": "Bash",
+        "matcher": "Bash|TaskOutput",
         "hooks": [
           {
             "type": "command",
@@ -81,6 +81,12 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/tool-failure-tracker.sh\"",
             "async": true
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-bash-test-verify.sh\"",
+            "async": true,
+            "asyncRewake": true
           }
         ]
       }

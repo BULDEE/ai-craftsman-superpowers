@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Post-Bash Test Auto-Verify Hook
-# Auto-sets verified=true when test suite passes (exit 0).
+# Sets verified=true when a test suite is seen to pass, revokes it when one is
+# seen to fail. "Seen" means decoded from what the host actually sent
+# (hooks/lib/tool_result.py, fixtures under tests/fixtures/hosts):
+#   Claude Code   a passing run is a PostToolUse (no exit code in the object:
+#                 a non-zero exit is a PostToolUseFailure, whose `error` names
+#                 it); a run_in_background run resolves later on TaskOutput,
+#                 tied to its Bash by task id.
+#   Codex         the shell output is a bare string with no exit code, so a
+#                 run there is `unknown`: no evidence granted, none revoked.
+# The reader this replaces took `tool_result.exit_code` (a field no host
+# sends) and defaulted it to 1: a passing suite became "REGRESSED" (audit
+# CR-117, C2).
 #
-# TRIGGERS: PostToolUse for Bash
-# EXIT CODES: 0 = always pass (informational only)
+# TRIGGERS: PostToolUse for Bash|TaskOutput, PostToolUseFailure for Bash
+# EXIT CODES: 0 = pass; 2 = a suite green earlier this session now fails
 # =============================================================================
 set -uo pipefail
 
@@ -16,11 +27,12 @@ hook_profile_should_run "post-bash-test-verify" "standard,strict" || exit 0
 
 INPUT=$(cat)
 
-# Only care about successful Bash commands
-COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null)
-EXIT_CODE=$(echo "$INPUT" | jq -r '.tool_result.exit_code // .tool_result.exitCode // "1"' 2>/dev/null)
-
-[[ -z "$COMMAND" ]] && exit 0
+DECODED=$(printf '%s' "$INPUT" | python3 "${SCRIPT_DIR}/lib/tool_result.py" 2>/dev/null) || exit 0
+STATE=$(printf '%s' "$DECODED" | jq -r '.state // "unknown"')
+EXIT_CODE=$(printf '%s' "$DECODED" | jq -r '.exit_code // empty')
+COMMAND=$(printf '%s' "$DECODED" | jq -r '.command // empty')
+TASK_ID=$(printf '%s' "$DECODED" | jq -r '.task_id // empty')
+TOOL=$(printf '%s' "$DECODED" | jq -r '.tool // empty')
 
 # Which commands run a test suite is the packs' knowledge. The literal list
 # this replaces meant the deterministic verification loop (ADR-0023) was blind
@@ -41,14 +53,6 @@ _test_command_pattern() {
     printf '(%s)' "$pattern"
 }
 
-source "${SCRIPT_DIR}/lib/config.sh"
-source "${SCRIPT_DIR}/lib/pack-loader.sh"
-pack_loader_init
-
-if ! echo "$COMMAND" | grep -qE "$(_test_command_pattern)"; then
-    exit 0
-fi
-
 _BRIDGE_FILE="${HOME}/.claude/craftsman-session-state-path"
 if [[ -f "$_BRIDGE_FILE" ]]; then
     SESSION_STATE=$(< "$_BRIDGE_FILE")
@@ -61,19 +65,56 @@ else
 fi
 
 LIB_DIR="${SCRIPT_DIR}/lib"
+
+# A TaskOutput names the task, not the command: the Bash that started it
+# recorded the pair below, and the result is read back against it.
+if [[ "$TOOL" == "TaskOutput" ]]; then
+    [[ -z "$TASK_ID" ]] && exit 0
+    COMMAND=$(python3 "$LIB_DIR/session_state.py" read "$SESSION_STATE" pending_test_tasks '[]' 2>/dev/null \
+        | jq -r --arg id "$TASK_ID" '[.[] | select(.task_id == $id)] | last | .command // empty' 2>/dev/null)
+    [[ -z "$COMMAND" ]] && exit 0
+fi
+[[ -z "$COMMAND" ]] && exit 0
+
+source "${SCRIPT_DIR}/lib/config.sh"
+source "${SCRIPT_DIR}/lib/pack-loader.sh"
+pack_loader_init
+
+if ! echo "$COMMAND" | grep -qE "$(_test_command_pattern)"; then
+    exit 0
+fi
+
+case "$STATE" in
+    running)
+        # Started in the background: remembered so the TaskOutput that ends
+        # it can be read as this command's result.
+        [[ -z "$TASK_ID" ]] && exit 0
+        python3 "$LIB_DIR/session_state.py" append "$SESSION_STATE" pending_test_tasks \
+            "$(jq -n --arg id "$TASK_ID" --arg c "$COMMAND" '{task_id: $id, command: $c}')" 20 2>/dev/null || true
+        exit 0
+        ;;
+    interrupted)
+        exit 0
+        ;;
+    unknown)
+        echo "craftsman: '${COMMAND}' ran, but this host's tool event carries no exit code; verification evidence is unchanged (neither granted nor revoked)." >&2
+        exit 0
+        ;;
+esac
+
 CURRENT=$(python3 "$LIB_DIR/session_state.py" check-flag "$SESSION_STATE" verified 2>/dev/null || echo "false")
 
 # Failing test run (ADR-0023): revoke verification evidence, feed the failure
 # log to the background monitor, and wake the session (exit 2 + asyncRewake)
 # only on a regression - the suite was green earlier in this session.
-if [[ "$EXIT_CODE" != "0" ]]; then
+if [[ "$STATE" == "failed" ]]; then
     DATA_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
     mkdir -p "$DATA_DIR" 2>/dev/null || true
-    printf '%s test failure: %s (exit %s)\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$COMMAND" "$EXIT_CODE" \
+    printf '%s test failure: %s (exit %s)\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$COMMAND" "${EXIT_CODE:-?}" \
         >> "${DATA_DIR}/test-failures.log" 2>/dev/null || true
     if [[ "$CURRENT" == "true" ]]; then
         python3 "$LIB_DIR/session_state.py" merge "$SESSION_STATE" verified false 2>/dev/null || true
-        echo "Test suite REGRESSED: '${COMMAND}' now exits ${EXIT_CODE} but was green earlier this session. Verification evidence revoked - fix the suite before claiming completion or pushing." >&2
+        echo "Test suite REGRESSED: '${COMMAND}' now exits ${EXIT_CODE:-non-zero} but was green earlier this session. Verification evidence revoked - fix the suite before claiming completion or pushing." >&2
         exit 2
     fi
     exit 0
@@ -81,6 +122,6 @@ fi
 
 # Passing test run: set verified (skip if already set)
 [[ "$CURRENT" == "true" ]] && exit 0
-python3 "$LIB_DIR/session_state.py" set-verified 2>/dev/null
+python3 "$LIB_DIR/session_state.py" set-verified "$SESSION_STATE" 2>/dev/null
 
 exit 0
