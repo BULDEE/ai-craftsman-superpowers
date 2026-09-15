@@ -53,14 +53,28 @@ ARGUMENT_NAMES = {
 }
 
 
-def _object(value):
+class Unreadable(Exception):
+    """A payload this translator cannot read for a write: refused, never passed."""
+
+
+def _object(value, required: bool):
     if isinstance(value, str):
         try:
             parsed = json.loads(value)
         except ValueError:
+            if required:
+                raise Unreadable("toolArgs is a string that is not JSON")
             return {}
-        return parsed if isinstance(parsed, dict) else {}
-    return value if isinstance(value, dict) else {}
+        if not isinstance(parsed, dict):
+            if required:
+                raise Unreadable("toolArgs is JSON but not an object")
+            return {}
+        return parsed
+    if isinstance(value, dict):
+        return value
+    if required:
+        raise Unreadable("tool arguments are missing")
+    return {}
 
 
 def _event(payload: dict) -> str:
@@ -82,22 +96,48 @@ def _arguments(tool: str, args: dict) -> dict:
     return translated
 
 
-def translate(payload: dict) -> dict:
-    tool = payload.get("tool_name") or payload.get("toolName") or ""
-    args = _object(payload.get("tool_input") if "tool_input" in payload else payload.get("toolArgs"))
-    core_tool = TOOL_NAMES.get(tool, tool)
+def _is_patch(args: dict) -> bool:
+    command = args.get("command") if isinstance(args.get("command"), str) else ""
+    return isinstance(args.get("patch"), str) or command.lstrip().startswith("*** Begin Patch")
+
+
+def _core_tool(tool: str, args: dict) -> str:
+    """The core's tool name. In the PascalCase form the host has already
+    mapped its tools to Claude names, and `apply_patch` arrives as "Edit"
+    (review of 84b2350, F1): a patch body is a patch whatever the name says."""
+    if tool in ("Write", "Edit", "Bash") and _is_patch(args):
+        return "apply_patch"
     if tool == "str_replace_editor" and args.get("command") == "create":
-        core_tool = "Write"
-    out = {
-        "hook_event_name": _event(payload),
+        return "Write"
+    return TOOL_NAMES.get(tool, tool)
+
+
+def _check_write(core_tool: str, args: dict, event: str) -> None:
+    """A write the core cannot judge is refused here, not waved through. The
+    would-be content matters before the write; after it, the file on disk is
+    what post-write-check.sh reads, so the path is enough."""
+    if core_tool in ("Write", "Edit") and not args.get("file_path"):
+        raise Unreadable(f"a {core_tool} with no file path")
+    if event == "PreToolUse" and core_tool == "Write" and not isinstance(args.get("content"), str):
+        raise Unreadable("a Write with no content")
+    if core_tool == "apply_patch" and not isinstance(args.get("command"), str):
+        raise Unreadable("an apply_patch with no patch body")
+
+
+def _envelope(payload: dict, event: str, tool: str) -> dict:
+    return {
+        "hook_event_name": event,
         "session_id": payload.get("session_id") or payload.get("sessionId") or "",
         "cwd": payload.get("cwd") or "",
-        "tool_name": core_tool,
-        "tool_input": _arguments(tool, args) if core_tool in ("Write", "Edit", "Bash", "apply_patch") else args,
         "craftsman_host": "copilot",
         "craftsman_surface": "cloud" if os.environ.get("COPILOT_AGENT_PROMPT") else "cli",
         "copilot_tool_name": tool,
     }
+
+
+def _carried(payload: dict) -> dict:
+    """Fields the core hooks read unchanged when present."""
+    out = {}
     result = payload.get("tool_result") if "tool_result" in payload else payload.get("toolResult")
     if isinstance(result, dict):
         out["tool_result"] = result
@@ -107,14 +147,40 @@ def translate(payload: dict) -> dict:
     return out
 
 
+def translate(payload: dict) -> dict:
+    tool = payload.get("tool_name") or payload.get("toolName") or ""
+    raw = payload.get("tool_input") if "tool_input" in payload else payload.get("toolArgs")
+    is_write = tool in TOOL_NAMES and TOOL_NAMES[tool] != "Bash" or tool in ("Write", "Edit")
+    args = _object(raw, required=is_write)
+    core_tool = _core_tool(tool, args)
+    arguments = _arguments(tool, args) if core_tool in ("Write", "Edit", "Bash", "apply_patch") else args
+    event = _event(payload)
+    if core_tool in ("Write", "Edit", "apply_patch"):
+        _check_write(core_tool, arguments, event)
+    out = _envelope(payload, event, tool)
+    out.update(tool_name=core_tool, tool_input=arguments)
+    out.update(_carried(payload))
+    return out
+
+
 def main() -> int:
+    """0 and the core payload; 3 and a reason on stderr for a write this
+    translator cannot read (the gate denies on it; review of 84b2350, F2). An
+    envelope that is not JSON at all is refused the same way: what it carries
+    is unknown, and unknown may be a write."""
     try:
         payload = json.load(sys.stdin)
     except (ValueError, TypeError):
-        payload = {}
+        sys.stderr.write("craftsman: the Copilot payload is not JSON\n")
+        return 3
     if not isinstance(payload, dict):
-        payload = {}
-    print(json.dumps(translate(payload)))
+        sys.stderr.write("craftsman: the Copilot payload is not an object\n")
+        return 3
+    try:
+        print(json.dumps(translate(payload)))
+    except Unreadable as why:
+        sys.stderr.write(f"craftsman: cannot judge this Copilot write: {why}\n")
+        return 3
     return 0
 
 

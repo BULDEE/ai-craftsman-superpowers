@@ -81,8 +81,26 @@ R=$(_run "$PRE" "$(_fx pre-tool-use.create.pascal "d['tool_input']['path'] = '$W
 [[ "${R%%|*}" == "2" && "${R#*|}" == *'"deny"'* && "${R#*|}" != *'"ask"'* ]] && log_pass "preToolUse: the gate's own configuration is denied, never asked (ask is deny in the cloud anyway)" || log_fail "preToolUse gate config" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
 R=$(_run "$PRE" "$(_fx pre-tool-use.bash.pascal)")
 [[ "${R%%|*}" == "0" && -z "${R#*|}" ]] && log_pass "preToolUse: a tool that is not a write is left alone (a surface that ignores matchers sends every tool)" || log_fail "preToolUse non-write" "rc=${R%%|*}"
+# Review of 84b2350: what the translator cannot read may be a write, so it is
+# denied, never passed (F2); a patch that arrives under the Claude name Edit
+# in the PascalCase form is still a patch (F1); a PHP001-only Write comes back
+# allowed WITH the corrected content as modifiedArgs (F3).
 R=$(_run "$PRE" "not json at all")
-[[ "${R%%|*}" == "0" ]] && log_pass "preToolUse: a payload with no tool is not this gate's (exit 0)" || log_fail "preToolUse garbage" "rc=${R%%|*} $(printf '%s' "${R#*|}" | cut -c1-100)"
+[[ "${R%%|*}" == "2" && "${R#*|}" == *'"deny"'* && "${R#*|}" == *"not JSON"* ]] && log_pass "preToolUse: an envelope that is not JSON is denied with the reason" || log_fail "preToolUse garbage" "rc=${R%%|*} $(printf '%s' "${R#*|}" | cut -c1-100)"
+R=$(_run "$PRE" "$(_fx pre-tool-use.create.camel "d['toolArgs'] = '{not json'")")
+[[ "${R%%|*}" == "2" && "${R#*|}" == *"not JSON"* ]] && log_pass "preToolUse: a create whose toolArgs string is not JSON is denied" || log_fail "preToolUse bad toolArgs" "rc=${R%%|*} $(printf '%s' "${R#*|}" | cut -c1-120)"
+R=$(_run "$PRE" "$(_fx pre-tool-use.create.pascal "del d['tool_input']['file_text']")")
+[[ "${R%%|*}" == "2" && "${R#*|}" == *"no content"* ]] && log_pass "preToolUse: a create with no content is denied (a write the core cannot judge)" || log_fail "preToolUse no content" "rc=${R%%|*} $(printf '%s' "${R#*|}" | cut -c1-120)"
+printf '*** Begin Patch\n*** Add File: %s/src/Domain/Order.php\n+<?php\n+declare(strict_types=1);\n+namespace App\\Domain;\n+use App\\Infrastructure\\Persistence\\DoctrineOrderRepository;\n+class Order\n+{\n+}\n*** End Patch\n' "$WORK" > "$WORK/edit.patch"
+R=$(_run "$PRE" "$(_fx pre-tool-use.create.pascal "d['tool_name'] = 'Edit'; d['tool_input'] = dict(command=open('$WORK/edit.patch').read())")")
+[[ "${R%%|*}" == "2" && "${R#*|}" == *LAYER001* ]] && log_pass "preToolUse: a V4A patch arriving as tool_name Edit (the PascalCase alias for apply_patch) is read as a patch and denied" || log_fail "preToolUse patch under Edit" "rc=${R%%|*} $(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
+printf '<?php\nnamespace App\\Domain;\nfinal class Order\n{\n}\n' > "$WORK/nostrict.php"
+R=$(_run "$PRE" "$(_fx pre-tool-use.create.pascal "d['tool_input']['file_text'] = open('$WORK/nostrict.php').read()")")
+if [[ "${R%%|*}" == "0" ]] && printf '%s' "${R#*|}" | jq -e '.permissionDecision == "allow" and (.modifiedArgs.file_text | test("declare\\(strict_types=1\\)"))' >/dev/null 2>&1; then
+    log_pass "preToolUse: a PHP file missing only strict_types is allowed with the corrected file_text as modifiedArgs (PHP001 autofix carried over)"
+else
+    log_fail "preToolUse autofix" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-200)"
+fi
 R=$(printf '%s' "$(_fx pre-tool-use.create.pascal)" | PATH="/nonexistent" bash "$PRE" 2>&1); RC=$?
 [[ "$RC" -ne 0 ]] && log_pass "preToolUse: a gate that cannot run fails closed (non-zero exit denies on this host)" || log_fail "preToolUse fail-closed" "rc=$RC"
 

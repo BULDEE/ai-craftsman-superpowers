@@ -55,7 +55,15 @@ HANDLERS=$(jq '[.hooks[][] | .hooks[]] | length' "$INSTALL/hooks/hooks.json" 2>/
 export CLAUDE_PLUGIN_ROOT="$INSTALL"
 export CLAUDE_PLUGIN_DATA="$WORK/data"; mkdir -p "$CLAUDE_PLUGIN_DATA"
 export CLAUDE_PLUGIN_OPTION_stack=fullstack CLAUDE_PLUGIN_OPTION_strictness=strict
-unset CLAUDE_CODE_SESSION_ID CLAUDECODE CRAFTSMAN_HEADLESS_VERIFY
+unset CLAUDE_CODE_SESSION_ID CLAUDECODE CRAFTSMAN_HEADLESS_VERIFY PYTHONPATH
+# The helpers must come from the installed tree, not from the checkout that
+# ran this suite (review of 84b2350, F5): the python import path is checked.
+V4A_FROM=$(cd "$INSTALL/hooks/lib" && python3 -c 'import v4a_patch, write_mirror; print(v4a_patch.__file__ + " " + write_mirror.__file__)')
+if [[ "$V4A_FROM" == "$INSTALL/"*" $INSTALL/"* ]]; then
+    log_pass "the patch reader and the mirror import from the installed tree"
+else
+    log_fail "installed imports" "$V4A_FROM"
+fi
 PROJ="$WORK/proj"; mkdir -p "$PROJ/src/Domain"; cd "$PROJ" && git init -q .
 printf '{"autoload":{"psr-4":{"App\\\\":"src/"}}}\n' > composer.json; git add -A >/dev/null; git commit -qm base >/dev/null
 BAD='<?php

@@ -14,13 +14,24 @@ PLUGIN_ROOT="$(cd "$ADAPTER_DIR/../.." && pwd)"
 export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}"
 
 INPUT=$(cat)
-CORE=$(printf '%s' "$INPUT" | python3 "$ADAPTER_DIR/translate.py" 2>/dev/null) || exit 0
+WHY=$(mktemp "${TMPDIR:-/tmp}/craftsman-copilot-why.XXXXXX") || exit 0
+CORE=$(printf '%s' "$INPUT" | python3 "$ADAPTER_DIR/translate.py" 2>"$WHY") || {
+    # The write has landed and cannot be read: said loudly, not passed.
+    MSG="craftsman: $(cat "$WHY" 2>/dev/null); the file that just landed was NOT validated. Run craftsman-validate on it."
+    rm -f "$WHY"
+    jq -n --arg c "$MSG" '{additionalContext: $c}'
+    printf '%s\n' "$MSG" >&2
+    exit 2
+}
+rm -f "$WHY"
 TOOL=$(printf '%s' "$CORE" | jq -r '.tool_name // empty')
 case "$TOOL" in Write|Edit|apply_patch) ;; *) exit 0 ;; esac
 
 RC=0
-ERR=$(printf '%s' "$CORE" | bash "$PLUGIN_ROOT/hooks/post-write-check.sh" 2>&1 >/tmp/craftsman-copilot-post.$$) || RC=$?
-OUT=$(cat "/tmp/craftsman-copilot-post.$$" 2>/dev/null); rm -f "/tmp/craftsman-copilot-post.$$"
+STDOUT=$(mktemp "${TMPDIR:-/tmp}/craftsman-copilot-post.XXXXXX") || exit 0
+trap 'rm -f "$STDOUT"' EXIT
+ERR=$(printf '%s' "$CORE" | bash "$PLUGIN_ROOT/hooks/post-write-check.sh" 2>&1 >"$STDOUT") || RC=$?
+OUT=$(cat "$STDOUT" 2>/dev/null)
 CONTEXT=$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.additionalContext // .systemMessage // empty' 2>/dev/null)
 if [[ "$RC" -eq 2 ]]; then
     CONTEXT="${ERR}"

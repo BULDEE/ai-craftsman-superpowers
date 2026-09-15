@@ -30,15 +30,32 @@ _deny() {
 }
 
 INPUT=$(cat)
-CORE=$(printf '%s' "$INPUT" | python3 "$ADAPTER_DIR/translate.py" 2>/dev/null) || _deny "craftsman: the Copilot payload could not be translated; the write is refused, not waved through"
+WHY=$(mktemp "${TMPDIR:-/tmp}/craftsman-copilot-why.XXXXXX") || _deny "craftsman: no temporary file; the write is refused, not waved through"
+trap 'rm -f "$WHY"' EXIT
+CORE=$(printf '%s' "$INPUT" | python3 "$ADAPTER_DIR/translate.py" 2>"$WHY") || _deny "$(cat "$WHY" 2>/dev/null || echo "craftsman: the Copilot payload could not be translated"); the write is refused, not waved through"
 TOOL=$(printf '%s' "$CORE" | jq -r '.tool_name // empty')
 case "$TOOL" in Write|Edit|apply_patch) ;; *) exit 0 ;; esac
 
+ALLOW_OUT=""
 for gate in config-protection.sh pre-write-check.sh; do
     RC=0
-    OUT=$(printf '%s' "$CORE" | bash "$PLUGIN_ROOT/hooks/$gate" 2>&1 >/dev/null) || RC=$?
+    GATE_OUT=$(printf '%s' "$CORE" | bash "$PLUGIN_ROOT/hooks/$gate" 2>"$WHY") || RC=$?
     if [[ "$RC" -ne 0 ]]; then
-        _deny "${OUT:-craftsman: $gate refused the write (exit $RC)}"
+        _deny "$(cat "$WHY" 2>/dev/null || echo "craftsman: $gate refused the write (exit $RC)")"
     fi
+    [[ "$gate" == "pre-write-check.sh" ]] && ALLOW_OUT="$GATE_OUT"
 done
+
+# pre-write-check.sh may allow WITH a corrected content (a Write missing only
+# declare(strict_types=1) comes back as updatedInput, ADR-0018). Dropping it
+# let the uncorrected file land as allowed (review of 84b2350, F3): the
+# correction is translated back into the tool's own argument name and
+# returned as the documented `modifiedArgs`.
+FIXED=$(printf '%s' "$ALLOW_OUT" | jq -r '.hookSpecificOutput.updatedInput.content // empty' 2>/dev/null)
+if [[ -n "$FIXED" ]]; then
+    printf '%s' "$INPUT" | jq --arg c "$FIXED" '
+        (if has("tool_input") then .tool_input else (.toolArgs | if type == "string" then fromjson else . end) end) as $args
+        | ($args | if has("file_text") then .file_text = $c elif has("content") then .content = $c else .content = $c end) as $fixed
+        | {permissionDecision: "allow", permissionDecisionReason: "craftsman: declare(strict_types=1) inserted (PHP001)", modifiedArgs: $fixed}'
+fi
 exit 0
