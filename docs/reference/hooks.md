@@ -38,7 +38,7 @@ Agent hooks run a model for semantic analysis beyond regex patterns. The backend
 |-------|-------|-------|---------|---------|
 | PostToolUse | DDD Verifier | Haiku | Layer violations, aggregate boundaries, value objects, naming | 30s |
 | InstructionsLoaded | Project Analyzer | Haiku | Architectural context map + correction trends + channel status | 20s |
-| Stop | Sentry Context | Haiku | Error context from Sentry MCP for edited files | 30s |
+| Stop | Sentry Context | none (no model call) | Asks for Sentry error context on the files this session wrote (the write log post-write-check.sh keeps; a Stop payload names no file). The request is shown to the user at Stop and handed to the model as `additionalContext` on the next UserPromptSubmit, once: a Stop hook has no model-visible channel on either host short of forcing a continuation | 30s |
 | Stop | Final Reviewer | Haiku | Architecture validation before session end (strict mode only) | 30s |
 
 **DDD Verifier** checks:

@@ -621,4 +621,54 @@ else
 fi
 rm -f "$WORK/src/Domain/Order.php"
 
+# =============================================================================
+# CR-128: the Sentry context request at Stop reaches the model, from the
+# files this session wrote
+# =============================================================================
+echo ""
+echo "--- Sentry context at Stop ---"
+rm -f "$CLAUDE_PLUGIN_DATA"/session-*
+STATE128="$CLAUDE_PLUGIN_DATA/session-state-s128.json"
+_sentry() { printf '%s' "$1" | HOME="$FAKE_HOME" CLAUDE_PLUGIN_OPTION_SENTRY_ORG=acme CLAUDE_PLUGIN_OPTION_AGENT_HOOKS=true bash "$ROOT_DIR/hooks/agent-sentry-context.sh" 2>/dev/null; }
+# no write this session: nothing to ask about, nothing emitted
+R=$(_sentry "$(host_fixture_with claude-code 2.1.272 stop "$WORK" "d['session_id'] = 's128'")")
+if [[ -z "$R" ]]; then
+    log_pass "Stop with no file written this session asks Sentry nothing"
+else
+    log_fail "Stop without writes" "$R"
+fi
+# two writes this session (recorded by post-write-check as paths), then Stop
+printf '%s\n' "$GOOD_PHP" > "$WORK/src/Domain/Order.php"
+printf 'export const ok: number = 1;\n' > "$WORK/src/Ok.ts"
+for f in "$WORK/src/Domain/Order.php" "$WORK/src/Ok.ts"; do
+    # no braces in the statement: the shell brace-expands them before python sees the text
+    printf '%s' "$(host_fixture_with claude-code 2.1.272 post-tool-use.write "$WORK" "d['session_id'] = 's128'; d['tool_input']['file_path'] = '$f'; d['tool_input']['content'] = open('$f').read()")" \
+        | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/post-write-check.sh" >/dev/null 2>&1
+done
+R=$(_sentry "$(host_fixture_with claude-code 2.1.272 stop "$WORK" "d['session_id'] = 's128'")")
+if printf '%s' "$R" | jq -e '.systemMessage' >/dev/null 2>&1 && [[ "$R" == *Order.php* && "$R" == *Ok.ts* ]]; then
+    log_pass "Stop after two writes asks Sentry about both files (the session's write list, no tool_input needed)"
+else
+    log_fail "Stop with writes" "$(printf '%s' "$R" | tr '\n' ' ' | cut -c1-200)"
+fi
+# the request is handed to the model on the next prompt, once
+R=$(printf '%s' "$(python3 -c 'import json; print(json.dumps({"session_id":"s128","prompt_id":"p","hook_event_name":"UserPromptSubmit","prompt":"continue please"}))')" | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/bias-detector.sh" 2>/dev/null)
+R2=$(printf '%s' "$(python3 -c 'import json; print(json.dumps({"session_id":"s128","prompt_id":"p","hook_event_name":"UserPromptSubmit","prompt":"continue please"}))')" | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/bias-detector.sh" 2>/dev/null)
+if [[ "$R" == *"SENTRY CONTEXT REQUEST"* && "$R" == *Order.php* && "$R2" != *"SENTRY CONTEXT REQUEST"* ]]; then
+    log_pass "the next UserPromptSubmit carries the Sentry request to the model, and the one after does not"
+else
+    log_fail "Sentry handoff" "first=$(printf '%s' "$R" | tr '\n' ' ' | cut -c1-120) second=$(printf '%s' "$R2" | tr '\n' ' ' | cut -c1-80)"
+fi
+# a Codex Stop carries the same fields and reaches the same request
+rm -f "$CLAUDE_PLUGIN_DATA"/session-*
+printf '%s\n' "$(host_fixture_with codex 0.154.0 post-tool-use.apply_patch.multifile-move "$WORK" "d['session_id'] = 's128c'; d['tool_input']['command'] = open('$WORK/good.patch').read()")" \
+    | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/post-write-check.sh" >/dev/null 2>&1
+R=$(_sentry "$(host_fixture_with codex 0.154.0 stop "$WORK" "d['session_id'] = 's128c'")")
+if [[ "$R" == *Order.php* ]]; then
+    log_pass "a Codex Stop after an apply_patch asks about the patched file"
+else
+    log_fail "Codex Stop" "$(printf '%s' "$R" | tr '\n' ' ' | cut -c1-160)"
+fi
+rm -f "$WORK/src/Domain/Order.php" "$WORK/src/Ok.ts" "$CLAUDE_PLUGIN_DATA"/session-*
+
 test_summary

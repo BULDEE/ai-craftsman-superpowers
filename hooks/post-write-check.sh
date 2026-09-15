@@ -283,11 +283,12 @@ fi
 # Exit silently if no file path or file doesn't exist
 [[ -z "$FILE_PATH" || ! -f "$FILE_PATH" ]] && exit 0
 
-# Write/Edit exposure counter: one line per validated write. Read by
-# session-metrics.sh at SessionEnd into sessions.writes_count (denominator
-# for violations-per-write benchmarks). Append is atomic enough for hook
-# concurrency; no locking needed.
-echo "1" >> "$(session_file session-writes)" 2>/dev/null || true
+# Write/Edit exposure log: one line per validated write, the path written.
+# session-metrics.sh counts the lines at SessionEnd into sessions.writes_count
+# and task-completed-verify.sh counts them as evidence of work; the Stop-time
+# Sentry hook reads the paths, since a Stop payload names no file (audit
+# CR-117, C11). Append is atomic enough for hook concurrency; no locking.
+printf '%s\n' "$FILE_PATH" >> "$(session_file session-writes)" 2>/dev/null || true
 
 # Get file extension
 EXT="${FILE_PATH##*.}"

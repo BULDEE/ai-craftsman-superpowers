@@ -192,16 +192,24 @@ if [[ -z "$WARNINGS" ]] && ! _bias_is_reported; then
     done
 fi
 
+# A context request left by a Stop-time hook (the Sentry request: a Stop has
+# no model-visible channel short of forcing a continuation) is handed to the
+# model here, once, and cleared.
+PENDING_CONTEXT=$(python3 "${SCRIPT_DIR}/lib/session_state.py" read "$SESSION_STATE" pending_context "" 2>/dev/null || true)
+[[ -n "$PENDING_CONTEXT" ]] && python3 "${SCRIPT_DIR}/lib/session_state.py" merge "$SESSION_STATE" pending_context '""' >/dev/null 2>&1 || true
+
 # Exclusive output formats: stdout is parsed as ONE payload by UserPromptSubmit.
-# Curated verdicts ship as JSON (systemMessage, user-visible, today's behavior).
-# Signal notes ship as plain stdout, the documented context channel the model
-# sees; they are emitted only when no curated warning fired at all.
+# Curated verdicts ship as JSON (systemMessage, user-visible, today's behavior),
+# with the pending context as additionalContext, the model's channel. Signal
+# notes ship as plain stdout, the documented context channel the model sees;
+# they are emitted only when no curated warning fired at all.
 if [[ -n "$WARNINGS" ]]; then
-    jq -n --arg msg "$WARNINGS" '{
+    jq -n --arg msg "$WARNINGS" --arg ctx "$PENDING_CONTEXT" '{
         systemMessage: $msg
-    }'
-elif [[ -n "$SIGNAL_NOTES" ]]; then
-    printf '%s\n%s' \
+    } + (if $ctx != "" then {hookSpecificOutput: {hookEventName: "UserPromptSubmit", additionalContext: $ctx}} else {} end)'
+elif [[ -n "$SIGNAL_NOTES" || -n "$PENDING_CONTEXT" ]]; then
+    [[ -n "$PENDING_CONTEXT" ]] && printf '%s\n' "$PENDING_CONTEXT"
+    [[ -n "$SIGNAL_NOTES" ]] && printf '%s\n%s' \
         "Bias signal from the prompt lexicon. The matcher has no conversation context; you have all of it. For each signal below: if it reflects the user's real intent, surface that discipline warning in their language; if the match is incidental (quoted text, descriptive use, topic discussion), ignore it silently and never mention this note." \
         "$SIGNAL_NOTES"
 fi

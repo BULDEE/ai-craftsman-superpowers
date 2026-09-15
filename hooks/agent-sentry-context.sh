@@ -20,11 +20,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/hook-profile.sh"
 hook_profile_should_run "agent-sentry-context" "standard,strict" || exit 0
 
-# Read tool input from stdin
+# The Stop payload names no file (tests/fixtures/hosts/*/stop.json on both
+# hosts), so this hook exited before asking anything for as long as it read
+# tool_input.file_path (audit CR-117, C11). The files are the ones this
+# session wrote, logged by post-write-check.sh.
 INPUT=$(cat)
-FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
-
-[[ -z "$FILE_PATH" || ! -f "$FILE_PATH" ]] && exit 0
+source "${SCRIPT_DIR}/lib/session-files.sh"
+session_files_bind "$INPUT"
+WRITES_FILE=$(session_file session-writes)
+[[ -f "$WRITES_FILE" ]] || exit 0
+FILES=$(grep -v '^1$' "$WRITES_FILE" 2>/dev/null | awk 'NF' | while IFS= read -r p; do [[ -f "$p" ]] && basename "$p"; done | sort -u | head -5 | tr '\n' ' ')
+FILES="${FILES% }"
+[[ -z "$FILES" ]] && exit 0
 
 # Circuit breaker check
 if [[ -f "${SCRIPT_DIR}/lib/channels.sh" ]]; then
@@ -36,8 +43,11 @@ if [[ -f "${SCRIPT_DIR}/lib/channels.sh" ]]; then
     fi
 fi
 
-FILENAME=$(basename "$FILE_PATH")
-jq -n --arg file "$FILENAME" '{
-    systemMessage: ("SENTRY CONTEXT REQUEST: Search Sentry for recent errors related to " + $file + ". Report top 3 issues (title, frequency, last seen). Max 200 chars each. If no issues found, skip.")
-}'
+REQUEST="SENTRY CONTEXT REQUEST: Search Sentry for recent errors related to ${FILES}. Report top 3 issues (title, frequency, last seen). Max 200 chars each. If no issues found, skip."
+# Two channels, because a Stop hook has no model-visible context field on
+# either host short of forcing a continuation: systemMessage reaches the
+# person now, and the request is kept for the next UserPromptSubmit, where
+# bias-detector.sh hands it to the model once.
+python3 "${SCRIPT_DIR}/lib/session_state.py" merge "$(session_file session-state.json)" pending_context "$(jq -n --arg r "$REQUEST" '$r')" 2>/dev/null || true
+jq -n --arg msg "$REQUEST" '{systemMessage: $msg}'
 exit 0
