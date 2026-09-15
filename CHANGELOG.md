@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Host adapters, one core (ADR-0029, campaign of 2026-09-15). The write gates
+  read a Codex `apply_patch` (V4A, multi-file, moves, `@@` anchors, End of
+  File) before it lands and refuse the gate's own configuration with `deny`
+  where the host cannot `ask`; test runs are decoded per host from the shapes
+  the hosts actually send (`hooks/lib/tool_result.py`), and a host whose shell
+  output carries no exit code grants and revokes nothing; every hook names
+  its session from its payload (`session_files_bind`); the doctrine export
+  owns one delimited block of `AGENTS.md`; pack skills ship as regular
+  files and learned skills may land in `.agents/skills`; agents export as
+  Codex roles (`craftsman-ci export --target codex-agents`); the challenge
+  skill collects its context with `craftsman-context review`; the semantic
+  review has a backend port (`claude-cli`, `codex-cli`, `none`) and each run
+  row names its backend; a per-host event matrix
+  (`hooks/host-capabilities.json`) and a host row in the healthcheck say
+  what each host loads and observes; a Copilot adapter honours the
+  documented contract, surfaces still to qualify; a fresh install from the
+  built archive is tested; every handler carries a `statusMessage`.
+  Fixtures under `tests/fixtures/hosts/` are captured from the real CLIs with
+  their provenance; `docs/reference/interop-2026-09-15-compat.md` says what
+  is proven, by which instrument, on which version.
+
 - Hermes: a `git push` between two conclusions waits for the conclusion
   gate. `adapters/hermes/pre-tool-call.sh` now reads `terminal` and refuses a
   push (and a commit under `strict`) unless `pre-verify.sh`'s last verdict is
