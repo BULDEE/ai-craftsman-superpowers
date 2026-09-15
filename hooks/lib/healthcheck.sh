@@ -179,18 +179,34 @@ hc_check_host() {
 }
 
 # Declared is not loaded, loaded is not triggered. hooks.json declares N
-# handlers; whether the host loaded each one is not visible from inside a hook
-# (Codex shows it in /hooks, Claude Code in /hooks), so this row states the
-# declared count and the events this session has evidence of, and nothing
-# more.
+# handlers on M events; which of those events the host loads is measured per
+# host in hooks/host-capabilities.json (Codex 0.154.0 loads 11 of the 12 kinds
+# this plugin declares on: not TaskCompleted, PostToolUseFailure or
+# FileChanged, audit CR-117 C10). A handler on an event the host does not load
+# is named here with the function it carries, so a declaration ignored never
+# counts as an active function. Triggered is this session's evidence only.
 hc_check_hooks_declared() {
-    local manifest="${CLAUDE_PLUGIN_ROOT:-$(pwd)}/hooks/hooks.json" declared events
+    local root="${CLAUDE_PLUGIN_ROOT:-$(pwd)}" manifest capabilities host declared events missing
+    manifest="$root/hooks/hooks.json"; capabilities="$root/hooks/host-capabilities.json"
     [[ -f "$manifest" ]] || { _hc_record "hooks" "error" "hooks.json missing"; return; }
     declared=$(jq '[.hooks[][] | .hooks[]] | length' "$manifest" 2>/dev/null || echo "?")
     events=$(jq -r '.hooks | keys | join(",")' "$manifest" 2>/dev/null)
-    _hc_record "hooks" "ok" "${declared} handlers declared on ${events}; loaded and trusted is the host's /hooks view, not measured here"
+    host="${CRAFTSMAN_SESSION_HOST:-}"
+    [[ -z "$host" ]] && type host_detect >/dev/null 2>&1 && host=$(host_detect "")
+    missing=""
+    if [[ -f "$capabilities" ]] && jq -e --arg h "$host" '.hosts[$h]' "$capabilities" >/dev/null 2>&1; then
+        missing=$(jq -r --arg h "$host" --slurpfile m "$manifest" '
+            .event_functions as $f
+            | (($m[0].hooks | keys) - .hosts[$h].events_loaded)
+            | map(. + " (" + ($f[.] // "function not named") + ")")
+            | join("; ")' "$capabilities" 2>/dev/null)
+    fi
+    if [[ -n "$missing" ]]; then
+        _hc_record "hooks" "warn" "${declared} handlers declared on ${events}; NOT loaded by ${host}: ${missing}. Trusted is the host's /hooks view, not measured here"
+    else
+        _hc_record "hooks" "ok" "${declared} handlers declared on ${events}; every event is one ${host:-this host} loads. Trusted is the host's /hooks view, not measured here"
+    fi
 }
-
 # --- Aggregate ---
 
 # Level 1.5 semantic validation (ADR-0019, amended): report which language

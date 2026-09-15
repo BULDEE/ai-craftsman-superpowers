@@ -2,7 +2,7 @@
 
 The plugin uses Claude Code hooks to automatically enforce code quality rules. Hooks run as shell scripts and agent prompts triggered by Claude Code events.
 
-**12 hook events wired**, documented below as two groups by what the hook checks: deterministic quality-gate scripts, and headless-Haiku semantic checks ([ADR-0018](../adr/0018-native-prompt-agent-hooks.md)).
+**12 hook events wired** on Claude Code; a host loads what it loads, and `hooks/host-capabilities.json` records it per host from the host's own schema (Codex 0.154.0 loads none of `TaskCompleted`, `PostToolUseFailure`, `FileChanged`, so the evidence gate at task completion, failure tracking with test-failure revocation, and external edit tracking are not active there, which `/craftsman:healthcheck` states rather than counts). Documented below as two groups by what the hook checks: deterministic quality-gate scripts, and headless-Haiku semantic checks ([ADR-0018](../adr/0018-native-prompt-agent-hooks.md)).
 
 ## Hook Events
 

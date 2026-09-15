@@ -45,7 +45,7 @@
 {"complexity":11,"fan_out":4,"file_lines":110,"ignores":0,"instrument":2,"max_fn_lines":27,"path":"hooks/lib/dispatch-context.sh"},
 {"complexity":10,"fan_out":0,"file_lines":300,"ignores":0,"instrument":2,"max_fn_lines":25,"path":"hooks/lib/haiku-verify.sh","reason":"host adapters lot 3 (CR-125): the semantic review has a backend port (claude-cli, codex-cli, none) and every run row names the backend that answered"},
 {"complexity":1,"fan_out":2,"file_lines":129,"ignores":0,"instrument":2,"max_fn_lines":7,"path":"hooks/lib/haiku_report.py"},
-{"complexity":6,"fan_out":0,"file_lines":297,"ignores":0,"instrument":2,"max_fn_lines":26,"path":"hooks/lib/healthcheck.sh","reason":"host adapters lot 2 (CR-132): one agent_hooks resolver reachable from the global file (no plugin options on Codex), one global-file resolver, a host row and a hooks row in the diagnostic"},
+{"complexity":7,"fan_out":0,"file_lines":313,"ignores":0,"instrument":2,"max_fn_lines":26,"path":"hooks/lib/healthcheck.sh","reason":"host adapters lot 3 (CR-127): the hooks row reads the per-host event matrix and names the function each unloaded event loses"},
 {"complexity":3,"fan_out":0,"file_lines":74,"ignores":0,"instrument":2,"max_fn_lines":17,"path":"hooks/lib/hook-events.sh"},
 {"complexity":5,"fan_out":1,"file_lines":72,"ignores":0,"instrument":2,"max_fn_lines":22,"path":"hooks/lib/hook-profile.sh"},
 {"complexity":9,"fan_out":0,"file_lines":43,"ignores":0,"instrument":2,"max_fn_lines":18,"path":"hooks/lib/host.sh"},

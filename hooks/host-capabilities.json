@@ -1,0 +1,28 @@
+{
+  "_comment": "What each host loads and observes, measured on the versions named; read by hooks/lib/healthcheck.sh. A declared handler on an event the host does not load is not an active function, and this file is where that is said. Provenance in tests/fixtures/hosts/PROVENANCE.md.",
+  "hosts": {
+    "claude-code": {
+      "version": "2.1.272",
+      "events_loaded": ["SessionStart", "PreToolUse", "PostToolUse", "PostToolUseFailure", "TaskCompleted", "UserPromptSubmit", "FileChanged", "SubagentStop", "PreCompact", "PostCompact", "Stop", "SessionEnd"],
+      "exit_code_observable": true,
+      "ask_supported": true,
+      "wakes_on_exit_2": true,
+      "skills_dir": ".claude/skills",
+      "source": "code.claude.com/docs/en/hooks and the captured events"
+    },
+    "codex": {
+      "version": "0.154.0",
+      "events_loaded": ["SessionStart", "PreToolUse", "PostToolUse", "UserPromptSubmit", "SubagentStart", "SubagentStop", "PreCompact", "PostCompact", "Stop", "SessionEnd", "PermissionRequest"],
+      "exit_code_observable": false,
+      "ask_supported": false,
+      "wakes_on_exit_2": false,
+      "skills_dir": ".agents/skills",
+      "source": "codex app-server generate-json-schema 0.154.0, definitions.ManagedHooksRequirements.properties; audit CR-117 hooks/list 14 of 17"
+    }
+  },
+  "event_functions": {
+    "TaskCompleted": "evidence gate before a task is marked complete (task-completed-verify.sh)",
+    "PostToolUseFailure": "failed tool tracking and test-failure revocation (tool-failure-tracker.sh, post-bash-test-verify.sh)",
+    "FileChanged": "external edit tracking for correction learning (file-changed.sh)"
+  }
+}

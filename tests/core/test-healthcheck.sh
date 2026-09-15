@@ -179,13 +179,42 @@ if [[ "$CODEX_MSG" == *"NOT observable"* && "$CODEX_MSG" == *"ask unsupported"* 
 else
     log_fail "hc_check_host" "codex=[$CODEX_MSG] claude=[$CLAUDE_MSG] unknown=$UNKNOWN_STATUS"
 fi
+# Declared is not loaded: hooks/host-capabilities.json says which events each
+# host loads (Codex 0.154.0: not TaskCompleted, PostToolUseFailure, FileChanged,
+# from its own generated schema), and a handler on an event the host does not
+# load is named with the function it carries, never counted as active.
 _HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
-CLAUDE_PLUGIN_ROOT="$ROOT_DIR" hc_check_hooks_declared
+CRAFTSMAN_SESSION_HOST=codex CLAUDE_PLUGIN_ROOT="$ROOT_DIR" hc_check_hooks_declared
+CODEX_HOOKS="${_HC_MESSAGES[0]}"; CODEX_HOOKS_STATUS="${_HC_STATUSES[0]}"
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CRAFTSMAN_SESSION_HOST=claude-code CLAUDE_PLUGIN_ROOT="$ROOT_DIR" hc_check_hooks_declared
+CLAUDE_HOOKS="${_HC_MESSAGES[0]}"; CLAUDE_HOOKS_STATUS="${_HC_STATUSES[0]}"
 DECLARED=$(jq '[.hooks[][] | .hooks[]] | length' "$ROOT_DIR/hooks/hooks.json")
-if [[ "${_HC_MESSAGES[0]}" == "${DECLARED} handlers declared on "* && "${_HC_MESSAGES[0]}" == *"not measured here"* ]]; then
-    log_pass "hc_check_hooks_declared: states the declared count and that loaded/trusted is the host's view, not a measurement"
+if [[ "$CODEX_HOOKS_STATUS" == "warn" && "$CODEX_HOOKS" == "${DECLARED} handlers declared on "* \
+    && "$CODEX_HOOKS" == *"NOT loaded by codex: FileChanged"* && "$CODEX_HOOKS" == *"PostToolUseFailure (failed tool tracking"* && "$CODEX_HOOKS" == *"TaskCompleted (evidence gate"* \
+    && "$CLAUDE_HOOKS_STATUS" == "ok" && "$CLAUDE_HOOKS" == *"every event is one claude-code loads"* ]]; then
+    log_pass "hc_check_hooks_declared: on Codex the three unloaded events are named with the function each loses; on Claude Code every event loads"
 else
-    log_fail "hc_check_hooks_declared" "${_HC_MESSAGES[0]}"
+    log_fail "hc_check_hooks_declared" "codex=[$CODEX_HOOKS_STATUS $CODEX_HOOKS] claude=[$CLAUDE_HOOKS_STATUS $CLAUDE_HOOKS]"
+fi
+# every declared event is accounted for on every host: loaded, or its lost function named
+UNACCOUNTED=$(python3 - "$ROOT_DIR" <<'PY'
+import json, sys
+root = sys.argv[1]
+declared = set(json.load(open(f"{root}/hooks/hooks.json"))["hooks"])
+caps = json.load(open(f"{root}/hooks/host-capabilities.json"))
+missing = []
+for host, spec in caps["hosts"].items():
+    for event in declared - set(spec["events_loaded"]):
+        if event not in caps["event_functions"]:
+            missing.append(f"{host}:{event}")
+print(" ".join(missing))
+PY
+)
+if [[ -z "$UNACCOUNTED" ]]; then
+    log_pass "host-capabilities.json accounts for every declared event on every host (loaded, or the lost function named)"
+else
+    log_fail "host-capabilities.json" "declared events with no loaded entry and no named function: $UNACCOUNTED"
 fi
 
 echo ""
