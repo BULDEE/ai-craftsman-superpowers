@@ -87,5 +87,32 @@ F2 and F3 are the reviewer's own. Two matrix rows above are reworded from
 - Codex shell exit codes: not observable on 0.154.0; the verification loop
   grants nothing there by design. Re-measure on each Codex release.
 - A Claude Code background test run the model never polls stays pending.
-- Grok as a host: not started (separate audit, as agreed). Grok as a review
-  backend: not implemented; the port takes a backend in one function.
+- Grok as a host: the engine reads its envelope (section below); the plugin's
+  own hooks do not run under Grok 1.0.30, so the gate is live there only
+  through a project or global hooks file pointing at the plugin's scripts.
+  Grok as a review backend: not implemented; the port takes a backend in one
+  function.
+
+## Grok 1.0.30 (audit of 2026-09-15, captured, then this branch)
+
+Grok reads the Claude catalogue (22 skills, 12 agents, `CLAUDE.md`) and the
+audit found the engine inert: a `write` of an invalid Domain class landed,
+`pre-write-check.sh` exited 0 on the captured envelope, `host_detect` said
+`copilot`. Three causes, two of them this plugin's, each fixed with a witness
+seen red first (`tests/core/test-host-payloads.sh`, Grok section):
+
+| Capability | Grok 1.0.30 | Proof |
+|---|---|---|
+| Write refused before disk (LAYER001, PHP002) via `write` | **captured**: the real envelope replayed through `pre-write-check.sh`, refused with `deny` | fixture `pre-tool-use.write`; red with `write` removed from `WRITE_TOOL_KINDS` |
+| Edit refused via `search_replace`, path relative to `cwd` as sent | captured | fixture `pre-tool-use.search_replace` |
+| Gate's own config | `ask` (documented honoured on any exit code) | `host_supports_ask grok` |
+| Host named from the envelope | captured: `grok` on every event under Claude's environment; Copilot fixture still `copilot` | red with the `workspaceRoot`/`hookEventName` clause removed |
+| Test run grants/revokes | **captured**: `run_terminal_command` result carries `exit_code` (a command exiting 3 is a PostToolUse with `exit_code: 3`) | fixtures `post-tool-use.bash.*` |
+| Events loaded | 11 kinds per its hooks guide; no `TaskCompleted`, no `FileChanged` | `hooks/host-capabilities.json`, healthcheck row |
+| Plugin hooks executed | **not observed**: `hooks/hooks.json` discovered (`has_hooks=true`), zero handlers loaded, headless, project plugin enabled; the user-scope copy read from the Claude cache likewise | `docs/reference/interop-2026-09-15-evidence/grok-plugin-hooks-1.0.30.md` |
+| Skills / agents discovered | listed by `grok inspect`; `/craftsman:debug` ran (audit) | audit report, not this branch |
+| Review backend `grok -p` | not implemented | |
+
+Not done, on purpose: no `adapters/grok/`. The envelope already carries
+`tool_input` and `session_id` in Claude's shape; what was missing was the tool
+names and the host's name, which are engine tables, not a translator.

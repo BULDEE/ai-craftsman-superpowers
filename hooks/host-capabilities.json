@@ -3,7 +3,20 @@
   "hosts": {
     "claude-code": {
       "version": "2.1.272",
-      "events_loaded": ["SessionStart", "PreToolUse", "PostToolUse", "PostToolUseFailure", "TaskCompleted", "UserPromptSubmit", "FileChanged", "SubagentStop", "PreCompact", "PostCompact", "Stop", "SessionEnd"],
+      "events_loaded": [
+        "SessionStart",
+        "PreToolUse",
+        "PostToolUse",
+        "PostToolUseFailure",
+        "TaskCompleted",
+        "UserPromptSubmit",
+        "FileChanged",
+        "SubagentStop",
+        "PreCompact",
+        "PostCompact",
+        "Stop",
+        "SessionEnd"
+      ],
       "exit_code_observable": true,
       "ask_supported": true,
       "wakes_on_exit_2": true,
@@ -12,12 +25,50 @@
     },
     "codex": {
       "version": "0.154.0",
-      "events_loaded": ["SessionStart", "PreToolUse", "PostToolUse", "UserPromptSubmit", "SubagentStart", "SubagentStop", "PreCompact", "PostCompact", "Stop", "SessionEnd", "PermissionRequest"],
+      "events_loaded": [
+        "SessionStart",
+        "PreToolUse",
+        "PostToolUse",
+        "UserPromptSubmit",
+        "SubagentStart",
+        "SubagentStop",
+        "PreCompact",
+        "PostCompact",
+        "Stop",
+        "SessionEnd",
+        "PermissionRequest"
+      ],
       "exit_code_observable": false,
       "ask_supported": false,
       "wakes_on_exit_2": false,
       "skills_dir": ".agents/skills",
       "source": "codex app-server generate-json-schema 0.154.0, definitions.ManagedHooksRequirements.properties; audit CR-117 hooks/list 14 of 17"
+    },
+    "grok": {
+      "version": "1.0.30",
+      "events_loaded": [
+        "SessionStart",
+        "PreToolUse",
+        "PostToolUse",
+        "PostToolUseFailure",
+        "UserPromptSubmit",
+        "SubagentStart",
+        "SubagentStop",
+        "PreCompact",
+        "PostCompact",
+        "Stop",
+        "SessionEnd"
+      ],
+      "exit_code_observable": false,
+      "ask_supported": true,
+      "wakes_on_exit_2": false,
+      "skills_dir": ".grok/skills",
+      "write_tools": [
+        "write",
+        "search_replace"
+      ],
+      "plugin_hooks_executed": "not observed: a Claude plugin's hooks/hooks.json is listed by `grok inspect` (hookType file) and no plugin handler appears in hook_execution; see tests/fixtures/hosts/PROVENANCE.md",
+      "source": "~/.grok/docs/user-guide/10-hooks.md (1.0.30) for the event list, the captured events for the payload; TaskCompleted and FileChanged are not events Grok fires"
     }
   },
   "event_functions": {

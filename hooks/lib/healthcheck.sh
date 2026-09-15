@@ -163,19 +163,28 @@ hc_check_session_bridge() {
 # sends no exit code for a shell command and ignores the `ask` decision,
 # Claude Code sends both. `CRAFTSMAN_SESSION_HOST` is set by session-start.sh
 # from its payload; a skill running later reads the environment instead.
+# What the host can do is read from the matrix, never from a case per host:
+# the case here knew Claude Code and Codex, and a Grok session (captured
+# 2026-09-15) was reported "unknown host" while the same file already said
+# what Copilot could not do. A host absent from the matrix is unqualified and
+# said so; one present is described by what was measured for it.
 hc_check_host() {
-    local host="${CRAFTSMAN_SESSION_HOST:-}"
+    local host="${CRAFTSMAN_SESSION_HOST:-}" capabilities="${CLAUDE_PLUGIN_ROOT:-$(pwd)}/hooks/host-capabilities.json" row
     if [[ -z "$host" ]] && type host_detect >/dev/null 2>&1; then
         host=$(host_detect "")
     fi
-    case "$host" in
-        claude-code)
-            _hc_record "host" "ok" "claude-code: test exit codes observable (verification loop live), PreToolUse ask honoured, skills read from .claude/skills" ;;
-        codex)
-            _hc_record "host" "ok" "codex: shell exit codes NOT observable (a test run grants and revokes nothing), PreToolUse ask unsupported (gate config denied instead), skills read from .agents/skills" ;;
-        *)
-            _hc_record "host" "warn" "unknown host: capabilities not qualified; gates run, ask is treated as unsupported" ;;
-    esac
+    row=$(jq -r --arg h "$host" '
+        .hosts[$h] // empty
+        | [ $h + " " + (.version // "?"),
+            (if .exit_code_observable then "test exit codes observable (verification loop live)" else "shell exit codes NOT observable (a test run grants and revokes nothing)" end),
+            (if .ask_supported then "PreToolUse ask honoured" else "PreToolUse ask unsupported (gate config denied instead)" end),
+            ("skills read from " + (.skills_dir // "?")) ]
+        | .[0] + ": " + (.[1:] | join(", "))' "$capabilities" 2>/dev/null)
+    if [[ -n "$row" ]]; then
+        _hc_record "host" "ok" "$row"
+    else
+        _hc_record "host" "warn" "${host:-unknown} host: capabilities not qualified in hooks/host-capabilities.json; gates run, ask is treated as unsupported"
+    fi
 }
 
 # Declared is not loaded, loaded is not triggered. hooks.json declares N

@@ -823,4 +823,111 @@ else
 fi
 rm -rf "$M" "$WORK/src/anchored.py"
 
+# --- Grok 1.0.30: the catalogue host whose engine never ran (CR-146..148) ----
+# Captured 2026-09-15 (PROVENANCE.md): Grok sends `tool_name: write` for a
+# creation and `search_replace` for an edit, both cases of every key
+# (`toolName` and `tool_name`), a `timestamp`, a `workspaceRoot` and a string
+# `transcriptPath` under ~/.grok/sessions. Replayed against this branch, the
+# write of an invalid Domain class exited 0 in silence: `write` was not a tool
+# the mirror judged, and host_detect called the envelope Copilot.
+_grok_pre_write() {
+    host_fixture_with grok 1.0.30 pre-tool-use.write "$WORK" \
+        "d['tool_input']['file_path'] = '$1'; d['toolInput']['file_path'] = '$1'; d['tool_input']['content'] = open('$2').read(); d['toolInput']['content'] = d['tool_input']['content']"
+}
+printf '%s' "$BAD_PHP" > "$WORK/bad.php.txt"
+printf '%s' "$GOOD_PHP" > "$WORK/good.php.txt"
+G_HOST=$(host_detect "$(host_fixture grok 1.0.30 pre-tool-use.write "$WORK")")
+G_MISS=""
+for f in "$ROOT_DIR"/tests/fixtures/hosts/grok/*/*.json; do
+    [[ "$f" == *hook-env* ]] && continue
+    [[ "$(CLAUDECODE=1 CLAUDE_CODE_SESSION_ID=parent host_detect "$(cat "$f")")" == grok ]] || G_MISS="$G_MISS $(basename "$f")"
+done
+C_HOST=$(host_detect "$(host_fixture copilot documented pre-tool-use.create.camel "$WORK")")
+G_ENV=$(env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID -u PLUGIN_ROOT GROK_SESSION_ID=s bash -c "source '$ROOT_DIR/hooks/lib/host.sh'; host_detect ''")
+if [[ "$G_HOST" == grok && -z "$G_MISS" && "$C_HOST" == copilot && "$G_ENV" == grok ]]; then
+    log_pass "CR-147: every captured Grok event names grok under Claude's environment, the Copilot envelope stays copilot, GROK_SESSION_ID alone names grok"
+else
+    log_fail "CR-147 host_detect grok" "write=$G_HOST missed:$G_MISS copilot=$C_HOST env=$G_ENV"
+fi
+
+R=$(_run pre-write-check.sh "$(_grok_pre_write "$WORK/src/Domain/Order.php" "$WORK/bad.php.txt")")
+if [[ "${R%%|*}" == "2" && "${R#*|}" == *LAYER001* && "${R#*|}" == *PHP002* ]]; then
+    log_pass "CR-146: the Grok write of an invalid Domain class is refused pre-write (LAYER001, PHP002)"
+else
+    log_fail "CR-146 grok write refused" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
+fi
+if [[ "${R#*|}" == *'"permissionDecision": "deny"'* || "${R#*|}" == *'"permissionDecision":"deny"'* ]]; then
+    log_pass "CR-146: the Grok refusal carries permissionDecision deny (Grok honours it on any exit code)"
+else
+    log_fail "CR-146 grok refusal carries deny" "out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-200)"
+fi
+R=$(_run pre-write-check.sh "$(_grok_pre_write "$WORK/src/Domain/Order.php" "$WORK/good.php.txt")")
+[[ "${R%%|*}" == "0" ]] && log_pass "control: the Grok write of a valid Domain class passes" || log_fail "control grok valid write" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
+L=$(_grok_pre_write "$WORK/src/Domain/Order.php" "$WORK/bad.php.txt" | python3 "$ROOT_DIR/hooks/lib/write_mirror.py" --list 2>/dev/null)
+[[ "$L" == *"src/Domain/Order.php"* ]] && log_pass "CR-146: write_mirror --list names the file a Grok write creates" || log_fail "CR-146 --list on grok write" "list=$L"
+
+# search_replace: the edit removes `final` from an existing class, the path is
+# RELATIVE to cwd as the host sent it (fixture: file_path "ok.txt").
+G_EDIT=$(host_fixture_with grok 1.0.30 pre-tool-use.search_replace "$WORK" \
+    "d['tool_input'].update(file_path='src/Domain/Existing.php', old_string='final class Existing', new_string='class Existing'); d['toolInput'] = dict(d['tool_input'])")
+R=$(cd "$WORK" && _run pre-write-check.sh "$G_EDIT")
+if [[ "${R%%|*}" == "2" && "${R#*|}" == *PHP002* ]]; then
+    log_pass "CR-146: a Grok search_replace dropping final, relative path as sent, is refused pre-write (PHP002)"
+else
+    log_fail "CR-146 grok search_replace refused" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
+fi
+R=$(cd "$WORK" && _run post-write-check.sh "$(host_fixture_with grok 1.0.30 post-tool-use.write "$WORK" \
+    "d['tool_input']['file_path'] = '$WORK/src/Domain/Existing.php'; d['toolInput'] = dict(d['tool_input'])")")
+[[ "${R%%|*}" == "0" && "${R#*|}" != *"UNJUDGED"* ]] && log_pass "control: the Grok post-write on a valid file passes" || log_fail "control grok post-write" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
+
+# config-protection reads the same envelope
+G_CFG=$(host_fixture_with grok 1.0.30 pre-tool-use.write "$WORK" \
+    "d['tool_input'].update(file_path='$WORK/.craft-rules.yml', content='rules:\n  LAYER001: ignore\n'); d['toolInput'] = dict(d['tool_input'])")
+R=$(_run config-protection.sh "$G_CFG")
+# Grok's hooks guide: allow, deny, ask, defer are all honoured from
+# hookSpecificOutput.permissionDecision, so the gate asks there as it does on
+# Claude Code, and denies only where ask decides nothing (Codex, Copilot).
+if [[ "${R#*|}" == *'"permissionDecision": "ask"'* ]]; then
+    log_pass "CR-146: a Grok write to .craft-rules.yml is put to the user (ask), as on Claude Code"
+else
+    log_fail "CR-146 grok config-protection" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-200)"
+fi
+
+# Grok's run_terminal_command result carries `exit_code` on PostToolUse (a
+# command exiting 3 produced PostToolUse, not PostToolUseFailure, fixture
+# post-tool-use.bash.exit3-with-output): the verification loop is live there,
+# unlike Codex. `output` is a byte array; `output_for_prompt` is the text.
+GSTATE="$CLAUDE_PLUGIN_DATA/session-state-g130.json"
+_gflag() { python3 "$ROOT_DIR/hooks/lib/session_state.py" check-flag "$GSTATE" verified; }
+_as_gtest() { host_fixture_with grok 1.0.30 "$1" "$WORK" "d['session_id'] = 'g130'; d['sessionId'] = 'g130'; d['tool_input']['command'] = 'pytest -q'; d['toolInput'] = dict(d['tool_input'])${2:-}"; }
+echo '{"verified": false}' > "$GSTATE"
+_verify "$(_as_gtest post-tool-use.bash.pytest-missing-exit1 "; d['tool_response']['exit_code'] = 0; d['toolResult'] = dict(d['tool_response'])")"; RC=$?
+if [[ "$RC" -eq 0 && "$(_gflag)" == "true" ]]; then
+    log_pass "Grok: a passing test run (exit_code 0 in the captured result shape) grants verified"
+else
+    log_fail "Grok passing run grants" "rc=$RC verified=$(_gflag) err=$VERIFY_ERR"
+fi
+_verify "$(_as_gtest post-tool-use.bash.pytest-missing-exit1)"; RC=$?
+if [[ "$RC" -eq 2 && "$(_gflag)" == "false" && "$VERIFY_ERR" == *REGRESSED* ]]; then
+    log_pass "Grok: the captured pytest run that exited 1 (PostToolUse, exit_code 1) revokes verified and reports the regression"
+else
+    log_fail "Grok exit 1 revokes" "rc=$RC verified=$(_gflag) err=$VERIFY_ERR"
+fi
+D=$(python3 "$ROOT_DIR/hooks/lib/tool_result.py" < "$(host_fixture_path grok 1.0.30 post-tool-use.bash.exit3-with-output)")
+[[ "$D" == *'"state": "failed"'* && "$D" == *'"exit_code": 3'* ]] && log_pass "Grok: the decoder reads exit_code 3 off the captured run_terminal_command result" || log_fail "Grok decoder exit 3" "$D"
+
+# CR-148: the matrix has a grok row and the healthcheck reads it
+if jq -e '.hosts.grok.events_loaded | index("PreToolUse")' "$ROOT_DIR/hooks/host-capabilities.json" >/dev/null 2>&1 \
+   && jq -e '.hosts.grok | has("exit_code_observable") and has("ask_supported") and has("skills_dir")' "$ROOT_DIR/hooks/host-capabilities.json" >/dev/null 2>&1; then
+    log_pass "CR-148: host-capabilities.json records grok with events_loaded, exit_code_observable, ask_supported, skills_dir"
+else
+    log_fail "CR-148 grok capabilities row" "$(jq -c '.hosts | keys' "$ROOT_DIR/hooks/host-capabilities.json")"
+fi
+HC=$(cd "$WORK" && CRAFTSMAN_SESSION_HOST=grok bash -c "source '$ROOT_DIR/hooks/lib/healthcheck.sh'; hc_check_host; hc_check_hooks_declared; printf '%s\n' \"\${_HC_MESSAGES[@]}\"" 2>/dev/null)
+if [[ "$HC" == *"grok"* && "$HC" != *"unknown host"* && "$HC" != *"not recorded"* ]]; then
+    log_pass "CR-148: the healthcheck names grok and reads its loaded events from the matrix"
+else
+    log_fail "CR-148 healthcheck grok" "$(printf '%s' "$HC" | tr '\n' ' ' | cut -c1-240)"
+fi
+
 test_summary

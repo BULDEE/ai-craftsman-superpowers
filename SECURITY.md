@@ -84,7 +84,10 @@ whose names start with `agent-` are shell scripts that shell out to a headless
   otherwise
 - ❌ Do NOT read environment variables beyond `$CLAUDE_PLUGIN_ROOT`,
   `$CLAUDE_PLUGIN_DATA`, `$CLAUDE_PLUGIN_OPTION_*`, `$HOME`, `$PWD`, `$TMPDIR`,
-  Claude Code's own `$CLAUDE_EFFORT` and `$CLAUDE_CODE_SESSION_ID`, and the
+  Claude Code's own `$CLAUDE_EFFORT`, `$CLAUDE_CODE_SESSION_ID` and
+  `$CLAUDECODE`, the other hosts' session names read by `hooks/lib/host.sh`
+  and `hooks/lib/session-files.sh` (`$CODEX_SESSION_ID`, `$PLUGIN_ROOT`,
+  `$GROK_SESSION_ID`, `$GROK_HOOK_EVENT`), and the
   `CRAFTSMAN_*` switches listed below. The list is the whole list:
   `tests/core/test-doc-claims.sh` fails when the code reads one this document
   does not name, because a partial list is read as the complete one.

@@ -14,11 +14,13 @@ Reads the hook payload on stdin, prints one line for the shell half:
   UNJUDGED <why>           a write this hook cannot judge and must not wave
   (nothing)                not a write this hook judges
 
-Three payload shapes. Hermes: `tool_name` write_file|patch with `args` (plugin
-hook) or `tool_input` (shell hook), `path`, `content` or
-`old_string`/`new_string`/`replace_all`, and `cwd`. Claude Code: `tool_name`
-Write|Edit with `tool_input`, `file_path`, `content` or
-`old_string`/`new_string`/`replace_all`. Codex: `tool_name` apply_patch with
+Four payload shapes, three kinds of write. Hermes: `tool_name`
+write_file|patch with `args` (plugin hook) or `tool_input` (shell hook),
+`path`, `content` or `old_string`/`new_string`/`replace_all`, and `cwd`.
+Claude Code: `tool_name` Write|Edit with `tool_input`, `file_path`, `content`
+or `old_string`/`new_string`/`replace_all`. Grok 1.0.30: the same two shapes
+under its own names, `write` and `search_replace`, the path relative to `cwd`
+when the model wrote it so (tests/fixtures/hosts/grok). Codex: `tool_name` apply_patch with
 the whole patch in `tool_input.command` (tests/fixtures/hosts/codex), one
 patch naming any number of files: the lines above are printed once per file,
 and a patch is judged as a whole by the shell half (one refused file refuses
@@ -45,7 +47,24 @@ import os
 import shutil
 import sys
 
-WRITE_TOOLS = ("write_file", "patch", "Write", "Edit", "apply_patch")
+# Every host tool this gate judges, and the kind of write it is: `write`
+# carries the whole file (`content`), `edit` carries `old_string`/`new_string`
+# over the file on disk, `patch` carries a V4A body naming its own files. The
+# name is the host's (a matcher alias in the host maps Claude's Write/Edit to
+# it, but the hook receives the host's own name: Grok sent `write` and the
+# gate exited 0 in silence, audit of 2026-09-15). Adding a host is one line
+# here, never a branch in the shell half.
+WRITE_TOOL_KINDS = {
+    "Write": "write", "write_file": "write", "write": "write",
+    "Edit": "edit", "patch": "edit", "search_replace": "edit",
+    "apply_patch": "patch",
+}
+WRITE_TOOLS = tuple(WRITE_TOOL_KINDS)
+
+
+def tool_kind(tool: str) -> str:
+    """write | edit | patch, or "" for a tool this gate does not judge."""
+    return WRITE_TOOL_KINDS.get(tool, "")
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
@@ -132,7 +151,7 @@ def _touches_gate(relative: str) -> bool:
 
 
 def _would_be_content(tool: str, args: dict, target: str) -> str | None:
-    if tool in ("write_file", "Write"):
+    if tool_kind(tool) == "write":
         content = args.get("content")
         return content if isinstance(content, str) else None
     old, new = args.get("old_string"), args.get("new_string")
@@ -250,20 +269,20 @@ def changes_of(payload: dict, paths_only: bool = False) -> list:
     args = _arguments(payload)
     if not tool:
         tool = "Edit" if "old_string" in args else "Write"
-    if tool not in WRITE_TOOLS:
+    if not tool_kind(tool):
         return []
     if _is_v4a(args):
         # Hermes's `mode: patch` body is not read here; a lister that returned
         # nothing let the config gate pass it (independent verification, 2026-09-15).
         raise ValueError("a V4A patch (mode: patch / patch) is not read by the write gate; use write_file or a replace-mode patch")
-    if tool == "apply_patch":
+    if tool_kind(tool) == "patch":
         return _patch_changes_of(payload, args, paths_only)
     path = args.get("path") or args.get("file_path")
     if not path:
         return []
     cwd = str(payload.get("cwd") or "")
     target = str(path) if os.path.isabs(str(path)) or not cwd else os.path.join(cwd, str(path))
-    return [Change("update" if tool in ("Edit", "patch") else "add", target, None, _would_be_content(tool, args, target))]
+    return [Change("update" if tool_kind(tool) == "edit" else "add", target, None, _would_be_content(tool, args, target))]
 
 
 def _place(mirror: str, workspace: str, relative: str, content: str) -> None:
@@ -351,7 +370,7 @@ def _changes_or_line(payload: dict, tool: str, args: dict, hint: str) -> tuple:
     """(changes, "") or ([], <line to print>) for a call the mirror cannot judge."""
     if _is_v4a(args):
         return [], "UNJUDGED a V4A patch (mode: patch) is not read by the write gate; use write_file or a replace-mode patch (old_string/new_string)"
-    if tool == "apply_patch":
+    if tool_kind(tool) == "patch":
         try:
             return changes_of(payload), ""
         except ValueError as error:
@@ -379,7 +398,7 @@ def _placement(payload: dict, mirror: str) -> str:
     """The lines the shell half reads, or "" for a call this gate does not judge."""
     args = _arguments(payload)
     tool = _tool_of(payload, args)
-    if tool not in WRITE_TOOLS:
+    if not tool_kind(tool):
         return ""
     hint = str(payload.get("cwd") or "")
     changes, line = _changes_or_line(payload, tool, args, hint)

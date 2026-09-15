@@ -1,0 +1,78 @@
+{
+  "hookEventName": "post_tool_use",
+  "sessionId": "01a0a688-b5aa-77d1-85a8-26ec39da1f6f",
+  "cwd": "__WORKSPACE__",
+  "workspaceRoot": "__WORKSPACE__/",
+  "timestamp": "2026-09-15T19:26:17.472029+00:00",
+  "transcriptPath": "/Users/__USER__/.grok/sessions/__WORKSPACE_ENCODED__/01a0a688-b5aa-77d1-85a8-26ec39da1f6f/updates.jsonl",
+  "permissionMode": "bypassPermissions",
+  "toolName": "search_replace",
+  "toolUseId": "call-fab401f5-2dab-4dc1-b49c-f45b41eee9de-0",
+  "toolInput": {
+    "file_path": "ok.txt",
+    "old_string": "ko",
+    "new_string": "ok"
+  },
+  "toolResult": {
+    "type": "SearchReplace",
+    "EditsApplied": {
+      "old_string": "ko",
+      "new_string": "ok",
+      "tool_output_for_prompt": "The file ok.txt has been updated successfully.",
+      "tool_output_for_prompt_concise": "The file ok.txt has been updated.",
+      "absolute_path": "__WORKSPACE__/ok.txt",
+      "edits": {
+        "details": [
+          {
+            "old_string": "ko",
+            "old_line": 1,
+            "new_string": "ok",
+            "new_line": 1,
+            "context_before": "",
+            "context_after": "",
+            "line_prefix": ""
+          }
+        ]
+      }
+    }
+  },
+  "toolInputTruncated": false,
+  "toolResultTruncated": false,
+  "durationMs": 5,
+  "isBackgrounded": false,
+  "hook_event_name": "PostToolUse",
+  "session_id": "01a0a688-b5aa-77d1-85a8-26ec39da1f6f",
+  "transcript_path": "/Users/__USER__/.grok/sessions/__WORKSPACE_ENCODED__/01a0a688-b5aa-77d1-85a8-26ec39da1f6f/updates.jsonl",
+  "permission_mode": "bypassPermissions",
+  "tool_name": "search_replace",
+  "tool_input": {
+    "file_path": "ok.txt",
+    "old_string": "ko",
+    "new_string": "ok"
+  },
+  "tool_response": {
+    "type": "SearchReplace",
+    "EditsApplied": {
+      "old_string": "ko",
+      "new_string": "ok",
+      "tool_output_for_prompt": "The file ok.txt has been updated successfully.",
+      "tool_output_for_prompt_concise": "The file ok.txt has been updated.",
+      "absolute_path": "__WORKSPACE__/ok.txt",
+      "edits": {
+        "details": [
+          {
+            "old_string": "ko",
+            "old_line": 1,
+            "new_string": "ok",
+            "new_line": 1,
+            "context_before": "",
+            "context_after": "",
+            "line_prefix": ""
+          }
+        ]
+      }
+    }
+  },
+  "tool_use_id": "call-fab401f5-2dab-4dc1-b49c-f45b41eee9de-0",
+  "duration_ms": 5
+}

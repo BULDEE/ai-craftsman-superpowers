@@ -11,7 +11,7 @@ The plugin uses Claude Code hooks to automatically enforce code quality rules. H
 | Event | Hook | Purpose |
 |-------|------|---------|
 | SessionStart | `session-start.sh` | Initialization, config loading, first-run detection |
-| PreToolUse | `config-protection.sh` | Refuse writes that would tamper with plugin configuration; reads a Write/Edit `file_path` or every file a Codex `apply_patch` names |
+| PreToolUse | `config-protection.sh` | Refuse writes that would tamper with plugin configuration; reads a Write/Edit `file_path` or every file a Codex `apply_patch` names. The matchers stay Claude's names (`Write|Edit`, `Bash`): every host measured maps them to its own tools (Codex `apply_patch`, Grok `write`/`search_replace`/`run_terminal_command`), and the hook receives the host's name, which `hooks/lib/write_mirror.py` reads through one table (`WRITE_TOOL_KINDS`) |
 | PreToolUse | `pre-write-check.sh` | Judge the would-be file **before** it lands, through the same pack validators post-write runs, on a mirror of the workspace; a multi-file patch is judged file by file and refused as a whole |
 | PreToolUse | `pre-push-verify.sh` | Validate git push commands for safety |
 | PostToolUse | `post-write-check.sh` | Validate file **after** write (all rules); one run per file for a Codex `apply_patch` |

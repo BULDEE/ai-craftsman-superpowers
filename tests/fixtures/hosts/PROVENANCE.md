@@ -106,6 +106,63 @@ Nothing else is edited. `hook-env.*.json` lists variable NAMES only.
   Code session this run was launched from. A skill in a Codex Bash tool can
   name its own session; a hook cannot rely on the environment.
 
+## grok/1.0.30
+
+- Date: 2026-09-15. `grok --version`: `grok 1.0.30 (04b7ffed98c6) [stable]`.
+  Model reported in the run output: `grok-4.6-build`. Project-level
+  `.grok/hooks/capture.json` (SessionStart, PreToolUse, PostToolUse,
+  PostToolUseFailure, every handler `cat` to a file), the project trusted with
+  `--trust`, run with `grok -p "<prompt>" --always-approve --trust
+  --output-format json --no-subagents`. Four runs: a `write`, two
+  `search_replace`, two shell commands.
+- Raw sha256 (first 16): session-start `edd68762c34a31fa`, write pre
+  `3d524631e5545ce5` / post `6f67f08a949e7ad0`, search_replace pre
+  `536f80be614d421e` / post `728cca583944b37c`, bash pre `fb355ce2ad06952b`,
+  bash exit 3 `40c12709552441cd`, bash pytest missing `5442b23ad06f42bb`.
+- One more redaction than the two above: the transcript path holds the
+  workspace URL-encoded (`%2Fprivate%2Ftmp%2F...`), replaced by
+  `__WORKSPACE_ENCODED__`.
+- Observed, and load-bearing for the hooks:
+  - Every key is sent TWICE, camelCase and snake_case: `hookEventName`
+    (lowercase, `pre_tool_use`) and `hook_event_name` (`PreToolUse`),
+    `sessionId`/`session_id`, `toolName`/`tool_name`, `toolInput`/`tool_input`,
+    `toolResult`/`tool_response`, `transcriptPath`/`transcript_path` (a string
+    under `~/.grok/sessions/<encoded workspace>/<session>/updates.jsonl`),
+    plus `cwd`, `workspaceRoot` (trailing slash), `timestamp` (ISO string),
+    `permissionMode`, `toolUseId`. The snake_case half is Claude Code's
+    shape, so a hook written for Claude Code reads it unchanged; the
+    `workspaceRoot` + lowercase `hookEventName` pair is what names the host.
+  - A creation is `tool_name: "write"` with `{file_path, content}`; an edit
+    is `tool_name: "search_replace"` with `{file_path, old_string,
+    new_string}` and the path RELATIVE to `cwd` when the model wrote it so
+    (`"ok.txt"`). Claude's `Write`/`Edit` matchers fire on both (the user's
+    `~/.claude/settings.json` `Write|Edit|MultiEdit|...` handler ran on
+    `write` and on `search_replace` in the transcript's `hook_execution`
+    rows), but the hook receives Grok's own name: a gate that only knew
+    `Write`/`Edit` exited 0 on both.
+  - Write/edit `tool_response` = `{"type": "SearchReplace", "EditsApplied":
+    {old_string, new_string, tool_output_for_prompt, absolute_path, edits}}`
+    for both tools.
+  - A shell command is `tool_name: "run_terminal_command"` (Claude's `Bash`
+    matcher fires on it); its `tool_response` = `{"type": "Bash", "output":
+    [<bytes>], "output_for_prompt": "exit: N\n<text>", "exit_code": N,
+    "command", "truncated", "signal", "timed_out", "current_dir",
+    "output_file", "total_bytes"}`. A command exiting 3 and one exiting 1
+    both produced PostToolUse WITH `exit_code`: the exit code is observable
+    on this host, unlike Codex.
+  - Hooks that ran, per the session's `hook_execution` rows: the global
+    `~/.claude/settings.json` handlers, the project `.grok/hooks` handlers
+    once trusted. Not a single handler from any Claude plugin, craftsman
+    included, although `grok inspect` lists `hooks/hooks.json` of six plugins
+    as `file plugin: <name>`. Not trusted, project hooks are silently skipped
+    (run 5: `search_replace` landed, no project row).
+  - `SessionStart` carries `source: "new"` and no transcript path.
+  - Hook environment (its hooks guide, 1.0.30): `GROK_HOOK_EVENT`,
+    `GROK_HOOK_NAME`, `GROK_SESSION_ID`, `GROK_WORKSPACE_ROOT`; plugin hooks
+    add `GROK_PLUGIN_ROOT`/`GROK_PLUGIN_DATA` and the `CLAUDE_PLUGIN_*`
+    aliases. `GROK_HOOK_EVENT` was read by the capture script; the rest is
+    documented, not captured.
+
 ## Not captured (open)
 
 - A Codex PLUGIN-bundled hook's environment (only a project hook was run).
@@ -113,3 +170,5 @@ Nothing else is edited. `hook-env.*.json` lists variable NAMES only.
   one PostToolUse with the final output; no intermediate event reached the
   hook.
 - Copilot CLI, VS Code and cloud: no consumer available on this machine.
+- A Grok PLUGIN-bundled hook running at all: see `plugin_hooks_executed` in
+  `hooks/host-capabilities.json`.

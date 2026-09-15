@@ -30,6 +30,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their provenance; `docs/reference/interop-2026-09-15-compat.md` says what
   is proven, by which instrument, on which version.
 
+- Grok 1.0.30 as a host, measured (audit of 2026-09-15): the write gates
+  judge its `write` and `search_replace` tools (they exited 0 in silence on
+  the captured envelope), `host_detect` names `grok` from the envelope
+  (`workspaceRoot` and a lowercase `hookEventName`; it was read as Copilot
+  because both carry a `timestamp`) and from `GROK_SESSION_ID`, the
+  capability matrix has a `grok` row and the healthcheck describes any host
+  from that row instead of a case per host, and `run_terminal_command`
+  results carry `exit_code`, so the verification loop is live there. The
+  mirror now holds one table of host tool names to a kind of write
+  (`WRITE_TOOL_KINDS`), and the pre-write gate no longer branches on a tool
+  name. What Grok does NOT do is recorded too: it discovers a plugin's
+  `hooks/hooks.json` and loads none of its handlers (headless, project plugin
+  enabled; `docs/reference/interop-2026-09-15-evidence/grok-plugin-hooks-1.0.30.md`),
+  so on Grok the engine runs only from a project or global hooks file, and
+  "compatible Grok" is not claimed.
+
 - Hermes: a `git push` between two conclusions waits for the conclusion
   gate. `adapters/hermes/pre-tool-call.sh` now reads `terminal` and refuses a
   push (and a commit under `strict`) unless `pre-verify.sh`'s last verdict is

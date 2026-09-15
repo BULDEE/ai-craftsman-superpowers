@@ -42,31 +42,12 @@ TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)
 # shapes; only a call that names no file at all is not this gate's.
 [[ -z "$FILE_PATH" && "$TOOL_NAME" != "apply_patch" ]] && exit 0
 
-# What the file WOULD contain. A Write carries it as `content`; an Edit
-# carries `old_string`/`new_string`, and reading `content` alone let every
-# Edit through the gate untouched while the same text through Write was
-# refused (guardrail review). The would-be file is the current one with the
-# edit applied; when the anchor is absent, Claude Code refuses the Edit itself
-# and what the gate can still judge is what the edit adds, never nothing.
-# A Write's content is read with jq, no interpreter start on the common path;
-# the Edit case pays one python3 start, which is what applying the edit costs.
+# The whole content a write carries, when it carries one. It feeds the PHP001
+# auto-fix below and nothing else: the would-be file the validators judge is
+# laid out by the mirror helper, for every shape (a Write, an Edit applied to
+# the file on disk, a patch), so the edit branch that used to be computed here
+# fed nobody. Read with jq, no interpreter start on the common path.
 FILE_CONTENT=$(echo "$INPUT" | jq -r '.tool_input.content // empty' 2>/dev/null || true)
-[[ -z "$FILE_CONTENT" && "$TOOL_NAME" == "Edit" ]] && FILE_CONTENT=$(printf '%s' "$INPUT" | python3 -c '
-import json, sys
-payload = json.load(sys.stdin)
-args = payload.get("tool_input") or {}
-old, new = args.get("old_string"), args.get("new_string")
-if not isinstance(old, str) or not isinstance(new, str):
-    sys.exit(0)
-try:
-    current = open(args.get("file_path", ""), encoding="utf-8", errors="replace").read()
-except OSError:
-    current = ""
-if old and old in current:
-    sys.stdout.write(current.replace(old, new) if args.get("replace_all") else current.replace(old, new, 1))
-else:
-    sys.stdout.write(new)
-' 2>/dev/null || true)
 
 # Only check source files, as declared by the loaded packs. A patch is
 # filtered per file below, since it may name several languages at once.
@@ -180,7 +161,9 @@ local_should_block=false
 # rule asked not to be policed on it, and a fix nobody asked for is policing.
 # =============================================================================
 
-if [[ $VIOLATION_COUNT -eq 1 && "$TOOL_NAME" == "Write" && "$LANG_ID" == "php" && "$local_should_block" == true ]] \
+# A call that carries the whole file is a write, whatever the host names it
+# (Write, write_file, Grok's `write`); the fix rewrites `content` in place.
+if [[ $VIOLATION_COUNT -eq 1 && -n "$FILE_CONTENT" && "$LANG_ID" == "php" && "$local_should_block" == true ]] \
    && [[ "$VIOLATIONS" == PHP001* ]] \
    && echo "$FILE_CONTENT" | head -1 | grep -q "^<?php" 2>/dev/null; then
     FIXED_CONTENT=$(printf '%s\n' "$FILE_CONTENT" | awk 'NR==1 && $0 ~ /^<\?php/ {print; print ""; print "declare(strict_types=1);"; next} {print}')
