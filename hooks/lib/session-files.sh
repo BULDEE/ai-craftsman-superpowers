@@ -6,12 +6,21 @@
 # SessionEnd deleted another's pending findings, a project's cross-file
 # patterns surfaced in a second project ("PHP001 found in 3 files" with one
 # file local), and `verified` set by any project satisfied pre-push-verify in
-# every other (learning-loop review, CR-3). Claude Code sets
-# CLAUDE_CODE_SESSION_ID in hook subprocesses AND in Bash tool subprocesses,
-# matching the `session_id` field of the hook input, so hooks and skills
-# resolve the same per-session file without a bridge. With no id (the suites,
-# an older Claude Code) the historical shared path is used, unchanged.
+# every other (learning-loop review, CR-3).
 #
+# The id is the `session_id` of the hook payload, bound once per hook with
+# session_files_bind. The environment is the fallback, not the source: a hook
+# process inherits its parent's environment whole, and a Codex session
+# started from a Claude Code Bash tool carries that Claude session's
+# CLAUDE_CODE_SESSION_ID (tests/fixtures/hosts/codex/.../hook-env), so naming
+# the files after the variable filed Codex's writes under the Claude session
+# (audit CR-117, C3). Skills running in the Bash tool have no payload and keep
+# the variable, which Claude Code sets there to the same value. With no id at
+# all (the suites, an older host) the historical shared path is used.
+#
+#   session_files_bind <payload json>  bind this hook to the payload's
+#                                      session_id (exported as
+#                                      CRAFTSMAN_SESSION_ID for the helpers)
 #   session_file <name> [session_id]   the per-session file for <name>
 #                                      (session-state.json, session-start-ts,
 #                                      session-writes, session-violations)
@@ -26,8 +35,15 @@ _session_files_dir() {
 # The id, cleaned to what a filename may carry: a hook input is untrusted data
 # and this string becomes part of a path.
 _session_files_id() {
-    local id="${1:-${CLAUDE_CODE_SESSION_ID:-}}"
+    local id="${1:-${CRAFTSMAN_SESSION_ID:-${CLAUDE_CODE_SESSION_ID:-}}}"
     printf '%s' "$id" | tr -cd 'A-Za-z0-9_-' | cut -c1-64
+}
+
+session_files_bind() {
+    local id
+    id=$(printf '%s' "${1:-}" | jq -r '.session_id // empty' 2>/dev/null | tr -cd 'A-Za-z0-9_-' | cut -c1-64)
+    [[ -n "$id" ]] && export CRAFTSMAN_SESSION_ID="$id"
+    return 0
 }
 
 session_file() {

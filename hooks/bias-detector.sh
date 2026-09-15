@@ -17,6 +17,8 @@ SESSION_STATE=$(session_file session-state.json)
 
 # Read the prompt from stdin (JSON format from Claude Code)
 INPUT=$(cat)
+session_files_bind "$INPUT"
+SESSION_STATE=$(session_file session-state.json)
 PROMPT=$(echo "$INPUT" | jq -r '.prompt // empty' 2>/dev/null || echo "$INPUT")
 
 # If we couldn't parse JSON, use the raw input

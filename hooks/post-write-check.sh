@@ -200,6 +200,8 @@ pack_loader_init
 
 # Read tool input from stdin (JSON from the host)
 INPUT=$(cat)
+session_files_bind "$INPUT"
+SESSION_STATE=$(session_file session-state.json)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 
 # A Codex apply_patch names its files inside `tool_input.command`, any number

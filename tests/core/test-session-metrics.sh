@@ -151,12 +151,16 @@ echo "--- Realistic Payload: duration from start marker ---"
 source "$ROOT_DIR/hooks/lib/metrics-db.sh"
 metrics_init 2>/dev/null || true
 
-# Simulate a session that started 90 seconds ago
-echo "$(( $(date +%s) - 90 ))" > "$CLAUDE_PLUGIN_DATA/session-start-ts"
+# Simulate a session that started 90 seconds ago. The payload below names the
+# session "abc", and the hook names its files after the payload
+# (lib/session-files.sh), so the marker carries that suffix.
+echo "$(( $(date +%s) - 90 ))" > "$CLAUDE_PLUGIN_DATA/session-start-ts-abc"
 
-# Record one blocked and one warned violation "during" the session
-metrics_record_violation "PHP003" "src/**/*.php" "critical" 1 0 2>/dev/null
-metrics_record_violation "WARN-PHP001" "src/**/*.php" "warning" 0 0 2>/dev/null
+# Record one blocked and one warned violation "during" the session: a hook
+# recording them is bound to the session its payload names, so the tally is
+# that session's file (CRAFTSMAN_SESSION_ID is what session_files_bind sets).
+CRAFTSMAN_SESSION_ID=abc metrics_record_violation "PHP003" "src/**/*.php" "critical" 1 0 2>/dev/null
+CRAFTSMAN_SESSION_ID=abc metrics_record_violation "WARN-PHP001" "src/**/*.php" "warning" 0 0 2>/dev/null
 
 run_session_metrics '{"session_id":"abc","cwd":"/tmp","hook_event_name":"SessionEnd","reason":"other"}' > /dev/null 2>&1
 
@@ -185,7 +189,7 @@ else
     log_fail "Warned count should be >= 1" "got '${LAST_WARNED}'"
 fi
 
-if [[ ! -f "$CLAUDE_PLUGIN_DATA/session-start-ts" ]]; then
+if [[ ! -f "$CLAUDE_PLUGIN_DATA/session-start-ts-abc" ]]; then
     log_pass "Start marker cleaned up after session end"
 else
     log_fail "Start marker should be removed" "still exists"
@@ -202,8 +206,8 @@ fi
 echo ""
 echo "--- Write/Edit Exposure Counter ---"
 
-echo "$(( $(date +%s) - 30 ))" > "$CLAUDE_PLUGIN_DATA/session-start-ts"
-printf 'w\nw\nw\n' > "$CLAUDE_PLUGIN_DATA/session-writes"
+echo "$(( $(date +%s) - 30 ))" > "$CLAUDE_PLUGIN_DATA/session-start-ts-abc"
+printf 'w\nw\nw\n' > "$CLAUDE_PLUGIN_DATA/session-writes-abc"
 
 run_session_metrics '{"session_id":"abc","cwd":"/tmp","hook_event_name":"SessionEnd","reason":"other"}' > /dev/null 2>&1
 
@@ -216,7 +220,7 @@ else
     log_fail "writes_count should be 3" "got '${LAST_WRITES}'"
 fi
 
-if [[ ! -f "$CLAUDE_PLUGIN_DATA/session-writes" ]]; then
+if [[ ! -f "$CLAUDE_PLUGIN_DATA/session-writes-abc" ]]; then
     log_pass "Writes counter file cleaned up after session end"
 else
     log_fail "session-writes should be removed" "still exists"

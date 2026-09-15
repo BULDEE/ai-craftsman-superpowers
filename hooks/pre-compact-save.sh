@@ -20,6 +20,7 @@ command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
 INPUT=$(cat 2>/dev/null) || true
 
 source "${SCRIPT_DIR}/lib/session-files.sh"
+session_files_bind "$INPUT"
 SESSION_STATE=$(session_file session-state.json)
 
 if $HAS_PYTHON3 && [[ -f "$SESSION_STATE" ]]; then

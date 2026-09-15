@@ -25,6 +25,7 @@ ERROR=$(echo "$INPUT" | jq -r '.error // empty' 2>/dev/null)
 [[ -z "$TOOL_NAME" ]] && exit 0
 
 source "${SCRIPT_DIR}/lib/session-files.sh"
+session_files_bind "$INPUT"
 SESSION_STATE=$(session_file session-state.json)
 
 if $HAS_PYTHON3; then

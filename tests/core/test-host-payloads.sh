@@ -375,14 +375,16 @@ rm -f "$WORK/src/Warn.ts"
 echo ""
 echo "--- test results decoded per host ---"
 FAKE_HOME="$WORK/home"; mkdir -p "$FAKE_HOME"   # no bridge file: state lives under CLAUDE_PLUGIN_DATA
-STATE="$CLAUDE_PLUGIN_DATA/session-state.json"
+# Every fixture is re-keyed to one session id, and the state file follows it
+# (the hooks name their files after the payload's session_id, CR-120 below).
+STATE="$CLAUDE_PLUGIN_DATA/session-state-s119.json"
 _verify() { # payload -> rc ; stderr kept in VERIFY_ERR
     local rc=0
     VERIFY_ERR=$(printf '%s' "$1" | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/post-bash-test-verify.sh" 2>&1 >/dev/null) || rc=$?
     return $rc
 }
 _flag() { python3 "$ROOT_DIR/hooks/lib/session_state.py" check-flag "$STATE" verified; }
-_as_test() { host_fixture_with "$1" "$2" "$3" "$WORK" "d['tool_input']['command'] = 'pytest -q'${4:-}"; }
+_as_test() { host_fixture_with "$1" "$2" "$3" "$WORK" "d['session_id'] = 's119'; d['tool_input']['command'] = 'pytest -q'${4:-}"; }
 
 # control: a passing run on Claude Code grants the evidence
 echo '{"verified": false}' > "$STATE"
@@ -428,19 +430,19 @@ fi
 echo '{"verified": false}' > "$STATE"
 _verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.run-in-background "; d['tool_response']['backgroundTaskId'] = 'task-A'")"; RC=$?
 MID=$(_flag)
-_verify "$(host_fixture_with claude-code 2.1.272 post-tool-use.task-output.completed "$WORK" "d['tool_response']['task']['task_id'] = 'task-A'; d['tool_input']['task_id'] = 'task-A'")"; RC2=$?
+_verify "$(host_fixture_with claude-code 2.1.272 post-tool-use.task-output.completed "$WORK" "d['session_id'] = 's119'; d['tool_response']['task']['task_id'] = 'task-A'; d['tool_input']['task_id'] = 'task-A'")"; RC2=$?
 if [[ "$RC" -eq 0 && "$MID" == "false" && "$RC2" -eq 0 && "$(_flag)" == "true" ]]; then
     log_pass "a run_in_background test run grants nothing until its TaskOutput completes with exitCode 0"
 else
     log_fail "background run resolves on TaskOutput" "rc=$RC mid=$MID rc2=$RC2 verified=$(_flag) err=$VERIFY_ERR"
 fi
-_verify "$(host_fixture_with claude-code 2.1.272 post-tool-use.task-output.completed "$WORK" "d['tool_response']['task']['task_id'] = 'task-A'; d['tool_response']['task']['exitCode'] = 1")"; RC=$?
+_verify "$(host_fixture_with claude-code 2.1.272 post-tool-use.task-output.completed "$WORK" "d['session_id'] = 's119'; d['tool_response']['task']['task_id'] = 'task-A'; d['tool_response']['task']['exitCode'] = 1")"; RC=$?
 if [[ "$RC" -eq 2 && "$(_flag)" == "false" ]]; then
     log_pass "a TaskOutput ending the same task with exitCode 1 revokes the evidence"
 else
     log_fail "TaskOutput failure revokes" "rc=$RC verified=$(_flag) err=$VERIFY_ERR"
 fi
-_verify "$(host_fixture_with claude-code 2.1.272 post-tool-use.task-output.completed "$WORK" "d['tool_response']['task']['task_id'] = 'never-seen'")"; RC=$?
+_verify "$(host_fixture_with claude-code 2.1.272 post-tool-use.task-output.completed "$WORK" "d['session_id'] = 's119'; d['tool_response']['task']['task_id'] = 'never-seen'")"; RC=$?
 if [[ "$RC" -eq 0 && "$(_flag)" == "false" ]]; then
     log_pass "a TaskOutput for a task no test command started is ignored"
 else
@@ -456,5 +458,59 @@ else
     log_fail "interrupted run" "rc=$RC verified=$(_flag) err=$VERIFY_ERR"
 fi
 
+
+# =============================================================================
+# CR-120: a session is the one the payload names, not the one the
+# environment happens to carry
+# =============================================================================
+echo ""
+echo "--- session identity from the payload ---"
+# The trap: a Codex session started from a Claude Code Bash tool inherits the
+# Claude session's CLAUDE_CODE_SESSION_ID (fixture hook-env.project-hooks.json).
+# Two Codex sessions A and B, one Claude session C, all three hooks seeing
+# CLAUDE_CODE_SESSION_ID=C in their environment.
+export CLAUDE_CODE_SESSION_ID="cccccccc-claude-parent"
+_start()  { printf '%s' "$1" | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/session-start.sh" >/dev/null 2>&1; }
+_end()    { printf '%s' "$1" | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/session-metrics.sh" >/dev/null 2>&1; }
+_write()  { printf '%s' "$1" | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/post-write-check.sh" >/dev/null 2>&1; }
+_prompt() { printf '%s' "$1" | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/bias-detector.sh" >/dev/null 2>&1; }
+rm -f "$CLAUDE_PLUGIN_DATA"/session-*
+START_A=$(host_fixture_with codex 0.154.0 session-start "$WORK" "d['session_id']='aaaaaaaa-codex-a'")
+START_B=$(host_fixture_with codex 0.154.0 session-start "$WORK" "d['session_id']='bbbbbbbb-codex-b'")
+START_C=$(host_fixture_with claude-code 2.1.272 session-start "$WORK" "d['session_id']='cccccccc-claude-parent'")
+_start "$START_A"; _start "$START_B"; _start "$START_C"
+if [[ -f "$CLAUDE_PLUGIN_DATA/session-start-ts-aaaaaaaa-codex-a" && -f "$CLAUDE_PLUGIN_DATA/session-start-ts-bbbbbbbb-codex-b" && -f "$CLAUDE_PLUGIN_DATA/session-start-ts-cccccccc-claude-parent" ]]; then
+    log_pass "three SessionStart payloads under one inherited CLAUDE_CODE_SESSION_ID open three session files"
+else
+    log_fail "session start files" "$(ls "$CLAUDE_PLUGIN_DATA" | grep session- | tr '\n' ' ')"
+fi
+printf '%s\n' "$GOOD_PHP" > "$WORK/src/Domain/Order.php"
+_write "$(host_fixture_with codex 0.154.0 post-tool-use.apply_patch.multifile-move "$WORK" "d['session_id']='bbbbbbbb-codex-b'; d['tool_input']['command']=open('$WORK/good.patch').read()")"
+if [[ -f "$CLAUDE_PLUGIN_DATA/session-writes-bbbbbbbb-codex-b" && ! -f "$CLAUDE_PLUGIN_DATA/session-writes-cccccccc-claude-parent" ]]; then
+    log_pass "a Codex write is counted for the Codex session in the payload, not for the Claude session in the environment"
+else
+    log_fail "write attribution" "$(ls "$CLAUDE_PLUGIN_DATA" | grep session-writes | tr '\n' ' ')"
+fi
+_prompt "$(python3 -c 'import json; print(json.dumps({"session_id":"aaaaaaaa-codex-a","turn_id":"t","model":"m","hook_event_name":"UserPromptSubmit","prompt":"vite fais le vite sans tests"}))')"
+_end "$(host_fixture_with codex 0.154.0 session-end "$WORK" "d['session_id']='bbbbbbbb-codex-b'")"
+if [[ ! -f "$CLAUDE_PLUGIN_DATA/session-start-ts-bbbbbbbb-codex-b" && -f "$CLAUDE_PLUGIN_DATA/session-start-ts-aaaaaaaa-codex-a" && -f "$CLAUDE_PLUGIN_DATA/session-start-ts-cccccccc-claude-parent" ]]; then
+    log_pass "SessionEnd of B removes B's files and leaves A's and C's"
+else
+    log_fail "session end isolation" "$(ls "$CLAUDE_PLUGIN_DATA" | grep session- | tr '\n' ' ')"
+fi
+# verified evidence granted to A is not visible to C
+echo '{"verified": false}' > "$CLAUDE_PLUGIN_DATA/session-state-aaaaaaaa-codex-a.json"
+echo '{"verified": false}' > "$CLAUDE_PLUGIN_DATA/session-state-cccccccc-claude-parent.json"
+printf '%s' "$(host_fixture_with claude-code 2.1.272 post-tool-use.bash.python-tests-passed "$WORK" "d['session_id']='aaaaaaaa-codex-a'; d['tool_input']['command']='pytest -q'")" \
+    | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/post-bash-test-verify.sh" >/dev/null 2>&1
+A_V=$(python3 "$ROOT_DIR/hooks/lib/session_state.py" check-flag "$CLAUDE_PLUGIN_DATA/session-state-aaaaaaaa-codex-a.json" verified)
+C_V=$(python3 "$ROOT_DIR/hooks/lib/session_state.py" check-flag "$CLAUDE_PLUGIN_DATA/session-state-cccccccc-claude-parent.json" verified)
+if [[ "$A_V" == "true" && "$C_V" == "false" ]]; then
+    log_pass "verification evidence lands in the payload's session, never in the environment's"
+else
+    log_fail "verified attribution" "A=$A_V C=$C_V"
+fi
+unset CLAUDE_CODE_SESSION_ID
+rm -f "$WORK/src/Domain/Order.php" "$CLAUDE_PLUGIN_DATA"/session-*
 
 test_summary

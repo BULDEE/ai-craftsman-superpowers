@@ -511,8 +511,8 @@ _metrics_tally_session() {
     local tally="${METRICS_DB_DIR}/session-violations"
     if type session_file >/dev/null 2>&1; then
         tally=$(session_file session-violations)
-    elif [[ -n "${CLAUDE_CODE_SESSION_ID:-}" ]]; then
-        tally="${METRICS_DB_DIR}/session-violations-$(printf '%s' "$CLAUDE_CODE_SESSION_ID" | tr -cd 'A-Za-z0-9_-' | cut -c1-64)"
+    elif [[ -n "${CRAFTSMAN_SESSION_ID:-${CLAUDE_CODE_SESSION_ID:-}}" ]]; then
+        tally="${METRICS_DB_DIR}/session-violations-$(printf '%s' "${CRAFTSMAN_SESSION_ID:-$CLAUDE_CODE_SESSION_ID}" | tr -cd 'A-Za-z0-9_-' | cut -c1-64)"
     fi
     echo "$kind" >> "$tally" 2>/dev/null || true
 }

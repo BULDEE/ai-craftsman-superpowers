@@ -31,8 +31,14 @@ VIOLATIONS_FILE=$(session_file session-violations)
 
 metrics_init 2>/dev/null || true
 
-# Read session info from stdin
+# Read session info from stdin, and name this session's files after it: the
+# variable in the environment may be another session's (see session-files.sh).
 INPUT=$(cat)
+session_files_bind "$INPUT"
+SESSION_STATE=$(session_file session-state.json)
+START_TS_FILE=$(session_file session-start-ts)
+WRITES_FILE=$(session_file session-writes)
+VIOLATIONS_FILE=$(session_file session-violations)
 
 # SessionEnd input has NO duration field (only session_id/transcript_path/
 # cwd/reason). Derive duration from the epoch marker written by

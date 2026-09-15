@@ -40,8 +40,11 @@ _init_packs() {
     fi
 }
 
-# Consume stdin (may be empty or JSON)
-cat > /dev/null 2>&1 || true
+# The payload names the session; this hook's files are named after it (see
+# lib/session-files.sh: the environment may carry another session's id).
+INPUT=$(cat 2>/dev/null) || INPUT=""
+source "${SCRIPT_DIR}/lib/session-files.sh"
+session_files_bind "$INPUT"
 
 # Python3 availability check - skip python-dependent features if missing
 HAS_PYTHON3=true
@@ -71,7 +74,6 @@ printf '%s' "$METRICS_DB_PATH" > "${HOME}/.claude/craftsman-metrics-db-path" 2>/
 # (only session_id/transcript_path/cwd/reason), so session-metrics.sh
 # derives duration and its violation-count window from this marker.
 _CRAFTSMAN_DATA_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
-source "${SCRIPT_DIR}/lib/session-files.sh"
 printf '%s' "$(date +%s)" > "$(session_file session-start-ts)" 2>/dev/null || true
 # Sessions that ended without a SessionEnd (a crash, a kill) leave their files
 # behind; a week later nobody will resume them.

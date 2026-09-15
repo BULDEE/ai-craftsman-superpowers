@@ -11,14 +11,18 @@ source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
 FAKE_HOME="/tmp/craftsman-verify-loop-$$"
 mkdir -p "$FAKE_HOME/.claude"
-FAKE_STATE="$FAKE_HOME/state.json"
-printf '%s' "$FAKE_STATE" > "$FAKE_HOME/.claude/craftsman-session-state-path"
 
 # The write count is the session-writes file post-write-check.sh appends to,
 # never a key of the state JSON: the hook used to read a `writes_count` key no
 # hook ever wrote, so the gate saw zero writes and let every task through.
 export CLAUDE_PLUGIN_DATA="$FAKE_HOME/data"
 mkdir -p "$CLAUDE_PLUGIN_DATA"
+# A hook names its state file after its payload's session_id under
+# CLAUDE_PLUGIN_DATA (lib/session-files.sh); the ~/.claude bridge is read by
+# skills in the Bash tool only. The payloads here carry no session_id, so the
+# shared file is the one.
+FAKE_STATE="$CLAUDE_PLUGIN_DATA/session-state.json"
+printf '%s' "$FAKE_STATE" > "$FAKE_HOME/.claude/craftsman-session-state-path"
 WRITES_FILE="$CLAUDE_PLUGIN_DATA/session-writes"
 
 set_writes() {

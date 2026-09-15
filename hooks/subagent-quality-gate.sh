@@ -36,6 +36,7 @@ TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
 [[ -z "$AGENT_TYPE" ]] && exit 0
 
 source "${SCRIPT_DIR}/lib/session-files.sh"
+session_files_bind "$INPUT"
 SESSION_STATE=$(session_file session-state.json)
 
 log_subagent_activity() {

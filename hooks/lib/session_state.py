@@ -305,9 +305,11 @@ def _resolve_session_state_path() -> str:
             'session-state.json',
         )
     # The bridge names the shared file; this session's own sits beside it,
-    # named by CLAUDE_CODE_SESSION_ID, which Claude Code sets in Bash tool
-    # subprocesses as in hooks (see hooks/lib/session-files.sh).
-    session_id = re.sub(r'[^A-Za-z0-9_-]', '', os.environ.get('CLAUDE_CODE_SESSION_ID', ''))[:64]
+    # named by the id the hook bound from its payload (CRAFTSMAN_SESSION_ID,
+    # see hooks/lib/session-files.sh) or, for a skill in the Bash tool, by
+    # CLAUDE_CODE_SESSION_ID.
+    session_id = re.sub(r'[^A-Za-z0-9_-]', '',
+                        os.environ.get('CRAFTSMAN_SESSION_ID') or os.environ.get('CLAUDE_CODE_SESSION_ID', ''))[:64]
     if not session_id:
         return shared
     return os.path.join(os.path.dirname(shared), f'session-state-{session_id}.json')
