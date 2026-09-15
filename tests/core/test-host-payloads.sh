@@ -510,6 +510,25 @@ else
     log_fail "F5 stale task result" "after=$AFTER_A replayed=$(_flag)"
 fi
 
+# C3 (independent verification): a compound command's result is not the runner's.
+echo '{"verified": false}' > "$STATE"
+for granted in "true || pytest" "pytest fail; true" "pytest -q | tee out.log" "pytest -q || echo ignored"; do
+    _verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.python-tests-passed "; d['tool_input']['command'] = \"$granted\"")"
+done
+COMPOUND_GRANT=$(_flag)
+echo '{"verified": true}' > "$STATE"
+_verify "$(_as_test claude-code 2.1.272 post-tool-use-failure.bash.exit1-tests-failed "; d['tool_input']['command'] = 'false && pytest -q'")"; RC_AND=$?
+_verify "$(_as_test claude-code 2.1.272 post-tool-use-failure.bash.exit1-tests-failed "; d['tool_input']['command'] = 'cd api && pytest -q'")"; RC_CD=$?
+COMPOUND_REVOKE=$(_flag)
+echo '{"verified": false}' > "$STATE"
+_verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.python-tests-passed "; d['tool_input']['command'] = 'cd api && pytest -q'")"
+CD_GRANT=$(_flag)
+if [[ "$COMPOUND_GRANT" == "false" && "$COMPOUND_REVOKE" == "true" && "$RC_AND" -eq 0 && "$RC_CD" -eq 0 && "$CD_GRANT" == "true" ]]; then
+    log_pass "C3: 'true || pytest', 'pytest fail; true' and a piped runner grant nothing; a failed 'false && pytest' or 'cd x && pytest' revokes nothing; a passing 'cd x && pytest' grants"
+else
+    log_fail "C3 compound commands" "grant=$COMPOUND_GRANT revoke-kept=$COMPOUND_REVOKE rc_and=$RC_AND rc_cd=$RC_CD cd_grant=$CD_GRANT"
+fi
+
 # an interruption is neither a pass nor a failure
 echo '{"verified": true}' > "$STATE"
 _verify "$(_as_test claude-code 2.1.272 post-tool-use-failure.bash.exit1-tests-failed "; d['is_interrupt'] = True")"; RC=$?
@@ -683,5 +702,46 @@ else
     log_fail "Sentry file name injection" "$(printf '%s' "$R" | tr '\n' ' ' | cut -c1-240)"
 fi
 rm -f "$WORK/src/$INJ_NAME" "$WORK/src/Plain.ts" "$CLAUDE_PLUGIN_DATA"/session-*
+
+# =============================================================================
+# Independent verification (Codex + Grok, 2026-09-15) on d08e0ec
+# =============================================================================
+echo ""
+echo "--- independent verification findings ---"
+# C4: after a real Update patch landed, post-write must validate the file, not
+# re-apply the hunks to the file they already changed.
+printf '<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\nfinal class Value\n{\n}\n' > "$WORK/src/Domain/Value.php"
+python3 - "$WORK" > "$WORK/upd.patch" <<'PY'
+import sys; w = sys.argv[1]
+print("\n".join(["*** Begin Patch", f"*** Update File: {w}/src/Domain/Value.php", "@@", "-final class Value", "+final class Value2", "*** End Patch"]))
+PY
+R=$(_run pre-write-check.sh "$(_codex_pre "$WORK/upd.patch")")
+PRE_RC="${R%%|*}"
+printf '<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\nfinal class Value2\n{\n}\n' > "$WORK/src/Domain/Value.php"   # the host applied it
+R=$(_run post-write-check.sh "$(_codex_post "$WORK/upd.patch")")
+if [[ "$PRE_RC" == "0" && "${R%%|*}" == "0" && "${R#*|}" != *"NOT validated"* ]]; then
+    log_pass "C4: a valid Update patch passes pre-write and, once applied, post-write validates the landed file instead of re-applying the hunks"
+else
+    log_fail "C4 post-write after update" "pre=$PRE_RC post=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
+fi
+rm -f "$WORK/src/Domain/Value.php"
+# C5: a host's own hook wiring is the gate's machinery
+for wiring in ".codex/hooks.json" ".codex/config.toml" ".github/hooks/craftsman.json"; do
+    _add_file_patch "$WORK/$wiring" "{}" > "$WORK/wiring.patch"
+    R=$(_run config-protection.sh "$(_codex_pre "$WORK/wiring.patch")")
+    [[ "${R%%|*}" == "2" && "${R#*|}" == *'"deny"'* ]] || WIRING_MISS="${WIRING_MISS:-} $wiring(rc=${R%%|*})"
+done
+if [[ -z "${WIRING_MISS:-}" ]]; then
+    log_pass "C5: a patch to .codex/hooks.json, .codex/config.toml or .github/hooks/*.json is denied as the gate's own machinery"
+else
+    log_fail "C5 host wiring" "passed:$WIRING_MISS"
+fi
+# G6: a raw Hermes-style `patch` body reaches config-protection as unreadable, never as nothing
+R=$(_run config-protection.sh "$(python3 -c 'import json; print(json.dumps({"tool_name":"Edit","session_id":"g6","tool_input":{"mode":"patch","patch":"*** Begin Patch\n*** Add File: x/.craft-rules.yml\n+rules:\n+  LAYER001: ignore\n*** End Patch"}}))')")
+if [[ "${R%%|*}" == "2" && "${R#*|}" == *'"deny"'* ]]; then
+    log_pass "G6: a write carrying a raw patch body the reader does not parse is denied, not listed as touching nothing"
+else
+    log_fail "G6 raw patch body" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
+fi
 
 test_summary

@@ -532,20 +532,27 @@ echo "=== Standalone Mode Tests ==="
     exit_code=$?
     echo "${exit_code}|${result}"
 )
+# Standalone means no plugin variables, not the developer's real home: with
+# HOME inherited this case read whatever registry cache ~/.claude held
+# (independent verification, 2026-09-15: a poisoned empty cache made it scan
+# zero files and exit 2 for the wrong reason).
+STANDALONE_HOME=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-standalone-home.XXXXXX")
 standalone_result=$( (
     unset CLAUDE_PLUGIN_ROOT
     unset CLAUDE_PLUGIN_DATA
     unset CLAUDE_PLUGIN_OPTION_strictness
     unset CLAUDE_PLUGIN_OPTION_stack
-    bash "$CLI" --format json "$FIXTURES_DIR/invalid-no-strict.php" 2>&1
+    HOME="$STANDALONE_HOME" bash "$CLI" --format json "$FIXTURES_DIR/invalid-no-strict.php" 2>&1
     echo "EXIT:$?"
 ) )
+rm -rf "$STANDALONE_HOME"
 standalone_exit=$(echo "$standalone_result" | grep -oE 'EXIT:[0-9]+' | cut -d: -f2)
 standalone_output=$(echo "$standalone_result" | grep -v 'EXIT:')
-if [[ "$standalone_exit" == "2" ]]; then
-    log_pass "Standalone mode: exits 2 on invalid file (no Claude env vars)"
+# Exit 2 for the right reason: the rule, not an empty scan.
+if [[ "$standalone_exit" == "2" ]] && echo "$standalone_output" | grep -q '"PHP001"'; then
+    log_pass "Standalone mode: exits 2 on invalid file for PHP001 (no Claude env vars, private HOME)"
 else
-    log_fail "Standalone mode should exit 2" "got exit $standalone_exit"
+    log_fail "Standalone mode should exit 2 for PHP001" "got exit $standalone_exit: ${standalone_output:0:160}"
 fi
 
 if echo "$standalone_output" | python3 -m json.tool >/dev/null 2>&1; then

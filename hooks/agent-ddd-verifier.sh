@@ -82,7 +82,23 @@ fi
 
 if [[ "$VERDICT" == DDD_VIOLATIONS* ]]; then
     FINDINGS=$(haiku_findings "${VERDICT#DDD_VIOLATIONS}")
+
+    # The token said findings and nothing survived the shape filter: a reply
+    # cut off after the first line, a refusal, a rate limit. That is a reply
+    # the layer cannot read, so it is unavailable, and it closes nothing: read
+    # as clean it retired every earlier finding on the file (independent
+    # verification, 2026-09-15).
+    if [[ -z "$(printf '%s' "$FINDINGS" | tr -d '[:space:]')" ]]; then
+        metrics_record_haiku_run "agent-ddd-verifier" "unavailable" 0 "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
+        exit 0
+    fi
     RECORDED=$(haiku_record_findings "agent-ddd-verifier" "$FINDINGS" "$_ABS_FILE" 2>/dev/null || printf '0')
+    # Findings that name no file of this project are a reply the layer cannot
+    # use: unavailable, and the earlier findings stay open.
+    if [[ "${RECORDED:-0}" -eq 0 ]]; then
+        metrics_record_haiku_run "agent-ddd-verifier" "unavailable" 0 "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
+        exit 0
+    fi
     haiku_close_resolved "$_ABS_FILE" "$(haiku_finding_rules "$FINDINGS")" 2>/dev/null || true
     if [[ "${RECORDED:-0}" -gt 0 ]]; then
         metrics_record_haiku_run "agent-ddd-verifier" "findings" "$RECORDED" "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
@@ -93,10 +109,6 @@ if [[ "$VERDICT" == DDD_VIOLATIONS* ]]; then
         } >&2
         exit 2
     fi
-    # The token said violations and nothing survived the shape filter, so this
-    # run has nothing to show and nothing to record. Counting it as a hit
-    # printed "1 found something" beside "haiku findings: 0".
-    metrics_record_haiku_run "agent-ddd-verifier" "clean" 0 "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
     exit 0
 fi
 

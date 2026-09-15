@@ -9,7 +9,14 @@ https://docs.github.com/en/copilot/reference/hooks-reference as read on
 failure, and the tool names `create`, `edit`, `str_replace_editor`, `bash`.
 
 The ARGUMENT names of the file tools (`path`, `file_text`, `old_str`,
-`new_str`) are the documented tool's and were not seen on a wire. A test
+`new_str`) do NOT appear on that page: it types `toolArgs` as "unknown" and
+says it is parsed from a JSON string when possible. They are the names those
+tools carry in GitHub's own tool definitions and were not seen on a wire. The
+page shows `resultType: "success"` for postToolUse and routes a failed tool to
+`postToolUseFailure` (with `error`); `result_type: "failure"` in
+`post-tool-use.bash.camel.json` is a value this adapter accepts, not one the
+page documents. The page names two hook surfaces, CLI and cloud agent; VS Code
+has its own hooks guide with the Claude format and its own tool names. A test
 that passes on these files proves the adapter honours the documented
 contract; it does not qualify a Copilot surface. The first real capture
 (`copilot --help`, a `.github/hooks/*.json` with `cat >> file` on preToolUse

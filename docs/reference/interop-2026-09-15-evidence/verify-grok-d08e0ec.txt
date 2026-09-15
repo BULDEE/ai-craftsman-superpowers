@@ -1,0 +1,73 @@
+VERDICT : CHANGES_REQUIRED
+REVISION : d08e0ec (écart : HEAD n'est pas 8b1a611 ; 8b1a611 est l'ancêtre ; +1 commit `docs(interop): a self-contained verification prompt...` ; 24 commits depuis 784091f, pas 23)
+ENVIRONNEMENT : Darwin 25.6.0 ; claude 2.1.272 ; codex-cli 0.154.0 ; grok 1.0.30 ; Hermes Agent v0.21.2 ; copilot ABSENT ; python 3.14.7 ; jq 1.7.1. Copie isolée : `/var/folders/m0/dvzhx8xn2158tyvxywfskdc40000gn/T/craftsman-verify-art.ta3h9U/grok-work/tmp/craftsman-verify.aTgWu5/repo`. HOME isolé pour Claude : `Not logged in`. `codex exec` et `codex debug prompt-input` dans ce sandbox Grok : `Operation not permitted (os error 1)`. Une autre session Codex sur la même machine a obtenu 401 Unauthorized sur l'API. Aucune écriture volontaire sous `~/.claude` / `~/.codex` / `~/.copilot` / `~/.agents` hors ce que `tests/ci/test-craftsman-ci.sh` fait lui-même en unsettant `CLAUDE_PLUGIN_DATA`.
+
+MATRICE :
+- Write refused before disk (LAYER001, PHP002) : Claude confirmée (captured + script direct, `test-host-payloads` 50/0 et `test-parity` 9/0). Codex confirmée au même niveau (apply_patch jugé avant disque) ; e2e `codex exec` non exercé ici. Copilot confirmée au contrat documenté (script direct, `test-copilot` 21/0, deny exit 2 + LAYER001/PHP002) ; pas de chargement natif. Hermes confirmée (script direct, parity). Piloté par modèle : non exercé.
+- Multi-file patch, move, anchors, EOF : Codex confirmée (captured + script direct ; B1 a fait rougir 19 assertions dont listing, move, hunk, EOF). Copilot confirmée au documenté (patch sous `tool_name` Edit). Hermes confirmée comme UNJUDGED (`write_mirror.py` `_is_v4a` / UNJUDGED). Claude n/a.
+- Gate's own config : Claude confirmée `ask` (script direct / suites config-protection). Codex confirmée `deny` (phpstan.neon et `.craft-rules.yml` via apply_patch). Copilot confirmée `deny` jamais `ask` (`test-copilot`). Hermes confirmée deny (parity). Chargement natif / modèle : non exercé.
+- Test run grants/revokes : Claude confirmée captured + script direct (`verified` true puis false, stderr `REGRESSED`, rc=2) ; e2e `claude -p` non exercé (HOME isolé = pas de login). Codex confirmée captured + script direct (état `unknown`, ni grant ni revoke). Copilot confirmée au décodeur documenté (`result_type` failure -> failed) ; `adapters/copilot/hooks.json` ne branche pas Bash, donc la boucle n'est pas livrée sur Copilot. Hermes n/a.
+- Session identity : Claude/Codex confirmées captured + script direct (section session identity  ; B3 rouge puis re-vert). Copilot confirmée au documenté (`sessionId` traduit). e2e héritage réel Codex-sous-Claude : non exercé.
+- Skills discovered (22) : confirmée sur l'archive (fresh-install : 22 SKILL.md réguliers, aucun symlink). Codex `codex debug prompt-input` : non exercé (`Operation not permitted`). Copilot : non mesuré (comme déclaré).
+- Agents / roles : export Codex confirmé depuis l'arbre installé (fresh-install : 12 rôles). `spawn_agent` / `~/.codex/agents/` : non exercé (item ouvert du document, et interdit d'écrire sous `~/.codex`). Copilot : non projeté (comme déclaré).
+- Review context (`craftsman-context review`) : Claude non rejoué en session native. Codex e2e non exercé. Copilot non mesuré.
+- Semantic review backend : script direct confirmé pour le câblage (`test-review-backend` 15/0). Invocation réelle `agent-ddd-verifier` sans `claude` : rc=0, SQLite `agent-ddd-verifier|unavailable|0|codex-cli`. C'est indisponible, pas approuvé. L'e2e Codex annoncé n'est pas tenu sur cette machine.
+- Events loaded : confirmée au documenté / artefact `hooks/host-capabilities.json` (12 Claude, 11 Codex). Pas de recompte par chargement natif.
+- Subagent gate : Claude confirmée captured + script direct (`agent_transcript_path`) ; B5 rouge (juge le parent) puis re-vert. Codex null : confirmée captured. Copilot non mesuré. Docs Copilot : pas de `agent_transcript_path`.
+- Sentry at Stop : Claude/Codex confirmées captured + script direct (noms quotés comme données, pas d'injection de nom hostile). Copilot non mesuré.
+- `agent_hooks: false` : sous-suite de la suite complète passée (script direct / faux CLI). Codex/Copilot via fichier global : non rejoué à part.
+- Fresh install : confirmée (`test-fresh-install.sh` 9/0, archive extraite, Write Claude et apply_patch Codex refusés depuis l'arbre installé).
+- Delivery of a background finding : Claude `asyncRewake` lu dans `hooks/hooks.json`, pas d'e2e. Copilot `additionalContext` confirmé au documenté (postToolUse exit 2 + additionalContext). Codex wake : non mesuré en session réelle.
+
+CONSTATS :
+1. major ; `tests/ci/test-craftsman-ci.sh:535-555` et `ci/craftsman-ci.sh:387-410` ; `bash tests/run-tests.sh` puis rejeu isolé de `test-craftsman-ci.sh` ; suite 274 passées / 1 échec (attendu 275/0). Assertion rouge : `Standalone mode should produce valid JSON`. Recette exacte du test (unset `CLAUDE_PLUGIN_DATA`) : stdout JSON `files_scanned: 0`, `languages:` vide, stderr `craftsman-ci: no source file was found, so this is not a pass.` sur `tests/ci/fixtures/invalid-no-strict.php`, EXIT:2. L'assertion `Standalone mode: exits 2 on invalid file` est donc un faux vert (scan vide, pas PHP001). Avec `CLAUDE_PLUGIN_DATA` isolé : `files_scanned: 1`, `rules: ["PHP001"]`, stderr vide, JSON valide. Le test casse l'isolation que `tests/run-tests.sh` pose.
+2. major ; `hooks/lib/lang-registry.sh:31-35` et `:66-68` ; même scénario standalone ; le défaut de cache est `${CLAUDE_PLUGIN_DATA:-$HOME/.claude/craftsman}` alors que pack-loader / session-files tombent sur `~/.claude/plugins/data/craftsman`. Des `lang-known-*.tsv` de 0 ligne existent sous `~/.claude/craftsman`. Un compile python échoué (`2>/dev/null` puis `mv` du tmp) empoisonne le cache ; les manifests plus anciens que ce fichier vide ne relancent pas le builder. Conséquence sur le Write : `hooks/pre-write-check.sh:75-77` `[[ -z "$LANG_ID" ]] && exit 0` laisse passer un fichier source si le registre est vide. CI, lui, refuse le scan vide. Deux verdicts pour la même ignorance.
+3. major ; `adapters/copilot/pre-tool-use.sh:24` ; l'adaptateur exporte `CLAUDE_PLUGIN_ROOT` mais pas `CLAUDE_PLUGIN_DATA`. Sur Copilot le registre peut donc lire `~/.claude/craftsman` (constat 2). Contrat documenté uniquement : pas de fil réel pour le confirmer.
+4. minor ; `tests/meta/test-fresh-install.sh` pendant l'extrait installé ; `SyntaxWarning: "\D" is an invalid escape sequence` sous Python 3.14.7. N'a pas fait échouer la suite.
+5. minor ; docs GitHub `hooks-reference` (lu 2026-09-15) : `toolArgs` / `tool_input` sont `unknown` ; `path`, `file_text`, `old_str`, `new_str` n'y figurent pas. `tests/fixtures/hosts/copilot/documented/PROVENANCE.md` le dit déjà. Surfaces listées officiellement : Copilot CLI et cloud agent. VS Code est un format d'enveloppe, pas une troisième surface de hooks dans cette page.
+6. minor ; `hooks/lib/write_mirror.py:232-233` `changes_of` retourne `[]` si `_is_v4a` (clé `patch` ou `mode: patch`) ; `--list` (config-protection) ne voit alors aucun fichier, alors que `_changes_or_line` émet UNJUDGED. L'adaptateur Copilot renomme `patch` -> `command`, donc le chemin documenté passe. Un enveloppe brut avec `patch` irait au fail-open de config-protection.
+
+GARDE-FOUS :
+- retire `apply_patch` de `WRITE_TOOLS` : rouge oui ; 19 échecs (attendu >= 8), dont `Codex apply_patch refused pre-write: rc=0`, `phpstan.neon via apply_patch refused: rc=0`, `gate config via apply_patch denied: rc=0`, listing/move/hunk/EOF. Restauré : `test-host-payloads` 50/0.
+- `_decode_string` -> `failed`/1 : rouge oui ; `Codex unknown result is not a regression: rc=2 ... REGRESSED: 'pytest -q' now exits 1` et `Codex unknown result grants nothing`. Restauré : 50/0.
+- `CLAUDE_CODE_SESSION_ID` avant `CRAFTSMAN_SESSION_ID` : rouge oui ; section session identity : `session start files: session-start-ts-cccccccc-claude-parent`, `write attribution: session-writes-cccccccc-claude-parent`, `verified attribution: A=false C=true`. Restauré : 50/0.
+- `doctrine_splice.py` branche fichier absent (`if False and os.path.isfile`) : rouge oui ; `user instructions lost`, `idempotent block: witness=0`, `copilot preservation`, orphan/ambiguous/CRLF. Restauré : `test-doctrine-export` 32/0.
+- `subagent-quality-gate.sh` lit `transcript_path` : rouge oui ; `subagent transcript: rc=0 out=` et `parent transcript not judged` avec `additionalContext` PHP002 du parent. Restauré : 50/0.
+
+COMMANDES EXÉCUTÉES :
+- `git clone --branch feat/interop-host-adapters` : HEAD d08e0ec
+- `/Users/woprrr/.local/bin/claude --version` : 2.1.272
+- `codex --version` : codex-cli 0.154.0
+- `hermes --version` : v0.21.2
+- `grok --version` : 1.0.30
+- `command -v copilot` : absent
+- `bash tests/run-tests.sh` : rc=1, Passed 274 Failed 1 (craftsman-ci CLI / standalone JSON)
+- `bash tests/ci/test-craftsman-ci.sh` : rc=1, 51/1, même assertion
+- `craftsman-ci --format json` avec DATA isolé : rc=2, PHP001, scanned=1
+- `craftsman-ci --format json` sans DATA : rc=2, scanned=0, languages vide
+- `bash tests/core/test-host-payloads.sh` : rc=0, 50/0
+- `bash tests/adapters/test-parity.sh` : rc=0, 9/0
+- `bash tests/adapters/test-copilot.sh` : rc=0, 21/0
+- `bash tests/core/test-review-backend.sh` : rc=0, 15/0
+- `bash tests/meta/test-fresh-install.sh` : rc=0, 9/0
+- `bash tests/perf/test-hook-latency.sh --report` : rc=0 ; post-write médiane 747.5ms (plafond 5.5x), pre-write 595.4ms, bias 279.9ms
+- B1..B5 mutations + restore : voir GARDE-FOUS ; re-vert 50/0 et doctrine 32/0
+- `codex exec --sandbox workspace-write --dangerously-bypass-hook-trust --ephemeral` (TMPDIR long puis court, danger-full-access, bypass sandbox) : rc=1 `failed to initialize in-process app-server client: Operation not permitted`
+- binaire natif Codex `debug prompt-input` : `Error: Operation not permitted`
+- `HOME=$C/home claude -p --dangerously-skip-permissions --model haiku` : rc=1 `Not logged in · Please run /login`
+- script direct `post-bash-test-verify.sh` pytest-q pass puis PostToolUseFailure : rc=0 `verified: true` puis rc=2 `verified: false` + `Test suite REGRESSED: 'pytest -q' now exits 1`
+- `agent-ddd-verifier.sh` PATH sans claude, fichier OrderService.php LAYER : rc=0, sqlite `agent-ddd-verifier|unavailable|0|codex-cli`
+- lecture officielle https://docs.github.com/en/copilot/reference/hooks-reference : create/edit/apply_patch, exit 2 = deny, ask = deny cloud, timeout fail-open ; pas de `file_text`/`path` dans cette page
+
+NON VÉRIFIÉ :
+- e2e Codex `codex exec` apply_patch (Order.php / Money.php / phpstan.neon sur disque) : CLI présent 0.154.0, init app-server bloquée dans ce sandbox ; l'autre session a eu 401. Indisponible, pas approuvé.
+- `codex debug prompt-input` (copie vs symlink SKILL.md) : même `Operation not permitted`.
+- Backend sémantique Codex réel : ligne `unavailable|codex-cli`, pas `findings|codex-cli`.
+- e2e Claude Code `claude -p` (pytest 0 puis 1, hooks PostToolUse/PostToolUseFailure chargés par l'hôte) : HOME isolé sans login ; recopier `auth.json` interdit ; Doppler + `--dangerously-skip-permissions` bloqué par le mode auto.
+- Copilot CLI, VS Code, cloud : binaire absent. Qualification manquante, comme déclaré. Les noms d'arguments réels `create`/`edit` restent non vus sur le fil.
+- Chargement natif des 12/11 events, `spawn_agent` craftsman-*, plugin Codex bundlé (`PLUGIN_ROOT`), Grok comme hôte : non commencés ou hors de cette passe.
+- Je n'ai pas désactivé de hook, pas posé `CRAFTSMAN_HEADLESS_VERIFY` globalement, pas modifié les checkouts partagés.
+
+On enchaîne sur un correctif (isolation standalone + cache registre vide) ou on s'arrête là ?
+
+[grok 1.0.30, num_turns=50, stopReason=end_turn]

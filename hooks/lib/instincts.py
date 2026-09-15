@@ -288,6 +288,20 @@ def _resolve_skills_dir(skills_dir: str) -> Path:
     return target
 
 
+def _own_skill_dir(skills_dir: Path, name: str) -> Path:
+    """The skill's directory, created, and neither it nor its SKILL.md a
+    symlink: the directory under the validated root could be a link placed
+    there beforehand, and the write followed it out of the project
+    (independent verification, 2026-09-15)."""
+    skill_dir = skills_dir / name
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    target = skill_dir / "SKILL.md"
+    if skill_dir.is_symlink() or target.is_symlink() or skill_dir.resolve() != skill_dir:
+        print(f"error: {skill_dir} is a symlink; refusing to write a skill through it", file=sys.stderr)
+        sys.exit(1)
+    return skill_dir
+
+
 SKILL_TEMPLATE = """---
 name: learned-{slug}
 description: Learned instinct for rule {rule}. This project corrected {rule} {occurrences} times across {distinct_files} files; apply the fix pattern proactively when writing matching code.
@@ -360,8 +374,7 @@ def approve(conn: sqlite3.Connection, instinct_id: int, skills_dir: str) -> None
         conn, instinct_id
     )
     contexts = _evidence_contexts(conn, project_hash, rule)
-    skill_dir = _resolve_skills_dir(skills_dir) / f"learned-{_slugify(rule)}"
-    skill_dir.mkdir(parents=True, exist_ok=True)
+    skill_dir = _own_skill_dir(_resolve_skills_dir(skills_dir), f"learned-{_slugify(rule)}")
     content = _render_skill(rule, summary, occurrences, distinct_files, confidence, contexts)
     (skill_dir / "SKILL.md").write_text(content)
     conn.execute(
@@ -435,8 +448,7 @@ def _cmd_promote(conn: sqlite3.Connection, args: list[str]) -> None:
         sys.exit(1)
     _rule, projects, occurrences, summary = match[0]
     rule = _safe_rule(rule)
-    skill_dir = _resolve_skills_dir(skills_dir) / f"learned-global-{_slugify(rule)}"
-    skill_dir.mkdir(parents=True, exist_ok=True)
+    skill_dir = _own_skill_dir(_resolve_skills_dir(skills_dir), f"learned-global-{_slugify(rule)}")
     (skill_dir / "SKILL.md").write_text(GLOBAL_TEMPLATE.format(
         rule=rule,
         slug=_slugify(rule),

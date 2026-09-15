@@ -1,0 +1,15 @@
+{
+  "app_version": "26.908.61612",
+  "app_build": "9218",
+  "embedded_cli": "0.154.0-alpha.6.2",
+  "probe_cli": "0.154.0",
+  "source_archive": "/Applications/ChatGPT.app/Contents/Resources/app.asar",
+  "component": "webview/assets/hooks-settings-abd54134dbb1.js",
+  "title_expression": "ut(t,l)",
+  "title_arguments": "row index, intl formatter",
+  "formatter_module": "webview/assets/hooks-settings-copy-3e338c0ace44.js",
+  "formatter_expression": "t.formatMessage(s.fallbackHookTitle,{index:e+1})",
+  "default_message": "Hook {index}",
+  "status_message_location": "Expanded hook details and execution status, not row title",
+  "method": "Read-only inspection of installed application bundle, no UI modification"
+}

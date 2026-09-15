@@ -88,6 +88,23 @@ def _write_role(agents_dir: str, out_dir: str, entry: str, version: str) -> None
     os.replace(tmp, target)
 
 
+def _output_dir_ok(out_dir: str) -> str:
+    """"" when the roles may be written there, else the reason not to.
+
+    The directory itself must be real, and its REAL path must stay under the
+    project or under $HOME: a symlinked parent (.codex -> elsewhere) passed the
+    first check and the roles landed outside the project (independent
+    verification, 2026-09-15).
+    """
+    if os.path.islink(out_dir) or not os.path.isdir(out_dir):
+        return f"{out_dir} is not a real directory; refusing to write roles through it"
+    real = os.path.realpath(out_dir)
+    roots = (os.path.realpath(os.getcwd()), os.path.realpath(os.path.expanduser("~")))
+    if not any(real == root or real.startswith(root + os.sep) for root in roots):
+        return f"{out_dir} resolves to {real}, outside the project and $HOME; refusing"
+    return ""
+
+
 def main(argv: list) -> int:
     if len(argv) < 4 or argv[1] != "codex":
         sys.stderr.write(__doc__)
@@ -95,14 +112,9 @@ def main(argv: list) -> int:
     agents_dir, out_dir = argv[2], argv[3]
     version = argv[5] if len(argv) > 5 and argv[4] == "--version" else "unknown"
     os.makedirs(out_dir, exist_ok=True)
-    # The output directory lives in the project, so a repository can have
-    # pre-created any name in it: a symlinked directory, or a symlinked
-    # `craftsman-x.toml.tmp` the first cut opened for writing and so truncated
-    # whatever it pointed at (review of ff99dd5, F1). The directory must be a
-    # real directory, the temporary file is created exclusively, and a target
-    # that is a symlink is refused rather than followed.
-    if os.path.islink(out_dir) or not os.path.isdir(out_dir):
-        sys.stderr.write(f"error: {out_dir} is not a real directory; refusing to write roles through it\n")
+    refusal = _output_dir_ok(out_dir)
+    if refusal:
+        sys.stderr.write(f"error: {refusal}\n")
         return 1
     entries = [entry for entry in sorted(os.listdir(agents_dir)) if entry.endswith(".md")]
     try:

@@ -104,6 +104,15 @@ fi
 R=$(printf '%s' "$(_fx pre-tool-use.create.pascal)" | PATH="/nonexistent" bash "$PRE" 2>&1); RC=$?
 [[ "$RC" -ne 0 ]] && log_pass "preToolUse: a gate that cannot run fails closed (non-zero exit denies on this host)" || log_fail "preToolUse fail-closed" "rc=$RC"
 
+# G3 (independent verification): Copilot's data never lands in Claude Code's tree
+XDG="$WORK/xdg"; mkdir -p "$XDG" "$WORK/fakehome"
+( unset CLAUDE_PLUGIN_DATA; printf '%s' "$(_fx pre-tool-use.create.pascal)" | XDG_DATA_HOME="$XDG" HOME="$WORK/fakehome" bash "$PRE" >/dev/null 2>&1 )
+if [[ -d "$XDG/craftsman/copilot" && ! -e "$WORK/fakehome/.claude" ]]; then
+    log_pass "with no CLAUDE_PLUGIN_DATA the adapter uses XDG_DATA_HOME/craftsman/copilot, not ~/.claude"
+else
+    log_fail "copilot data dir" "$(ls -a "$XDG" "$WORK/fakehome" 2>/dev/null | tr '\n' ' ')"
+fi
+
 # post
 printf '<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\nuse App\\Infrastructure\\Persistence\\DoctrineOrderRepository;\nclass Order\n{\n}\n' > src/Domain/Order.php
 R=$(_run "$POST" "$(_fx post-tool-use.create.pascal)")

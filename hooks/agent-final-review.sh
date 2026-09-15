@@ -108,11 +108,21 @@ fi
 if [[ "$VERDICT" == REVIEW_ISSUES* ]]; then
     echo $((REWAKES + 1)) > "$BUDGET_FILE" 2>/dev/null || true
     FINDINGS=$(haiku_findings "${VERDICT#REVIEW_ISSUES}")
+
+    # The token said findings and nothing survived the shape filter: a reply
+    # cut off after the first line, a refusal, a rate limit. That is a reply
+    # the layer cannot read, so it is unavailable, and it closes nothing: read
+    # as clean it retired every earlier finding on the file (independent
+    # verification, 2026-09-15).
+    if [[ -z "$(printf '%s' "$FINDINGS" | tr -d '[:space:]')" ]]; then
+        metrics_record_haiku_run "agent-final-review" "unavailable" 0 "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
+        exit 0
+    fi
     RECORDED=$(haiku_record_findings "agent-final-review" "$FINDINGS" "$_ABS_FILE" 2>/dev/null || printf '0')
     if [[ "${RECORDED:-0}" -eq 0 ]]; then
-        # Nothing survived the shape filter, so there is nothing to show and
-        # nothing to record. A hit with zero findings is not a hit.
-        metrics_record_haiku_run "agent-final-review" "clean" 0 "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
+        # Findings that name no file of this project are a reply the layer
+        # cannot use: unavailable, never clean, and nothing is closed.
+        metrics_record_haiku_run "agent-final-review" "unavailable" 0 "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
         exit 0
     fi
     metrics_record_haiku_run "agent-final-review" "findings" "$RECORDED" "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true

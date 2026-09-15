@@ -323,6 +323,43 @@ else
     log_fail "symlinked roles dir" "rc=$RC wrote: $(ls "$WORK/elsewhere" | tr '\n' ' ')"
 fi
 rm -rf .codex agents-probe "$WORK/elsewhere"
+# Independent verification (2026-09-15): a symlinked parent or target under a
+# validated directory carried the write out of the project. Refused now.
+# outside means outside the project (the test runs inside $WORK): a sibling directory
+OUTSIDE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-outside-target.XXXXXX"); mkdir -p .codex
+ln -s "$OUTSIDE_DIR" .codex/agents
+RC=0; bash "$CLI" export --target codex-agents >/dev/null 2>&1 || RC=$?
+if [[ "$RC" -ne 0 && -z "$(ls "$OUTSIDE_DIR")" ]]; then
+    log_pass "a symlinked .codex/agents parent is refused; nothing lands outside the project"
+else
+    log_fail "symlinked roles parent" "rc=$RC wrote: $(ls "$OUTSIDE_DIR" | tr '\n' ' ')"
+fi
+rm -rf .codex "$OUTSIDE_DIR"
+rm -rf .github; OUTSIDE_GH=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-outside-gh.XXXXXX"); ln -s "$OUTSIDE_GH" .github
+RC=0; bash "$CLI" export --target copilot >/dev/null 2>&1 || RC=$?
+if [[ "$RC" -ne 0 && ! -e "$OUTSIDE_GH/copilot-instructions.md" ]]; then
+    log_pass "a symlinked .github parent is refused for the Copilot instructions"
+else
+    log_fail "symlinked .github" "rc=$RC $(ls "$OUTSIDE_GH" | tr '\n' ' ')"
+fi
+rm -f .github; rm -rf "$OUTSIDE_GH"
+OUTSIDE_MD=$(mktemp "${TMPDIR:-/tmp}/craftsman-outside-agents.XXXXXX"); printf 'keep\n' > "$OUTSIDE_MD"; ln -s "$OUTSIDE_MD" AGENTS.md
+RC=0; bash "$CLI" export --target agents-md >/dev/null 2>&1 || RC=$?
+if [[ "$RC" -ne 0 && "$(cat "$OUTSIDE_MD")" == "keep" ]]; then
+    log_pass "a symlinked AGENTS.md is refused and its target untouched"
+else
+    log_fail "symlinked AGENTS.md" "rc=$RC $(cat "$OUTSIDE_MD")"
+fi
+rm -f AGENTS.md "$OUTSIDE_MD"
+# mixed line endings stay mixed outside the block
+printf 'USER-CRLF\r\nUSER-LF\n' > AGENTS.md
+bash "$CLI" export --target agents-md >/dev/null 2>&1
+if head -c 20 AGENTS.md | od -c | grep -q 'C   R   L   F  \\r  \\n' && grep -q $'^USER-LF$' AGENTS.md; then
+    log_pass "a file with mixed line endings keeps each line's own ending outside the block"
+else
+    log_fail "mixed line endings" "$(head -c 24 AGENTS.md | od -c | head -2 | tr '\n' ' ')"
+fi
+rm -f AGENTS.md
 
 cd "$PREV_PWD"
 rm -rf "$WORK"

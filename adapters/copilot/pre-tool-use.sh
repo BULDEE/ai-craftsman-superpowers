@@ -22,6 +22,11 @@ set -uo pipefail
 ADAPTER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_ROOT="$(cd "$ADAPTER_DIR/../.." && pwd)"
 export CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}"
+# Copilot's data (metrics, registry cache, session files) lives in its own
+# directory; unset, the core fell back to Claude Code's ~/.claude tree
+# (independent verification, 2026-09-15). Ephemeral in the cloud agent.
+export CLAUDE_PLUGIN_DATA="${CLAUDE_PLUGIN_DATA:-${CRAFTSMAN_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/craftsman/copilot}}"
+mkdir -p "$CLAUDE_PLUGIN_DATA" 2>/dev/null || true
 
 _deny() {
     printf '%s\n' "$1" >&2

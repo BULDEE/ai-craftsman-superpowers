@@ -35,6 +35,25 @@ Levels of proof, from weakest to strongest:
 | Fresh install from the built archive | e2e (`tests/meta/test-fresh-install.sh`) | same tree | same tree | same tree |
 | Delivery of a background finding | asyncRewake on exit 2 | at the next safe point, no wake of an idle session (documented) | `additionalContext` (documented) | conclusion gate |
 
+## Independent verification (2026-09-15, on d08e0ec)
+
+Codex 0.154.0 and Grok 1.0.30 ran `docs/reference/interop-2026-09-15-verify-prompt.md`
+in isolated clones (reports: `interop-2026-09-15-evidence/verify-*.txt`). Both:
+CHANGES_REQUIRED. Both confirmed the suites (275/0 with an isolated HOME), the
+five red guardrails, and every "captured" and "script direct" row above; neither
+could exercise the model-driven rows (no credentials in the isolated HOME, and
+Grok's sandbox refused `codex exec`), so those rows rest on this campaign's own
+e2e runs. The fourteen findings they raised were all reproduced and fixed with
+a witness: symlinked parents or skill directories carrying a write out of the
+project (instincts, roles, doctrine), a landed Update patch re-applied and
+reported unvalidated, a compound shell command's result read as the runner's,
+a host's own hook wiring (`.codex/hooks.json`, `.github/hooks/*.json`) not
+treated as gate machinery, a `DDD_VIOLATIONS` reply with nothing readable read
+as clean and closing earlier findings, a poisoned empty registry cache trusted
+for a month, the Copilot adapter defaulting to Claude Code's data tree, the
+standalone CI test reading the developer's real HOME, mixed line endings
+normalised, and a raw `patch` body listed as touching nothing.
+
 ## Open, with the action that closes each
 
 - A real `spawn_agent` of a `craftsman-*` role: project-level `.codex/agents/`

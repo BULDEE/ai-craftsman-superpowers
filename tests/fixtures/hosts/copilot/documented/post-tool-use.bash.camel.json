@@ -9,5 +9,6 @@
   "toolResult": {
     "resultType": "failure",
     "textResultForLlm": "1 failed"
-  }
+  },
+  "_provenance": "resultType failure is accepted by the adapter but not shown on the reference page (it documents success, and postToolUseFailure for a failed tool)"
 }

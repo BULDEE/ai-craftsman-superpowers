@@ -69,9 +69,16 @@ _gate_own_config() {
     esac
     return 1
 }
+# Every host's own hook wiring is the gate's machinery: Claude Code's
+# settings, Codex's project hooks and config (`[features] hooks = false` lives
+# there), Copilot's `.github/hooks/*.json` and `.copilot/hooks/`, and the
+# installed plugin. A patch to `.codex/hooks.json` passed here with exit 0
+# (independent verification, 2026-09-15).
 _gate_own_machinery() {
     case "$1" in
         */.claude/settings.json|*/.claude/settings.local.json) return 0 ;;
+        */.codex/hooks.json|*/.codex/config.toml) return 0 ;;
+        */.github/hooks/*.json|*/.copilot/hooks/*|*/.github/copilot/settings.json|*/.github/copilot/settings.local.json) return 0 ;;
     esac
     [[ -n "${CLAUDE_PLUGIN_ROOT:-}" && "$1" == "${CLAUDE_PLUGIN_ROOT%/}/"* ]]
 }
@@ -84,8 +91,8 @@ ASK_FILE=""
 while IFS= read -r FILE_PATH; do
     [[ -z "$FILE_PATH" ]] && continue
     if _gate_own_machinery "$FILE_PATH"; then
-        _deny "$FILE_PATH" "${FILE_PATH} is the gate's own machinery (Claude Code settings or the installed plugin). Ask the user to change it." \
-            "${FILE_PATH} is the quality gate's own machinery (Claude Code settings or the installed plugin). A session does not rewrite the gate it runs under; ask the user to change it."
+        _deny "$FILE_PATH" "${FILE_PATH} is the gate's own machinery (a host's hook wiring or the installed plugin). Ask the user to change it." \
+            "${FILE_PATH} is the quality gate's own machinery (a host's hook wiring or the installed plugin). A session does not rewrite the gate it runs under; ask the user to change it."
     fi
     if _gate_own_config "$FILE_PATH"; then
         host_supports_ask "$HOST" || _deny "$FILE_PATH" "$(basename "$FILE_PATH") configures the quality gate itself and this host cannot hand the write to the user. Ask the user to edit it directly." \

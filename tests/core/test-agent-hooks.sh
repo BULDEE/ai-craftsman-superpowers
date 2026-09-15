@@ -617,4 +617,42 @@ else
 fi
 rm -rf "$AH_DIR"
 
+echo ""
+echo "=== a reply the layer cannot read is unavailable, and closes nothing ==="
+# Independent verification (2026-09-15): "DDD_VIOLATIONS" followed by nothing
+# readable was recorded clean and closed the file's earlier findings as fixed.
+C6_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-c6.XXXXXX")
+mkdir -p "$C6_DIR/bin" "$C6_DIR/proj/src/Domain" "$C6_DIR/data"
+printf '<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\nuse App\\Infrastructure\\Mailer;\nfinal class Order\n{\n}\n' > "$C6_DIR/proj/src/Domain/Order.php"
+( cd "$C6_DIR/proj" && git init -q . && git add -A && git commit -qm base ) >/dev/null 2>&1
+_c6_run() { # $1 = reply the fake CLI gives
+    printf '#!/bin/sh\nprintf "%%s\\n" "%s"\n' "$1" > "$C6_DIR/bin/claude"; chmod +x "$C6_DIR/bin/claude"
+    ( cd "$C6_DIR/proj" && printf '{"session_id":"c6","prompt_id":"p","tool_name":"Write","tool_input":{"file_path":"%s"}}' "$C6_DIR/proj/src/Domain/Order.php" \
+        | env -u CRAFTSMAN_HEADLESS_VERIFY -u CLAUDE_EFFORT PATH="$C6_DIR/bin:$PATH" CLAUDE_PLUGIN_ROOT="$ROOT_DIR" CLAUDE_PLUGIN_DATA="$C6_DIR/data" \
+              CLAUDE_PLUGIN_OPTION_STACK=fullstack CLAUDE_PLUGIN_OPTION_AGENT_HOOKS=true bash "$ROOT_DIR/hooks/agent-ddd-verifier.sh" >/dev/null 2>&1 )
+}
+# a real finding first, so there is something to close
+_c6_run 'DDD_VIOLATIONS
+src/Domain/Order.php:4 layer violation - Domain imports Infrastructure'
+FIRST=$(sqlite3 "$C6_DIR/data/metrics.db" "select verdict from haiku_runs order by id desc limit 1")
+printf '\n' >> "$C6_DIR/proj/src/Domain/Order.php"   # the file changed, so a clean reply COULD close
+_c6_run 'DDD_VIOLATIONS
+output truncated'
+SECOND=$(sqlite3 "$C6_DIR/data/metrics.db" "select verdict from haiku_runs order by id desc limit 1")
+CLOSED=$(sqlite3 "$C6_DIR/data/metrics.db" "select count(*) from corrections where source='haiku'")
+if [[ "$FIRST" == "findings" && "$SECOND" == "unavailable" && "$CLOSED" == "0" ]]; then
+    log_pass "a DDD_VIOLATIONS reply with nothing readable is recorded unavailable and closes no earlier finding"
+else
+    log_fail "truncated verdict" "first=$FIRST second=$SECOND closed=$CLOSED"
+fi
+_c6_run 'DDD_VIOLATIONS
+/etc/passwd:1 layer violation - not in this project'
+THIRD=$(sqlite3 "$C6_DIR/data/metrics.db" "select verdict from haiku_runs order by id desc limit 1")
+[[ "$THIRD" == "unavailable" ]] && log_pass "findings naming no file of the project are unavailable, not clean" || log_fail "outside findings" "$THIRD"
+_c6_run 'CLEAN'
+FOURTH=$(sqlite3 "$C6_DIR/data/metrics.db" "select verdict from haiku_runs order by id desc limit 1")
+CLOSED=$(sqlite3 "$C6_DIR/data/metrics.db" "select count(*) from corrections where source='haiku'")
+[[ "$FOURTH" == "clean" && "$CLOSED" -ge 1 ]] && log_pass "control: the exact CLEAN token on the changed file is clean and closes the earlier finding" || log_fail "control clean" "verdict=$FOURTH closed=$CLOSED"
+rm -rf "$C6_DIR"
+
 test_summary

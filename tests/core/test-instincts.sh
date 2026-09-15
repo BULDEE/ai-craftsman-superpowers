@@ -524,6 +524,18 @@ if [[ "$NESTED_RC" != "0" && ! -d "$INJ_DIR/nested" ]]; then
 else
     log_fail "nested skills dir" "rc=$NESTED_RC"
 fi
+# a learned-<rule> directory pre-created as a symlink out of the project is refused
+sqlite3 "$INJ_DB" "INSERT INTO instincts(id,project_hash,rule,pattern_summary,occurrences,distinct_files,confidence,status,created_at,reviewed_at) VALUES(33,'p1','PY005','x',5,3,0.95,'candidate',datetime('now'),NULL);" 2>/dev/null
+OUTSIDE_SKILL="$INJ_DIR/../outside-skill-$$"; mkdir -p "$OUTSIDE_SKILL"
+ln -s "$OUTSIDE_SKILL" "$INJ_DIR/.agents/skills/learned-py005"
+LINK_RC=0
+(cd "$INJ_DIR" && python3 "$INSTINCTS" approve "$INJ_DB" 33 "$INJ_DIR/.agents/skills") >/dev/null 2>&1 || LINK_RC=$?
+if [[ "$LINK_RC" != "0" && ! -e "$OUTSIDE_SKILL/SKILL.md" ]]; then
+    log_pass "a learned skill directory that is a symlink out of the project is refused, nothing written through it"
+else
+    log_fail "symlinked skill dir" "rc=$LINK_RC $(ls "$OUTSIDE_SKILL" | tr '\n' ' ')"
+fi
+rm -rf "$OUTSIDE_SKILL"
 if grep -q '^name: ' "$INJ_SKILL"; then
     log_pass "the Claude destination's skill carries the same name field (valid for both hosts)"
 else

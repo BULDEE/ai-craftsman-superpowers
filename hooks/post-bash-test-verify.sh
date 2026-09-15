@@ -86,6 +86,27 @@ if ! echo "$COMMAND" | grep -qE "$(_test_command_pattern)"; then
     exit 0
 fi
 
+# The command's result is the RUNNER's result only when the runner is what
+# decided it. Measured (independent verification, 2026-09-15): `true || pytest`
+# granted evidence for a runner that never ran, `false && pytest` revoked it
+# for a `false`, `pytest fail; true` granted it for a green `true`. So:
+#   grant   only when the runner is the LAST command (`cd api && pytest`,
+#           `pytest -q`), with no `||` anywhere and no pipe in that last command
+#   revoke  only when the runner is the WHOLE command: a failed `cd x && pytest`
+#           may be the cd, and a revocation on a guess is an invented regression
+# Anything else is unknown: nothing granted, nothing revoked, and said so.
+_last_command() { printf '%s' "$1" | tr '\n' ';' | sed 's/&&/;/g' | awk -F';' '{for (i=NF; i>0; i--) if ($i ~ /[^[:space:]]/) {print $i; exit}}'; }
+LAST=$(_last_command "$COMMAND")
+RUNNER_LAST=false; RUNNER_ALONE=false
+if [[ "$COMMAND" != *"||"* && "$LAST" != *"|"* ]] && printf '%s' "$LAST" | grep -qE "$(_test_command_pattern)"; then
+    RUNNER_LAST=true
+    [[ "$COMMAND" != *"&&"* && "$COMMAND" != *";"* && "$COMMAND" != *$'\n'* ]] && RUNNER_ALONE=true
+fi
+if [[ "$STATE" == "succeeded" && "$RUNNER_LAST" != true ]] || [[ "$STATE" == "failed" && "$RUNNER_ALONE" != true ]]; then
+    echo "craftsman: '${COMMAND}' is a compound command; its result is not the test runner's, so verification evidence is unchanged (run the runner as the last or only command)." >&2
+    exit 0
+fi
+
 case "$STATE" in
     running)
         # Started in the background: remembered so the TaskOutput that ends

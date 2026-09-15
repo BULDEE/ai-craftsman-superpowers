@@ -223,23 +223,45 @@ def _patch_changes(command: str, cwd: str) -> list:
     return [_patch_change(entry, cwd) for entry in v4a_patch.parse(command)]
 
 
-def changes_of(payload: dict) -> list:
-    """The change list of any payload shape this helper reads; [] when it reads none."""
+def _patch_paths(command: str, cwd: str) -> list:
+    """The same files with no content: what a reader AFTER the write needs.
+    Re-applying the hunks to the file they already changed failed and reported
+    a landed, valid edit as "NOT validated" (independent verification,
+    2026-09-15)."""
+    return [Change(op, _absolute(path, cwd), _absolute(new_path, cwd))
+            for op, path, new_path, _body in v4a_patch.parse(command)]
+
+
+def _patch_changes_of(payload: dict, args: dict, paths_only: bool) -> list:
+    command = args.get("command")
+    if not isinstance(command, str):
+        return []
+    cwd = str(payload.get("cwd") or "")
+    return _patch_paths(command, cwd) if paths_only else _patch_changes(command, cwd)
+
+
+def changes_of(payload: dict, paths_only: bool = False) -> list:
+    """The change list of any payload shape this helper reads; [] when it reads none.
+
+    `paths_only` names the files without computing their would-be content:
+    the post-write listing, where the files are already on disk.
+    """
     tool = payload.get("tool_name") or ""
     args = _arguments(payload)
     if not tool:
         tool = "Edit" if "old_string" in args else "Write"
-    if tool not in WRITE_TOOLS or _is_v4a(args):
+    if tool not in WRITE_TOOLS:
         return []
-    cwd = str(payload.get("cwd") or "")
+    if _is_v4a(args):
+        # Hermes's `mode: patch` body is not read here; a lister that returned
+        # nothing let the config gate pass it (independent verification, 2026-09-15).
+        raise ValueError("a V4A patch (mode: patch / patch) is not read by the write gate; use write_file or a replace-mode patch")
     if tool == "apply_patch":
-        command = args.get("command")
-        if not isinstance(command, str):
-            return []
-        return _patch_changes(command, cwd)
+        return _patch_changes_of(payload, args, paths_only)
     path = args.get("path") or args.get("file_path")
     if not path:
         return []
+    cwd = str(payload.get("cwd") or "")
     target = str(path) if os.path.isabs(str(path)) or not cwd else os.path.join(cwd, str(path))
     return [Change("update" if tool in ("Edit", "patch") else "add", target, None, _would_be_content(tool, args, target))]
 
@@ -374,7 +396,7 @@ def _placement(payload: dict, mirror: str) -> str:
 
 def _listing(payload: dict) -> str:
     try:
-        changes = changes_of(payload)
+        changes = changes_of(payload, paths_only=True)
     except ValueError as error:
         return "UNREADABLE\t" + str(error)
     rows = []

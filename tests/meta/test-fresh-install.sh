@@ -81,8 +81,9 @@ final class Order
 }'
 _pre() { local rc=0; printf '%s' "$1" | HOME="$WORK/home" bash "$INSTALL/hooks/pre-write-check.sh" >/dev/null 2>&1 || rc=$?; echo $rc; }
 mkdir -p "$WORK/home/.claude"
-CLAUDE_BAD=$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$PROJ" "d['tool_input']['file_path'] = '$PROJ/src/Domain/Order.php'; d['tool_input']['content'] = '''$BAD'''")
-CLAUDE_GOOD=$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$PROJ" "d['tool_input']['file_path'] = '$PROJ/src/Domain/Order.php'; d['tool_input']['content'] = '''$GOOD'''")
+printf '%s\n' "$BAD" > "$WORK/bad.php"; printf '%s\n' "$GOOD" > "$WORK/good.php"
+CLAUDE_BAD=$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$PROJ" "d['tool_input']['file_path'] = '$PROJ/src/Domain/Order.php'; d['tool_input']['content'] = open('$WORK/bad.php').read()")
+CLAUDE_GOOD=$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$PROJ" "d['tool_input']['file_path'] = '$PROJ/src/Domain/Order.php'; d['tool_input']['content'] = open('$WORK/good.php').read()")
 python3 - "$PROJ/src/Domain/Order.php" "$BAD" > "$WORK/bad.patch" <<'PY'
 import sys
 print("*** Begin Patch\n*** Add File: " + sys.argv[1] + "\n" + "\n".join("+" + l for l in sys.argv[2].split("\n")) + "\n*** End Patch")
