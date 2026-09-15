@@ -30,7 +30,10 @@ HOST=$(host_detect "$INPUT")
 # helper's --list, which is also what post-write reads.
 FILE_PATHS=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
 if [[ -z "$FILE_PATHS" ]]; then
-    LISTING=$(printf '%s' "$INPUT" | python3 "${SCRIPT_DIR}/lib/write_mirror.py" --list 2>/dev/null || true)
+    LISTING=$(printf '%s' "$INPUT" | python3 "${SCRIPT_DIR}/lib/write_mirror.py" --list 2>/dev/null); LISTING_RC=$?
+    # A listing that crashed named nothing, and nothing is not a pass
+    # (ADR-0029; review F3).
+    [[ "$LISTING_RC" -ne 0 ]] && LISTING="UNREADABLE	the listing helper exited ${LISTING_RC}"
     if [[ "$LISTING" == UNREADABLE* ]]; then
         echo "🚫 BLOCKED by AI Craftsman - config-protection: the patch could not be read (${LISTING#UNREADABLE	}). A write the gate cannot read is not let through; rewrite the patch." >&2
         jq -n --arg why "${LISTING#UNREADABLE	}" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: ("the patch could not be read by the quality gate (" + $why + "); rewrite it")}}'

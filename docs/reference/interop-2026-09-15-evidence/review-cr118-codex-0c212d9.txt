@@ -1,0 +1,40 @@
+VERDICT: CHANGES_REQUIRED
+REVISION: 0c212d980a2fa9c36827c25fbb186934a0edc5c1
+
+FINDINGS:
+
+1. blocking, hooks/lib/write_mirror.py:294: Add File drops the final newline, allowing violations on the last line to escape validation.
+Evidence: content is constructed with "\n".join(body). The TypeScript validator uses "while IFS= read -r line; do" (packs/react/hooks/typescript-validator.sh:15), which skips an unterminated final line. For a patch adding only "export const x: any = 1;", the mirror contains no newline. Read-only reproduction: the validator’s loop visits zero lines; the newline control visits one. Preserve the final newline when reconstructing Add File content.
+
+2. blocking, hooks/lib/write_mirror.py:304: Unmatched context becomes partial content instead of an evaluation failure.
+Evidence: "applied if applied is not None else _added_lines(body)". For an existing "// craftsman-ignore: TS001   " line followed by "const x: any = 1;", deleting the suppression using context without its trailing spaces makes apply_hunks return None. The resulting judged content is "", confirmed in memory. The retained violation is therefore invisible if the host applies the whitespace-tolerant deletion described by this helper’s contract. Reconstruct the complete result or refuse the patch.
+
+3. blocking, hooks/config-protection.sh:33 and hooks/pre-write-check.sh:104: Helper failures are converted into successful passes.
+Evidence: both Python invocations end with "2>/dev/null || true". Config protection subsequently executes '[[ -z "$FILE_PATHS" ]] && exit 0'; pre-write executes '[[ -z "$MIRROR_FILES" ]] && exit 0'. A missing Python executable or helper crash therefore bypasses both gates. A mirror-only failure, such as an OSError while copying rules, also bypasses pre-write while config protection can successfully list and allow the ordinary source path. Additionally, pre-write discards UNJUDGED output through its MIRROR-only filter. Check helper status and explicitly refuse unjudged writes.
+
+4. major, hooks/lib/write_mirror.py:228: Hunk location directives are discarded, so the mirror can modify the wrong occurrence.
+Evidence: "@@" only causes "hunks.append([])", "*** End of File" executes "pass", and apply_hunks selects the first matching context. In-memory reproduction with identical return statements in first() and second(): "@@ function second() {" changes first() in the mirror. An EOF-directed replacement in "same\nmiddle\nsame\n" changes the first “same”. Preserve these location constraints or refuse patches requiring them.
+
+5. blocking, hooks/lib/write_mirror.py:422: Files from separate workspace roots can overwrite each other in the shared mirror.
+Evidence: each destination is independently resolved into "target, workspace, relative", then written through "_place(mirror, workspace, relative, change.content)". In a monorepo where packages/a and packages/b each contain package.json, both src/example.ts files map to the same mirror/src/example.ts. Adding an invalid file in a first and a valid file in b second leaves the valid content for both subsequent validations. Rule files and root metadata also share that destination. Isolate mirror contents by workspace.
+
+6. major, hooks/post-write-check.sh:222: Child execution failures other than exit 2 are treated as passes.
+Evidence: '[[ "${rc:-0}" -eq 2 ]] && CHILD_RC=2', followed by "rc=0" and eventually "exit 0". A child terminated with exit 137 produces a parent exit 0, confirmed by a read-only shell reproduction. The listing branch likewise filters UNREADABLE away and exits 0 when no paths remain; a failed listing command reaches the existing ERR trap that exits 0. Map evaluation failures to exit 2.
+
+7. major, hooks/post-write-check.sh:233: The JSON merger silently loses normal child warnings.
+Evidence: it splits stdout using 'sys.stdin.read().split("\n")', attempts "json.loads(chunk)", and discards parsing errors. Children emit pretty-printed objects with "jq -n" at line 727. In-memory reproduction using that object shape yielded zero accepted chunks. Consequently, a warning-only patch returns exit 0 with no warning JSON. Parse complete child objects or emit compact JSON before merging.
+
+COMMANDS RUN:
+
+- cat supplied diff.patch: read first; initial output was truncated, then completed through targeted git diffs and file reads.
+- git rev-parse HEAD; git diff HEAD^ HEAD --stat/--name-only; targeted git diff/show: confirmed revision and reviewed commit changes.
+- cat, nl -ba, rg, and Python file reads: inspected changed hooks, tests, fixtures, provenance, and relevant validator callers.
+- Python AST-extracted parser probes: reproduced discarded anchors, EOF misplacement, empty deletion fallback, and missing final newline; ordinary gate-config deletion and header-like filenames parsed correctly.
+- Python JSON parsing probe: confirmed pretty-printed child messages are discarded.
+- Read-only Bash snippets invoked through Python: confirmed zero-line validation without a newline and exit-137 aggregation into exit 0.
+- git status --short: observed concurrent fixture/provenance changes; excluded those changes from this review.
+- Initial heredoc and some glob searches: failed due sandbox temporary-file restrictions or unmatched paths; relevant reads were retried.
+
+NOT VERIFIED:
+
+No test suite, complete hook execution, actual file mutation, or live host invocation was performed. Host application of the example patches, end-to-end hook routing, and Claude Code autofix behavior remain runtime-unverified. Shell children at this revision use bash "$0", not /bin/zsh.

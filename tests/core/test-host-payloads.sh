@@ -217,6 +217,8 @@ fi
 rm -f "$WORK/src/Domain/Order.php" "$WORK/src/Domain/Good.php"
 
 # --- the real capture itself, unmodified, is read as two files ------------
+# The file the captured hunk edits, as it was when the capture was made.
+printf '<?php\n\nnamespace App\\Domain;\n\nfinal class Existing\n{\n}\n' > "$WORK/Existing.php"
 R=$(host_fixture codex 0.154.0 pre-tool-use.apply_patch.multifile-move "$WORK" \
     | python3 "$ROOT_DIR/hooks/lib/write_mirror.py" --list 2>&1)
 EXPECTED=$(printf 'add\t%s/src/Domain/Order.php\nmove\t%s/Existing.php\t%s/src/Domain/Existing.php' "$WORK" "$WORK" "$WORK")
@@ -225,6 +227,147 @@ if [[ "$R" == "$EXPECTED" ]]; then
 else
     log_fail "captured patch listing" "$(printf '%s' "$R" | tr '\n\t' ' >' | cut -c1-200)"
 fi
+M=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-mirror.XXXXXX")
+host_fixture codex 0.154.0 pre-tool-use.apply_patch.multifile-move "$WORK" \
+    | python3 "$ROOT_DIR/hooks/lib/write_mirror.py" "$M" >/dev/null 2>&1
+if grep -q "public function ping" "$M/src/Domain/Existing.php" 2>/dev/null \
+    && grep -q "^final class Existing" "$M/src/Domain/Existing.php" \
+    && [[ "$(tail -c1 "$M/src/Domain/Order.php" | od -An -c | tr -d ' ')" == '\n' ]]; then
+    log_pass "the mirror holds the moved file with its hunk applied, and the added file ends with a newline"
+else
+    log_fail "mirror content" "$(ls -R "$M" | tr '\n' ' ' | cut -c1-120) :: $(cat "$M/src/Domain/Existing.php" 2>/dev/null | tr '\n' '|')"
+fi
+rm -rf "$M"
+rm -f "$WORK/Existing.php"
+
+# =============================================================================
+# Independent review of the first cut (Codex, read-only): seven ways a patch
+# could pass unjudged. Each one is a case here, so the fix has a witness.
+# =============================================================================
+echo ""
+echo "--- review findings on the patch reader ---"
+
+# F1: an added file's last line is a line. `while read` skips an unterminated
+# one, so a one-line TS file holding `any` passed.
+_add_file_patch "$WORK/src/one.ts" "export const x: any = 1;" > "$WORK/f1.patch"
+R=$(_run pre-write-check.sh "$(_codex_pre "$WORK/f1.patch")")
+if [[ "${R%%|*}" == "2" && "${R#*|}" == *TS001* ]]; then
+    log_pass "F1: a one-line added file is judged (its last line ends with a newline in the mirror)"
+else
+    log_fail "F1 trailing newline" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
+fi
+
+# F2: a hunk that cannot be placed is a refusal, not a judgment of its added
+# lines (which, for a deletion, is nothing).
+printf '// craftsman-ignore: TS001\nconst x: any = 1;\n' > "$WORK/src/sup.ts"
+python3 - "$WORK" > "$WORK/f2.patch" <<'PY'
+import sys; w = sys.argv[1]
+print("\n".join(["*** Begin Patch", f"*** Update File: {w}/src/sup.ts", "@@", "-// this context line is not in the file", " const x: any = 1;", "*** End Patch"]))
+PY
+R=$(_run pre-write-check.sh "$(_codex_pre "$WORK/f2.patch")")
+if [[ "${R%%|*}" == "2" && "${R#*|}" == *"does not match the file"* && "${R#*|}" == *'"deny"'* ]]; then
+    log_pass "F2: a hunk whose context is not in the file refuses the patch and says which file"
+else
+    log_fail "F2 unplaceable hunk" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-200)"
+fi
+# ...and a deletion that does locate is judged on the whole result.
+python3 - "$WORK" > "$WORK/f2b.patch" <<'PY'
+import sys; w = sys.argv[1]
+print("\n".join(["*** Begin Patch", f"*** Update File: {w}/src/sup.ts", "@@", "-// craftsman-ignore: TS001", " const x: any = 1;", "*** End Patch"]))
+PY
+R=$(_run pre-write-check.sh "$(_codex_pre "$WORK/f2b.patch")")
+if [[ "${R%%|*}" == "2" && "${R#*|}" == *TS001* ]]; then
+    log_pass "F2: deleting the suppression comment exposes the violation it hid"
+else
+    log_fail "F2 deletion judged" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
+fi
+# Codex tolerates trailing whitespace drift in context; so does the reader.
+printf 'const y = 1;   \nconst x: any = 2;\n' > "$WORK/src/drift.ts"
+python3 - "$WORK" > "$WORK/f2c.patch" <<'PY'
+import sys; w = sys.argv[1]
+print("\n".join(["*** Begin Patch", f"*** Update File: {w}/src/drift.ts", "@@", " const y = 1;", "-const x: any = 2;", "+const x: number = 2;", "*** End Patch"]))
+PY
+R=$(_run pre-write-check.sh "$(_codex_pre "$WORK/f2c.patch")")
+if [[ "${R%%|*}" == "0" ]]; then
+    log_pass "F2: context differing only by trailing whitespace still places (as Codex's applier does)"
+else
+    log_fail "F2 whitespace tolerance" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
+fi
+rm -f "$WORK/src/sup.ts" "$WORK/src/drift.ts"
+
+# F3: a helper that cannot run is a refusal on both gates. A python3 that
+# exits 3 breaks the engine's own loaders first on the pre-write side (the ERR
+# trap refuses) and the listing helper on the config side; either way the
+# valid patch that passed above is refused now, and nothing says "allow".
+mkdir -p "$WORK/nopath"; printf '#!/bin/sh\nexit 3\n' > "$WORK/nopath/python3"; chmod +x "$WORK/nopath/python3"
+R=$(printf '%s' "$(_codex_pre "$WORK/good.patch")" | PATH="$WORK/nopath:$PATH" bash "$ROOT_DIR/hooks/pre-write-check.sh" 2>&1); RC=$?
+R2=$(printf '%s' "$(_codex_pre "$WORK/good.patch")" | PATH="$WORK/nopath:$PATH" bash "$ROOT_DIR/hooks/config-protection.sh" 2>&1); RC2=$?
+if [[ "$RC" -eq 2 && "$RC2" -eq 2 && "$R" != *'"allow"'* && "$R2" != *'"allow"'* ]]; then
+    log_pass "F3: a crashing helper refuses the write on pre-write and on config-protection (no verdict is not a clean verdict)"
+else
+    log_fail "F3 helper crash refuses" "pre rc=$RC [$(printf '%s' "$R" | tr '\n' ' ' | cut -c1-100)] cfg rc=$RC2 [$(printf '%s' "$R2" | tr '\n' ' ' | cut -c1-100)]"
+fi
+rm -rf "$WORK/nopath"
+
+# F4: `@@ anchor` picks the occurrence; End of File pins the tail.
+printf 'function first() {\n  return 1;\n}\nfunction second() {\n  return 1;\n}\n' > "$WORK/src/two.ts"
+python3 - "$WORK" > "$WORK/f4.patch" <<'PY'
+import sys; w = sys.argv[1]
+print("\n".join(["*** Begin Patch", f"*** Update File: {w}/src/two.ts", "@@ function second() {", "-  return 1;", "+  const leak: any = 2; return leak;", "*** End Patch"]))
+PY
+M=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-mirror.XXXXXX")
+_codex_pre "$WORK/f4.patch" | python3 "$ROOT_DIR/hooks/lib/write_mirror.py" "$M" >/dev/null 2>&1
+if [[ "$(sed -n '2p' "$M/src/two.ts")" == "  return 1;" && "$(sed -n '5p' "$M/src/two.ts")" == *"any"* ]]; then
+    log_pass "F4: an @@ anchor edits the occurrence it names, not the first match"
+else
+    log_fail "F4 anchor" "$(cat "$M/src/two.ts" 2>/dev/null | tr '\n' '|')"
+fi
+rm -rf "$M"
+printf 'same\nmiddle\nsame\n' > "$WORK/src/eof.ts"
+python3 - "$WORK" > "$WORK/f4b.patch" <<'PY'
+import sys; w = sys.argv[1]
+print("\n".join(["*** Begin Patch", f"*** Update File: {w}/src/eof.ts", "@@", "-same", "+last", "*** End of File", "*** End Patch"]))
+PY
+M=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-mirror.XXXXXX")
+_codex_pre "$WORK/f4b.patch" | python3 "$ROOT_DIR/hooks/lib/write_mirror.py" "$M" >/dev/null 2>&1
+if [[ "$(cat "$M/src/eof.ts" | tr '\n' '|')" == "same|middle|last|" ]]; then
+    log_pass "F4: an End of File hunk edits the tail, not the first match"
+else
+    log_fail "F4 end of file" "$(cat "$M/src/eof.ts" 2>/dev/null | tr '\n' '|')"
+fi
+rm -rf "$M" "$WORK/src/two.ts" "$WORK/src/eof.ts"
+
+# F5: two workspaces in one patch do not share a mirror path.
+mkdir -p "$WORK/packages/a/src" "$WORK/packages/b/src"
+printf '{"name":"a"}\n' > "$WORK/packages/a/package.json"
+printf '{"name":"b"}\n' > "$WORK/packages/b/package.json"
+_add_file_patch "$WORK/packages/a/src/example.ts" "export const bad: any = 1;" "$WORK/packages/b/src/example.ts" "export const good: number = 1;" > "$WORK/f5.patch"
+R=$(_run pre-write-check.sh "$(_codex_pre "$WORK/f5.patch")")
+if [[ "${R%%|*}" == "2" && "${R#*|}" == *TS001* ]]; then
+    log_pass "F5: a monorepo patch adding an invalid file in one package and a valid one in another is refused"
+else
+    log_fail "F5 monorepo mirror" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
+fi
+rm -rf "$WORK/packages"
+
+# F6: what landed and could not be read is reported unvalidated, not passed.
+R=$(_run post-write-check.sh "$(host_fixture_with codex 0.154.0 post-tool-use.apply_patch.multifile-move "$WORK" "d['tool_input']['command'] = 'not a patch'")")
+if [[ "${R%%|*}" == "2" && "${R#*|}" == *"NOT validated"* ]]; then
+    log_pass "F6: a landed patch the reader cannot parse is reported as unvalidated (exit 2), not passed"
+else
+    log_fail "F6 unreadable after landing" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
+fi
+
+# F7: a warning-only patch still surfaces its warnings in one JSON object.
+printf 'export default function f() { return 1 }\n' > "$WORK/src/Warn.ts"
+_add_file_patch "$WORK/src/Warn.ts" "export default function f() { return 1 }" > "$WORK/f7.patch"
+R=$(_run post-write-check.sh "$(_codex_post "$WORK/f7.patch")")
+if [[ "${R%%|*}" == "0" && "${R#*|}" == *TS002* ]] && printf '%s' "${R#*|}" | python3 -c 'import json,sys; d=json.loads(sys.stdin.read()); assert "TS002" in d["hookSpecificOutput"]["additionalContext"]' 2>/dev/null; then
+    log_pass "F7: an advisory finding on a landed patch reaches the host as one JSON object"
+else
+    log_fail "F7 warning merge" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-200)"
+fi
+rm -f "$WORK/src/Warn.ts"
 
 # =============================================================================
 # CR-119: a test run is what the host said about it, not a field nobody sends

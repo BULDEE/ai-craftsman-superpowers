@@ -102,11 +102,25 @@ trap 'rm -rf "$MIRROR"' EXIT
 # A relative file_path is relative to the session's working directory, which
 # is this hook's; the helper is told, since the payload does not carry it.
 PLACED=$(printf '%s' "$INPUT" | jq --arg cwd "$PWD" '. + {cwd: (.cwd // $cwd)}' 2>/dev/null \
-    | python3 "${SCRIPT_DIR}/lib/write_mirror.py" "$MIRROR" 2>/dev/null || true)
+    | python3 "${SCRIPT_DIR}/lib/write_mirror.py" "$MIRROR" 2>/dev/null); PLACED_RC=$?
+# A helper that crashed placed nothing, and nothing is not a pass (ADR-0029;
+# review F3: `|| true` here let a missing python3 wave every write through).
+if [[ "$PLACED_RC" -ne 0 ]]; then
+    echo "🚫 BLOCKED by AI Craftsman - the pre-write gate could not lay out the would-be file (write_mirror.py exit ${PLACED_RC}). Retry the write once; if it repeats, the gate needs attention, not the write." >&2
+    jq -n --arg rc "$PLACED_RC" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: ("the pre-write gate could not lay out the would-be file (write_mirror.py exit " + $rc + "); retry once, then report the gate")}}'
+    exit 2
+fi
 # One `MIRROR <relative path>` per would-be file (one for a Write/Edit, any
-# number for a patch). GATE lines are config-protection.sh's to refuse and
-# UNJUDGED lines are refused there too; a placement with no mirror line is
-# not a write this gate judges.
+# number for a patch). GATE lines are config-protection.sh's to refuse. An
+# UNJUDGED line is a write this gate could not read (an unplaceable hunk, a
+# relative path with no workspace) and is refused here, with the reason: an
+# unread mutation is not a pass.
+UNJUDGED=$(printf '%s\n' "$PLACED" | awk '/^UNJUDGED /{print substr($0, 10); exit}')
+if [[ -n "$UNJUDGED" ]]; then
+    echo "🚫 BLOCKED by AI Craftsman - the write cannot be judged before it lands: ${UNJUDGED}" >&2
+    jq -n --arg why "$UNJUDGED" '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: ("the write cannot be judged before it lands: " + $why)}}'
+    exit 2
+fi
 MIRROR_FILES=$(printf '%s\n' "$PLACED" | awk '/^MIRROR /{print substr($0, 8)}')
 [[ -z "$MIRROR_FILES" ]] && exit 0
 MIRROR_FILE_COUNT=$(printf '%s\n' "$MIRROR_FILES" | grep -c .)
@@ -137,7 +151,7 @@ _pre_emit() {
     case " $BLOCKING_RULES " in *" ${MIRROR_REL}:${rule} "*) return 0 ;; esac
     [[ "$severity" == "block" ]] && BLOCKING_RULES="$BLOCKING_RULES ${MIRROR_REL}:${rule}"
     # A patch names several files: the finding says which one.
-    [[ "$MIRROR_FILE_COUNT" -gt 1 ]] && message="${message} [${MIRROR_REL}]"
+    [[ "$MIRROR_FILE_COUNT" -gt 1 ]] && message="${message} [${MIRROR_REL#ws[0-9]*/}]"
     VIOLATIONS="${VIOLATIONS}${rule}: ${message}\n"
     ((VIOLATION_COUNT++)) || true
 }

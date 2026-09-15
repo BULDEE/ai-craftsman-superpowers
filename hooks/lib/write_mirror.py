@@ -223,19 +223,24 @@ def parse_v4a(text: str) -> list:
             path, new_path, i = line[len(V4A_UPDATE):].strip(), None, i + 1
             if i < len(lines) and lines[i].startswith(V4A_MOVE):
                 new_path, i = lines[i][len(V4A_MOVE):].strip(), i + 1
+            # A hunk is {"anchor": text after "@@" or "", "eof": bool, "lines": [...]}.
+            # The anchor names the line the hunk sits under, End of File pins
+            # it to the tail: both decide WHICH occurrence changes, and a
+            # mirror that ignored them edited the first match (review, F4).
             hunks: list = []
             while i < len(lines) and not (lines[i].startswith("*** ") and not lines[i].startswith(V4A_EOF)):
                 if lines[i].startswith("@@"):
-                    hunks.append([])
+                    hunks.append({"anchor": lines[i][2:].strip(), "eof": False, "lines": []})
                 elif lines[i].startswith(V4A_EOF):
-                    pass
+                    if hunks:
+                        hunks[-1]["eof"] = True
                 elif lines[i][:1] in (" ", "-", "+"):
                     if not hunks:
-                        hunks.append([])
-                    hunks[-1].append(lines[i])
+                        hunks.append({"anchor": "", "eof": False, "lines": []})
+                    hunks[-1]["lines"].append(lines[i])
                 elif lines[i] == "":
                     if hunks:
-                        hunks[-1].append(" ")
+                        hunks[-1]["lines"].append(" ")
                 else:
                     raise ValueError(f"Update File {path}: unreadable hunk line {lines[i]!r}")
                 i += 1
@@ -245,45 +250,71 @@ def parse_v4a(text: str) -> list:
     raise ValueError("not a V4A patch: missing '*** End Patch'")
 
 
-def apply_hunks(current: str, hunks: list) -> str | None:
-    """The file after the hunks, or None when a hunk's context is not in the file.
+def _locate(src: list, before: list, start: int, end: int) -> int:
+    """First index in [start, end) where `before` matches, exact first, then
+    ignoring trailing whitespace, then surrounding whitespace: the three passes
+    Codex's own applier tolerates, so a patch it would land is one we judge."""
+    for normalise in (lambda l: l, str.rstrip, str.strip):
+        window = [normalise(l) for l in before]
+        for at in range(start, end - len(before) + 1):
+            if [normalise(l) for l in src[at:at + len(before)]] == window:
+                return at
+    return -1
 
-    Each hunk is located by its ` ` and `-` lines, in order, after the
-    previous hunk. Codex's own applier is fuzzier (it tolerates whitespace
-    drift); a miss here is not "will not apply", so the caller judges the
-    added lines instead of waving the file through.
+
+def apply_hunks(current: str, hunks: list) -> str | None:
+    """The file after the hunks, or None when a hunk cannot be placed.
+
+    None is a refusal, not a fallback: a hunk that deletes a suppression
+    comment and does not locate would otherwise be judged on its added lines
+    alone, which is nothing (review, F2). The caller refuses the patch and
+    says which hunk.
     """
     src = current.split("\n")
     out: list = []
     cursor = 0
     for hunk in hunks:
-        before = [l[1:] for l in hunk if l[:1] in (" ", "-")]
-        after = [l[1:] for l in hunk if l[:1] in (" ", "+")]
+        lines = hunk["lines"]
+        before = [l[1:] for l in lines if l[:1] in (" ", "-")]
+        after = [l[1:] for l in lines if l[:1] in (" ", "+")]
+        start = cursor
+        if hunk["anchor"]:
+            anchored = next((at for at in range(cursor, len(src)) if src[at].strip() == hunk["anchor"]), -1)
+            if anchored < 0:
+                return None
+            start = anchored
         if not before:
-            out.extend(src[cursor:])
+            at = len(src) if hunk["eof"] else start
+            out.extend(src[cursor:at])
             out.extend(after)
-            cursor = len(src)
+            cursor = at
             continue
-        found = -1
-        for start in range(cursor, len(src) - len(before) + 1):
-            if src[start:start + len(before)] == before:
-                found = start
-                break
-        if found < 0:
-            return None
-        out.extend(src[cursor:found])
+        if hunk["eof"]:
+            at = len(src) - len(before)
+            while at >= start and src[at:] and _locate(src, before, at, len(src)) != at:
+                at -= 1
+            # A trailing "" from a final newline is part of the tail.
+            if at < start or _locate(src, before, at, len(src)) != at:
+                tail = len(src) - 1 if src and src[-1] == "" else len(src)
+                at = tail - len(before)
+                if at < start or _locate(src, before, at, tail) != at:
+                    return None
+        else:
+            at = _locate(src, before, start, len(src))
+            if at < 0:
+                return None
+        out.extend(src[cursor:at])
         out.extend(after)
-        cursor = found + len(before)
+        cursor = at + len(before)
     out.extend(src[cursor:])
     return "\n".join(out)
 
 
-def _added_lines(hunks: list) -> str:
-    return "\n".join(l[1:] for hunk in hunks for l in hunk if l.startswith("+"))
-
-
 def _patch_changes(command: str, cwd: str) -> list:
-    """Every file a Codex apply_patch would touch, with its would-be content."""
+    """Every file a Codex apply_patch would touch, with its would-be content.
+
+    Raises ValueError for a hunk that cannot be placed: the caller refuses.
+    """
     changes = []
     for op, path, new_path, body in parse_v4a(command):
         target = path if os.path.isabs(path) else os.path.join(cwd, path) if cwd else path
@@ -291,7 +322,10 @@ def _patch_changes(command: str, cwd: str) -> list:
         if new_path:
             new_target = new_path if os.path.isabs(new_path) else os.path.join(cwd, new_path) if cwd else new_path
         if op == "add":
-            changes.append(Change("add", target, None, "\n".join(body)))
+            # Patch lines are lines: the file ends with a newline, and a
+            # validator reading it with `while read` sees the last one too
+            # (review, F1).
+            changes.append(Change("add", target, None, "\n".join(body) + "\n" if body else ""))
         elif op == "delete":
             changes.append(Change("delete", target))
         else:
@@ -301,7 +335,9 @@ def _patch_changes(command: str, cwd: str) -> list:
             except OSError:
                 current = ""
             applied = apply_hunks(current, body)
-            changes.append(Change(op, target, new_target, applied if applied is not None else _added_lines(body)))
+            if applied is None:
+                raise ValueError(f"a hunk of Update File {path} does not match the file as it is; re-read it and rewrite the patch")
+            changes.append(Change(op, target, new_target, applied))
     return changes
 
 
@@ -415,18 +451,26 @@ def _placement(payload: dict, mirror: str) -> str:
         if not os.path.isabs(str(path)) and not hint:
             return "UNJUDGED a relative path with no workspace to resolve it against; write an absolute path"
         changes = changes_of(payload)
-    lines = []
+    # One mirror root per workspace. Two packages of a monorepo each holding
+    # src/example.ts landed on the same mirror path and the second overwrote
+    # the first (review, F5); a single-change payload keeps the plain form
+    # the Hermes gate reads.
+    resolved = []
     for change in changes:
         if not os.path.isabs(change.destination) and not hint:
             return "UNJUDGED a relative path with no workspace to resolve it against; write an absolute path"
-        target, workspace, relative = _resolve(change.destination, hint)
+        resolved.append((change,) + _resolve(change.destination, hint))
+    workspaces = sorted({workspace for _, _, workspace, _ in resolved})
+    roots = {ws: (mirror if len(workspaces) == 1 else os.path.join(mirror, f"ws{n}")) for n, ws in enumerate(workspaces)}
+    lines = []
+    for change, target, workspace, relative in resolved:
         if _touches_gate(relative):
             lines.append("GATE " + relative)
             continue
         if change.content is None:
             continue
-        _place(mirror, workspace, relative, change.content)
-        lines.append("MIRROR " + relative)
+        _place(roots[workspace], workspace, relative, change.content)
+        lines.append("MIRROR " + os.path.relpath(os.path.join(roots[workspace], relative), mirror))
     return "\n".join(lines)
 
 

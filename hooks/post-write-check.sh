@@ -210,34 +210,52 @@ FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 # verdict is the strictest child's. The per-file logic below stays the one
 # path, and the metrics rows carry the same session and tool_use ids.
 if [[ -z "$FILE_PATH" && "$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)" == "apply_patch" ]]; then
-    PATCH_FILES=$(printf '%s' "$INPUT" | python3 "${SCRIPT_DIR}/lib/write_mirror.py" --list 2>/dev/null \
-        | awk -F'\t' '$1 != "delete" && $1 != "UNREADABLE" {print (NF >= 3 ? $3 : $2)}')
+    LISTING=$(printf '%s' "$INPUT" | python3 "${SCRIPT_DIR}/lib/write_mirror.py" --list 2>/dev/null); LISTING_RC=$?
+    if [[ "$LISTING_RC" -ne 0 || "$LISTING" == UNREADABLE* ]]; then
+        # The write has landed and cannot be undone here; what can be said is
+        # that it was not validated, loudly (review F6).
+        echo "🚫 AI Craftsman could not read the patch that just landed (${LISTING#UNREADABLE	}); its files were NOT validated. Run the validation on them explicitly." >&2
+        exit 2
+    fi
+    PATCH_FILES=$(printf '%s' "$LISTING" | awk -F'\t' '$1 != "delete" {print (NF >= 3 ? $3 : $2)}')
     [[ -z "$PATCH_FILES" ]] && exit 0
     CHILD_RC=0
     CHILD_OUT=""
     while IFS= read -r written; do
         [[ -z "$written" || ! -f "$written" ]] && continue
+        rc=0
         out=$(printf '%s' "$INPUT" | jq --arg fp "$written" '.tool_name = "Write" | .tool_input = {file_path: $fp}' \
             | bash "$0") || rc=$?
-        [[ "${rc:-0}" -eq 2 ]] && CHILD_RC=2
-        rc=0
+        # 2 is a verdict; any other failure is a child that could not judge,
+        # and no verdict is not a clean verdict (review F6).
+        if [[ "$rc" -ne 0 && "$rc" -ne 2 ]]; then
+            echo "🚫 AI Craftsman could not validate ${written} after the patch landed (exit ${rc})." >&2
+            CHILD_RC=2
+        fi
+        [[ "$rc" -eq 2 ]] && CHILD_RC=2
         [[ -n "$out" ]] && CHILD_OUT="${CHILD_OUT}${out}"$'\n'
     done <<< "$PATCH_FILES"
     if [[ "$CHILD_RC" -eq 2 ]]; then
         exit 2
     fi
-    # One JSON object for the host: the children's messages, joined.
+    # One JSON object for the host: the children's messages, joined. The
+    # children print pretty JSON, so the stream is decoded object by object,
+    # not line by line (review F7).
     [[ -n "$CHILD_OUT" ]] && printf '%s' "$CHILD_OUT" | python3 -c '
 import json, sys
-bodies = []
-for chunk in sys.stdin.read().split("\n"):
-    chunk = chunk.strip()
-    if not chunk:
-        continue
+text = sys.stdin.read()
+decoder = json.JSONDecoder()
+bodies, at = [], 0
+while at < len(text):
+    while at < len(text) and text[at].isspace():
+        at += 1
+    if at >= len(text):
+        break
     try:
-        obj = json.loads(chunk)
+        obj, end = decoder.raw_decode(text, at)
     except ValueError:
-        continue
+        break
+    at = end
     body = (obj.get("hookSpecificOutput") or {}).get("additionalContext") or obj.get("systemMessage")
     if body:
         bodies.append(body)
