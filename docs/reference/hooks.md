@@ -32,7 +32,7 @@ finding blocks or only warns.
 
 ### Agent Hooks (v1.3.0+)
 
-Agent hooks run AI models (Haiku) for semantic analysis beyond regex patterns:
+Agent hooks run a model for semantic analysis beyond regex patterns. The backend is a boundary chosen once per hook run by `semantic_backend` (`CRAFTSMAN_REVIEW_BACKEND`, then `review: backend:` in the global `.craft-config.yml`, else auto: `claude -p` when `claude` is on PATH, `codex exec` read-only and ephemeral when `codex` is, else none). The prompts, the shape filter on the reply and the telemetry are shared; `unavailable` and `failed` are recorded as such and never read as clean, and every `haiku_runs` row names the backend that answered (a review Claude answered from a Codex session is not a Claude Code session). Delivery is the host's: Claude Code wakes the session on exit 2 (asyncRewake); Codex delivers a background hook's output at its next safe point and does not wake an idle session. Agent hooks:
 
 | Event | Agent | Model | Purpose | Timeout |
 |-------|-------|-------|---------|---------|

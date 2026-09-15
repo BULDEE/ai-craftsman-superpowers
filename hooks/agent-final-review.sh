@@ -117,7 +117,7 @@ if [[ "$VERDICT" == REVIEW_ISSUES* ]]; then
     fi
     metrics_record_haiku_run "agent-final-review" "findings" "$RECORDED" "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
     {
-        echo "Final review (Haiku) found architecture issues in this session's changes:"
+        echo "Final review (${SEMANTIC_BACKEND_USED:-semantic}) found architecture issues in this session's changes:"
         printf '%s\n' "$FINDINGS"
         if [[ "$FILE_COUNT" -gt 15 ]]; then
             echo "Also: ${FILE_COUNT} files changed - prefer small atomic commits (1-5 files each) before pushing."

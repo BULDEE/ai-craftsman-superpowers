@@ -347,6 +347,9 @@ _metrics_migrate_haiku_content_hash() {
     if ! _metrics_sql_read "PRAGMA table_info(haiku_runs);" | grep -q '|content_hash|'; then
         _metrics_sql <<< "ALTER TABLE haiku_runs ADD COLUMN content_hash TEXT;" 2>/dev/null
     fi
+    if ! _metrics_sql_read "PRAGMA table_info(haiku_runs);" | grep -q '|backend|'; then
+        _metrics_sql <<< "ALTER TABLE haiku_runs ADD COLUMN backend TEXT;" 2>/dev/null
+    fi
 }
 
 # metrics_content_hash <file>: sha256 of the content, empty when unreadable.
@@ -537,9 +540,12 @@ metrics_record_haiku_run() {
     project_hash=$(metrics_project_hash)
     [[ -n "$file" ]] && pattern=$(metrics_file_pattern "$file")
     [[ -n "$file" ]] && content_hash=$(metrics_content_hash "$file")
+    # The backend that answered (claude-cli, codex-cli, or none for an
+    # unavailable run): a review Claude answered from a Codex session is not a
+    # Claude Code session, and the two are told apart here, not by the host.
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
-        "INSERT INTO haiku_runs (project_hash, hook, verdict, findings, duration_ms, file_pattern, content_hash) VALUES (?, ?, ?, ?, ?, ?, ?)" \
-        "$project_hash" "$hook" "$verdict" "$findings" "$duration_ms" "$pattern" "$content_hash"
+        "INSERT INTO haiku_runs (project_hash, hook, verdict, findings, duration_ms, file_pattern, content_hash, backend) VALUES (?, ?, ?, ?, ?, ?, ?, ?)" \
+        "$project_hash" "$hook" "$verdict" "$findings" "$duration_ms" "$pattern" "$content_hash" "${SEMANTIC_BACKEND_USED:-none}"
 }
 
 # metrics_haiku_last_finding_hash <file>: the content hash recorded with the

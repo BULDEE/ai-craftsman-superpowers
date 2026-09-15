@@ -87,7 +87,7 @@ if [[ "$VERDICT" == DDD_VIOLATIONS* ]]; then
     if [[ "${RECORDED:-0}" -gt 0 ]]; then
         metrics_record_haiku_run "agent-ddd-verifier" "findings" "$RECORDED" "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
         {
-            echo "DDD verification (Haiku) found issues in ${FILE_PATH}:"
+            echo "DDD verification (${SEMANTIC_BACKEND_USED:-semantic}) found issues in ${FILE_PATH}:"
             printf '%s\n' "$FINDINGS"
             echo "Fix them or justify why they are acceptable."
         } >&2

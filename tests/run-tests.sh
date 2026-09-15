@@ -567,6 +567,13 @@ test_host_payloads() {
     run_subtest "Host payload contract tests pass" "$SCRIPT_DIR/core/test-host-payloads.sh" || true
 }
 
+test_review_backend() {
+    echo ""
+    log_info "Testing the semantic review backend port (functional)"
+
+    run_subtest "Review backend tests pass" "$SCRIPT_DIR/core/test-review-backend.sh" || true
+}
+
 test_security_invariants() {
     echo ""
     log_info "Testing security invariants (functional)"
@@ -838,6 +845,7 @@ main() {
         test_instincts
         test_config_protection
         test_host_payloads
+        test_review_backend
         test_security_invariants
         test_config_resolution
         test_bias_detector
