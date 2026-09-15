@@ -1,0 +1,21 @@
+{
+  "session_id": "27215959-64e3-4f49-a36b-90d9789338fa",
+  "transcript_path": "/Users/__USER__/.claude/projects/-private-tmp-claude-501--Users-woprrr-Dev-claude-ai-craftsman-superpowers-b2a2ee5c-aa20-40c5-9619-3de33b67a297-scratchpad-claude-capture-proj/27215959-64e3-4f49-a36b-90d9789338fa.jsonl",
+  "cwd": "__WORKSPACE__",
+  "prompt_id": "96811e96-ea1a-4570-adb1-89a490fab29e",
+  "permission_mode": "bypassPermissions",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "python3 -c 'print(\"2 passed\")'"
+  },
+  "tool_response": {
+    "stdout": "2 passed",
+    "stderr": "",
+    "interrupted": false,
+    "isImage": false,
+    "noOutputExpected": false
+  },
+  "tool_use_id": "toolu_019ohTdyXxmnaaN58QopZoCC",
+  "duration_ms": 53
+}

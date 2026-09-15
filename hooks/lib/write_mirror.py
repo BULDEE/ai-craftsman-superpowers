@@ -14,11 +14,20 @@ Reads the hook payload on stdin, prints one line for the shell half:
   UNJUDGED <why>           a write this hook cannot judge and must not wave
   (nothing)                not a write this hook judges
 
-Two payload shapes. Hermes: `tool_name` write_file|patch with `args` (plugin
+Three payload shapes. Hermes: `tool_name` write_file|patch with `args` (plugin
 hook) or `tool_input` (shell hook), `path`, `content` or
 `old_string`/`new_string`/`replace_all`, and `cwd`. Claude Code: `tool_name`
 Write|Edit with `tool_input`, `file_path`, `content` or
-`old_string`/`new_string`/`replace_all`.
+`old_string`/`new_string`/`replace_all`. Codex: `tool_name` apply_patch with
+the whole patch in `tool_input.command` (tests/fixtures/hosts/codex), one
+patch naming any number of files: the lines above are printed once per file,
+and a patch is judged as a whole by the shell half (one refused file refuses
+the patch, since the host applies it atomically).
+
+  --list   print one `<op>\t<path>[\t<new path>]` per change (absolute paths,
+           op in add|update|delete|move) and nothing else. What the
+           config gate and the post-write hook read to know which files a
+           call touches without building a mirror.
 
 Beside the file, the mirror carries what the engine reads for it: every
 `.craft-config.yml`/`.craft-rules.yml` on the ancestor chain, the workspace's
@@ -36,7 +45,7 @@ import os
 import shutil
 import sys
 
-WRITE_TOOLS = ("write_file", "patch", "Write", "Edit")
+WRITE_TOOLS = ("write_file", "patch", "Write", "Edit", "apply_patch")
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
@@ -153,6 +162,170 @@ def _is_v4a(args: dict) -> bool:
     return args.get("mode") == "patch" or isinstance(args.get("patch"), str)
 
 
+# ---------------------------------------------------------------------------
+# One call, many files: the change list every shape is read into
+# ---------------------------------------------------------------------------
+
+class Change:
+    """One file the call would touch: op add|update|delete|move, its paths, its would-be content.
+
+    `content` is None when the call cannot say what the file will hold (a
+    delete, or an update whose hunks did not locate their context and whose
+    added lines are judged instead). `judged` is the text the validators see.
+    """
+
+    __slots__ = ("op", "path", "new_path", "content")
+
+    def __init__(self, op: str, path: str, new_path: str | None = None, content: str | None = None):
+        self.op, self.path, self.new_path, self.content = op, path, new_path, content
+
+    @property
+    def destination(self) -> str:
+        return self.new_path or self.path
+
+
+V4A_BEGIN, V4A_END = "*** Begin Patch", "*** End Patch"
+V4A_ADD, V4A_DELETE, V4A_UPDATE, V4A_MOVE = "*** Add File: ", "*** Delete File: ", "*** Update File: ", "*** Move to: "
+V4A_EOF = "*** End of File"
+
+
+def parse_v4a(text: str) -> list:
+    """The V4A grammar as Codex 0.154.0 sends it, into (op, path, new_path, hunks or lines).
+
+    Add File carries `+` lines; Update File carries `@@` hunks of ` `/`-`/`+`
+    lines and an optional Move to; Delete File carries nothing. Anything the
+    grammar does not name raises ValueError: an unread patch is not a pass,
+    the caller refuses it.
+    """
+    lines = text.split("\n")
+    if not lines or lines[0].strip() != V4A_BEGIN:
+        raise ValueError("not a V4A patch: missing '*** Begin Patch'")
+    entries: list = []
+    i = 1
+    while i < len(lines):
+        line = lines[i]
+        if line.strip() == V4A_END:
+            return entries
+        if line.startswith(V4A_ADD):
+            path, i, body = line[len(V4A_ADD):].strip(), i + 1, []
+            while i < len(lines) and not lines[i].startswith("*** "):
+                if not lines[i].startswith("+"):
+                    raise ValueError(f"Add File {path}: line without '+' prefix")
+                body.append(lines[i][1:])
+                i += 1
+            entries.append(("add", path, None, body))
+            continue
+        if line.startswith(V4A_DELETE):
+            entries.append(("delete", line[len(V4A_DELETE):].strip(), None, []))
+            i += 1
+            continue
+        if line.startswith(V4A_UPDATE):
+            path, new_path, i = line[len(V4A_UPDATE):].strip(), None, i + 1
+            if i < len(lines) and lines[i].startswith(V4A_MOVE):
+                new_path, i = lines[i][len(V4A_MOVE):].strip(), i + 1
+            hunks: list = []
+            while i < len(lines) and not (lines[i].startswith("*** ") and not lines[i].startswith(V4A_EOF)):
+                if lines[i].startswith("@@"):
+                    hunks.append([])
+                elif lines[i].startswith(V4A_EOF):
+                    pass
+                elif lines[i][:1] in (" ", "-", "+"):
+                    if not hunks:
+                        hunks.append([])
+                    hunks[-1].append(lines[i])
+                elif lines[i] == "":
+                    if hunks:
+                        hunks[-1].append(" ")
+                else:
+                    raise ValueError(f"Update File {path}: unreadable hunk line {lines[i]!r}")
+                i += 1
+            entries.append(("move" if new_path else "update", path, new_path, hunks))
+            continue
+        raise ValueError(f"unreadable patch line {line!r}")
+    raise ValueError("not a V4A patch: missing '*** End Patch'")
+
+
+def apply_hunks(current: str, hunks: list) -> str | None:
+    """The file after the hunks, or None when a hunk's context is not in the file.
+
+    Each hunk is located by its ` ` and `-` lines, in order, after the
+    previous hunk. Codex's own applier is fuzzier (it tolerates whitespace
+    drift); a miss here is not "will not apply", so the caller judges the
+    added lines instead of waving the file through.
+    """
+    src = current.split("\n")
+    out: list = []
+    cursor = 0
+    for hunk in hunks:
+        before = [l[1:] for l in hunk if l[:1] in (" ", "-")]
+        after = [l[1:] for l in hunk if l[:1] in (" ", "+")]
+        if not before:
+            out.extend(src[cursor:])
+            out.extend(after)
+            cursor = len(src)
+            continue
+        found = -1
+        for start in range(cursor, len(src) - len(before) + 1):
+            if src[start:start + len(before)] == before:
+                found = start
+                break
+        if found < 0:
+            return None
+        out.extend(src[cursor:found])
+        out.extend(after)
+        cursor = found + len(before)
+    out.extend(src[cursor:])
+    return "\n".join(out)
+
+
+def _added_lines(hunks: list) -> str:
+    return "\n".join(l[1:] for hunk in hunks for l in hunk if l.startswith("+"))
+
+
+def _patch_changes(command: str, cwd: str) -> list:
+    """Every file a Codex apply_patch would touch, with its would-be content."""
+    changes = []
+    for op, path, new_path, body in parse_v4a(command):
+        target = path if os.path.isabs(path) else os.path.join(cwd, path) if cwd else path
+        new_target = None
+        if new_path:
+            new_target = new_path if os.path.isabs(new_path) else os.path.join(cwd, new_path) if cwd else new_path
+        if op == "add":
+            changes.append(Change("add", target, None, "\n".join(body)))
+        elif op == "delete":
+            changes.append(Change("delete", target))
+        else:
+            try:
+                with open(target, encoding="utf-8", errors="replace") as handle:
+                    current = handle.read()
+            except OSError:
+                current = ""
+            applied = apply_hunks(current, body)
+            changes.append(Change(op, target, new_target, applied if applied is not None else _added_lines(body)))
+    return changes
+
+
+def changes_of(payload: dict) -> list:
+    """The change list of any payload shape this helper reads; [] when it reads none."""
+    tool = payload.get("tool_name") or ""
+    args = _arguments(payload)
+    if not tool:
+        tool = "Edit" if "old_string" in args else "Write"
+    if tool not in WRITE_TOOLS or _is_v4a(args):
+        return []
+    cwd = str(payload.get("cwd") or "")
+    if tool == "apply_patch":
+        command = args.get("command")
+        if not isinstance(command, str):
+            return []
+        return _patch_changes(command, cwd)
+    path = args.get("path") or args.get("file_path")
+    if not path:
+        return []
+    target = str(path) if os.path.isabs(str(path)) or not cwd else os.path.join(cwd, str(path))
+    return [Change("update" if tool in ("Edit", "patch") else "add", target, None, _would_be_content(tool, args, target))]
+
+
 def _place(mirror: str, workspace: str, relative: str, content: str) -> None:
     """The would-be file, and every rule file the engine would read for it.
 
@@ -216,7 +389,7 @@ def _resolve(path: str, hint: str) -> tuple:
 
 
 def _placement(payload: dict, mirror: str) -> str:
-    """The line the shell half reads, or "" for a call this gate does not judge."""
+    """The lines the shell half reads, or "" for a call this gate does not judge."""
     tool = payload.get("tool_name") or ""
     args = _arguments(payload)
     if not tool:
@@ -227,23 +400,55 @@ def _placement(payload: dict, mirror: str) -> str:
         return ""
     if _is_v4a(args):
         return "UNJUDGED a V4A patch (mode: patch) is not read by the write gate; use write_file or a replace-mode patch (old_string/new_string)"
-    path = args.get("path") or args.get("file_path")
-    if not path:
-        return ""
-    target, workspace, relative = _resolve(str(path), str(payload.get("cwd") or ""))
-    if target is None:
-        return "UNJUDGED a relative path with no workspace to resolve it against; write an absolute path"
-    if _touches_gate(relative):
-        return "GATE " + relative
-    content = _would_be_content(tool, args, target)
-    if content is None:
-        return ""
-    _place(mirror, workspace, relative, content)
-    return "MIRROR " + relative
+    hint = str(payload.get("cwd") or "")
+    if tool == "apply_patch":
+        try:
+            changes = changes_of(payload)
+        except ValueError as error:
+            return f"UNJUDGED the apply_patch body could not be read ({error}); rewrite the patch"
+        if not changes:
+            return ""
+    else:
+        path = args.get("path") or args.get("file_path")
+        if not path:
+            return ""
+        if not os.path.isabs(str(path)) and not hint:
+            return "UNJUDGED a relative path with no workspace to resolve it against; write an absolute path"
+        changes = changes_of(payload)
+    lines = []
+    for change in changes:
+        if not os.path.isabs(change.destination) and not hint:
+            return "UNJUDGED a relative path with no workspace to resolve it against; write an absolute path"
+        target, workspace, relative = _resolve(change.destination, hint)
+        if _touches_gate(relative):
+            lines.append("GATE " + relative)
+            continue
+        if change.content is None:
+            continue
+        _place(mirror, workspace, relative, change.content)
+        lines.append("MIRROR " + relative)
+    return "\n".join(lines)
+
+
+def _listing(payload: dict) -> str:
+    try:
+        changes = changes_of(payload)
+    except ValueError as error:
+        return "UNREADABLE\t" + str(error)
+    rows = []
+    for change in changes:
+        row = change.op + "\t" + os.path.abspath(change.path)
+        if change.new_path:
+            row += "\t" + os.path.abspath(change.new_path)
+        rows.append(row)
+    return "\n".join(rows)
 
 
 def main() -> int:
-    line = _placement(_payload(), sys.argv[1])
+    if len(sys.argv) > 1 and sys.argv[1] == "--list":
+        line = _listing(_payload())
+    else:
+        line = _placement(_payload(), sys.argv[1])
     if line:
         print(line)
     return 0

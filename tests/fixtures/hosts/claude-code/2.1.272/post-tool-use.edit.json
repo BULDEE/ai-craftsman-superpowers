@@ -1,0 +1,48 @@
+{
+  "session_id": "27215959-64e3-4f49-a36b-90d9789338fa",
+  "transcript_path": "/Users/__USER__/.claude/projects/-private-tmp-claude-501--Users-woprrr-Dev-claude-ai-craftsman-superpowers-b2a2ee5c-aa20-40c5-9619-3de33b67a297-scratchpad-claude-capture-proj/27215959-64e3-4f49-a36b-90d9789338fa.jsonl",
+  "cwd": "__WORKSPACE__",
+  "prompt_id": "96811e96-ea1a-4570-adb1-89a490fab29e",
+  "permission_mode": "bypassPermissions",
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Edit",
+  "tool_input": {
+    "file_path": "__WORKSPACE__/Existing.php",
+    "old_string": "<?php\n\nnamespace App\\Domain;\n\nfinal class Existing\n{\n}",
+    "new_string": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\Domain;\n\nfinal class Existing\n{\n\tpublic function ping(): string\n\t{\n\t\treturn 'pong';\n\t}\n}",
+    "replace_all": false
+  },
+  "tool_response": {
+    "filePath": "__WORKSPACE__/Existing.php",
+    "oldString": "<?php\n\nnamespace App\\Domain;\n\nfinal class Existing\n{\n}",
+    "newString": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\Domain;\n\nfinal class Existing\n{\n\tpublic function ping(): string\n\t{\n\t\treturn 'pong';\n\t}\n}",
+    "originalFile": "<?php\n\nnamespace App\\Domain;\n\nfinal class Existing\n{\n}\n",
+    "structuredPatch": [
+      {
+        "oldStart": 1,
+        "oldLines": 7,
+        "newStart": 1,
+        "newLines": 13,
+        "lines": [
+          " <?php",
+          " ",
+          "+declare(strict_types=1);",
+          "+",
+          " namespace App\\Domain;",
+          " ",
+          " final class Existing",
+          " {",
+          "+  public function ping(): string",
+          "+  {",
+          "+    return 'pong';",
+          "+  }",
+          " }"
+        ]
+      }
+    ],
+    "userModified": false,
+    "replaceAll": false
+  },
+  "tool_use_id": "toolu_01JrezvpPf3MWtYKcR84qCdR",
+  "duration_ms": 3
+}

@@ -1,0 +1,14 @@
+{
+  "session_id": "27215959-64e3-4f49-a36b-90d9789338fa",
+  "transcript_path": "/Users/__USER__/.claude/projects/-private-tmp-claude-501--Users-woprrr-Dev-claude-ai-craftsman-superpowers-b2a2ee5c-aa20-40c5-9619-3de33b67a297-scratchpad-claude-capture-proj/27215959-64e3-4f49-a36b-90d9789338fa.jsonl",
+  "cwd": "__WORKSPACE__",
+  "prompt_id": "96811e96-ea1a-4570-adb1-89a490fab29e",
+  "permission_mode": "bypassPermissions",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Write",
+  "tool_input": {
+    "file_path": "__WORKSPACE__/src/Domain/Order.php",
+    "content": "<?php\n\nnamespace App\\Domain;\n\nclass Order\n{\n}\n"
+  },
+  "tool_use_id": "toolu_01Fj62PrtHYXt26iy8BM2dVS"
+}

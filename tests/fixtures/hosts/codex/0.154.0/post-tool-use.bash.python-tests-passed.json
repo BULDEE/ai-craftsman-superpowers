@@ -1,0 +1,15 @@
+{
+  "session_id": "01a0a47b-7f66-7522-a1fa-6d94ae7cafbf",
+  "turn_id": "01a0a47b-7fe7-7301-a880-4bdf88865d13",
+  "transcript_path": null,
+  "cwd": "__WORKSPACE__",
+  "hook_event_name": "PostToolUse",
+  "model": "gpt-6-astra",
+  "permission_mode": "default",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "python3 -c 'import sys; print(\"collected 2 items\"); print(\"2 passed\"); sys.exit(0)'"
+  },
+  "tool_response": "collected 2 items\n2 passed\n",
+  "tool_use_id": "exec-9e02c382-7058-4f57-a13a-d7402458c564"
+}

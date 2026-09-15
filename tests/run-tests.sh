@@ -560,6 +560,13 @@ test_config_protection() {
     run_subtest "Config-protection tests pass" "$SCRIPT_DIR/core/test-config-protection.sh" || true
 }
 
+test_host_payloads() {
+    echo ""
+    log_info "Testing host payload contracts on real captures (functional)"
+
+    run_subtest "Host payload contract tests pass" "$SCRIPT_DIR/core/test-host-payloads.sh" || true
+}
+
 test_security_invariants() {
     echo ""
     log_info "Testing security invariants (functional)"
@@ -830,6 +837,7 @@ main() {
         test_observation
         test_instincts
         test_config_protection
+        test_host_payloads
         test_security_invariants
         test_config_resolution
         test_bias_detector

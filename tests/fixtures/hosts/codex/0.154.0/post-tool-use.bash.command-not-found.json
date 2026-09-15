@@ -1,0 +1,15 @@
+{
+  "session_id": "01a0a47b-7f66-7522-a1fa-6d94ae7cafbf",
+  "turn_id": "01a0a47b-7fe7-7301-a880-4bdf88865d13",
+  "transcript_path": null,
+  "cwd": "__WORKSPACE__",
+  "hook_event_name": "PostToolUse",
+  "model": "gpt-6-astra",
+  "permission_mode": "default",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "pytest --version"
+  },
+  "tool_response": "zsh:1: command not found: pytest\n",
+  "tool_use_id": "exec-4bddb608-90cc-4925-86e3-9defa2758841"
+}

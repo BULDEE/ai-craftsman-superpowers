@@ -198,9 +198,55 @@ trap 'metrics_violations_queue_flush 2>/dev/null' EXIT
 # Init pack loader (discovers and sources pack validators)
 pack_loader_init
 
-# Read tool input from stdin (JSON from Claude Code)
+# Read tool input from stdin (JSON from the host)
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
+
+# A Codex apply_patch names its files inside `tool_input.command`, any number
+# of them, and has no `file_path`; reading that field alone validated nothing
+# after a patch landed (audit CR-117, C1). The files are on disk by now, so
+# each one is judged as the Write it amounts to: this script re-runs itself
+# once per written file with the same payload and the file named, and the
+# verdict is the strictest child's. The per-file logic below stays the one
+# path, and the metrics rows carry the same session and tool_use ids.
+if [[ -z "$FILE_PATH" && "$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)" == "apply_patch" ]]; then
+    PATCH_FILES=$(printf '%s' "$INPUT" | python3 "${SCRIPT_DIR}/lib/write_mirror.py" --list 2>/dev/null \
+        | awk -F'\t' '$1 != "delete" && $1 != "UNREADABLE" {print (NF >= 3 ? $3 : $2)}')
+    [[ -z "$PATCH_FILES" ]] && exit 0
+    CHILD_RC=0
+    CHILD_OUT=""
+    while IFS= read -r written; do
+        [[ -z "$written" || ! -f "$written" ]] && continue
+        out=$(printf '%s' "$INPUT" | jq --arg fp "$written" '.tool_name = "Write" | .tool_input = {file_path: $fp}' \
+            | bash "$0") || rc=$?
+        [[ "${rc:-0}" -eq 2 ]] && CHILD_RC=2
+        rc=0
+        [[ -n "$out" ]] && CHILD_OUT="${CHILD_OUT}${out}"$'\n'
+    done <<< "$PATCH_FILES"
+    if [[ "$CHILD_RC" -eq 2 ]]; then
+        exit 2
+    fi
+    # One JSON object for the host: the children's messages, joined.
+    [[ -n "$CHILD_OUT" ]] && printf '%s' "$CHILD_OUT" | python3 -c '
+import json, sys
+bodies = []
+for chunk in sys.stdin.read().split("\n"):
+    chunk = chunk.strip()
+    if not chunk:
+        continue
+    try:
+        obj = json.loads(chunk)
+    except ValueError:
+        continue
+    body = (obj.get("hookSpecificOutput") or {}).get("additionalContext") or obj.get("systemMessage")
+    if body:
+        bodies.append(body)
+if bodies:
+    text = "\n".join(bodies)
+    print(json.dumps({"systemMessage": text, "hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": text}}))
+'
+    exit 0
+fi
 
 # Refuse the characters that are dangerous where the path is interpolated,
 # rather than allow-listing an alphabet. The allowlist excluded [ ] ( ) + , and

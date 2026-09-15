@@ -1,0 +1,15 @@
+{
+  "session_id": "01a0a47a-55c7-7243-9eee-16b3154dc245",
+  "turn_id": "01a0a47a-568a-7943-9bb7-1ff11778599a",
+  "transcript_path": null,
+  "cwd": "__WORKSPACE__",
+  "hook_event_name": "PostToolUse",
+  "model": "gpt-6-astra",
+  "permission_mode": "default",
+  "tool_name": "apply_patch",
+  "tool_input": {
+    "command": "*** Begin Patch\n*** Add File: __WORKSPACE__/src/Domain/Order.php\n+<?php\n+namespace App\\Domain;\n+class Order\n+{\n+}\n*** Update File: __WORKSPACE__/Existing.php\n*** Move to: __WORKSPACE__/src/Domain/Existing.php\n@@\n final class Existing\n {\n+    public function ping(): string\n+    {\n+        return 'pong';\n+    }\n }\n*** End Patch"
+  },
+  "tool_response": "Exit code: 0\nWall time: 0.3 seconds\nOutput:\nSuccess. Updated the following files:\nA __WORKSPACE__/src/Domain/Order.php\nM __WORKSPACE__/src/Domain/Existing.php\n",
+  "tool_use_id": "exec-df59b9b0-a0ae-4ec7-bba2-11a154e1ebab"
+}

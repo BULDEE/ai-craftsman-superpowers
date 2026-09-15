@@ -36,8 +36,11 @@ command -v jq >/dev/null 2>&1 || false
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)
 
-# Exit silently if no file path
-[[ -z "$FILE_PATH" ]] && exit 0
+# A Write/Edit names its file here. A Codex apply_patch names its files inside
+# `tool_input.command` and has no `file_path`: exiting on the missing field
+# waved every patch through (audit CR-117, C1). The mirror helper reads both
+# shapes; only a call that names no file at all is not this gate's.
+[[ -z "$FILE_PATH" && "$TOOL_NAME" != "apply_patch" ]] && exit 0
 
 # What the file WOULD contain. A Write carries it as `content`; an Edit
 # carries `old_string`/`new_string`, and reading `content` alone let every
@@ -65,11 +68,14 @@ else:
     sys.stdout.write(new)
 ' 2>/dev/null || true)
 
-# Only check source files, as declared by the loaded packs
+# Only check source files, as declared by the loaded packs. A patch is
+# filtered per file below, since it may name several languages at once.
 pack_loader_init
-EXT="${FILE_PATH##*.}"
-LANG_ID=$(lang_for_file "$FILE_PATH")
-[[ -z "$LANG_ID" ]] && exit 0
+LANG_ID=""
+if [[ -n "$FILE_PATH" ]]; then
+    LANG_ID=$(lang_for_file "$FILE_PATH")
+    [[ -z "$LANG_ID" ]] && exit 0
+fi
 
 VIOLATIONS=""
 VIOLATION_COUNT=0
@@ -95,12 +101,15 @@ MIRROR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-pre-write.XXXXXX")
 trap 'rm -rf "$MIRROR"' EXIT
 # A relative file_path is relative to the session's working directory, which
 # is this hook's; the helper is told, since the payload does not carry it.
-PLACED=$(printf '%s' "$INPUT" | jq --arg cwd "$PWD" '. + {cwd: $cwd}' 2>/dev/null \
+PLACED=$(printf '%s' "$INPUT" | jq --arg cwd "$PWD" '. + {cwd: (.cwd // $cwd)}' 2>/dev/null \
     | python3 "${SCRIPT_DIR}/lib/write_mirror.py" "$MIRROR" 2>/dev/null || true)
-case "$PLACED" in
-    MIRROR\ *) MIRROR_FILE="$MIRROR/${PLACED#MIRROR }" ;;
-    *) exit 0 ;;   # not a write this gate judges (config-protection.sh owns the gate's own files)
-esac
+# One `MIRROR <relative path>` per would-be file (one for a Write/Edit, any
+# number for a patch). GATE lines are config-protection.sh's to refuse and
+# UNJUDGED lines are refused there too; a placement with no mirror line is
+# not a write this gate judges.
+MIRROR_FILES=$(printf '%s\n' "$PLACED" | awk '/^MIRROR /{print substr($0, 8)}')
+[[ -z "$MIRROR_FILES" ]] && exit 0
+MIRROR_FILE_COUNT=$(printf '%s\n' "$MIRROR_FILES" | grep -c .)
 
 # Same order as post-write's add_violation: severity for THIS file, an
 # explicit ignore leaves, a marker the rule allows silences, a baseline mark
@@ -125,8 +134,10 @@ _pre_emit() {
     if rules_baseline_holds "$MIRROR_FILE" "$rule" "$severity"; then
         severity="warn"; message="${message} (already present at the baseline, not blocking)"
     fi
-    case " $BLOCKING_RULES " in *" $rule "*) return 0 ;; esac
-    [[ "$severity" == "block" ]] && BLOCKING_RULES="$BLOCKING_RULES $rule"
+    case " $BLOCKING_RULES " in *" ${MIRROR_REL}:${rule} "*) return 0 ;; esac
+    [[ "$severity" == "block" ]] && BLOCKING_RULES="$BLOCKING_RULES ${MIRROR_REL}:${rule}"
+    # A patch names several files: the finding says which one.
+    [[ "$MIRROR_FILE_COUNT" -gt 1 ]] && message="${message} [${MIRROR_REL}]"
     VIOLATIONS="${VIOLATIONS}${rule}: ${message}\n"
     ((VIOLATION_COUNT++)) || true
 }
@@ -134,8 +145,14 @@ add_violation() { _pre_emit "$1" "$2"; }
 add_warning()   { _pre_emit "$1" "$2"; }
 metrics_record_violation() { :; }
 FILE_PATH_REAL="$FILE_PATH"
-FILE_PATH="$MIRROR_FILE"
-pack_dispatch_file "$MIRROR_FILE"
+while IFS= read -r MIRROR_REL; do
+    [[ -z "$MIRROR_REL" ]] && continue
+    MIRROR_FILE="$MIRROR/$MIRROR_REL"
+    LANG_ID=$(lang_for_file "$MIRROR_FILE")
+    [[ -z "$LANG_ID" ]] && continue
+    FILE_PATH="$MIRROR_FILE"
+    pack_dispatch_file "$MIRROR_FILE"
+done <<< "$MIRROR_FILES"
 FILE_PATH="$FILE_PATH_REAL"
 
 local_should_block=false
@@ -178,12 +195,17 @@ if [[ $VIOLATION_COUNT -gt 0 ]]; then
         done <<< "$(echo -e "$VIOLATIONS")"
         echo "Fix these before writing. Use // craftsman-ignore: <RULE_ID> to suppress." >&2
 
-        # Structured JSON on stdout (consumed by Claude AI)
+        # Structured JSON on stdout. Exit 2 is the refusal on every host; the
+        # deny is stated as well, since a host that reads the JSON before the
+        # exit code (Codex) must not read an advisory additionalContext as
+        # the whole verdict.
         jq -n --arg v "$(echo -e "$VIOLATIONS")" \
                --arg c "$VIOLATION_COUNT" \
         '{
             hookSpecificOutput: {
                 hookEventName: "PreToolUse",
+                permissionDecision: "deny",
+                permissionDecisionReason: ("BLOCKED before write: " + $c + " violation(s):\n" + $v + "\nFix the code before writing."),
                 additionalContext: ("BLOCKED before write: " + $c + " violation(s):\n" + $v + "\nFix the code before writing.")
             }
         }'
