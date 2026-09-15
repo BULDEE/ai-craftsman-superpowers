@@ -567,6 +567,13 @@ test_host_payloads() {
     run_subtest "Host payload contract tests pass" "$SCRIPT_DIR/core/test-host-payloads.sh" || true
 }
 
+test_copilot_adapter() {
+    echo ""
+    log_info "Testing the Copilot adapter on the documented contract (functional)"
+
+    run_subtest "Copilot adapter tests pass" "$SCRIPT_DIR/adapters/test-copilot.sh" || true
+}
+
 test_review_backend() {
     echo ""
     log_info "Testing the semantic review backend port (functional)"
@@ -846,6 +853,7 @@ main() {
         test_config_protection
         test_host_payloads
         test_review_backend
+        test_copilot_adapter
         test_security_invariants
         test_config_resolution
         test_bias_detector

@@ -25,8 +25,13 @@ host_detect() {
         # Codex carries `model` on every event but SessionEnd and a null
         # `transcript_path` on all of them; Claude Code carries `prompt_id` on
         # every event but SessionStart and a string `transcript_path` on all.
+        # An adapter that translated the payload names the host itself
+        # (adapters/copilot/translate.py); a raw Copilot envelope carries a
+        # `timestamp`, which neither Claude Code nor Codex sends.
         mark=$(printf '%s' "$input" | jq -r '
-            if .tool_name == "apply_patch" or has("model") then "codex"
+            if (.craftsman_host // "") != "" then .craftsman_host
+            elif has("timestamp") and (has("toolName") or has("tool_name") or has("sessionId")) then "copilot"
+            elif .tool_name == "apply_patch" or has("model") then "codex"
             elif has("prompt_id") or (.transcript_path | type) == "string" then "claude-code"
             elif has("transcript_path") and .transcript_path == null then "codex"
             else "" end' 2>/dev/null)

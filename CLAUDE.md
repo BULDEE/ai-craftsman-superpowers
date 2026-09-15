@@ -136,9 +136,10 @@ packs/              → Loadable language packs (7 packs)
 ci/                 → CI pipeline integration; ci/adapters/ = CI providers
 adapters/           → host agent runtimes (a different axis from ci/adapters/)
   hermes/           → Nous Research Hermes: pre_verify hook, Claude Code wrapper
+  copilot/          → GitHub Copilot CLI/cloud: envelope translator, gate and post hooks (documented contract, no surface qualified yet)
 ```
 
-Three front-ends over one core: `hooks/` for Claude Code, `ci/craftsman-ci.sh`
+Four front-ends over one core: `hooks/` for Claude Code, `ci/craftsman-ci.sh`
 for pipelines, `adapters/<host>/` for other agent runtimes. The rules engine,
 the packs and `knowledge/` are shared, and the parity tests fail when two
 front-ends disagree on a severity. A fourth front-end is an adapter, never a

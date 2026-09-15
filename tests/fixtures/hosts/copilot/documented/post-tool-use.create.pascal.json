@@ -1,0 +1,15 @@
+{
+  "hook_event_name": "PostToolUse",
+  "session_id": "copilot-doc-1",
+  "timestamp": "2026-09-15T00:00:00Z",
+  "cwd": "__WORKSPACE__",
+  "tool_name": "create",
+  "tool_input": {
+    "path": "__WORKSPACE__/src/Domain/Order.php",
+    "file_text": "(see pre)"
+  },
+  "tool_result": {
+    "result_type": "success",
+    "text_result_for_llm": "Created __WORKSPACE__/src/Domain/Order.php"
+  }
+}

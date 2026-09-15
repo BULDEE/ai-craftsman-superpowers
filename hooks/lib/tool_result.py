@@ -103,6 +103,18 @@ def _decode_object(result: dict, response: dict) -> dict:
     return _verdict(result, "unknown", None, "object tool_response without exit code or stdout")
 
 
+def _decode_copilot(result: dict, response: dict) -> dict:
+    """Copilot's `tool_result` (`result_type`/`resultType`: success or failure,
+    `text_result_for_llm`). Documented, not captured: no exit code is named, so
+    success and failure are what the host said and nothing finer."""
+    kind = response.get("result_type", response.get("resultType"))
+    if kind == "success":
+        return _verdict(result, "succeeded", None, "Copilot tool_result.result_type success (documented shape)")
+    if kind == "failure":
+        return _verdict(result, "failed", None, "Copilot tool_result.result_type failure (documented shape)")
+    return _verdict(result, "unknown", None, f"Copilot tool_result.result_type {kind!r}")
+
+
 def _decode_string(result: dict, response: str) -> dict:
     """A string response is Codex. apply_patch's starts with "Exit code: N" and
     is the tool's own report; a shell command's is its stdout, which may say
@@ -125,6 +137,9 @@ def decode(payload: dict) -> dict:
         return _verdict(result, "unknown", None, f"{event} carries no command result")
     if tool == "TaskOutput" and isinstance(response, dict):
         return _decode_task_output(result, response, args)
+    copilot = payload.get("tool_result")
+    if isinstance(copilot, dict) and ("result_type" in copilot or "resultType" in copilot):
+        return _decode_copilot(result, copilot)
     if isinstance(response, dict):
         return _decode_object(result, response)
     if isinstance(response, str):

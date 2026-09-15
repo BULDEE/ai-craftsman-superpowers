@@ -1,0 +1,13 @@
+{
+  "sessionId": "copilot-doc-4",
+  "timestamp": 1757894400,
+  "cwd": "__WORKSPACE__",
+  "toolName": "bash",
+  "toolArgs": {
+    "command": "pytest -q"
+  },
+  "toolResult": {
+    "resultType": "failure",
+    "textResultForLlm": "1 failed"
+  }
+}
