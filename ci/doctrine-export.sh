@@ -143,6 +143,28 @@ _doctrine_write_block() {
     DOCTRINE_BLOCK="$(_doctrine_block "$body")" python3 "${CI_LIB_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}/doctrine_splice.py" "$file" "$DOCTRINE_END"
 }
 
+# The plugin's agents as Codex roles (ci/agent_roles.py): mission text shared,
+# envelope translated, nothing of Claude Code's model or tool names transposed.
+# Written to the project's .codex/agents/ (documented); ~/.codex/agents/ is the
+# location observed loaded by `codex exec` 0.154.0, and the message says so.
+_doctrine_write_codex_agents() {
+    local here
+    here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    python3 "${CI_LIB_DIR:-$here}/agent_roles.py" codex "$here/../agents" .codex/agents --version "${VERSION:-unknown}" || return 1
+    echo "Codex loads ~/.codex/agents/ (observed) and a project's .codex/agents/ (documented): copy the craftsman-*.toml files there if the roles are not offered by spawn_agent."
+}
+
+_doctrine_write_agents_md() {
+    _doctrine_write_block AGENTS.md "$1" || return 1
+    echo "Updated the craftsman block of AGENTS.md (read by Codex, Copilot, Cursor, Gemini, and other agents)"
+}
+
+_doctrine_write_copilot() {
+    mkdir -p .github
+    _doctrine_write_block .github/copilot-instructions.md "$1" || return 1
+    echo "Updated the craftsman block of .github/copilot-instructions.md"
+}
+
 # doctrine_export <target> - writes the instruction file(s) for a harness.
 doctrine_export() {
     local target="${1:-agents-md}"
@@ -150,25 +172,15 @@ doctrine_export() {
     body=$(_doctrine_body)
 
     case "$target" in
-        agents-md)
-            _doctrine_write_block AGENTS.md "$body" || return 1
-            echo "Updated the craftsman block of AGENTS.md (read by Codex, Copilot, Cursor, Gemini, and other agents)"
-            ;;
-        cursor)
-            _doctrine_write_cursor "$body"
-            ;;
-        copilot)
-            mkdir -p .github
-            _doctrine_write_block .github/copilot-instructions.md "$body" || return 1
-            echo "Updated the craftsman block of .github/copilot-instructions.md"
-            ;;
+        agents-md)    _doctrine_write_agents_md "$body" ;;
+        cursor)       _doctrine_write_cursor "$body" ;;
+        copilot)      _doctrine_write_copilot "$body" ;;
+        codex-agents) _doctrine_write_codex_agents ;;
         all)
-            doctrine_export agents-md
-            doctrine_export cursor
-            doctrine_export copilot
+            doctrine_export agents-md && doctrine_export cursor && doctrine_export copilot
             ;;
         *)
-            echo "Unknown export target: $target. Use: agents-md, cursor, copilot, all" >&2
+            echo "Unknown export target: $target. Use: agents-md, cursor, copilot, codex-agents, all" >&2
             return 2
             ;;
     esac

@@ -237,6 +237,51 @@ fi
 rm -f orphan.md
 rm -f AGENTS.md user-only.md after-one.md
 
+# --- Codex roles from the shared agents ------------------------------------
+echo ""
+echo "--- codex-agents export ---"
+mkdir -p .codex/agents
+printf 'name = "mine"\ndescription = "user role"\ndeveloper_instructions = "keep me"\n' > .codex/agents/mine.toml
+RC=0; bash "$CLI" export --target codex-agents >/dev/null 2>&1 || RC=$?
+ROLE_COUNT=$(ls .codex/agents/craftsman-*.toml 2>/dev/null | wc -l | tr -d ' ')
+AGENT_COUNT=$(ls "$ROOT_DIR"/agents/*.md | wc -l | tr -d ' ')
+if [[ "$RC" -eq 0 && "$ROLE_COUNT" == "$AGENT_COUNT" && "$ROLE_COUNT" -gt 0 ]]; then
+    log_pass "one craftsman-<name>.toml per agents/*.md ($ROLE_COUNT)"
+else
+    log_fail "codex-agents count" "rc=$RC roles=$ROLE_COUNT agents=$AGENT_COUNT"
+fi
+if python3 - <<'PYCHECK'
+import glob, re, sys, tomllib
+ok = True
+for path in glob.glob(".codex/agents/craftsman-*.toml"):
+    with open(path, "rb") as handle:
+        role = tomllib.load(handle)
+    ok &= set(role) == {"name", "description", "developer_instructions"}
+    ok &= role["name"] == "craftsman-" + re.sub(r"^craftsman-|\.toml$", "", path.split("/")[-1])
+    ok &= len(role["developer_instructions"]) > 200 and "---" not in role["developer_instructions"][:5]
+sys.exit(0 if ok else 1)
+PYCHECK
+then
+    log_pass "every role parses as TOML with exactly name, description, developer_instructions (no model, tools or effort transposed) and a frontmatter-free body"
+else
+    log_fail "codex-agents shape" "a role is missing a field, carries a host field, or kept its frontmatter"
+fi
+if grep -q 'Validates dependency direction' .codex/agents/craftsman-architect.toml \
+    && grep -q '^name = "craftsman-architect"' .codex/agents/craftsman-architect.toml \
+    && grep -q 'sha256:' .codex/agents/craftsman-architect.toml; then
+    log_pass "the architect role carries the source description, the prefixed name and its provenance"
+else
+    log_fail "architect role" "$(head -4 .codex/agents/craftsman-architect.toml | tr '\n' '|')"
+fi
+cp .codex/agents/craftsman-architect.toml role-one.toml
+bash "$CLI" export --target codex-agents >/dev/null 2>&1
+if diff -q role-one.toml .codex/agents/craftsman-architect.toml >/dev/null && grep -q 'keep me' .codex/agents/mine.toml; then
+    log_pass "a second export is byte-identical and leaves the user's own role untouched"
+else
+    log_fail "codex-agents idempotence" "role changed or user role lost"
+fi
+rm -rf .codex role-one.toml
+
 cd "$PREV_PWD"
 rm -rf "$WORK"
 

@@ -37,7 +37,30 @@ cat ~/.claude/teams/session-*/config.json
 
 A `members` array containing a `team-lead` entry means native teams are working.
 
-## Degraded Mode (flag not set)
+## Strategy Is Chosen by the Tools the Host Exposes
+
+The flag above is Claude Code's. On another host it means nothing, and a
+strategy chosen on it would announce a degradation that is not one. Choose
+from what the session actually offers, in this order:
+
+1. `TaskCreate`, `SendMessage` and named teammates are available: Claude Code
+   native teams (the section above).
+2. `spawn_agent` is available (Codex): the same composition, one
+   `spawn_agent` per member with the matching `craftsman-<name>` role
+   (`craftsman-ci export --target codex-agents` writes the roles from the
+   shared `agents/*.md`; Codex loads `~/.codex/agents/` and a project's
+   `.codex/agents/`), each task the member's focus, then `wait_agent` and
+   consolidate. If the role is not offered, spawn the default role with the
+   agent's mission pasted as the task; say which you did.
+3. Only an `Agent` (or equivalent single-dispatch) tool: parallel dispatch, one
+   per member, as described below.
+4. None of the above: run the members sequentially yourself, in the order the
+   composition lists, and say so in the first line.
+
+Model names, effort levels and tool lists are never carried across hosts:
+each host's role or agent definition names its own.
+
+## Degraded Mode on Claude Code (flag not set)
 
 Degrade **only** when `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is unset or empty.
 A missing `TeamCreate` tool is not a degradation trigger. Do NOT abort and do
