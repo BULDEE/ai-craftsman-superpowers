@@ -202,6 +202,21 @@ Nothing else is edited. `hook-env.*.json` lists variable NAMES only.
   trusted. The write gate judges write TOOLS; `docs/reference/hooks.md` says
   so.
 
+- End to end on 2026-09-20, the branch wired as a project hooks file
+  (`.grok/hooks/craftsman.json`, generated from `hooks/hooks.json`) with the
+  folder trusted: the real CLI, prompted, refused a `write` of a non-final
+  Domain class importing Infrastructure, refused the `search_replace` that
+  dropped `final`, refused `phpstan.neon`, and put `.craft-rules.yml` to the
+  user (`ask`), which `--always-approve` accepted. `run_terminal_command`
+  exiting 1 wrote the failure line and revoked the evidence, so the
+  verification loop is live there. Control with the folder untrusted: every
+  forbidden file landed, silently, which is what an untrusted project hook
+  does on this host.
+  A refusal appears in Grok's own `hook_execution` rows as `failed`: that is
+  how the host renders exit 2, not a broken hook. The branch exposed as a
+  project PLUGIN (`.grok/plugins/craftsman`) is still listed
+  `project, disabled` and contributes no hook row.
+
 ## Not captured (open)
 
 - A Codex PLUGIN-bundled hook's environment (only a project hook was run).

@@ -81,8 +81,10 @@
         "write",
         "search_replace"
       ],
-      "plugin_hooks_executed": "not observed: a Claude plugin's hooks/hooks.json is listed by `grok inspect` (hookType file) and no plugin handler appears in hook_execution; see tests/fixtures/hosts/PROVENANCE.md",
-      "source": "~/.grok/docs/user-guide/10-hooks.md (1.0.30) for the event list, the captured events for the payload; TaskCompleted and FileChanged are not events Grok fires"
+      "plugin_hooks_executed": "not observed: a Claude plugin's hooks/hooks.json is listed by `grok inspect` (hookType file) and no plugin handler appears in hook_execution; a project plugin is listed `project, disabled` and contributes no row either (measured 2026-09-15 and again 2026-09-20). The engine runs there through a project or global hooks file",
+      "source": "~/.grok/docs/user-guide/10-hooks.md (1.0.30) for the event list, the captured events for the payload; TaskCompleted and FileChanged are not events Grok fires",
+      "trust": "a project hooks file runs only once the folder is trusted (--trust, or /hooks-trust): untrusted, it is skipped in silence and every forbidden write lands (measured 2026-09-20)",
+      "refusal_rendering": "a hook that exits 2 shows as `failed` in Grok's hook_execution rows: that is a refusal, not a broken hook"
     }
   },
   "event_functions": {
