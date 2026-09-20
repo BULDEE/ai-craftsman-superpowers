@@ -26,6 +26,11 @@ _host_from_payload() {
     # Codex carries `model` on every event but SessionEnd and a null
     # `transcript_path` on all of them; Claude Code carries `prompt_id` on
     # every event but SessionStart and a string `transcript_path` on all.
+    # Claude Code's marks are read BEFORE `model`, which is a field any host
+    # may add between two releases: read first, it renamed a 2.1.278 session
+    # codex, and the banner then said its own events were not loaded
+    # (2026-09-20). What Codex alone carries is its tool and a NULL
+    # transcript path.
     # An adapter that translated the payload names the host itself
     # (adapters/copilot/translate.py). Grok 1.0.30 (captured) sends every key
     # in both cases plus `workspaceRoot` and a lowercase `hookEventName`
@@ -37,9 +42,9 @@ _host_from_payload() {
         if (.craftsman_host // "") != "" then .craftsman_host
         elif has("workspaceRoot") and has("hookEventName") then "grok"
         elif has("timestamp") and (has("toolName") or has("tool_name") or has("sessionId")) then "copilot"
-        elif .tool_name == "apply_patch" or has("model") then "codex"
+        elif .tool_name == "apply_patch" then "codex"
         elif has("prompt_id") or (.transcript_path | type) == "string" then "claude-code"
-        elif has("transcript_path") and .transcript_path == null then "codex"
+        elif has("model") or (has("transcript_path") and .transcript_path == null) then "codex"
         else "" end' 2>/dev/null
 }
 

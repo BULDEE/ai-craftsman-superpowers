@@ -187,7 +187,11 @@ fi
 # "18 handlers declared but load status unknown" (measured 2026-09-20 in a
 # `claude --plugin-dir` session). The check is the skill's own command line.
 SKILL_CMD=$(awk '/^source .*config.sh/,/^hc_json$/' "$ROOT_DIR/skills/healthcheck/SKILL.md")
-HC_OUT=$(cd "$ROOT_DIR" && env CLAUDE_PLUGIN_ROOT="$ROOT_DIR" CLAUDE_PLUGIN_DATA="$CLAUDE_PLUGIN_DATA" \
+# The Bash tool puts the plugin's bin/ on PATH and exports no
+# CLAUDE_PLUGIN_ROOT (measured 2026-09-20), which is how the skill resolves
+# this installation: through craftsman-path, not through the environment.
+HC_OUT=$(cd "$ROOT_DIR" && env -u CLAUDE_PLUGIN_ROOT PATH="$ROOT_DIR/bin:$PATH" \
+    CLAUDE_PLUGIN_DATA="$CLAUDE_PLUGIN_DATA" \
     CLAUDECODE=1 CLAUDE_CODE_SESSION_ID=hc-skill bash -c "$SKILL_CMD" 2>/dev/null)
 HC_HOST=$(printf '%s' "$HC_OUT" | jq -r '.. | objects | select(.name? == "host") | "\(.status) \(.message)"' 2>/dev/null)
 HC_HOOKS=$(printf '%s' "$HC_OUT" | jq -r '.. | objects | select(.name? == "hooks") | "\(.status) \(.message)"' 2>/dev/null)

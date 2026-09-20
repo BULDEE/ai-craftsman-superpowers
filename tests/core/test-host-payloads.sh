@@ -108,6 +108,22 @@ else
     log_fail "host_detect" "apply_patch=$H1 bash=$H2 write=$H3 anonymous=$H4 missed:$H_MISS"
 fi
 
+# A host adds a field between two releases. `has("model")` was a Codex mark
+# read BEFORE the Claude Code ones, so a Claude Code payload that also carries
+# a model named codex, and the session banner then said its own events were
+# "NOT loaded by codex" (reported from a 2.1.278 session, 2026-09-20). The
+# marks Codex alone carries are its tool and its NULL transcript path; a
+# string transcript path or a prompt_id is Claude Code whatever else is in
+# the payload.
+H_MODEL=$(host_detect "$(host_fixture_with claude-code 2.1.272 session-start "$WORK" "d['model'] = dict(id='claude-opus-5')")")
+H_MODEL2=$(host_detect "$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$WORK" "d['model'] = 'claude-opus-5'")")
+H_CODEX_STILL=$(host_detect "$(host_fixture codex 0.154.0 session-start "$WORK")")
+if [[ "$H_MODEL" == claude-code && "$H_MODEL2" == claude-code && "$H_CODEX_STILL" == codex ]]; then
+    log_pass "a Claude Code payload carrying a model field is still claude-code, and a Codex event is still codex"
+else
+    log_fail "model field does not rename the host" "session-start=$H_MODEL write=$H_MODEL2 codex=$H_CODEX_STILL"
+fi
+
 # --- control: the Claude Code Write fixture is refused pre-write ------------
 PAYLOAD=$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$WORK" \
     "d['tool_input']['file_path'] = '$WORK/src/Domain/Order.php'; d['tool_input']['content'] = open('/dev/stdin').read() if False else '''$BAD_PHP'''")
