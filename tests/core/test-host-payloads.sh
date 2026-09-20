@@ -532,17 +532,26 @@ for granted in "true || pytest" "pytest fail; true" "pytest -q | tee out.log" "p
     _verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.python-tests-passed "; d['tool_input']['command'] = \"$granted\"")"
 done
 COMPOUND_GRANT=$(_flag)
+# A failure whose last command is the runner revokes the evidence, and does
+# NOT cry regression: which command failed is not knowable from here.
+# `echo 1 > rc && ./bin/pytest -q` exited 1 with the suite red and kept the
+# evidence green (measured in a live session, 2026-09-20), which is the
+# direction that pushes a red tree.
 echo '{"verified": true}' > "$STATE"
 _verify "$(_as_test claude-code 2.1.272 post-tool-use-failure.bash.exit1-tests-failed "; d['tool_input']['command'] = 'false && pytest -q'")"; RC_AND=$?
-_verify "$(_as_test claude-code 2.1.272 post-tool-use-failure.bash.exit1-tests-failed "; d['tool_input']['command'] = 'cd api && pytest -q'")"; RC_CD=$?
+ERR_AND="$VERIFY_ERR"
 COMPOUND_REVOKE=$(_flag)
+echo '{"verified": true}' > "$STATE"
+_verify "$(_as_test claude-code 2.1.272 post-tool-use-failure.bash.exit1-tests-failed "; d['tool_input']['command'] = 'echo 1 > pytest.rc && ./bin/pytest -q'")"; RC_CD=$?
+RELATIVE_REVOKE=$(_flag)
 echo '{"verified": false}' > "$STATE"
 _verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.python-tests-passed "; d['tool_input']['command'] = 'cd api && pytest -q'")"
 CD_GRANT=$(_flag)
-if [[ "$COMPOUND_GRANT" == "false" && "$COMPOUND_REVOKE" == "true" && "$RC_AND" -eq 0 && "$RC_CD" -eq 0 && "$CD_GRANT" == "true" ]]; then
-    log_pass "C3: 'true || pytest', 'pytest fail; true' and a piped runner grant nothing; a failed 'false && pytest' or 'cd x && pytest' revokes nothing; a passing 'cd x && pytest' grants"
+if [[ "$COMPOUND_GRANT" == "false" && "$COMPOUND_REVOKE" == "false" && "$RELATIVE_REVOKE" == "false" \
+    && "$RC_AND" -eq 0 && "$RC_CD" -eq 0 && "$ERR_AND" != *REGRESSED* && "$CD_GRANT" == "true" ]]; then
+    log_pass "C3: 'true || pytest', 'pytest fail; true' and a piped runner grant nothing; a failed chain ending on the runner revokes the evidence without crying regression; a passing 'cd x && pytest' grants"
 else
-    log_fail "C3 compound commands" "grant=$COMPOUND_GRANT revoke-kept=$COMPOUND_REVOKE rc_and=$RC_AND rc_cd=$RC_CD cd_grant=$CD_GRANT"
+    log_fail "C3 compound commands" "grant=$COMPOUND_GRANT revoke=$COMPOUND_REVOKE relative=$RELATIVE_REVOKE rc_and=$RC_AND rc_cd=$RC_CD cd_grant=$CD_GRANT err=$(printf '%s' "$ERR_AND" | tr '\n' ' ' | cut -c1-80)"
 fi
 
 # F4 (challenge review): the launcher inside a quoted string is not an invocation

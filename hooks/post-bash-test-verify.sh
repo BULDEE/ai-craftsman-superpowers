@@ -104,8 +104,17 @@ fi
 # for a `false`, `pytest fail; true` granted it for a green `true`. So:
 #   grant   only when the runner is the LAST command (`cd api && pytest`,
 #           `pytest -q`), with no `||` anywhere and no pipe in that last command
-#   revoke  only when the runner is the WHOLE command: a failed `cd x && pytest`
-#           may be the cd, and a revocation on a guess is an invented regression
+#   revoke  when the runner is the LAST command, because after a failure that
+#           may be the suite, "the suite passed in this session" is no longer
+#           a claim this layer can make. `verified` gates a push, so doubt
+#           revokes: the cost is one re-run, the cost of the other direction
+#           is a red tree pushed. Measured 2026-09-20: `echo 1 > pytest.rc &&
+#           ./bin/pytest -q` exited 1 with the suite red and left the
+#           evidence green.
+#   WAKE    (exit 2, "REGRESSED") only when the runner is the WHOLE command:
+#           a failed `cd x && pytest` may be the cd, and crying regression on
+#           a guess is an invented regression. A compound failure revokes
+#           quietly and says how to restore the evidence.
 # Anything else is unknown: nothing granted, nothing revoked, and said so.
 _last_command() { printf '%s' "$1" | tr '\n' ';' | sed 's/&&/;/g' | awk -F';' '{for (i=NF; i>0; i--) if ($i ~ /[^[:space:]]/) {print $i; exit}}'; }
 LAST=$(_last_command "$COMMAND")
@@ -114,7 +123,7 @@ if [[ "$COMMAND" != *"||"* && "$LAST" != *"|"* ]] && printf '%s' "$LAST" | grep 
     RUNNER_LAST=true
     [[ "$COMMAND" != *"&&"* && "$COMMAND" != *";"* && "$COMMAND" != *$'\n'* ]] && RUNNER_ALONE=true
 fi
-if [[ "$STATE" == "succeeded" && "$RUNNER_LAST" != true ]] || [[ "$STATE" == "failed" && "$RUNNER_ALONE" != true ]]; then
+if [[ "$RUNNER_LAST" != true ]]; then
     echo "craftsman: '${COMMAND}' is a compound command; its result is not the test runner's, so verification evidence is unchanged (run the runner as the last or only command)." >&2
     exit 0
 fi
@@ -155,6 +164,11 @@ if [[ "$STATE" == "failed" ]]; then
         >> "${DATA_DIR}/test-failures.log" 2>/dev/null || true
     if [[ "$CURRENT" == "true" ]]; then
         python3 "$LIB_DIR/session_state.py" merge "$SESSION_STATE" verified false 2>/dev/null || true
+        # The wake is for a failure this layer can attribute to the runner.
+        if [[ "$RUNNER_ALONE" != true ]]; then
+            echo "craftsman: '${COMMAND}' exited ${EXIT_CODE:-non-zero} and ends on a test runner; which command failed is not knowable from here, so the verification evidence is revoked. Run the runner alone to grant it again." >&2
+            exit 0
+        fi
         echo "Test suite REGRESSED: '${COMMAND}' now exits ${EXIT_CODE:-non-zero} but was green earlier this session. Verification evidence revoked - fix the suite before claiming completion or pushing." >&2
         exit 2
     fi
