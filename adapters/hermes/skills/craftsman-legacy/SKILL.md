@@ -85,7 +85,7 @@ When `--from` is given, use that data as the **complexity** axis and still compu
 0. **Detect the project's own tooling FIRST.** The plugin consumes what the stack already declares; it never imposes a second opinion:
 
    ```bash
-   python3 "~/.hermes/plugins/craftsman/hooks/lib/tooling_detect.py" "$PWD"
+   python3 "${HOME}/.hermes/plugins/craftsman/hooks/lib/tooling_detect.py" "$PWD"
    ```
 
    - Tools declared → run their report command and use it as the complexity axis (same as `--from`, without asking the user for a path).
@@ -105,7 +105,7 @@ When `--from` is given, use that data as the **complexity** axis and still compu
 
    ```bash
    # Command-time only (never in a hook). Ranks top-right first; --json for data.
-   python3 "~/.hermes/plugins/craftsman/hooks/lib/hotspot_analysis.py" --since 12.month --top 30
+   python3 "${HOME}/.hermes/plugins/craftsman/hooks/lib/hotspot_analysis.py" --since 12.month --top 30
    ```
 
    The **top-right** quadrant (complex AND churning) is where the effort belongs.

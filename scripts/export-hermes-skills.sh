@@ -64,6 +64,7 @@ body = re.sub(r"(?m)\n*^> The (?:commands below call|diagnostic is one command)[
 body = re.sub(r"\$\(craftsman-path ([^)]*)\)", r"~/.hermes/plugins/craftsman/\1", body)
 body = body.replace("craftsman-healthcheck", "~/.hermes/plugins/craftsman/bin/craftsman-healthcheck")
 body = body.replace("${CLAUDE_PLUGIN_ROOT}", "~/.hermes/plugins/craftsman")
+body = body.replace('"~/.hermes/', '"${HOME}/.hermes/')
 
 header = (
     "---\n"

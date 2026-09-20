@@ -73,7 +73,7 @@ Write your current design summary (Phase 1 output + intended type/boundaries) to
 ```bash
 DESIGN_TMP=$(mktemp /tmp/craftsman-design-XXXX.md)
 # Write your Phase 1 analysis + proposed model into $DESIGN_TMP first (Write tool), then:
-bash "~/.hermes/plugins/craftsman/hooks/design-panel.sh" "$DESIGN_TMP"
+bash "${HOME}/.hermes/plugins/craftsman/hooks/design-panel.sh" "$DESIGN_TMP"
 ```
 
 Three contradictors attack the design (YAGNI, invariants/boundaries, feasibility). If the panel is unavailable (agent hooks disabled), fall back to self-challenging with the same three lenses:

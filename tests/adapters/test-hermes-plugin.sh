@@ -412,6 +412,14 @@ else
     log_fail "skill export" "generator failed or left a knowledge/ link"
 fi
 
+RUNTIME_COMMAND=$(sed -n 's/.*$(bash "\([^"]*craftsman-runtime\)" metrics).*/\1/p' "$ROOT_DIR/adapters/hermes/skills/craftsman-debug/SKILL.md")
+EXPANDED_RUNTIME=$(bash -c 'eval "printf '\''%s'\'' \"$1\""' _ "$RUNTIME_COMMAND")
+if [[ "$EXPANDED_RUNTIME" == "$HOME/.hermes/plugins/craftsman/bin/craftsman-runtime" ]]; then
+    log_pass "the exported debug helper expands its home path inside shell quotes"
+else
+    log_fail "exported debug helper path" "$EXPANDED_RUNTIME"
+fi
+
 if python3 -c "import yaml" 2>/dev/null; then
     if python3 -c "import yaml,sys; m=yaml.safe_load(open('$ROOT_DIR/plugin.yaml')); sys.exit(0 if m['name']=='craftsman' and 'pre_verify' in m['provides_hooks'] else 1)"; then
         log_pass "plugin.yaml declares the craftsman plugin and its hooks"
