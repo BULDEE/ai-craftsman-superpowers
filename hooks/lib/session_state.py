@@ -33,6 +33,7 @@ import os
 import re
 import sys
 import tempfile
+import runtime_paths
 
 CROSS_FILE_PATTERN_THRESHOLD = 3
 DIRECTORY_PATTERN_THRESHOLD = 2
@@ -315,18 +316,15 @@ def handle_read_session_metrics(arguments: list[str]) -> None:
 
 
 def _shared_state_path() -> str:
-    from runtime_paths import data_dir
-    return os.path.join(data_dir(), 'session-state.json')
+    return os.path.join(runtime_paths.data_dir(), 'session-state.json')
 
 
 def _environment_session_id() -> str:
-    from runtime_paths import session_id
-    return session_id()
+    return runtime_paths.session_id()
 
 
 def _resolve_session_state_path() -> str:
-    from runtime_paths import state_path
-    return state_path()
+    return runtime_paths.state_path()
 
 
 def handle_set_verified(arguments: list[str]) -> None:

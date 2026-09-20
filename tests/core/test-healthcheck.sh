@@ -281,8 +281,8 @@ AR_FULL=$(_roles_row "$AR_HOME")
 AR_CC=$(cd "$ROOT_DIR" && env CRAFTSMAN_SESSION_HOST=claude-code bash -c '
     source hooks/lib/config.sh; source hooks/lib/healthcheck.sh
     hc_check_agent_roles; printf "%s" "${_HC_STATUSES[0]}"' 2>/dev/null)
-if [[ "$AR_EMPTY" == warn\|*"loads roles from config layers"* && "$AR_FULL" == ok\|1* && "$AR_CC" == ok ]]; then
-    log_pass "a Codex home without roles reports the native plugin limitation; with them it is ok; another host is ok without looking"
+if [[ "$AR_EMPTY" == warn\|*"loads roles from config layers"* && "$AR_FULL" == warn\|1* && "$AR_CC" == ok ]]; then
+    log_pass "a Codex home without roles reports the native plugin limitation; with them loading is still unmeasured; another host is ok without looking"
 else
     log_fail "agent roles per host" "empty=[$(printf '%s' "$AR_EMPTY" | cut -c1-90)] full=[$AR_FULL] claude=$AR_CC"
 fi
@@ -380,5 +380,13 @@ else
 fi
 
 echo ""
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CRAFTSMAN_SESSION_HOST=codex CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 hc_check_agent_teams
+if [[ "${_HC_MESSAGES[0]}" == *"Claude team flag does not apply"* ]]; then
+    log_pass "a parent Claude team flag does not enable teams in Codex"
+else
+    log_fail "Codex incorrectly inherits Claude teams"
+fi
+
 echo "Results: ${TESTS_PASSED} passed, ${TESTS_FAILED} failed"
 [[ $TESTS_FAILED -eq 0 ]] && exit 0 || exit 1

@@ -181,7 +181,7 @@ hc_check_agent_roles() {
     dir="${CODEX_HOME:-${HOME}/.codex}/agents"
     count=$(ls "$dir"/craftsman-*.toml 2>/dev/null | wc -l | tr -d ' ')
     if [[ "${count:-0}" -gt 0 ]]; then
-        _hc_record "agent-roles" "ok" "${count} craftsman roles in ${dir}"
+        _hc_record "agent-roles" "warn" "${count} craftsman role files in ${dir}; native role loading not measured here"
     else
         _hc_record "agent-roles" "warn" "no craftsman role in ${dir}: Codex 0.155.1 loads roles from config layers, not plugin manifests. Plugin agent missions remain available under agents/"
     fi
@@ -322,7 +322,7 @@ hc_check_write_gate() {
         _hc_record "write-gate" "ok" "engine wired via ${gate}"
         return
     fi
-    _hc_record "write-gate" "warn" "${host} lists a plugin's hooks/hooks.json and runs none of them (measured). The write gate is inert until: craftsman-ci export --target grok-hooks --into .grok/hooks (then grok --trust). Untrusted project hooks are skipped in silence"
+    _hc_record "write-gate" "warn" "${host} lists a plugin's hooks/hooks.json and runs none of them (measured). The write gate is inert at startup on 1.0.34. Native: reload in /hooks or /plugins, then verify plugin/craftsman handlers. Initial SessionStart is missed. Optional compatibility: craftsman-ci export --target grok-hooks --into .grok/hooks (then grok --trust)"
 }
 # --- Aggregate ---
 
