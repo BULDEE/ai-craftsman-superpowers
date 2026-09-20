@@ -142,6 +142,18 @@ claude
 /craftsman:setup --quick
 ```
 
+**Vous faites tourner [Grok](https://docs.x.ai/build) au lieu de (ou à côté de) Claude Code ?** Installez le plugin en natif (pas via le catalogue Claude) :
+
+```bash
+grok plugin marketplace add /chemin/vers/ai-craftsman-superpowers
+grok plugin install craftsman --trust
+# Grok 1.0.34 liste hooks/hooks.json du plugin (hookType file) et n'en execute
+# aucun. Le moteur est le repertoire de hooks Grok (toujours de confiance) :
+craftsman-ci export --target grok-hooks --into ~/.grok/hooks
+```
+
+`grok plugin validate` sur cet arbre est le controle d'install. `~/.grok/hooks/craftsman.json` est genere depuis le meme `hooks/hooks.json` (matchers `write` et `search_replace`). Un refus apparait en `failed` dans les lignes de hooks Grok : c'est ainsi que l'hote rend le code 2. Ce qui marche : la porte d'ecriture sur `write` et `search_replace` avant le disque, la protection de config, `ask` honore, et un run de tests qui accorde puis revoque la preuve (le resultat shell porte un `exit_code`). Une copie par projet (`.grok/hooks`, puis `grok --trust`) est optionnelle ; sans confiance, les hooks projet sont ignores en silence.
+
 **Vous faites tourner des agents [Hermes](https://hermes-agent.nousresearch.com) au lieu de (ou à côté de) Claude Code ?** Le même dépôt est un plugin Hermes natif :
 
 ```bash

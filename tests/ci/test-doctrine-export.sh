@@ -378,14 +378,32 @@ HH_OUT=$(cd "$HH" && bash "$CLI" export --target grok-hooks 2>&1)
 HH_FILE="$HH/.grok/hooks/craftsman.json"
 HH_EVENTS=$(jq -r '.hooks | keys | join(",")' "$HH_FILE" 2>/dev/null)
 HH_CMD=$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$HH_FILE" 2>/dev/null)
+HH_MATCH=$(jq -r '.hooks.PreToolUse[0].matcher' "$HH_FILE" 2>/dev/null)
 HH_IF=$(jq -r '[.hooks[][] | .hooks[] | select(.command | test("git push"))] | length' "$HH_FILE" 2>/dev/null)
 if [[ "$HH_EVENTS" != *TaskCompleted* && "$HH_EVENTS" != *FileChanged* && "$HH_EVENTS" == *PreToolUse* \
     && "$HH_CMD" != *'${CLAUDE_PLUGIN_ROOT}'* && "$HH_CMD" == *"CLAUDE_PLUGIN_ROOT=$ROOT_DIR"* \
+    && "$HH_MATCH" == *write* && "$HH_MATCH" == *search_replace* \
     && "$HH_IF" == "0" && "$HH_OUT" == *"--trust"* ]]; then
-    log_pass "grok-hooks writes the manifest's handlers with the root expanded and carried, drops the events Grok does not fire and the conditional handlers, and names the trust step"
+    log_pass "grok-hooks writes the manifest's handlers with the root expanded and carried, drops the events Grok does not fire and the conditional handlers, names write/search_replace, and names the trust step"
 else
-    log_fail "grok-hooks export" "events=$HH_EVENTS if=$HH_IF cmd=$(printf '%s' "$HH_CMD" | cut -c1-70)"
+    log_fail "grok-hooks export" "events=$HH_EVENTS if=$HH_IF match=$HH_MATCH cmd=$(printf '%s' "$HH_CMD" | cut -c1-70)"
 fi
 rm -rf "$HH"
+
+GROK_MKT="$ROOT_DIR/.grok-plugin/marketplace.json"
+CLAUDE_MKT="$ROOT_DIR/.claude-plugin/marketplace.json"
+if [[ "$(jq -r '.plugins[0].name,.plugins[0].version' "$GROK_MKT")" == "$(jq -r '.plugins[0].name,.plugins[0].version' "$CLAUDE_MKT")" \
+    && "$(jq -r '.plugins[0].source.type' "$GROK_MKT")" == "local" ]]; then
+    log_pass "Grok native marketplace names the same craftsman plugin and version as the Claude index"
+else
+    log_fail "Grok marketplace" "$(jq -c '.plugins[0]|{name,version,source}' "$GROK_MKT")"
+fi
+if command -v grok >/dev/null 2>&1; then
+    if grok plugin validate "$ROOT_DIR" >/dev/null 2>&1; then
+        log_pass "grok plugin validate accepts this tree as a native plugin"
+    else
+        log_fail "grok plugin validate" "$(grok plugin validate "$ROOT_DIR" 2>&1 | tr '\n' ' ' | cut -c1-160)"
+    fi
+fi
 
 test_summary

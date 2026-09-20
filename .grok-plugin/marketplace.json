@@ -1,0 +1,25 @@
+{
+  "name": "ai-craftsman-superpowers",
+  "version": "4.11.0",
+  "owner": {
+    "name": "Alexandre Mallet",
+    "email": "contact@buldee.com"
+  },
+  "metadata": {
+    "description": "A quality gate for AI-written code. A prompt asks; this refuses the write. SOLID, Clean Architecture, hexagonal, DDD, legacy rescue."
+  },
+  "plugins": [
+    {
+      "name": "craftsman",
+      "version": "4.11.0",
+      "description": "A pre-write hook that refuses edits breaking your layer boundaries, plus a structural ratchet so inherited legacy never turns the repository red on day one.",
+      "author": {
+        "name": "Alexandre Mallet",
+        "email": "contact@buldee.com"
+      },
+      "source": { "type": "local", "path": "./" },
+      "category": "development",
+      "tags": ["architecture", "quality", "php", "symfony", "react", "typescript", "ci", "rule-engine"]
+    }
+  ]
+}

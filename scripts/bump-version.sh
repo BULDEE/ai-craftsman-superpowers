@@ -165,6 +165,12 @@ bump_file "${ROOT_DIR}/plugin.yaml" \
     "version: ${NEW_VERSION}" \
     "plugin.yaml"
 
+# 6. Grok native marketplace index (same version as the Claude one).
+bump_file "${ROOT_DIR}/.grok-plugin/marketplace.json" \
+    "\"version\": \"${CURRENT_VERSION}\"" \
+    "\"version\": \"${NEW_VERSION}\"" \
+    ".grok-plugin/marketplace.json"
+
 echo ""
 if [[ "$DRIFTED" -gt 0 ]]; then
     echo "FAILED: ${DRIFTED} file(s) drifted out of version sync (see ✗ above)."

@@ -709,6 +709,8 @@ assert 'post-write-check.sh' in hooks[0]['command']
 ddd = hooks[1]
 assert 'agent-ddd-verifier.sh' in ddd['command']
 assert ddd.get('async') is True and ddd.get('asyncRewake') is True
+m = d['hooks']['PostToolUse'][0].get('matcher','')
+assert 'write' in m.split('|') and 'search_replace' in m.split('|'), m
 " 2>/dev/null; then
     log_pass "PostToolUse: post-write-check + async DDD verifier (asyncRewake)"
 else

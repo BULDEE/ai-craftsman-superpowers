@@ -257,6 +257,31 @@ hc_check_host() {
 # FileChanged, audit CR-117 C10). A handler on an event the host does not load
 # is named here with the function it carries, so a declaration ignored never
 # counts as an active function. Triggered is this session's evidence only.
+# Grok (and any host whose matrix sets plugin_hooks_executed to false) lists
+# a plugin's hooks/hooks.json and runs none of it. The write gate is live
+# there only when a project or global hooks file actually calls
+# pre-write-check.sh. skills_dir `.grok/skills` -> `.grok/hooks/craftsman.json`.
+_hc_host_gate_file() {
+    local host="$1" capabilities="$2" skills rel f
+    skills=$(jq -r --arg h "$host" '.hosts[$h].skills_dir // empty' "$capabilities" 2>/dev/null)
+    [[ -n "$skills" ]] || return 1
+    rel="$(dirname "$skills")/hooks/craftsman.json"
+    for f in "${PWD}/${rel}" "${HOME}/${rel}"; do
+        [[ -f "$f" ]] || continue
+        jq -e '.. | strings | select(test("pre-write-check\\.sh"))' "$f" >/dev/null 2>&1 || continue
+        printf '%s' "$f"
+        return 0
+    done
+    return 1
+}
+
+# jq's // treats boolean false as missing, so a host that does not run
+# plugin hooks would be read as "they run". has() then the value.
+_hc_plugin_hooks_run() {
+    jq -r --arg h "$1" '
+        .hosts[$h] | if has("plugin_hooks_executed") then .plugin_hooks_executed else true end' "$2" 2>/dev/null
+}
+
 hc_check_hooks_declared() {
     local root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}" manifest capabilities host declared events missing
     manifest="$root/hooks/hooks.json"; capabilities="$root/hooks/host-capabilities.json"
@@ -285,6 +310,32 @@ hc_check_hooks_declared() {
     else
         _hc_record "hooks" "ok" "${declared} handlers declared on ${events}; every event is one ${host:-this host} loads. Trusted is the host's /hooks view, not measured here"
     fi
+}
+
+# Plugin hooks listed is not plugin hooks executed. Grok 1.0.30 and 1.0.34
+# list hooks/hooks.json and run none of it; the write gate is live only
+# through a project or global craftsman.json that calls pre-write-check.sh.
+hc_check_write_gate() {
+    local root capabilities host plugin_run gate
+    root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+    capabilities="$root/hooks/host-capabilities.json"
+    host="${CRAFTSMAN_SESSION_HOST:-}"
+    [[ -z "$host" ]] && type host_detect >/dev/null 2>&1 && host=$(host_detect "")
+    if [[ ! -f "$capabilities" ]] || ! jq -e --arg h "$host" '.hosts[$h]' "$capabilities" >/dev/null 2>&1; then
+        _hc_record "write-gate" "ok" "host not in matrix; hooks row covers this"
+        return
+    fi
+    plugin_run=$(_hc_plugin_hooks_run "$host" "$capabilities")
+    if [[ "$plugin_run" != "false" && "$plugin_run" != "not observed"* ]]; then
+        _hc_record "write-gate" "ok" "${host} runs plugin-bundled hooks"
+        return
+    fi
+    gate=$(_hc_host_gate_file "$host" "$capabilities") || gate=""
+    if [[ -n "$gate" ]]; then
+        _hc_record "write-gate" "ok" "engine wired via ${gate}"
+        return
+    fi
+    _hc_record "write-gate" "warn" "${host} lists a plugin's hooks/hooks.json and runs none of them (measured). The write gate is inert until: craftsman-ci export --target grok-hooks --into .grok/hooks (then grok --trust). Untrusted project hooks are skipped in silence"
 }
 # --- Aggregate ---
 
@@ -362,6 +413,7 @@ hc_run_all() {
     hc_check_node
     hc_check_host
     hc_check_hooks_declared
+    hc_check_write_gate
     hc_check_config
     hc_check_packs
     hc_check_skills
