@@ -7,15 +7,14 @@ from pathlib import Path
 
 def manifests(root: Path) -> dict:
     source = json.loads((root / '.claude-plugin/plugin.json').read_text())
-    portable = {key: value for key, value in source.items() if key != 'userConfig'}
-    portable['$schema'] = 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json'
-    portable['extensions'] = {'com.openai': {'hooks': './hooks/hooks.json'}}
+    codex = {key: value for key, value in source.items() if key != 'userConfig'}
+    codex.update(skills='./skills', hooks='./hooks/hooks.json')
     grok = {key: value for key, value in source.items() if key != 'userConfig'}
     grok['hooks'] = './hooks/hooks.json'
     marketplace = json.loads((root / '.claude-plugin/marketplace.json').read_text())
     for entry in marketplace['plugins']:
         entry['source'] = {'type': 'local', 'path': './'}
-    codex = {
+    codex_catalog = {
         'name': marketplace['name'],
         'interface': {'displayName': 'AI Craftsman Superpowers'},
         'plugins': [{
@@ -25,9 +24,9 @@ def manifests(root: Path) -> dict:
             'category': 'Developer tools',
         }],
     }
-    return {'plugin.json': portable, '.grok-plugin/plugin.json': grok,
+    return {'.codex-plugin/plugin.json': codex, '.grok-plugin/plugin.json': grok,
             '.grok-plugin/marketplace.json': marketplace,
-            '.agents/plugins/marketplace.json': codex}
+            '.agents/plugins/marketplace.json': codex_catalog}
 
 
 def artifacts(root: Path) -> dict[Path, bytes]:
@@ -47,6 +46,9 @@ def main() -> int:
     parser.add_argument('--check', action='store_true')
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
     args = parser.parse_args()
+    if (args.root / 'plugin.json').exists():
+        print('Root plugin.json masks native Codex hooks on 0.155.1; remove this portable entry point explicitly')
+        return 1
     drift = []
     for target, content in artifacts(args.root).items():
         if args.check and not matches(target, content):

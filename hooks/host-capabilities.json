@@ -57,7 +57,8 @@
       ],
       "trust": "installing and enabling a plugin does not trust its hooks: the 14 handlers loaded from this manifest were reported trustStatus=untrusted until reviewed (/hooks), or bypassed for one invocation with --dangerously-bypass-hook-trust",
       "async_continuation": "a background hook cannot force a continuation: exit 2 and asyncRewake are Claude Code's, and unfinished background hooks are cancelled at shutdown. A verdict that must be acted on belongs in a synchronous gate",
-      "native_agents": "0.155.1 plugin manifest loads skills, MCP, apps and hooks; role loader reads config layers and their agents directories, not plugin agent directories. Missions can be read from agents/ without importing roles."
+      "native_agents": "0.155.1 plugin manifest loads skills, MCP, apps and hooks; role loader reads config layers and their agents directories, not plugin agent directories. Missions can be read from agents/ without importing roles.",
+      "native_manifest": ".codex-plugin/plugin.json: 22 skills and 14 hooks read on 0.155.1 with no Claude manifest. Portable root plugin.json masks this native entry point and intentionally excludes hooks in this host version."
     },
     "grok": {
       "version": "1.0.34",

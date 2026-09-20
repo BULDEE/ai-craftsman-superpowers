@@ -9,12 +9,18 @@ mkdir -p "$FIXTURE/.claude-plugin" "$FIXTURE/packs/example/agents"
 printf '# Native agent\n' > "$FIXTURE/packs/example/agents/probe.md"
 cp "$ROOT/.claude-plugin/"*.json "$FIXTURE/.claude-plugin/"
 python3 "$ROOT/scripts/native-manifests.py" --root "$FIXTURE" >/dev/null
-printf '{"name":"wrong"}\n' > "$FIXTURE/plugin.json"
+printf '{"name":"wrong"}\n' > "$FIXTURE/.codex-plugin/plugin.json"
 python3 "$ROOT/scripts/native-manifests.py" --root "$FIXTURE" --check >/dev/null
 assert_exit_code 'guard rejects a stale native manifest' 1 "$?"
 python3 "$ROOT/scripts/native-manifests.py" --root "$FIXTURE" >/dev/null
 python3 "$ROOT/scripts/native-manifests.py" --root "$FIXTURE" --check >/dev/null
 assert_exit_code 'regeneration restores the native manifest' 0 "$?"
+printf '{"name":"portable"}\n' > "$FIXTURE/plugin.json"
+python3 "$ROOT/scripts/native-manifests.py" --root "$FIXTURE" --check >/dev/null
+assert_exit_code 'guard rejects a portable entry point masking native hooks' 1 "$?"
+python3 "$ROOT/scripts/native-manifests.py" --root "$FIXTURE" >/dev/null
+assert_exit_code 'generator preserves an unexpected portable manifest for explicit resolution' 1 "$?"
+rm "$FIXTURE/plugin.json"
 printf '# Stale agent\n' > "$FIXTURE/agents/probe.md"
 python3 "$ROOT/scripts/native-manifests.py" --root "$FIXTURE" --check >/dev/null
 assert_exit_code 'guard rejects a stale bundled agent' 1 "$?"

@@ -137,9 +137,12 @@ claude
 /craftsman:setup --quick
 ```
 
-**Running [Codex](https://developers.openai.com/codex)?** The root `plugin.json`
-is the portable native entry point; `.agents/plugins/marketplace.json` is the
-Codex catalogue. The Claude manifest remains available for compatibility.
+**Running [Codex](https://developers.openai.com/codex)?** The native entry point
+is `.codex-plugin/plugin.json`; `.agents/plugins/marketplace.json` is its
+catalogue. No Claude import is required. Codex 0.155.1 deliberately omits hooks
+from the portable root `plugin.json` format, so this package does not ship that
+competing entry point. The native loader reads 22 skills and 14 handlers even
+when the Claude manifest is absent.
 
 ```bash
 codex plugin marketplace add BULDEE/ai-craftsman-superpowers
@@ -150,7 +153,7 @@ codex   # review and trust the Craftsman handlers in /hooks
 Installing does not grant hook trust. On Codex 0.155.1, the installed 4.11.0
 handlers were qualified through the real CLI: a valid `apply_patch` succeeds,
 TS001 and a change that relaxes the gate are refused before disk. The new
-portable entry point is consumer-readable; installing a development candidate
+native entry point is consumer-readable; installing a development candidate
 still requires its own qualification. The 22 skills load. Named plugin agent
 roles are not loaded by this version's plugin manifest: its role loader reads
 configuration directories. Read the shipped `agents/` missions for generic

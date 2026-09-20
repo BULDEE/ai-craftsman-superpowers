@@ -143,8 +143,11 @@ claude
 ```
 
 **Vous utilisez [Codex](https://developers.openai.com/codex) ?** Le manifeste
-portable natif est `plugin.json`, avec le catalogue
-`.agents/plugins/marketplace.json`. Le manifeste Claude reste compatible.
+natif est `.codex-plugin/plugin.json`, avec le catalogue
+`.agents/plugins/marketplace.json`. Aucun import Claude n'est nécessaire.
+Codex 0.155.1 ignore les hooks du format portable `plugin.json` à la racine ;
+ce point d'entrée concurrent n'est donc pas livré. Le chargeur natif lit les
+22 skills et 14 handlers même en l'absence du manifeste Claude.
 
 ```bash
 codex plugin marketplace add BULDEE/ai-craftsman-superpowers
@@ -155,7 +158,7 @@ codex   # examiner et approuver les hooks Craftsman dans /hooks
 L'installation ne donne pas confiance aux hooks. Sur Codex 0.155.1, les handlers
 4.11.0 installes acceptent un `apply_patch` valide et refusent TS001 ainsi que
 le relachement de la configuration avant ecriture. Le nouveau manifeste
-portable est lu par le consommateur natif ; un candidat de developpement doit
+natif est lu par le consommateur ; un candidat de developpement doit
 encore etre qualifie apres son installation. Les 22 skills sont chargees.
 Le chargeur de roles de cette version lit les repertoires de configuration,
 pas les agents du plugin. Les missions `agents/` restent utilisables pour une
