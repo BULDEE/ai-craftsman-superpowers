@@ -10,9 +10,12 @@
 #   metrics_record_session 120 '["design","entity"]' '[]' 3 2
 # =============================================================================
 
-METRICS_DB_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
-METRICS_DB="${METRICS_DB_DIR}/metrics.db"
 METRICS_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+METRICS_DB_DIR="${CRAFTSMAN_PLUGIN_DATA:-${GROK_PLUGIN_DATA:-${PLUGIN_DATA:-${CLAUDE_PLUGIN_DATA:-}}}}"
+if [[ -z "$METRICS_DB_DIR" ]]; then
+    METRICS_DB_DIR=$(python3 "${METRICS_LIB_DIR}/runtime_paths.py" data) || return 1
+fi
+METRICS_DB="${METRICS_DB_DIR}/metrics.db"
 
 # DDL and reads used to require the sqlite3 binary while DML went through
 # python, so a host without the CLI (the Hermes image, before its Docker layer

@@ -38,16 +38,16 @@ Every mode (including `--quick`) ends with the observation step. The repository 
 
 1. Run the conventions analyzer and SHOW the user what was inferred before writing anything:
    ```bash
-   bash ~/.claude/craftsman-conventions.sh analyze
+   bash "$(craftsman-path bin/craftsman-helper)" conventions analyze
    ```
 2. On confirmation (automatic in `--quick` and `--refresh`), generate the project conventions skill:
    ```bash
-   bash ~/.claude/craftsman-conventions.sh generate "$PWD/.claude/skills"   # Codex reads "$PWD/.agents/skills" instead
+   bash "$(craftsman-path bin/craftsman-helper)" conventions generate "$PWD/.claude/skills"   # Codex reads "$PWD/.agents/skills" instead
    ```
    This writes `.claude/skills/project-conventions/SKILL.md` (`.agents/skills/...` on Codex; `user-invocable: false`, loaded as background knowledge, shareable via git, freely editable).
 3. Warm the codemap cache (review skills inject it as live context):
    ```bash
-   bash ~/.claude/craftsman-codemap.sh >/dev/null
+   bash "$(craftsman-path bin/craftsman-helper)" codemap >/dev/null
    ```
 
 Regeneration is always explicit (`--refresh`), never silent: the generated file records its generation date and inputs.
@@ -89,7 +89,7 @@ The default flow when `/craftsman:setup` runs inside a project. Observe first, t
 ### Step A: Observe
 
 ```bash
-bash ~/.claude/craftsman-conventions.sh signals
+bash "$(craftsman-path bin/craftsman-helper)" conventions signals
 ```
 
 It prints one JSON line:

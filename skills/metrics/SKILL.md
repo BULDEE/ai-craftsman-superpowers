@@ -29,7 +29,7 @@ You are a **metrics analyst** reporting on code quality trends.
 
 Use the Bash tool to query the metrics database. Run all 4 queries in a single call:
 ```bash
-DB=$(cat ~/.claude/craftsman-metrics-db-path 2>/dev/null || echo ~/.claude/plugins/data/craftsman/metrics.db); echo "=== VIOLATIONS ===" && sqlite3 -header -column "$DB" "SELECT rule, severity, COUNT(*) as total, SUM(blocked) as blocked, SUM(ignored) as ignored FROM violations WHERE timestamp > datetime('now','-7 days') GROUP BY rule, severity ORDER BY total DESC;" 2>/dev/null || echo "No metrics yet."; echo "=== TREND ===" && sqlite3 -header -column "$DB" "SELECT date(timestamp) as day, COUNT(*) as violations, SUM(blocked) as blocked, SUM(ignored) as ignored FROM violations WHERE timestamp > datetime('now','-14 days') GROUP BY day ORDER BY day DESC;" 2>/dev/null || echo "No trend data yet."; echo "=== SESSIONS ===" && sqlite3 -header -column "$DB" "SELECT date(timestamp) as day, COUNT(*) as sessions, SUM(violations_blocked) as blocked, SUM(violations_warned) as warned FROM sessions WHERE timestamp > datetime('now','-14 days') GROUP BY day ORDER BY day DESC;" 2>/dev/null || echo "No session data yet."; echo "=== CORRECTIONS ===" && sqlite3 -header -column "$DB" "SELECT rule, action, COUNT(*) as count FROM corrections WHERE timestamp > datetime('now','-30 days') GROUP BY rule, action ORDER BY count DESC LIMIT 10;" 2>/dev/null || echo "No correction data yet."
+DB=$(bash "$(craftsman-path bin/craftsman-runtime)" metrics); echo "=== VIOLATIONS ===" && sqlite3 -header -column "$DB" "SELECT rule, severity, COUNT(*) as total, SUM(blocked) as blocked, SUM(ignored) as ignored FROM violations WHERE timestamp > datetime('now','-7 days') GROUP BY rule, severity ORDER BY total DESC;" 2>/dev/null || echo "No metrics yet."; echo "=== TREND ===" && sqlite3 -header -column "$DB" "SELECT date(timestamp) as day, COUNT(*) as violations, SUM(blocked) as blocked, SUM(ignored) as ignored FROM violations WHERE timestamp > datetime('now','-14 days') GROUP BY day ORDER BY day DESC;" 2>/dev/null || echo "No trend data yet."; echo "=== SESSIONS ===" && sqlite3 -header -column "$DB" "SELECT date(timestamp) as day, COUNT(*) as sessions, SUM(violations_blocked) as blocked, SUM(violations_warned) as warned FROM sessions WHERE timestamp > datetime('now','-14 days') GROUP BY day ORDER BY day DESC;" 2>/dev/null || echo "No session data yet."; echo "=== CORRECTIONS ===" && sqlite3 -header -column "$DB" "SELECT rule, action, COUNT(*) as count FROM corrections WHERE timestamp > datetime('now','-30 days') GROUP BY rule, action ORDER BY count DESC LIMIT 10;" 2>/dev/null || echo "No correction data yet."
 ```
 
 ### Step 2: The semantic layer's own numbers
@@ -233,7 +233,7 @@ To calculate trend, compare current 7-day score against the prior 7-day window (
 
 Use the Bash tool to query agent/team stats:
 ```bash
-sqlite3 -header -column "$(cat ~/.claude/craftsman-metrics-db-path 2>/dev/null || echo ~/.claude/plugins/data/craftsman/metrics.db)" "SELECT date(timestamp) as day, agents_spawned, skills_used FROM sessions WHERE timestamp > datetime('now','-14 days') AND (COALESCE(agents_spawned,'[]') != '[]' OR COALESCE(skills_used,'[]') != '[]') ORDER BY day DESC;" || echo "No agent/team data yet."
+sqlite3 -header -column "$(bash "$(craftsman-path bin/craftsman-runtime)" metrics)" "SELECT date(timestamp) as day, agents_spawned, skills_used FROM sessions WHERE timestamp > datetime('now','-14 days') AND (COALESCE(agents_spawned,'[]') != '[]' OR COALESCE(skills_used,'[]') != '[]') ORDER BY day DESC;" || echo "No agent/team data yet."
 ```
 
 Add to the report:
@@ -276,34 +276,34 @@ Prefer the team's existing tool report when one exists (`/craftsman:legacy audit
 The correction learning loop promotes recurring corrections into learned skills, with you as the gate. List pending candidates:
 
 ```bash
-bash ~/.claude/craftsman-instincts.sh candidates
+bash "$(craftsman-path bin/craftsman-helper)" instincts candidates
 ```
 
 For each candidate, show the user the rule, confidence, occurrence count, ignored count, and evidence, then ask what to do. A rule is a candidate only when it was fixed MORE often than it was rejected (ignored or scoped), and a candidate whose rejections catch up is withdrawn from the list on the next refresh (#45). The confidence is a different statistic, the lower bound of the acceptance rate given the evidence (Wilson, 95%): it orders the list, more corrections rank higher, nothing saturates, so the first candidate listed is the one best supported by the data. Read it as an order, never as a bar.
 
 - **Approve** (generates `<skills dir>/learned-<rule>/SKILL.md` with provenance, loaded automatically as background knowledge; the directory is the host's: `$PWD/.claude/skills` on Claude Code, `$PWD/.agents/skills` on Codex, and the helper refuses any other depth):
   ```bash
-  bash ~/.claude/craftsman-instincts.sh approve <id> "$PWD/.claude/skills"
+  bash "$(craftsman-path bin/craftsman-helper)" instincts approve <id> "$PWD/.claude/skills"
   ```
 - **Reject** (not re-proposed unless significant new evidence accumulates):
   ```bash
-  bash ~/.claude/craftsman-instincts.sh reject <id>
+  bash "$(craftsman-path bin/craftsman-helper)" instincts reject <id>
   ```
 
-Also list what is already codified with `bash ~/.claude/craftsman-instincts.sh list approved` and offer retirement (delete the generated skill directory) for instincts the user no longer wants. Never approve or reject without an explicit user decision: automatic promotion is forbidden by ADR-0020.
+Also list what is already codified with `bash "$(craftsman-path bin/craftsman-helper)" instincts list approved` and offer retirement (delete the generated skill directory) for instincts the user no longer wants. Never approve or reject without an explicit user decision: automatic promotion is forbidden by ADR-0020.
 
 ### Step 10: Cross-Project Promotion (scoping)
 
 An instinct approved in a single project stays project-scoped: it belongs to that codebase, and injecting it elsewhere is contamination. When the SAME rule has been approved in two or more independent projects, it stops being a codebase quirk and starts describing how you work. Only then is global promotion offered:
 
 ```bash
-bash ~/.claude/craftsman-instincts.sh global-candidates
+bash "$(craftsman-path bin/craftsman-helper)" instincts global-candidates
 ```
 
 Present each candidate with its project count, then promote only on an explicit user decision:
 
 ```bash
-bash ~/.claude/craftsman-instincts.sh promote <RULE> "$HOME/.claude/skills"   # Codex: "$HOME/.agents/skills"
+bash "$(craftsman-path bin/craftsman-helper)" instincts promote <RULE> "$HOME/.claude/skills"   # Codex: "$HOME/.agents/skills"
 ```
 
 This writes `~/.claude/skills/learned-global-<rule>/SKILL.md` (or `~/.agents/skills/` for Codex; `user-invocable: false`), applied across all projects. The same rule as project scope holds: never promote automatically, and retirement is deleting the file.
@@ -313,7 +313,7 @@ This writes `~/.claude/skills/learned-global-<rule>/SKILL.md` (or `~/.agents/ski
 When `$ARGUMENTS` contains `--dashboard`, skip the textual report and render the aggregated view instead:
 
 ```bash
-bash ~/.claude/craftsman-dashboard.sh --serve
+bash "$(craftsman-path bin/craftsman-helper)" dashboard --serve
 ```
 
 This aggregates every repository recorded in the metrics database into one self-contained HTML page served on `127.0.0.1:8787` (add a port number after `--serve` to change it): quality score, violations per repository, most-violated rules, corrections applied, learned instincts, and the 30-day trend. Nothing leaves the machine.

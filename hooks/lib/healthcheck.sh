@@ -88,12 +88,13 @@ hc_check_packs() {
 }
 
 hc_check_metrics_db() {
-    local db_path="${METRICS_DB:-${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db}"
+    local db_path
+    db_path=$(python3 "${_HC_LIB_DIR}/runtime_paths.py" metrics 2>/dev/null) || { _hc_record "metrics" "warn" "native session data binding unavailable"; return; }
     if [[ -f "$db_path" ]]; then
         local sessions violations
         sessions=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM sessions;" 2>/dev/null || echo "0")
         violations=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM violations;" 2>/dev/null || echo "0")
-        _hc_record "metrics" "ok" "${sessions} sessions, ${violations} violations"
+        _hc_record "metrics" "ok" "${sessions} sessions, ${violations} violations (${db_path})"
     else
         _hc_record "metrics" "warn" "DB not found"
     fi
@@ -130,33 +131,15 @@ hc_check_superpowers() {
 # the skill degrades to parallel subagent dispatch. Status is "ok" either way:
 # absence is a mode, not a fault. The message tells the user which mode they get.
 hc_check_agent_teams() {
+    local host="${CRAFTSMAN_SESSION_HOST:-$(host_detect "")}"
+    if [[ "$host" != "claude-code" ]]; then
+        _hc_record "agent-teams" "ok" "${host}: host-native subagents; Claude team flag does not apply"
+        return
+    fi
     if [[ -n "${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-}" ]]; then
         _hc_record "agent-teams" "ok" "native teams enabled"
     else
         _hc_record "agent-teams" "ok" "env flag not set - /craftsman:team runs in degraded parallel mode"
-    fi
-}
-
-# Claude Code reads agents/ from the plugin itself; Codex reads TOML roles
-# from its own home, and installing the plugin does not put them there. The
-# export writes them (`craftsman-ci export --target codex-agents --into
-# "$CODEX_HOME/agents"`), and once written all twelve are offered to
-# spawn_agent and spawn (measured 2026-09-20). Until then a Codex session has
-# the skills and none of the roles, which is worth a line rather than a
-# silence.
-hc_check_agent_roles() {
-    local host="${CRAFTSMAN_SESSION_HOST:-}" dir count
-    [[ -z "$host" ]] && type host_detect >/dev/null 2>&1 && host=$(host_detect "")
-    if [[ "$host" != "codex" ]]; then
-        _hc_record "agent-roles" "ok" "read from the plugin by this host"
-        return
-    fi
-    dir="${CODEX_HOME:-${HOME}/.codex}/agents"
-    count=$(ls "$dir"/craftsman-*.toml 2>/dev/null | wc -l | tr -d ' ')
-    if [[ "${count:-0}" -gt 0 ]]; then
-        _hc_record "agent-roles" "ok" "${count} craftsman roles in ${dir}"
-    else
-        _hc_record "agent-roles" "warn" "no craftsman role in ${dir}: this host reads TOML roles from its own home and installing the plugin does not write them. Run: craftsman-ci export --target codex-agents --into \"${dir}\""
     fi
 }
 
@@ -170,9 +153,10 @@ hc_check_agent_roles() {
 # host and judging Codex by it reported a bridge into the wrong home
 # (measured 2026-09-20).
 _hc_bridge_elsewhere() {
-    local host="$1" data="${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-}}"
+    local host="$1" data
+    data=$(python3 "${_HC_LIB_DIR}/runtime_paths.py" data 2>/dev/null) || data=""
     if [[ -z "$data" ]]; then
-        _hc_record "session-bridge" "warn" "${host}: no plugin data directory in this process; session state falls back to the shared file"
+        _hc_record "session-bridge" "warn" "${host}: no plugin data directory in this process; session state is unavailable until trusted SessionStart runs"
     elif [[ -d "$data" && -w "$data" ]]; then
         _hc_record "session-bridge" "ok" "${host}: session state under ${data} (the ~/.claude bridge is Claude Code's and is not written here)"
     else
@@ -199,7 +183,7 @@ hc_check_agent_roles() {
     if [[ "${count:-0}" -gt 0 ]]; then
         _hc_record "agent-roles" "ok" "${count} craftsman roles in ${dir}"
     else
-        _hc_record "agent-roles" "warn" "no craftsman role in ${dir}: this host reads TOML roles from its own home and installing the plugin does not write them. Run: craftsman-ci export --target codex-agents --into \"${dir}\""
+        _hc_record "agent-roles" "warn" "no craftsman role in ${dir}: Codex 0.155.1 loads roles from config layers, not plugin manifests. Plugin agent missions remain available under agents/"
     fi
 }
 
@@ -238,12 +222,15 @@ hc_check_host() {
     fi
     row=$(jq -r --arg h "$host" '
         .hosts[$h] // empty
-        | [ $h + " " + (.version // "?"),
+        | [ $h + " (qualified " + (.version // "?") + ")",
             (if .exit_code_observable then "test exit codes observable (verification loop live)" else "shell exit codes NOT observable (a test run grants and revokes nothing)" end),
             (if .ask_supported then "PreToolUse ask honoured" else "PreToolUse ask unsupported (gate config denied instead)" end),
             ("skills read from " + (.skills_dir // "?")) ]
         | .[0] + ": " + (.[1:] | join(", "))' "$capabilities" 2>/dev/null)
     if [[ -n "$row" ]]; then
+        local version="${CODEX_VERSION:-}"
+        [[ "$host" != "codex" ]] && version=""
+        [[ -n "$version" ]] && row="running ${host} ${version}; ${row}"
         _hc_record "host" "ok" "$row"
     else
         _hc_record "host" "warn" "${host:-unknown} host: capabilities not qualified in hooks/host-capabilities.json; gates run, ask is treated as unsupported"
@@ -257,6 +244,31 @@ hc_check_host() {
 # FileChanged, audit CR-117 C10). A handler on an event the host does not load
 # is named here with the function it carries, so a declaration ignored never
 # counts as an active function. Triggered is this session's evidence only.
+# Grok (and any host whose matrix sets plugin_hooks_executed to false) lists
+# a plugin's hooks/hooks.json and runs none of it. The write gate is live
+# there only when a project or global hooks file actually calls
+# pre-write-check.sh. skills_dir `.grok/skills` -> `.grok/hooks/craftsman.json`.
+_hc_host_gate_file() {
+    local host="$1" capabilities="$2" skills rel f
+    skills=$(jq -r --arg h "$host" '.hosts[$h].skills_dir // empty' "$capabilities" 2>/dev/null)
+    [[ -n "$skills" ]] || return 1
+    rel="$(dirname "$skills")/hooks/craftsman.json"
+    for f in "${PWD}/${rel}" "${HOME}/${rel}"; do
+        [[ -f "$f" ]] || continue
+        jq -e '.. | strings | select(test("pre-write-check\\.sh"))' "$f" >/dev/null 2>&1 || continue
+        printf '%s' "$f"
+        return 0
+    done
+    return 1
+}
+
+# jq's // treats boolean false as missing, so a host that does not run
+# plugin hooks would be read as "they run". has() then the value.
+_hc_plugin_hooks_run() {
+    jq -r --arg h "$1" '
+        .hosts[$h] | if has("plugin_hooks_executed") then .plugin_hooks_executed else true end' "$2" 2>/dev/null
+}
+
 hc_check_hooks_declared() {
     local root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}" manifest capabilities host declared events missing
     manifest="$root/hooks/hooks.json"; capabilities="$root/hooks/host-capabilities.json"
@@ -285,6 +297,32 @@ hc_check_hooks_declared() {
     else
         _hc_record "hooks" "ok" "${declared} handlers declared on ${events}; every event is one ${host:-this host} loads. Trusted is the host's /hooks view, not measured here"
     fi
+}
+
+# Plugin hooks listed is not plugin hooks executed. Grok 1.0.30 and 1.0.34
+# list hooks/hooks.json and run none of it; the write gate is live only
+# through a project or global craftsman.json that calls pre-write-check.sh.
+hc_check_write_gate() {
+    local root capabilities host plugin_run gate
+    root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+    capabilities="$root/hooks/host-capabilities.json"
+    host="${CRAFTSMAN_SESSION_HOST:-}"
+    [[ -z "$host" ]] && type host_detect >/dev/null 2>&1 && host=$(host_detect "")
+    if [[ ! -f "$capabilities" ]] || ! jq -e --arg h "$host" '.hosts[$h]' "$capabilities" >/dev/null 2>&1; then
+        _hc_record "write-gate" "ok" "host not in matrix; hooks row covers this"
+        return
+    fi
+    plugin_run=$(_hc_plugin_hooks_run "$host" "$capabilities")
+    if [[ "$plugin_run" != "false" && "$plugin_run" != "not observed"* ]]; then
+        _hc_record "write-gate" "warn" "${host}: plugin hooks supported; current trust and execution are not measured here. Check the native /hooks view"
+        return
+    fi
+    gate=$(_hc_host_gate_file "$host" "$capabilities") || gate=""
+    if [[ -n "$gate" ]]; then
+        _hc_record "write-gate" "ok" "engine wired via ${gate}"
+        return
+    fi
+    _hc_record "write-gate" "warn" "${host} lists a plugin's hooks/hooks.json and runs none of them (measured). The write gate is inert until: craftsman-ci export --target grok-hooks --into .grok/hooks (then grok --trust). Untrusted project hooks are skipped in silence"
 }
 # --- Aggregate ---
 
@@ -362,6 +400,7 @@ hc_run_all() {
     hc_check_node
     hc_check_host
     hc_check_hooks_declared
+    hc_check_write_gate
     hc_check_config
     hc_check_packs
     hc_check_skills

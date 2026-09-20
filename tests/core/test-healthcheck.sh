@@ -11,6 +11,10 @@ export CLAUDE_PLUGIN_ROOT="$ROOT_DIR"
 export CLAUDE_PLUGIN_DATA="/tmp/craftsman-test-hc-$$"
 mkdir -p "$CLAUDE_PLUGIN_DATA"
 trap 'rm -rf "$CLAUDE_PLUGIN_DATA"' EXIT
+# A Grok Bash tool exports GROK_SESSION_ID (1.0.34). host_detect reads it
+# before Codex/Claude marks, so in-process checks that expect the Claude
+# bridge or a Codex home named grok and went green on the wrong row.
+unset GROK_SESSION_ID GROK_HOOK_EVENT GROK_AGENT
 
 source "$ROOT_DIR/hooks/lib/config.sh"
 source "$ROOT_DIR/hooks/lib/pack-loader.sh"
@@ -122,7 +126,7 @@ export HOME="$_ORIG_HOME"
 # Test: agent-teams check is ok in BOTH modes - absence of the experimental
 # flag is a mode (degraded parallel dispatch), never a fault
 _HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
-CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="" hc_check_agent_teams
+CRAFTSMAN_SESSION_HOST=claude-code CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="" hc_check_agent_teams
 if [[ "${_HC_STATUSES[0]}" == "ok" && "${_HC_MESSAGES[0]}" == *"degraded"* ]]; then
     log_pass "hc_check_agent_teams: ok + degraded-mode message without the flag"
 else
@@ -130,7 +134,7 @@ else
 fi
 
 _HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
-CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="1" hc_check_agent_teams
+CRAFTSMAN_SESSION_HOST=claude-code CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="1" hc_check_agent_teams
 if [[ "${_HC_STATUSES[0]}" == "ok" && "${_HC_MESSAGES[0]}" == *"native"* ]]; then
     log_pass "hc_check_agent_teams: ok + native message with the flag"
 else
@@ -253,7 +257,7 @@ CX_OUT=$(cd "$ROOT_DIR" && env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID -u CRAFTS
         printf "%s|%s\n%s|%s\n" "${_HC_STATUSES[0]}" "${_HC_MESSAGES[0]}" "${_HC_STATUSES[1]}" "${_HC_MESSAGES[1]}"' 2>/dev/null)
 CX_HOST=$(printf '%s' "$CX_OUT" | sed -n 1p)
 CX_BRIDGE=$(printf '%s' "$CX_OUT" | sed -n 2p)
-if [[ "$CX_HOST" == ok\|codex* && "$CX_BRIDGE" == ok\|codex:* && "$CX_BRIDGE" == *"$CX_DATA"* ]]; then
+if [[ "$CX_HOST" == ok\|*codex* && "$CX_BRIDGE" == ok\|codex:* && "$CX_BRIDGE" == *"$CX_DATA"* ]]; then
     log_pass "a Codex shell names codex from CODEX_THREAD_ID, and the bridge row points at this installation's data directory, not at ~/.claude"
 else
     log_fail "healthcheck under a Codex shell" "host=[$(printf '%s' "$CX_HOST" | cut -c1-70)] bridge=[$(printf '%s' "$CX_BRIDGE" | cut -c1-80)]"
@@ -277,8 +281,8 @@ AR_FULL=$(_roles_row "$AR_HOME")
 AR_CC=$(cd "$ROOT_DIR" && env CRAFTSMAN_SESSION_HOST=claude-code bash -c '
     source hooks/lib/config.sh; source hooks/lib/healthcheck.sh
     hc_check_agent_roles; printf "%s" "${_HC_STATUSES[0]}"' 2>/dev/null)
-if [[ "$AR_EMPTY" == warn\|*"craftsman-ci export --target codex-agents"* && "$AR_FULL" == ok\|1* && "$AR_CC" == ok ]]; then
-    log_pass "a Codex home without the exported roles is a warning naming the export command; with them it is ok; another host is ok without looking"
+if [[ "$AR_EMPTY" == warn\|*"loads roles from config layers"* && "$AR_FULL" == ok\|1* && "$AR_CC" == ok ]]; then
+    log_pass "a Codex home without roles reports the native plugin limitation; with them it is ok; another host is ok without looking"
 else
     log_fail "agent roles per host" "empty=[$(printf '%s' "$AR_EMPTY" | cut -c1-90)] full=[$AR_FULL] claude=$AR_CC"
 fi
@@ -327,6 +331,52 @@ if [[ -z "$UNACCOUNTED" ]]; then
     log_pass "host-capabilities.json accounts for every declared event on every host (loaded, or the lost function named)"
 else
     log_fail "host-capabilities.json" "declared events with no loaded entry and no named function: $UNACCOUNTED"
+fi
+
+# Grok lists a plugin's hooks/hooks.json and runs none of them (measured
+# 1.0.30 and again 1.0.34 in this session: grok inspect shows
+# `file plugin: craftsman`, hook_execution has only global/settings rows, a
+# write of a non-final Domain class importing Infrastructure landed). The
+# healthcheck that only named FileChanged/TaskCompleted as "not loaded"
+# reported 12 ok / 2 warn while the write gate was inert. The consumer is
+# this row: unwired Grok is a warning that names the export, a
+# .grok/hooks/craftsman.json that actually calls pre-write-check.sh is wired.
+G_PROJ=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-grok-hc.XXXXXX")
+G_HOME=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-grok-home.XXXXXX")
+_g_hooks_row() { ( cd "$G_PROJ" && HOME="$G_HOME" CRAFTSMAN_SESSION_HOST=grok CLAUDE_PLUGIN_ROOT="$ROOT_DIR" bash -c 'source "$CLAUDE_PLUGIN_ROOT/hooks/lib/config.sh"; source "$CLAUDE_PLUGIN_ROOT/hooks/lib/healthcheck.sh"; hc_check_write_gate; printf "%s|%s" "${_HC_STATUSES[0]}" "${_HC_MESSAGES[0]}"' ); }
+G_BARE=$(_g_hooks_row)
+if [[ "$G_BARE" == warn\|*"write gate is inert"* && "$G_BARE" == *"craftsman-ci export --target grok-hooks"* ]]; then
+    log_pass "an unwired Grok project warns that the write gate is inert and names the grok-hooks export"
+else
+    log_fail "unwired Grok write gate" "$(printf '%s' "$G_BARE" | cut -c1-220)"
+fi
+mkdir -p "$G_PROJ/.grok/hooks"
+printf '%s\n' '{"hooks":{"PreToolUse":[{"hooks":[{"command":"bash /opt/craftsman/hooks/pre-write-check.sh"}]}]}}' \
+    > "$G_PROJ/.grok/hooks/craftsman.json"
+G_WIRED=$(_g_hooks_row)
+if [[ "$G_WIRED" == ok\|*"wired via"* && "$G_WIRED" != *"write gate is inert"* ]]; then
+    log_pass "a Grok project with .grok/hooks/craftsman.json calling pre-write-check.sh is wired"
+else
+    log_fail "wired Grok write gate" "$(printf '%s' "$G_WIRED" | cut -c1-220)"
+fi
+rm -rf "$G_PROJ" "$G_HOME"
+
+# The Grok row of the matrix is what hc_check_host prints. exit_code_observable
+# was false while the captured run_terminal_command result carries exit_code
+# (PROVENANCE.md, CR-146 decoder test), so the healthcheck told a Grok session
+# the verification loop grants nothing. The value is the contract, not the key.
+if jq -e '.hosts.grok.exit_code_observable == true and .hosts.grok.plugin_hooks_executed == false' \
+    "$ROOT_DIR/hooks/host-capabilities.json" >/dev/null 2>&1; then
+    log_pass "Grok matrix: exit codes observable, plugin hooks not executed (boolean)"
+else
+    log_fail "Grok matrix values" "$(jq -c '.hosts.grok | {version,exit_code_observable,plugin_hooks_executed}' "$ROOT_DIR/hooks/host-capabilities.json")"
+fi
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CRAFTSMAN_SESSION_HOST=grok CLAUDE_PLUGIN_ROOT="$ROOT_DIR" hc_check_host
+if [[ "${_HC_STATUSES[0]}" == "ok" && "${_HC_MESSAGES[0]}" == *"verification loop live"* && "${_HC_MESSAGES[0]}" != *"NOT observable"* ]]; then
+    log_pass "hc_check_host on Grok reports the verification loop live"
+else
+    log_fail "hc_check_host Grok loop" "${_HC_STATUSES[0]} ${_HC_MESSAGES[0]}"
 fi
 
 echo ""

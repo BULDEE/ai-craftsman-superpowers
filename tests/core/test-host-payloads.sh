@@ -21,7 +21,7 @@ export CLAUDE_PLUGIN_ROOT="$ROOT_DIR"
 export CLAUDE_PLUGIN_DATA="${TMPDIR:-/tmp}/craftsman-host-payloads-$$"
 export CLAUDE_PLUGIN_OPTION_stack="fullstack"
 export CLAUDE_PLUGIN_OPTION_strictness="strict"
-unset CRAFTSMAN_DISABLED_HOOKS CRAFTSMAN_HOOK_PROFILE CLAUDECODE
+unset CRAFTSMAN_DISABLED_HOOKS CRAFTSMAN_HOOK_PROFILE CLAUDECODE GROK_SESSION_ID GROK_HOOK_EVENT GROK_AGENT
 mkdir -p "$CLAUDE_PLUGIN_DATA"
 
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-host-payloads.XXXXXX")
@@ -91,7 +91,7 @@ source "$ROOT_DIR/hooks/lib/host.sh"
 H1=$(CLAUDECODE=1 CLAUDE_CODE_SESSION_ID=parent host_detect "$(host_fixture codex 0.154.0 pre-tool-use.apply_patch.multifile-move "$WORK")")
 H2=$(CLAUDECODE=1 CLAUDE_CODE_SESSION_ID=parent host_detect "$(host_fixture codex 0.154.0 pre-tool-use.bash "$WORK")")
 H3=$(host_detect "$(host_fixture claude-code 2.1.272 pre-tool-use.write "$WORK")")
-H4=$(env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID -u PLUGIN_ROOT bash -c "source '$ROOT_DIR/hooks/lib/host.sh'; host_detect '{\"tool_input\":{\"file_path\":\"/x\"}}'")
+H4=$(env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID -u PLUGIN_ROOT -u GROK_SESSION_ID -u GROK_HOOK_EVENT -u GROK_AGENT bash -c "source '$ROOT_DIR/hooks/lib/host.sh'; host_detect '{\"tool_input\":{\"file_path\":\"/x\"}}'")
 # every captured event of both hosts, under the other host's environment
 H_MISS=""
 for f in "$ROOT_DIR"/tests/fixtures/hosts/codex/*/*.json; do
@@ -947,10 +947,10 @@ D=$(python3 "$ROOT_DIR/hooks/lib/tool_result.py" < "$(host_fixture_path grok 1.0
 
 # CR-148: the matrix has a grok row and the healthcheck reads it
 if jq -e '.hosts.grok.events_loaded | index("PreToolUse")' "$ROOT_DIR/hooks/host-capabilities.json" >/dev/null 2>&1 \
-   && jq -e '.hosts.grok | has("exit_code_observable") and has("ask_supported") and has("skills_dir")' "$ROOT_DIR/hooks/host-capabilities.json" >/dev/null 2>&1; then
-    log_pass "CR-148: host-capabilities.json records grok with events_loaded, exit_code_observable, ask_supported, skills_dir"
+   && jq -e '.hosts.grok.exit_code_observable == true and .hosts.grok.plugin_hooks_executed == false and .hosts.grok.ask_supported == true' "$ROOT_DIR/hooks/host-capabilities.json" >/dev/null 2>&1; then
+    log_pass "CR-148: host-capabilities.json records grok with events_loaded, exit codes observable, plugin hooks not executed"
 else
-    log_fail "CR-148 grok capabilities row" "$(jq -c '.hosts | keys' "$ROOT_DIR/hooks/host-capabilities.json")"
+    log_fail "CR-148 grok capabilities row" "$(jq -c '.hosts.grok | {version,exit_code_observable,plugin_hooks_executed,ask_supported}' "$ROOT_DIR/hooks/host-capabilities.json")"
 fi
 HC=$(cd "$WORK" && CRAFTSMAN_SESSION_HOST=grok bash -c "source '$ROOT_DIR/hooks/lib/healthcheck.sh'; hc_check_host; hc_check_hooks_declared; printf '%s\n' \"\${_HC_MESSAGES[@]}\"" 2>/dev/null)
 if [[ "$HC" == *"grok"* && "$HC" != *"unknown host"* && "$HC" != *"not recorded"* ]]; then

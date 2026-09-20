@@ -43,11 +43,7 @@ printf '## Live Context (collected %s, revision %s%s, cwd %s)\n' "$(date -u +%Y-
 # --- codemap: this installation's helper, cached per project -----------------
 # The data directory: the host's variable in a hook, the Claude Code bridge
 # file for a skill in its Bash tool (where no variable is set), else the default.
-DATA_DIR="${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-}}"
-if [[ -z "$DATA_DIR" && -f "${HOME}/.claude/craftsman-metrics-db-path" ]]; then
-    DATA_DIR=$(dirname "$(cat "${HOME}/.claude/craftsman-metrics-db-path")")
-fi
-DATA_DIR="${DATA_DIR:-${HOME}/.claude/plugins/data/craftsman}"
+DATA_DIR=$(python3 "$PLUGIN_ROOT/hooks/lib/runtime_paths.py" data) || exit 1
 if [[ -f "$PLUGIN_ROOT/hooks/lib/codemap.py" ]]; then
     RC=0
     # awk drains its input where head would close the pipe early, and a
