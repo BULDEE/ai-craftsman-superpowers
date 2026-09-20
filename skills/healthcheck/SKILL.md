@@ -39,10 +39,19 @@ craftsman-healthcheck
    PATH: call it by full path rather than replacing it with a diagnosis of
    your own. Report a failure of this command as the finding it is.
 
-2. Parse the JSON output and present each check with its status:
-   - `ok` → display with checkmark
-   - `warn` → display with warning and actionable message
-   - `error` → display with error and fix instructions
+2. Present every check the JSON contains, with the status the JSON gives it
+   and the message the JSON gives it:
+   - `ok` → checkmark
+   - `warn` → warning sign, and the message names the action that clears it
+   - `error` → error sign, and the message names the fix
+
+   The report is a reading of that JSON and nothing else. Never raise a
+   `warn` or an `error` to ok, never write "ALL GREEN" while any check is not
+   ok, never add a check the JSON does not contain, and never restate a
+   message as a count you inferred (a session rendered `lsp: warn, none
+   installed` as "LSP ok, 4 servers active" and called the whole report ALL
+   GREEN, 2026-09-20). A diagnostic that flatters the installation is worse
+   than no diagnostic: the user acts on it.
 
 3. Format as a clear diagnostic report:
 
@@ -52,7 +61,7 @@ craftsman-healthcheck
 │  [check name]     [status icon] [message]   │
 │  ...                                         │
 │                                              │
-│  Status: ALL GREEN / N issues found          │
+│  Status: N ok, M warnings, K errors          │
 ╰──────────────────────────────────────────────╯
 ```
 

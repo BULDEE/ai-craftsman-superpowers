@@ -211,6 +211,17 @@ else
     log_fail "healthcheck as the skill runs it" "host=[$HC_HOST] hooks=[$(printf '%s' "$HC_HOOKS" | cut -c1-90)]"
 fi
 
+# The skill renders a diagnostic, so its instructions must forbid improving
+# it: a session displayed `lsp: warn, none installed` as ok with an invented
+# count and called the report ALL GREEN (2026-09-20).
+HC_SKILL="$ROOT_DIR/skills/healthcheck/SKILL.md"
+if grep -q "Never raise a" "$HC_SKILL" && grep -q "never write \"ALL GREEN\" while any check is not" "$HC_SKILL" \
+    && ! grep -q "Status: ALL GREEN" "$HC_SKILL"; then
+    log_pass "the healthcheck skill forbids raising a status, inventing a check or reporting ALL GREEN over a warning"
+else
+    log_fail "healthcheck skill rendering rules" "$(grep -c "ALL GREEN" "$HC_SKILL") ALL GREEN mentions"
+fi
+
 # Declared is not loaded: hooks/host-capabilities.json says which events each
 # host loads (Codex 0.154.0: not TaskCompleted, PostToolUseFailure, FileChanged,
 # from its own generated schema), and a handler on an event the host does not
