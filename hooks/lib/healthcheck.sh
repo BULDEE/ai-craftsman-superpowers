@@ -137,6 +137,29 @@ hc_check_agent_teams() {
     fi
 }
 
+# Claude Code reads agents/ from the plugin itself; Codex reads TOML roles
+# from its own home, and installing the plugin does not put them there. The
+# export writes them (`craftsman-ci export --target codex-agents --into
+# "$CODEX_HOME/agents"`), and once written all twelve are offered to
+# spawn_agent and spawn (measured 2026-09-20). Until then a Codex session has
+# the skills and none of the roles, which is worth a line rather than a
+# silence.
+hc_check_agent_roles() {
+    local host="${CRAFTSMAN_SESSION_HOST:-}" dir count
+    [[ -z "$host" ]] && type host_detect >/dev/null 2>&1 && host=$(host_detect "")
+    if [[ "$host" != "codex" ]]; then
+        _hc_record "agent-roles" "ok" "read from the plugin by this host"
+        return
+    fi
+    dir="${CODEX_HOME:-${HOME}/.codex}/agents"
+    count=$(ls "$dir"/craftsman-*.toml 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "${count:-0}" -gt 0 ]]; then
+        _hc_record "agent-roles" "ok" "${count} craftsman roles in ${dir}"
+    else
+        _hc_record "agent-roles" "warn" "no craftsman role in ${dir}: this host reads TOML roles from its own home and installing the plugin does not write them. Run: craftsman-ci export --target codex-agents --into \"${dir}\""
+    fi
+}
+
 # The bridge is Claude Code's: its skills run in a Bash tool that carries no
 # plugin data directory, so session-start.sh writes the path there for them.
 # Another host has no such file and must not be judged by it: a Codex session
@@ -154,6 +177,29 @@ _hc_bridge_elsewhere() {
         _hc_record "session-bridge" "ok" "${host}: session state under ${data} (the ~/.claude bridge is Claude Code's and is not written here)"
     else
         _hc_record "session-bridge" "error" "${host}: plugin data directory ${data} is not writable"
+    fi
+}
+
+# Claude Code reads agents/ from the plugin itself; Codex reads TOML roles
+# from its own home, and installing the plugin does not put them there. The
+# export writes them (`craftsman-ci export --target codex-agents --into
+# "$CODEX_HOME/agents"`), and once written all twelve are offered to
+# spawn_agent and spawn (measured 2026-09-20). Until then a Codex session has
+# the skills and none of the roles, which is worth a line rather than a
+# silence.
+hc_check_agent_roles() {
+    local host="${CRAFTSMAN_SESSION_HOST:-}" dir count
+    [[ -z "$host" ]] && type host_detect >/dev/null 2>&1 && host=$(host_detect "")
+    if [[ "$host" != "codex" ]]; then
+        _hc_record "agent-roles" "ok" "read from the plugin by this host"
+        return
+    fi
+    dir="${CODEX_HOME:-${HOME}/.codex}/agents"
+    count=$(ls "$dir"/craftsman-*.toml 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "${count:-0}" -gt 0 ]]; then
+        _hc_record "agent-roles" "ok" "${count} craftsman roles in ${dir}"
+    else
+        _hc_record "agent-roles" "warn" "no craftsman role in ${dir}: this host reads TOML roles from its own home and installing the plugin does not write them. Run: craftsman-ci export --target codex-agents --into \"${dir}\""
     fi
 }
 
@@ -324,6 +370,7 @@ hc_run_all() {
     hc_check_lsp
     hc_check_superpowers
     hc_check_agent_teams
+    hc_check_agent_roles
     hc_check_session_bridge
 }
 

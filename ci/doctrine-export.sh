@@ -163,6 +163,22 @@ _doctrine_write_codex_agents() {
     return 0
 }
 
+# A host that discovers hooks/hooks.json and runs none of it (Grok 1.0.30)
+# still runs a project hooks file. It is written from the manifest, never by
+# hand: a wiring typed a second time is a wiring that drifts.
+_doctrine_write_host_hooks() {
+    local host="$1" here root into="${EXPORT_INTO:-}" out
+    here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    root="$(cd "$here/.." && pwd)"
+    [[ -z "$into" ]] && into=".${host}/hooks"
+    out="${into%/}/craftsman.json"
+    python3 "${CI_LIB_DIR:-$here}/host_hooks.py" "$host" "$root" "$out" || return 1
+    if [[ "$host" == "grok" ]]; then
+        echo "Trust the folder before these run: 'grok --trust', or /hooks-trust in the session. Untrusted, project hooks are skipped in silence (measured on 1.0.30)."
+    fi
+    return 0
+}
+
 _doctrine_write_agents_md() {
     _doctrine_write_block AGENTS.md "$1" || return 1
     echo "Updated the craftsman block of AGENTS.md (read by Codex, Copilot, Cursor, Gemini, and other agents)"
@@ -185,11 +201,13 @@ doctrine_export() {
         cursor)       _doctrine_write_cursor "$body" ;;
         copilot)      _doctrine_write_copilot "$body" ;;
         codex-agents) _doctrine_write_codex_agents ;;
+        grok-hooks)   _doctrine_write_host_hooks grok ;;
+        codex-hooks)  _doctrine_write_host_hooks codex ;;
         all)
             doctrine_export agents-md && doctrine_export cursor && doctrine_export copilot
             ;;
         *)
-            echo "Unknown export target: $target. Use: agents-md, cursor, copilot, codex-agents, all" >&2
+            echo "Unknown export target: $target. Use: agents-md, cursor, copilot, codex-agents, grok-hooks, codex-hooks, all" >&2
             return 2
             ;;
     esac

@@ -260,6 +260,30 @@ else
 fi
 rm -rf "$CX_DATA"
 
+# Codex reads TOML roles from its own home and installing the plugin does not
+# write them: the twelve are offered to spawn_agent only once exported there
+# (measured 2026-09-20, a craftsman-architect spawn answered). A session with
+# the skills and none of the roles deserves a line, not a silence.
+AR_HOME=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-roles.XXXXXX")
+_roles_row() { # $1 = CODEX_HOME
+    cd "$ROOT_DIR" && env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID -u CRAFTSMAN_SESSION_HOST \
+        CODEX_THREAD_ID=r1 CODEX_HOME="$1" CLAUDE_PLUGIN_ROOT="$ROOT_DIR" bash -c '
+            source hooks/lib/config.sh; source hooks/lib/healthcheck.sh
+            hc_check_agent_roles; printf "%s|%s" "${_HC_STATUSES[0]}" "${_HC_MESSAGES[0]}"' 2>/dev/null
+}
+AR_EMPTY=$(_roles_row "$AR_HOME")
+mkdir -p "$AR_HOME/agents" && printf 'name = "craftsman-architect"\n' > "$AR_HOME/agents/craftsman-architect.toml"
+AR_FULL=$(_roles_row "$AR_HOME")
+AR_CC=$(cd "$ROOT_DIR" && env CRAFTSMAN_SESSION_HOST=claude-code bash -c '
+    source hooks/lib/config.sh; source hooks/lib/healthcheck.sh
+    hc_check_agent_roles; printf "%s" "${_HC_STATUSES[0]}"' 2>/dev/null)
+if [[ "$AR_EMPTY" == warn\|*"craftsman-ci export --target codex-agents"* && "$AR_FULL" == ok\|1* && "$AR_CC" == ok ]]; then
+    log_pass "a Codex home without the exported roles is a warning naming the export command; with them it is ok; another host is ok without looking"
+else
+    log_fail "agent roles per host" "empty=[$(printf '%s' "$AR_EMPTY" | cut -c1-90)] full=[$AR_FULL] claude=$AR_CC"
+fi
+rm -rf "$AR_HOME"
+
 # Declared is not loaded: hooks/host-capabilities.json says which events each
 # host loads (Codex 0.154.0: not TaskCompleted, PostToolUseFailure, FileChanged,
 # from its own generated schema), and a handler on an event the host does not

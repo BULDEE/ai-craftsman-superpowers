@@ -368,4 +368,24 @@ rm -f AGENTS.md
 cd "$PREV_PWD"
 rm -rf "$WORK"
 
+
+# A host that discovers hooks/hooks.json and runs none of it still runs a
+# project hooks file, and that file is generated from the manifest: typed a
+# second time, a wiring drifts from what it mirrors. Grok 1.0.30 is that
+# host (measured twice, 2026-09-15 and 2026-09-20).
+HH=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-hosthooks.XXXXXX")
+HH_OUT=$(cd "$HH" && bash "$CLI" export --target grok-hooks 2>&1)
+HH_FILE="$HH/.grok/hooks/craftsman.json"
+HH_EVENTS=$(jq -r '.hooks | keys | join(",")' "$HH_FILE" 2>/dev/null)
+HH_CMD=$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$HH_FILE" 2>/dev/null)
+HH_IF=$(jq -r '[.hooks[][] | .hooks[] | select(.command | test("git push"))] | length' "$HH_FILE" 2>/dev/null)
+if [[ "$HH_EVENTS" != *TaskCompleted* && "$HH_EVENTS" != *FileChanged* && "$HH_EVENTS" == *PreToolUse* \
+    && "$HH_CMD" != *'${CLAUDE_PLUGIN_ROOT}'* && "$HH_CMD" == *"CLAUDE_PLUGIN_ROOT=$ROOT_DIR"* \
+    && "$HH_IF" == "0" && "$HH_OUT" == *"--trust"* ]]; then
+    log_pass "grok-hooks writes the manifest's handlers with the root expanded and carried, drops the events Grok does not fire and the conditional handlers, and names the trust step"
+else
+    log_fail "grok-hooks export" "events=$HH_EVENTS if=$HH_IF cmd=$(printf '%s' "$HH_CMD" | cut -c1-70)"
+fi
+rm -rf "$HH"
+
 test_summary

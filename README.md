@@ -137,6 +137,38 @@ claude
 /craftsman:setup --quick
 ```
 
+**Running [Codex](https://developers.openai.com/codex) instead of (or next to) Claude Code?** Codex reads this repository's Claude manifest, so the same plugin installs natively:
+
+```bash
+codex plugin marketplace add BULDEE/ai-craftsman-superpowers   # reads .claude-plugin/marketplace.json
+codex plugin add craftsman@ai-craftsman-superpowers
+```
+
+Then two steps that installing does NOT do for you, both measured on 0.154.0 (2026-09-20):
+
+```bash
+# 1. Trust the hooks. Installed and enabled is not trusted: until you review
+#    them in /hooks, they are loaded and do not run.
+codex          # then: /hooks   -> review and trust the craftsman handlers
+
+# 2. Install the agent roles. Codex reads TOML roles from its own home; the
+#    plugin ships Markdown agents, and the export converts them.
+craftsman-ci export --target codex-agents --into "${CODEX_HOME:-$HOME/.codex}/agents"
+```
+
+`/craftsman:healthcheck` says which of the two is still missing. What you get there: the write gate before disk on `apply_patch` (V4A patches, multi-file, moves), the config protection, the 22 skills and, after the export, the 12 roles for `spawn_agent`. What you do not get, because the host does not offer it: a `ask` decision (the gate denies instead), a shell exit code in the tool event (a test run grants and revokes nothing), and a background hook that wakes an idle session. Detail per capability: [`tests/fixtures/hosts/PROVENANCE.md`](tests/fixtures/hosts/PROVENANCE.md).
+
+**Running [Grok](https://docs.x.ai/build) instead of (or next to) Claude Code?** Grok reads the Claude catalogue, so `grok inspect` lists the 22 skills and the agents with no setup. The engine is a separate step, because Grok discovers a plugin's `hooks/hooks.json` and runs none of it (measured on 1.0.30, twice): point a project hooks file at this installation's scripts, then trust the folder.
+
+```bash
+mkdir -p .grok/hooks
+# one handler per event, generated from the plugin's own manifest
+craftsman-ci export --target grok-hooks --into .grok/hooks
+grok --trust        # or /hooks-trust in the session
+```
+
+Until the folder is trusted, project hooks are skipped in silence and every forbidden write lands. A refusal shows up as `failed` in Grok's hook rows: that is how the host renders exit 2. What works there: the write gate on `write` and `search_replace` before disk, the config protection, `ask` honoured, and a test run that grants then revokes the verification evidence (its shell result carries an exit code).
+
 **Running [Hermes](https://hermes-agent.nousresearch.com) agents instead of (or next to) Claude Code?** The same repository is a native Hermes plugin:
 
 ```bash
