@@ -247,7 +247,7 @@
 {"complexity":0,"fan_out":3,"file_lines":289,"ignores":3,"instrument":2,"max_fn_lines":7,"path":"tests/packs/test-security.sh"},
 {"complexity":0,"fan_out":5,"file_lines":139,"ignores":0,"instrument":2,"max_fn_lines":1,"path":"tests/packs/test-structural.sh"},
 {"complexity":0,"fan_out":5,"file_lines":118,"ignores":0,"instrument":2,"max_fn_lines":1,"path":"tests/packs/test-symfony.sh"},
-{"complexity":2,"fan_out":2,"file_lines":421,"ignores":0,"instrument":2,"max_fn_lines":23,"path":"tests/perf/test-hook-latency.sh","reason":"four comment lines: the macOS runner readings the Darwin pre-write ceiling is set from"},
+{"complexity":2,"fan_out":2,"file_lines":429,"ignores":0,"instrument":2,"max_fn_lines":23,"path":"tests/perf/test-hook-latency.sh","reason":"the self-check exercises the ceiling in both directions instead of doubling a hook that may already be far under it, and the awk reads its numbers under LC_ALL=C"},
 {"complexity":32,"fan_out":1,"file_lines":900,"ignores":1,"instrument":2,"max_fn_lines":132,"path":"tests/run-tests.sh","reason":"host interoperability campaign (PR #99): every hook binds its session from the payload (session_files_bind, 3 lines each), the mirror and the host library gain the Codex patch and the Grok tool table, the healthcheck reads the host matrix, and the suites gain the per-host fixtures and witnesses (test-doctrine-export covers the delimited AGENTS.md block, test-healthcheck the host rows, test-lang-registry the cache invariants)"},
 {"complexity":0,"fan_out":0,"file_lines":344,"ignores":0,"instrument":2,"max_fn_lines":5,"path":"tests/templates/test-templates.sh"}
 ]
