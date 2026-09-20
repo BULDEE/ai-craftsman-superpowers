@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -12,6 +13,7 @@ import session_state
 
 class RuntimePathsTest(unittest.TestCase):
     def setUp(self):
+        self.process_path = os.environ.get('PATH', os.defpath)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
@@ -50,6 +52,33 @@ class RuntimePathsTest(unittest.TestCase):
 
     def test_unbound_native_session_does_not_read_claude_bridge(self):
         os.environ['CODEX_SESSION_ID'] = 'missing'
+        with self.assertRaises(RuntimeError):
+            session_state._resolve_session_state_path()
+
+    def run_grok_prompt(self, with_data=True):
+        plugin = Path(__file__).resolve().parents[2]
+        env = {'PATH': self.process_path, 'HOME': str(self.root),
+               'CRAFTSMAN_RUNTIME_HOME': str(self.root), 'GROK_SESSION_ID': 'outer',
+               'CLAUDE_PLUGIN_ROOT': str(plugin)}
+        if with_data:
+            env['CLAUDE_PLUGIN_DATA'] = str(self.root / 'native-data')
+        payload = {'workspaceRoot': str(self.root), 'hookEventName': 'user_prompt_submit',
+                   'session_id': 'native', 'prompt': 'Read the current status.'}
+        result = subprocess.run(['bash', str(plugin / 'hooks/bias-detector.sh')],
+                                input=json.dumps(payload), text=True, capture_output=True,
+                                env=env, cwd=self.root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_grok_prompt_recovers_native_binding_without_session_start(self):
+        self.run_grok_prompt()
+        os.environ['GROK_SESSION_ID'] = 'native'
+        self.assertEqual(session_state._resolve_session_state_path(), str(self.root / 'native-data/session-state-native.json'))
+        self.assertFalse((self.root / '.grok/craftsman/sessions/outer.json').exists())
+        self.assertEqual((self.root / '.claude/craftsman-session-state-path').read_text(), '/stale/claude/session-state.json')
+
+    def test_grok_prompt_without_native_store_does_not_bind_claude_default(self):
+        self.run_grok_prompt(with_data=False)
+        os.environ['GROK_SESSION_ID'] = 'native'
         with self.assertRaises(RuntimeError):
             session_state._resolve_session_state_path()
 

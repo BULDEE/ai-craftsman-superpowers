@@ -181,6 +181,9 @@ apres rechargement, sans export de hooks. Verifiez l'execution des handlers
 `plugin/craftsman/` dans la session. Le `SessionStart` initial manque et n'est
 pas rejoue : la parite automatique complete n'est donc pas acquise. Un refus
 apparait en `failed` avec `blocked: true` dans les evenements.
+Apres rechargement, le prochain hook natif de prompt lie la session a son propre
+stockage : les helpers d'etat et de metriques fonctionnent meme si l'evenement
+initial a manque. Le chemin vient du hook natif, jamais d'un chemin Claude devine.
 
 `bin/craftsman-grok-install` installe en natif par defaut, sans exporter de hooks.
 Le cablage de compatibilite reste disponible explicitement avec

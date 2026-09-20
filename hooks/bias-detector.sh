@@ -3,8 +3,8 @@
 # Bias Detection Hook for Claude Code
 # Detects cognitive biases in prompts and displays non-blocking warnings.
 #
-# SECURITY: This script only reads stdin and outputs warnings to stdout.
-#           It does NOT modify files, execute commands, or access network.
+# Reads the prompt, records session context and emits non-blocking warnings.
+# No network access.
 # =============================================================================
 set -uo pipefail
 
@@ -18,6 +18,12 @@ SESSION_STATE=$(session_file session-state.json)
 # Read the prompt from stdin (JSON format from Claude Code)
 INPUT=$(cat)
 session_files_bind "$INPUT"
+# Grok can load native hooks after SessionStart. Bind only the explicit store
+# supplied to this hook; a compatibility hook without one must not invent it.
+source "${SCRIPT_DIR}/lib/host.sh"
+if [[ -n "${CLAUDE_PLUGIN_DATA:-}" && "$(host_detect "$INPUT")" == "grok" ]]; then
+    python3 "${SCRIPT_DIR}/lib/runtime_paths.py" bind grok "${CRAFTSMAN_SESSION_ID:-}" "$(dirname "$SCRIPT_DIR")" "$CLAUDE_PLUGIN_DATA" 2>/dev/null || true
+fi
 SESSION_STATE=$(session_file session-state.json)
 PROMPT=$(echo "$INPUT" | jq -r '.prompt // empty' 2>/dev/null || echo "$INPUT")
 

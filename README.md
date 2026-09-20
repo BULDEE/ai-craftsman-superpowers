@@ -176,6 +176,9 @@ a valid write and refused its forbidden fixture after this reload, without
 exported hooks. Verify `plugin/craftsman/` handler execution in your session.
 The missed initial `SessionStart` is not replayed, so this is not full automatic
 startup parity. A refusal appears as `failed` with `blocked: true` in hook events.
+After reload, the next native prompt hook binds the session to its own data
+store, so state and metrics helpers work even when that initial event was missed.
+It uses the store supplied by the native hook, never a guessed Claude path.
 
 `bin/craftsman-grok-install` defaults to native installation and does not export
 hooks. Existing compatibility wiring remains supported explicitly through
