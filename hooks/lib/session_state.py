@@ -30,9 +30,10 @@ Commands:
 
 import json
 import os
-import re
 import sys
 import tempfile
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import runtime_paths
 
 CROSS_FILE_PATTERN_THRESHOLD = 3
