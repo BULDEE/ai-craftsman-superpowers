@@ -186,7 +186,9 @@ fi
 # qualified, reported "unknown host: capabilities not qualified" and
 # "18 handlers declared but load status unknown" (measured 2026-09-20 in a
 # `claude --plugin-dir` session). The check is the skill's own command line.
-SKILL_CMD=$(awk '/^source .*config.sh/,/^hc_json$/' "$ROOT_DIR/skills/healthcheck/SKILL.md")
+# The skill's first bash block, whatever it is: extracted from SKILL.md so the
+# suite cannot drift from what the model is told to run.
+SKILL_CMD=$(awk '/^```bash$/{f=1; next} /^```$/{if (f) exit} f' "$ROOT_DIR/skills/healthcheck/SKILL.md")
 # The Bash tool puts the plugin's bin/ on PATH and exports no
 # CLAUDE_PLUGIN_ROOT (measured 2026-09-20), which is how the skill resolves
 # this installation: through craftsman-path, not through the environment.

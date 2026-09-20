@@ -49,7 +49,7 @@ else
 fi
 HANDLERS=$(jq '[.hooks[][] | .hooks[]] | length' "$INSTALL/hooks/hooks.json" 2>/dev/null)
 [[ "$HANDLERS" == "$(jq '[.hooks[][] | .hooks[]] | length' "$ROOT_DIR/hooks/hooks.json")" ]] && log_pass "hooks.json ships with its $HANDLERS handlers" || log_fail "hooks manifest" "$HANDLERS"
-[[ -f "$INSTALL/hooks/host-capabilities.json" && -f "$INSTALL/adapters/copilot/hooks.json" && -x "$INSTALL/bin/craftsman-context" && -x "$INSTALL/bin/craftsman-path" \
+[[ -f "$INSTALL/hooks/host-capabilities.json" && -f "$INSTALL/adapters/copilot/hooks.json" && -x "$INSTALL/bin/craftsman-context" && -x "$INSTALL/bin/craftsman-path" && -x "$INSTALL/bin/craftsman-healthcheck" \
    && "$("$INSTALL/bin/craftsman-path" hooks/lib)" == "$INSTALL/hooks/lib" ]] && log_pass "the host matrix, the Copilot adapter, craftsman-context and craftsman-path ship, and craftsman-path resolves the INSTALLED tree" || log_fail "shipped files" "missing"
 
 # the gates, from the installed tree, on an empty data directory

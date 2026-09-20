@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# =============================================================================
+# craftsman-healthcheck - the plugin's own diagnostic, as one command
+#
+# Usage: craftsman-healthcheck [--json]     (default: JSON, one array)
+#
+# A skill body is text handed to a model, and a multi-line `source ... && ...`
+# chain is something a model edits, shortens or replaces with a diagnosis of
+# its own: measured on 2026-09-20, /craftsman:healthcheck answered
+# "Installation incomplete" with invented check names while the documented
+# command, run verbatim in the same directory with the same PATH, printed a
+# healthy report. One command with no substitutions removes that freedom.
+#
+# Everything is resolved from this file's own installation, so the working
+# directory is the user's project, as it always is in a Bash tool.
+# =============================================================================
+set -uo pipefail
+_self="${BASH_SOURCE[0]}"
+while [[ -L "$_self" ]]; do
+    _target=$(readlink "$_self")
+    [[ "$_target" == /* ]] && _self="$_target" || _self="$(dirname "$_self")/$_target"
+done
+ROOT="$(cd "$(dirname "$_self")/.." && pwd)"
+source "$ROOT/hooks/lib/config.sh" || exit 1
+source "$ROOT/hooks/lib/pack-loader.sh" || exit 1
+pack_loader_init 2>/dev/null
+source "$ROOT/hooks/lib/healthcheck.sh" || exit 1
+case "${1:---json}" in
+    --json) hc_json ;;
+    --summary) hc_summary ;;
+    *) echo "Usage: craftsman-healthcheck [--json|--summary]" >&2; exit 1 ;;
+esac
