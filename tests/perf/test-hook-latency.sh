@@ -367,28 +367,36 @@ done <<< "$RESULTS"
 # The instrument, seen red on purpose, in the same run that trusts it. A
 # ceiling nobody has watched fail is a ceiling nobody knows is wired up.
 #
-# The synthetic regression is PROPORTIONAL to what was just measured, not a
-# fixed 0.4s. A fixed sleep proved the point on an idle laptop and proved
-# nothing under load, where the baseline itself grew past it: the check then
-# reported that the ceilings could not catch a 400ms regression, which was true
-# and useless. Doubling the tightest hook is the regression the tightest ceiling
-# exists to catch, and it is the same regression at any machine speed.
-TIGHTEST="$(printf '%s' "$RESULTS" | awk -F'|' '
-    NF >= 4 && $2 + 0 > 0 { if (best == "" || $2 + 0 < best) { best = $2 + 0; ceiling = $4 } }
-    END { printf "%s %s", (best == "" ? 0 : best), (ceiling == "" ? 0 : ceiling) }')"
-TIGHTEST_MS="${TIGHTEST%% *}"
-SMALLEST_CEILING="${TIGHTEST##* }"
+# What is exercised is the comparison itself, at the ceiling: a run just OVER
+# the tightest ceiling must be refused, and one well under it must pass. The
+# previous form doubled the tightest hook and asked whether the doubling
+# crossed the ceiling. That holds only while the hook already costs more than
+# half its ceiling, and on a macOS runner where bias-detector measured 0.83x
+# of a 1.8x ceiling the doubled run landed at 1.70x and the check failed
+# while every hook was comfortably inside its budget (2026-09-20). The
+# premise was arithmetic, not a regression: an instrument that reports a
+# fault on a healthy tree teaches its readers to skip it.
+# LC_ALL=C, because awk reads `1.8` through the locale's decimal separator:
+# under fr_FR it parses as 1, and the smallest ceiling came out as 1x on a
+# French machine while CI, running under C, saw 1.8x. A number that changes
+# with the operator's locale is not a measurement.
+SMALLEST_CEILING="$(printf '%s' "$RESULTS" | LC_ALL=C awk -F'|' '
+    NF >= 4 && $4 + 0 > 0 { if (smallest == "" || $4 + 0 < smallest) smallest = $4 + 0 }
+    END { printf "%s", (smallest == "" ? 0 : smallest) }')"
 
-if _is_measurement "$TIGHTEST_MS" && [[ "$TIGHTEST_MS" != "0" ]]; then
-    DOUBLE_SECONDS="$(python3 -c "print('%.3f' % (2 * $TIGHTEST_MS / 1000.0))")"
-    SLOW_MS="$(_median_ms "sleep $DOUBLE_SECONDS" 3)"
-    SLOW_RATIO="$(python3 -c "print('%.2f' % ($SLOW_MS / $FLOOR_MS))" 2>/dev/null || echo 0)"
-    crosses=$(python3 -c "print(1 if $SLOW_RATIO > $SMALLEST_CEILING else 0)" 2>/dev/null || echo 0)
-    if [[ "$crosses" -eq 1 ]]; then
-        log_pass "doubling the tightest hook does cross its ceiling (${SLOW_MS}ms, ${SLOW_RATIO}x > ${SMALLEST_CEILING}x)"
+if _is_measurement "$FLOOR_MS" && [[ "$FLOOR_MS" != "0" ]] && [[ "$SMALLEST_CEILING" != "0" ]]; then
+    OVER_SECONDS="$(python3 -c "print('%.3f' % (1.15 * $SMALLEST_CEILING * $FLOOR_MS / 1000.0))")"
+    UNDER_SECONDS="$(python3 -c "print('%.3f' % (0.50 * $SMALLEST_CEILING * $FLOOR_MS / 1000.0))")"
+    OVER_MS="$(_median_ms "sleep $OVER_SECONDS" 3)"
+    UNDER_MS="$(_median_ms "sleep $UNDER_SECONDS" 3)"
+    OVER_RATIO="$(python3 -c "print('%.2f' % ($OVER_MS / $FLOOR_MS))" 2>/dev/null || echo 0)"
+    UNDER_RATIO="$(python3 -c "print('%.2f' % ($UNDER_MS / $FLOOR_MS))" 2>/dev/null || echo 0)"
+    both=$(python3 -c "print(1 if $OVER_RATIO > $SMALLEST_CEILING and $UNDER_RATIO <= $SMALLEST_CEILING else 0)" 2>/dev/null || echo 0)
+    if [[ "$both" -eq 1 ]]; then
+        log_pass "the tightest ceiling (${SMALLEST_CEILING}x) refuses a run above it (${OVER_RATIO}x) and accepts one below (${UNDER_RATIO}x)"
     else
-        log_fail "doubling the tightest hook does cross its ceiling" \
-            "measured ${SLOW_MS}ms, ${SLOW_RATIO}x, under the ${SMALLEST_CEILING}x ceiling: a doubling would ship unnoticed"
+        log_fail "the tightest ceiling is wired in both directions" \
+            "over=${OVER_MS}ms ${OVER_RATIO}x, under=${UNDER_MS}ms ${UNDER_RATIO}x, ceiling ${SMALLEST_CEILING}x"
     fi
 else
     log_fail "the instrument could be checked against itself" \
