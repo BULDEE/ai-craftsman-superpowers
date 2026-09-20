@@ -31,7 +31,7 @@ run_hook() {
 run_hook_unknown_host() {
     local file_path="$1"
     local output
-    output=$(jq -n --arg fp "$file_path" '{"tool_input":{"file_path":$fp}}' | env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID -u PLUGIN_ROOT bash "$ROOT_DIR/hooks/config-protection.sh" 2>/dev/null)
+    output=$(jq -n --arg fp "$file_path" '{"tool_input":{"file_path":$fp}}' | env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID -u PLUGIN_ROOT -u GROK_SESSION_ID -u GROK_HOOK_EVENT -u GROK_AGENT bash "$ROOT_DIR/hooks/config-protection.sh" 2>/dev/null)
     local exit_code=$?
     echo "$exit_code|$output"
 }

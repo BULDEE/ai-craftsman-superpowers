@@ -62,6 +62,22 @@ else
     log_pass "sourcing test-helpers.sh isolates plugin data on its own ($HELPER_DATA)"
 fi
 
+# A Grok Bash tool exports GROK_SESSION_ID (1.0.34). host_detect reads it
+# before Claude/Codex marks, so an "unknown host" assertion names grok and
+# asks instead of denying. Same class as CLAUDE_CODE_SESSION_ID: strip here,
+# a test that wants a Grok identity sets the variable itself.
+GROK_LEAK=$(
+    GROK_SESSION_ID=leaked GROK_AGENT=1 env -u _TEST_HELPERS_LOADED bash -c \
+        'source "$1" >/dev/null 2>&1; printf "%s" "${GROK_SESSION_ID-UNSET}"' \
+        _ "$ROOT_DIR/tests/lib/test-helpers.sh"
+)
+if [[ "$GROK_LEAK" == "UNSET" || -z "$GROK_LEAK" ]]; then
+    log_pass "sourcing test-helpers.sh unsets GROK_SESSION_ID"
+else
+    log_fail "sourcing test-helpers.sh leaves GROK_SESSION_ID set" \
+        "got '$GROK_LEAK'; unknown-host assertions then ask instead of deny"
+fi
+
 if [[ "${CRAFTSMAN_ISOLATION_AUDIT:-0}" != "1" ]]; then
     echo ""
     echo "Suite isolation audit skipped (costs a full suite run)."

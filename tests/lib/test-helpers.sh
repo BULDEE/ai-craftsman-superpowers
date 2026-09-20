@@ -31,6 +31,10 @@ export CLAUDE_PLUGIN_OPTION_strictness="${CLAUDE_PLUGIN_OPTION_strictness:-stric
 # asserts on the shared session-state.json would then read a file no hook
 # wrote. Unset here; a test that wants two sessions sets the id itself.
 unset CLAUDE_CODE_SESSION_ID
+# Grok 1.0.34 exports GROK_SESSION_ID into the same Bash tool. host_detect
+# reads it first, so an "unknown host" assertion names grok and asks instead
+# of denying. A test that wants a Grok identity sets the variable itself.
+unset GROK_SESSION_ID GROK_HOOK_EVENT GROK_AGENT
 
 # A git identity, once, for every fixture that commits. The ubuntu runner has
 # none configured, so `git commit --allow-empty` failed silently inside
