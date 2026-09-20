@@ -52,6 +52,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shell command the model runs is caught by CI and the pre-push gate, not
   before disk; and async delivery is the host's, which Codex does not offer.
 
+- A host's hooks file is generated from the manifest, never typed twice:
+  `craftsman-ci export --target grok-hooks` (and `codex-hooks`) writes the
+  handlers with `${CLAUDE_PLUGIN_ROOT}` expanded and carried in each
+  handler's environment, the events that host does not fire dropped, and the
+  conditional handlers that are Claude Code's dropped. Grok needs it because
+  it discovers a plugin's `hooks/hooks.json` and runs none of it; the
+  generated file was replayed on the real CLI and gives the same refusals.
+  `/craftsman:healthcheck` gained an `agent-roles` row: on Codex it counts
+  the craftsman roles in that host's home and names the export command when
+  there are none, since installing the plugin does not write them and,
+  written, all twelve are offered to spawn_agent. README documents the native
+  install on both hosts, including the steps installing does not perform
+  (trusting the hooks, exporting the roles) and what each host does not
+  offer.
+
 - Grok 1.0.30 as a host, measured (audit of 2026-09-15): the write gates
   judge its `write` and `search_replace` tools (they exited 0 in silence on
   the captured envelope), `host_detect` names `grok` from the envelope
