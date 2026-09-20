@@ -179,6 +179,24 @@ if [[ "$CODEX_MSG" == *"NOT observable"* && "$CODEX_MSG" == *"ask unsupported"* 
 else
     log_fail "hc_check_host" "codex=[$CODEX_MSG] claude=[$CLAUDE_MSG] unknown=$UNKNOWN_STATUS"
 fi
+# The real consumer is skills/healthcheck/SKILL.md, which sources config.sh,
+# pack-loader.sh and healthcheck.sh and nothing else. Every case above hands
+# the host in by hand, so none of them noticed that `host_detect` is not
+# defined in that process: a Claude Code session, the one host fully
+# qualified, reported "unknown host: capabilities not qualified" and
+# "18 handlers declared but load status unknown" (measured 2026-09-20 in a
+# `claude --plugin-dir` session). The check is the skill's own command line.
+SKILL_CMD=$(awk '/^source .*config.sh/,/^hc_json$/' "$ROOT_DIR/skills/healthcheck/SKILL.md")
+HC_OUT=$(cd "$ROOT_DIR" && env CLAUDE_PLUGIN_ROOT="$ROOT_DIR" CLAUDE_PLUGIN_DATA="$CLAUDE_PLUGIN_DATA" \
+    CLAUDECODE=1 CLAUDE_CODE_SESSION_ID=hc-skill bash -c "$SKILL_CMD" 2>/dev/null)
+HC_HOST=$(printf '%s' "$HC_OUT" | jq -r '.. | objects | select(.name? == "host") | "\(.status) \(.message)"' 2>/dev/null)
+HC_HOOKS=$(printf '%s' "$HC_OUT" | jq -r '.. | objects | select(.name? == "hooks") | "\(.status) \(.message)"' 2>/dev/null)
+if [[ "$HC_HOST" == ok*claude-code* && "$HC_HOOKS" != *"not recorded"* && "$HC_HOOKS" != *"loaded events unknown"* ]]; then
+    log_pass "the skill's own command line names the host: healthcheck.sh brings its own host library, the caller does not have to"
+else
+    log_fail "healthcheck as the skill runs it" "host=[$HC_HOST] hooks=[$(printf '%s' "$HC_HOOKS" | cut -c1-90)]"
+fi
+
 # Declared is not loaded: hooks/host-capabilities.json says which events each
 # host loads (Codex 0.154.0: not TaskCompleted, PostToolUseFailure, FileChanged,
 # from its own generated schema), and a handler on an event the host does not

@@ -9,6 +9,14 @@
 #   hc_full_report      # Full formatted report for /craftsman:healthcheck
 # =============================================================================
 
+# This library names the host, so it brings the library that reads it rather
+# than trusting its caller to have sourced it: skills/healthcheck/SKILL.md
+# sources config.sh, pack-loader.sh and this file, and `host_detect` was
+# undefined there, so a Claude Code session reported "unknown host" and
+# "load status unknown" about itself (measured 2026-09-20).
+_HC_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+type host_detect >/dev/null 2>&1 || source "${_HC_LIB_DIR}/host.sh"
+
 declare -a _HC_NAMES=()
 declare -a _HC_STATUSES=()
 declare -a _HC_MESSAGES=()
