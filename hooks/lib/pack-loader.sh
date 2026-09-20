@@ -554,7 +554,7 @@ _pack_owns_symlink() {
 }
 
 pack_sync_symlinks() {
-    local root="${CLAUDE_PLUGIN_ROOT:-$(pwd)}"
+    local root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
     local packs_dir="${_PACKS_DIR:-$root/packs}"
     packs_dir=$(cd "$packs_dir" 2>/dev/null && pwd) || return 0
 

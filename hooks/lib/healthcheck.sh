@@ -177,7 +177,7 @@ hc_check_session_bridge() {
 # what Copilot could not do. A host absent from the matrix is unqualified and
 # said so; one present is described by what was measured for it.
 hc_check_host() {
-    local host="${CRAFTSMAN_SESSION_HOST:-}" capabilities="${CLAUDE_PLUGIN_ROOT:-$(pwd)}/hooks/host-capabilities.json" row
+    local host="${CRAFTSMAN_SESSION_HOST:-}" capabilities="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}/hooks/host-capabilities.json" row
     if [[ -z "$host" ]] && type host_detect >/dev/null 2>&1; then
         host=$(host_detect "")
     fi
@@ -203,7 +203,7 @@ hc_check_host() {
 # is named here with the function it carries, so a declaration ignored never
 # counts as an active function. Triggered is this session's evidence only.
 hc_check_hooks_declared() {
-    local root="${CLAUDE_PLUGIN_ROOT:-$(pwd)}" manifest capabilities host declared events missing
+    local root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}" manifest capabilities host declared events missing
     manifest="$root/hooks/hooks.json"; capabilities="$root/hooks/host-capabilities.json"
     [[ -f "$manifest" ]] || { _hc_record "hooks" "error" "hooks.json missing"; return; }
     declared=$(jq '[.hooks[][] | .hooks[]] | length' "$manifest" 2>/dev/null || echo "?")

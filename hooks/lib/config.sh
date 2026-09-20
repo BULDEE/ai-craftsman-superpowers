@@ -199,7 +199,7 @@ config_sentry_enabled() {
 }
 
 config_packs_dir() {
-    echo "${CLAUDE_PLUGIN_ROOT:-$(pwd)}/packs"
+    echo "${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}/packs"
 }
 
 # Parse external pack paths from the USER'S OWN global config.

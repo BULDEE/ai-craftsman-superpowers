@@ -190,13 +190,21 @@ SKILL_CMD=$(awk '/^source .*config.sh/,/^hc_json$/' "$ROOT_DIR/skills/healthchec
 # The Bash tool puts the plugin's bin/ on PATH and exports no
 # CLAUDE_PLUGIN_ROOT (measured 2026-09-20), which is how the skill resolves
 # this installation: through craftsman-path, not through the environment.
-HC_OUT=$(cd "$ROOT_DIR" && env -u CLAUDE_PLUGIN_ROOT PATH="$ROOT_DIR/bin:$PATH" \
+# From the USER'S project directory, which is where the Bash tool runs: the
+# library must resolve the installation from its own location. Four call
+# sites fell back to `pwd`, so the checks read the project for hooks.json and
+# the host matrix and reported "hooks.json missing" plus an unqualified host,
+# which a model read as a broken installation (2026-09-20).
+HC_CWD=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-hc-cwd.XXXXXX")
+HC_OUT=$(cd "$HC_CWD" && env -u CLAUDE_PLUGIN_ROOT PATH="$ROOT_DIR/bin:$PATH" \
     CLAUDE_PLUGIN_DATA="$CLAUDE_PLUGIN_DATA" \
     CLAUDECODE=1 CLAUDE_CODE_SESSION_ID=hc-skill bash -c "$SKILL_CMD" 2>/dev/null)
 HC_HOST=$(printf '%s' "$HC_OUT" | jq -r '.. | objects | select(.name? == "host") | "\(.status) \(.message)"' 2>/dev/null)
 HC_HOOKS=$(printf '%s' "$HC_OUT" | jq -r '.. | objects | select(.name? == "hooks") | "\(.status) \(.message)"' 2>/dev/null)
-if [[ "$HC_HOST" == ok*claude-code* && "$HC_HOOKS" != *"not recorded"* && "$HC_HOOKS" != *"loaded events unknown"* ]]; then
-    log_pass "the skill's own command line names the host: healthcheck.sh brings its own host library, the caller does not have to"
+rm -rf "$HC_CWD"
+if [[ "$HC_HOST" == ok*claude-code* && "$HC_HOOKS" == ok* \
+    && "$HC_HOOKS" != *"not recorded"* && "$HC_HOOKS" != *"loaded events unknown"* ]]; then
+    log_pass "the skill's own command line, run from the user's project, names the host and reads this installation's hooks.json"
 else
     log_fail "healthcheck as the skill runs it" "host=[$HC_HOST] hooks=[$(printf '%s' "$HC_HOOKS" | cut -c1-90)]"
 fi
