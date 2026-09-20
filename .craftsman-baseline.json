@@ -212,7 +212,7 @@
 {"complexity":16,"fan_out":1,"file_lines":104,"ignores":0,"instrument":2,"max_fn_lines":104,"path":"tests/core/test-okf-knowledge.sh"},
 {"complexity":1,"fan_out":3,"file_lines":626,"ignores":1,"instrument":2,"max_fn_lines":31,"path":"tests/core/test-pack-loader.sh","reason":"Ship native pack agents before host discovery and enforce ordinary-copy integrity with RED/GREEN regressions"},
 {"complexity":2,"fan_out":1,"file_lines":509,"ignores":0,"instrument":2,"max_fn_lines":10,"path":"tests/core/test-precedence.sh"},
-{"complexity":27,"fan_out":1,"file_lines":123,"ignores":0,"instrument":2,"max_fn_lines":123,"path":"tests/core/test-quick-setup.sh"},
+{"complexity":28,"fan_out":1,"file_lines":129,"ignores":0,"instrument":2,"max_fn_lines":129,"path":"tests/core/test-quick-setup.sh","reason":"Execute the native setup helper instead of asserting the retired Claude wrapper spelling"},
 {"complexity":6,"fan_out":7,"file_lines":796,"ignores":2,"instrument":2,"max_fn_lines":12,"path":"tests/core/test-ratchet.sh","reason":"ratchet inert without a mark and anchored on the file; routing asked of the consumer (architecture review)"},
 {"complexity":1,"fan_out":1,"file_lines":123,"ignores":0,"instrument":2,"max_fn_lines":7,"path":"tests/core/test-review-backend.sh"},
 {"complexity":4,"fan_out":4,"file_lines":122,"ignores":0,"instrument":2,"max_fn_lines":11,"path":"tests/core/test-routing-table.sh","reason":"every route checked against its SKILL.md, both directions (#48)"},

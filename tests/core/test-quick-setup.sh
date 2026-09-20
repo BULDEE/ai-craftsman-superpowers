@@ -88,9 +88,15 @@ fi
 
 # --- Situational onboarding (v4.0) ---
 
-grep -q "craftsman-conventions.sh signals" "$SETUP_CMD" \
-    && log_pass "setup consults situational signals" \
-    || log_fail "signals step" "missing"
+SIGNALS_COMMAND=$(grep -F 'conventions signals' "$SETUP_CMD")
+SIGNALS_PROJECT=$(mktemp -d)
+SIGNALS_OUTPUT=$(cd "$SIGNALS_PROJECT" && PATH="$ROOT_DIR/bin:$PATH" bash -c "$SIGNALS_COMMAND" 2>/dev/null)
+rm -rf "$SIGNALS_PROJECT"
+if [[ -n "$SIGNALS_COMMAND" ]] && printf '%s' "$SIGNALS_OUTPUT" | python3 -c 'import json,sys; d=json.load(sys.stdin); sys.exit(0 if d["existing_project"] is False and d["has_tests"] is False else 1)' 2>/dev/null; then
+    log_pass "the documented native setup command reads real project signals"
+else
+    log_fail "signals step" "missing command or invalid observation: $SIGNALS_OUTPUT"
+fi
 
 grep -q -- "--global" "$SETUP_CMD" \
     && log_pass "setup documents --global workshop profile" \
