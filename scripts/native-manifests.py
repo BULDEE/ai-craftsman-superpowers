@@ -13,6 +13,8 @@ def manifests(root: Path) -> dict:
     grok = {key: value for key, value in source.items() if key != 'userConfig'}
     grok['hooks'] = './hooks/hooks.json'
     marketplace = json.loads((root / '.claude-plugin/marketplace.json').read_text())
+    for entry in marketplace['plugins']:
+        entry['source'] = {'type': 'local', 'path': './'}
     codex = {
         'name': marketplace['name'],
         'interface': {'displayName': 'AI Craftsman Superpowers'},

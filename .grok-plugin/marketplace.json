@@ -17,7 +17,10 @@
         "name": "Alexandre Mallet",
         "email": "contact@buldee.com"
       },
-      "source": "./",
+      "source": {
+        "type": "local",
+        "path": "./"
+      },
       "category": "development",
       "tags": [
         "architecture",

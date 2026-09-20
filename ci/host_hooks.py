@@ -27,6 +27,29 @@ UNFIRED = {
     "codex": ("TaskCompleted", "PostToolUseFailure", "FileChanged"),
 }
 
+# Grok 1.0.34 aliases Write/Edit to search_replace and keeps the Claude
+# name, but the create tool is `write` (lowercase) and is not that alias
+# (hooks guide: Write -> search_replace). A matcher that only says Write|Edit
+# therefore misses every creation. Extra names are OR'd; Claude ignores them.
+GROK_MATCHER_EXTRA = {
+    "Write": ("write", "search_replace"),
+    "Edit": ("write", "search_replace"),
+    "Bash": ("run_terminal_command",),
+}
+
+
+def _matcher_for(host: str, matcher: str) -> str:
+    if host != "grok" or not matcher:
+        return matcher
+    seen = []
+    for part in matcher.split("|"):
+        if part and part not in seen:
+            seen.append(part)
+        for extra in GROK_MATCHER_EXTRA.get(part, ()):
+            if extra not in seen:
+                seen.append(extra)
+    return "|".join(seen)
+
 
 def _handler(entry: dict, root: str, data: str) -> dict | None:
     if "if" in entry:
@@ -34,14 +57,14 @@ def _handler(entry: dict, root: str, data: str) -> dict | None:
     command = str(entry.get("command", "")).replace("${CLAUDE_PLUGIN_ROOT}", root)
     if not command:
         return None
-    env = f'env CLAUDE_PLUGIN_ROOT={root} CLAUDE_PLUGIN_DATA={data} '
+    env = f'env CLAUDE_PLUGIN_ROOT={root} CLAUDE_PLUGIN_DATA={data} GROK_PLUGIN_ROOT={root} GROK_PLUGIN_DATA={data} '
     out = {"type": entry.get("type", "command"), "command": env + command}
     if entry.get("timeout"):
         out["timeout"] = entry["timeout"]
     return out
 
 
-def _groups(groups: list, root: str, data: str) -> list:
+def _groups(groups: list, root: str, data: str, host: str) -> list:
     kept = []
     for group in groups:
         handlers = [made for made in (_handler(entry, root, data) for entry in group.get("hooks", [])) if made]
@@ -49,7 +72,7 @@ def _groups(groups: list, root: str, data: str) -> list:
             continue
         rewritten = {"hooks": handlers}
         if group.get("matcher"):
-            rewritten["matcher"] = group["matcher"]
+            rewritten["matcher"] = _matcher_for(host, group["matcher"])
         kept.append(rewritten)
     return kept
 
@@ -69,7 +92,7 @@ def main() -> int:
     for event, groups in manifest.get("hooks", {}).items():
         if event in unfired:
             continue
-        kept = _groups(groups, root, data)
+        kept = _groups(groups, root, data, host)
         if kept:
             hooks[event] = kept
     os.makedirs(os.path.dirname(os.path.abspath(output)) or ".", exist_ok=True)

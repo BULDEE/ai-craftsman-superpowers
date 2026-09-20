@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Native Grok install: the plugin, then the write gate.
+#
+# Grok 1.0.34 discovers a plugin's hooks/hooks.json (hookType file, event
+# "(plugin)") and does not expand it into handlers. The gate is live through
+# ~/.grok/hooks/craftsman.json, which Grok always trusts. This script is that
+# pair of steps, with the plugin root expanded from this installation.
+set -euo pipefail
+_self="${BASH_SOURCE[0]}"
+while [[ -L "$_self" ]]; do
+    _target=$(readlink "$_self")
+    [[ "$_target" == /* ]] && _self="$_target" || _self="$(dirname "$_self")/$_target"
+done
+ROOT="$(cd "$(dirname "$_self")/.." && pwd)"
+grok plugin install "$ROOT" --trust
+bash "$ROOT/ci/craftsman-ci.sh" export --target grok-hooks --into "${HOME}/.grok/hooks"
+echo "Native Grok install: plugin trusted, write gate in ${HOME}/.grok/hooks/craftsman.json"
+echo "New sessions load the gate. An already-open session does not."

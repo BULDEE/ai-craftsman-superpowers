@@ -13,7 +13,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Write|Edit|write|search_replace",
         "hooks": [
           {
             "type": "command",
@@ -28,7 +28,7 @@
         ]
       },
       {
-        "matcher": "Bash",
+        "matcher": "Bash|run_terminal_command",
         "hooks": [
           {
             "type": "command",
@@ -41,7 +41,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Write|Edit|write|search_replace",
         "hooks": [
           {
             "type": "command",
@@ -58,7 +58,7 @@
         ]
       },
       {
-        "matcher": "Bash|TaskOutput",
+        "matcher": "Bash|TaskOutput|run_terminal_command",
         "hooks": [
           {
             "type": "command",
@@ -83,7 +83,7 @@
     ],
     "PostToolUseFailure": [
       {
-        "matcher": "Write|Edit|Bash",
+        "matcher": "Write|Edit|Bash|write|search_replace|run_terminal_command",
         "hooks": [
           {
             "type": "command",

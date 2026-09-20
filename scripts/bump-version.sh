@@ -165,6 +165,11 @@ bump_file "${ROOT_DIR}/plugin.yaml" \
     "version: ${NEW_VERSION}" \
     "plugin.yaml"
 
+# 6. Grok native marketplace index (same version as the Claude one).
+bump_file "${ROOT_DIR}/.grok-plugin/marketplace.json" \
+    "\"version\": \"${CURRENT_VERSION}\"" \
+    "\"version\": \"${NEW_VERSION}\"" \
+    ".grok-plugin/marketplace.json"
 if [[ -f "${ROOT_DIR}/scripts/native-manifests.py" ]]; then
     if [[ "$CHECK_ONLY" == true ]]; then
         python3 "${ROOT_DIR}/scripts/native-manifests.py" --check || DRIFTED=$((DRIFTED + 1))
