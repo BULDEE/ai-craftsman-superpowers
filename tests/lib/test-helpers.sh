@@ -30,8 +30,9 @@ export CLAUDE_PLUGIN_OPTION_strictness="${CLAUDE_PLUGIN_OPTION_strictness:-stric
 # included, and the hooks name their state files after it. A suite that
 # asserts on the shared session-state.json would then read a file no hook
 # wrote. Unset here; a test that wants two sessions sets the id itself.
+# Grok exports its identity into tool subprocesses too. Tests name their own host.
 unset CRAFTSMAN_PLUGIN_DATA GROK_PLUGIN_DATA PLUGIN_DATA
-unset CLAUDE_CODE_SESSION_ID CODEX_SESSION_ID CODEX_THREAD_ID GROK_SESSION_ID GROK_HOOK_EVENT CRAFTSMAN_SESSION_ID CRAFTSMAN_SESSION_HOST
+unset CLAUDE_CODE_SESSION_ID CODEX_SESSION_ID CODEX_THREAD_ID GROK_SESSION_ID GROK_HOOK_EVENT GROK_AGENT CRAFTSMAN_SESSION_ID CRAFTSMAN_SESSION_HOST
 
 # A git identity, once, for every fixture that commits. The ubuntu runner has
 # none configured, so `git commit --allow-empty` failed silently inside
