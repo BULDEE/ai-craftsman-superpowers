@@ -30,27 +30,28 @@ def manifests(root: Path) -> dict:
             '.agents/plugins/marketplace.json': codex}
 
 
+def artifacts(root: Path) -> dict[Path, bytes]:
+    result = {root / name: (json.dumps(value, indent=2, ensure_ascii=False) + '\n').encode()
+              for name, value in manifests(root).items()}
+    result.update({root / 'agents' / source.name: source.read_bytes()
+                   for source in sorted(root.glob('packs/*/agents/*.md'))})
+    return result
+
+
+def matches(target: Path, content: bytes) -> bool:
+    return not target.is_symlink() and target.is_file() and target.read_bytes() == content
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true')
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
     args = parser.parse_args()
     drift = []
-    for name, value in manifests(args.root).items():
-        target = args.root / name
-        content = json.dumps(value, indent=2, ensure_ascii=False) + '\n'
+    for target, content in artifacts(args.root).items():
+        if args.check and not matches(target, content):
+            drift.append(str(target.relative_to(args.root)))
         if args.check:
-            if not target.is_file() or target.read_text() != content:
-                drift.append(name)
-            continue
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content)
-    for source in sorted(args.root.glob('packs/*/agents/*.md')):
-        target = args.root / 'agents' / source.name
-        content = source.read_bytes()
-        if args.check:
-            if target.is_symlink() or not target.is_file() or target.read_bytes() != content:
-                drift.append(str(target.relative_to(args.root)))
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
         if target.is_symlink():

@@ -143,7 +143,7 @@
 {"complexity":5,"fan_out":0,"file_lines":198,"ignores":0,"instrument":2,"max_fn_lines":29,"path":"scripts/bump-version.sh","reason":"Native host session binding, native manifest synchronization and regression coverage; adds one shared runtime path dependency and two suite groups, preserving Grok 205717c"},
 {"complexity":5,"fan_out":0,"file_lines":198,"ignores":0,"instrument":2,"max_fn_lines":22,"path":"scripts/consolidate-metrics.sh"},
 {"complexity":9,"fan_out":4,"file_lines":96,"ignores":0,"instrument":2,"max_fn_lines":96,"path":"scripts/export-hermes-skills.sh","reason":"Preserve the Hermes skill export when native helpers introduce a quoted plugin path"},
-{"complexity":9,"fan_out":4,"file_lines":68,"ignores":0,"instrument":2,"max_fn_lines":33,"path":"scripts/native-manifests.py","reason":"Ship native pack agents before host discovery and enforce ordinary-copy integrity with RED/GREEN regressions"},
+{"complexity":6,"fan_out":4,"file_lines":68,"ignores":0,"instrument":2,"max_fn_lines":25,"path":"scripts/native-manifests.py","reason":"Ship native pack agents before host discovery and enforce ordinary-copy integrity with RED/GREEN regressions"},
 {"complexity":1,"fan_out":0,"file_lines":53,"ignores":0,"instrument":2,"max_fn_lines":7,"path":"scripts/release-build.sh"},
 {"complexity":0,"fan_out":0,"file_lines":80,"ignores":0,"instrument":2,"max_fn_lines":3,"path":"scripts/release-guard.sh"},
 {"complexity":5,"fan_out":0,"file_lines":214,"ignores":0,"instrument":2,"max_fn_lines":19,"path":"scripts/validate-pack.sh"},
