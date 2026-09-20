@@ -7,6 +7,14 @@ disable-model-invocation: true
 
 # /craftsman:healthcheck - Plugin Diagnostic
 
+
+> The commands below call `craftsman-path`, which prints an absolute path
+> inside this installation. The plugin's `bin/` is on PATH in the Claude Code
+> Bash tool; on a host where it is not, call it by its full path
+> (`<plugin root>/bin/craftsman-path`). Do not use `${CLAUDE_PLUGIN_ROOT}` in a
+> skill body: a skill is text handed to a model, the host expands nothing there,
+> and Claude Code does not export that variable to the Bash tool.
+
 ## Outcome Contract
 
 - **Outcome**: a diagnostic of the plugin installation and runtime, with each failing check tied to a fix.
@@ -20,10 +28,10 @@ Run a full health check of your AI Craftsman Superpowers installation.
 1. Run the healthcheck script using the Bash tool:
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/config.sh" && \
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/pack-loader.sh" && \
+source "$(craftsman-path hooks/lib/config.sh)" && \
+source "$(craftsman-path hooks/lib/pack-loader.sh)" && \
 pack_loader_init 2>/dev/null && \
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/healthcheck.sh" && \
+source "$(craftsman-path hooks/lib/healthcheck.sh)" && \
 hc_json
 ```
 

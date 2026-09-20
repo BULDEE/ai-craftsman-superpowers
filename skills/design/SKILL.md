@@ -10,6 +10,14 @@ disable-model-invocation: true
 
 # /craftsman:design - Senior Domain-Driven Design
 
+
+> The commands below call `craftsman-path`, which prints an absolute path
+> inside this installation. The plugin's `bin/` is on PATH in the Claude Code
+> Bash tool; on a host where it is not, call it by its full path
+> (`<plugin root>/bin/craftsman-path`). Do not use `${CLAUDE_PLUGIN_ROOT}` in a
+> skill body: a skill is text handed to a model, the host expands nothing there,
+> and Claude Code does not export that variable to the Bash tool.
+
 ## Outcome Contract
 
 - **Outcome**: a domain model (entity, value object, or aggregate) with an explicit persistence mapping and stated trade-offs.
@@ -65,7 +73,7 @@ Write your current design summary (Phase 1 output + intended type/boundaries) to
 ```bash
 DESIGN_TMP=$(mktemp /tmp/craftsman-design-XXXX.md)
 # Write your Phase 1 analysis + proposed model into $DESIGN_TMP first (Write tool), then:
-bash "${CLAUDE_PLUGIN_ROOT}/hooks/design-panel.sh" "$DESIGN_TMP"
+bash "$(craftsman-path hooks/design-panel.sh)" "$DESIGN_TMP"
 ```
 
 Three contradictors attack the design (YAGNI, invariants/boundaries, feasibility). If the panel is unavailable (agent hooks disabled), fall back to self-challenging with the same three lenses:

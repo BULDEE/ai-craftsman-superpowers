@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# =============================================================================
+# craftsman-path - print an absolute path inside THIS installation
+#
+# Usage: craftsman-path [relative/path]     (no argument prints the root)
+#
+# A skill's body is text handed to a model, not a hook command: the host does
+# not expand `${CLAUDE_PLUGIN_ROOT}` there, and Claude Code 2.1.278 does not
+# export that variable to the Bash tool at all (measured 2026-09-20: the tool
+# sees CLAUDECODE and the session id, nothing else). Five skills sourced
+# libraries through it, so `/craftsman:healthcheck` ran `source
+# "/hooks/lib/config.sh"`, failed, and the model improvised a diagnosis of a
+# path bug that did not exist.
+#
+# This command resolves the installation from its own location, which is the
+# one thing always true, and never from ~/.claude (the wrapper written there
+# belongs to whichever host started last). The plugin's bin/ is on PATH in the
+# Claude Code Bash tool; on a host where it is not, call it by full path.
+# =============================================================================
+set -uo pipefail
+_self="${BASH_SOURCE[0]}"
+while [[ -L "$_self" ]]; do
+    _target=$(readlink "$_self")
+    [[ "$_target" == /* ]] && _self="$_target" || _self="$(dirname "$_self")/$_target"
+done
+ROOT="$(cd "$(dirname "$_self")/.." && pwd)"
+if [[ $# -eq 0 ]]; then
+    printf '%s\n' "$ROOT"
+else
+    printf '%s\n' "${ROOT%/}/${1#/}"
+fi
