@@ -124,7 +124,12 @@ fi
 # their libraries through that variable, so /craftsman:healthcheck ran
 # `source "/hooks/lib/config.sh"` and the model improvised a diagnosis.
 ENV_IN_SKILLS=$(grep -ln 'CLAUDE_PLUGIN_ROOT}' "$ROOT_DIR"/skills/*/SKILL.md 2>/dev/null \
-    | while IFS= read -r f; do grep -q 'Do not use `${CLAUDE_PLUGIN_ROOT}`' "$f" || basename "$(dirname "$f")"; done)
+    | while IFS= read -r f; do
+        # the prohibition is prose and wraps where it wraps: the check reads
+        # the file as one line so a reflow does not turn it into a failure
+        sed 's/^>[[:space:]]*//' "$f" | tr '\n' ' ' | tr -s ' ' \
+            | grep -q 'Do not use `${CLAUDE_PLUGIN_ROOT}` in a skill body' || basename "$(dirname "$f")"
+      done)
 if [[ -z "$ENV_IN_SKILLS" ]]; then
     log_pass "no skill body resolves the plugin through an environment variable the Bash tool does not set"
 else

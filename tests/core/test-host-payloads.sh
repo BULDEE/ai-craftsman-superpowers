@@ -108,20 +108,24 @@ else
     log_fail "host_detect" "apply_patch=$H1 bash=$H2 write=$H3 anonymous=$H4 missed:$H_MISS"
 fi
 
-# A host adds a field between two releases. `has("model")` was a Codex mark
-# read BEFORE the Claude Code ones, so a Claude Code payload that also carries
-# a model named codex, and the session banner then said its own events were
-# "NOT loaded by codex" (reported from a 2.1.278 session, 2026-09-20). The
-# marks Codex alone carries are its tool and its NULL transcript path; a
-# string transcript path or a prompt_id is Claude Code whatever else is in
-# the payload.
-H_MODEL=$(host_detect "$(host_fixture_with claude-code 2.1.272 session-start "$WORK" "d['model'] = dict(id='claude-opus-5')")")
-H_MODEL2=$(host_detect "$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$WORK" "d['model'] = 'claude-opus-5'")")
-H_CODEX_STILL=$(host_detect "$(host_fixture codex 0.154.0 session-start "$WORK")")
-if [[ "$H_MODEL" == claude-code && "$H_MODEL2" == claude-code && "$H_CODEX_STILL" == codex ]]; then
-    log_pass "a Claude Code payload carrying a model field is still claude-code, and a Codex event is still codex"
+# Which field names which host is a measurement, and it moved: Codex 0.154.0
+# run through its app server sends a REAL transcript path (fixture
+# codex/0.154.0-app-server, captured 2026-09-20 by a Codex session qualifying
+# this plugin), where the project-hook capture of 2026-09-15 sent null. Read
+# by the string-transcript clause alone, that session called itself
+# claude-code and wrote Claude Code's bridge. What separates them on every
+# capture of both hosts: Codex carries `model` and never `prompt_id`; Claude
+# Code carries `prompt_id` on its tool events and `model` on none of them.
+H_CX_APP=$(host_detect "$(host_fixture codex 0.154.0-app-server session-start "$WORK")")
+H_CX_OLD=$(host_detect "$(host_fixture codex 0.154.0 session-start "$WORK")")
+H_CC_SS=$(host_detect "$(host_fixture claude-code 2.1.272 session-start "$WORK")")
+# and a Claude Code tool event that grows a `model` field stays Claude Code,
+# because it carries the prompt_id Codex never sends
+H_CC_MODEL=$(host_detect "$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$WORK" "d['model'] = 'claude-opus-5'")")
+if [[ "$H_CX_APP" == codex && "$H_CX_OLD" == codex && "$H_CC_SS" == claude-code && "$H_CC_MODEL" == claude-code ]]; then
+    log_pass "the app-server Codex payload (real transcript path) names codex, the project-hook one still does, and a Claude Code event carrying a model stays claude-code"
 else
-    log_fail "model field does not rename the host" "session-start=$H_MODEL write=$H_MODEL2 codex=$H_CODEX_STILL"
+    log_fail "host marks across both Codex capture modes" "app-server=$H_CX_APP project=$H_CX_OLD claude-session-start=$H_CC_SS claude-with-model=$H_CC_MODEL"
 fi
 
 # --- control: the Claude Code Write fixture is refused pre-write ------------

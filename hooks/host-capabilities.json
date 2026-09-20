@@ -36,13 +36,27 @@
         "PostCompact",
         "Stop",
         "SessionEnd",
-        "PermissionRequest"
+        "PermissionRequest",
+        "Interrupt"
       ],
       "exit_code_observable": false,
       "ask_supported": false,
       "wakes_on_exit_2": false,
       "skills_dir": ".agents/skills",
-      "source": "codex app-server generate-json-schema 0.154.0, definitions.ManagedHooksRequirements.properties; audit CR-117 hooks/list 14 of 17"
+      "source": "codex app-server generate-json-schema 0.154.0; the released event list (codex-rs/hooks/src/lib.rs, rust-v0.154.0) read by a Codex session qualifying this plugin 2026-09-20, which named Interrupt as a twelfth kind and PermissionRequest and SubagentStart as supported; audit CR-117 hooks/list 14 of 17",
+      "events_this_plugin_declares_and_codex_loads": [
+        "SessionStart",
+        "PreToolUse",
+        "PostToolUse",
+        "UserPromptSubmit",
+        "SubagentStop",
+        "PreCompact",
+        "PostCompact",
+        "Stop",
+        "SessionEnd"
+      ],
+      "trust": "installing and enabling a plugin does not trust its hooks: the 14 handlers loaded from this manifest were reported trustStatus=untrusted until reviewed (/hooks), or bypassed for one invocation with --dangerously-bypass-hook-trust",
+      "async_continuation": "a background hook cannot force a continuation: exit 2 and asyncRewake are Claude Code's, and unfinished background hooks are cancelled at shutdown. A verdict that must be acted on belongs in a synchronous gate"
     },
     "grok": {
       "version": "1.0.30",

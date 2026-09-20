@@ -241,6 +241,25 @@ else
 fi
 rm -rf "$LSP_HOME"
 
+# A skill runs in the host's shell tool, which carries no payload. In a Codex
+# session `craftsman-healthcheck` reported "unknown host" about Codex and
+# read the ~/.claude bridge, which belongs to another host (measured
+# 2026-09-20 by a Codex session qualifying this plugin).
+CX_DATA=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-cx-data.XXXXXX")
+CX_OUT=$(cd "$ROOT_DIR" && env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID -u CRAFTSMAN_SESSION_HOST \
+    CODEX_THREAD_ID=01a0bf07 CLAUDE_PLUGIN_ROOT="$ROOT_DIR" CLAUDE_PLUGIN_DATA="$CX_DATA" bash -c '
+        source hooks/lib/config.sh; source hooks/lib/healthcheck.sh
+        hc_check_host; hc_check_session_bridge
+        printf "%s|%s\n%s|%s\n" "${_HC_STATUSES[0]}" "${_HC_MESSAGES[0]}" "${_HC_STATUSES[1]}" "${_HC_MESSAGES[1]}"' 2>/dev/null)
+CX_HOST=$(printf '%s' "$CX_OUT" | sed -n 1p)
+CX_BRIDGE=$(printf '%s' "$CX_OUT" | sed -n 2p)
+if [[ "$CX_HOST" == ok\|codex* && "$CX_BRIDGE" == ok\|codex:* && "$CX_BRIDGE" == *"$CX_DATA"* ]]; then
+    log_pass "a Codex shell names codex from CODEX_THREAD_ID, and the bridge row points at this installation's data directory, not at ~/.claude"
+else
+    log_fail "healthcheck under a Codex shell" "host=[$(printf '%s' "$CX_HOST" | cut -c1-70)] bridge=[$(printf '%s' "$CX_BRIDGE" | cut -c1-80)]"
+fi
+rm -rf "$CX_DATA"
+
 # Declared is not loaded: hooks/host-capabilities.json says which events each
 # host loads (Codex 0.154.0: not TaskCompleted, PostToolUseFailure, FileChanged,
 # from its own generated schema), and a handler on an event the host does not

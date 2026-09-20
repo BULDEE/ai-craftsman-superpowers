@@ -32,6 +32,25 @@ finding blocks or only warns.
 
 ### Agent Hooks (v1.3.0+)
 
+## What the write gate does not see
+
+The gate judges the host's WRITE tools (`Write`, `Edit`, `apply_patch`,
+`write`, `search_replace`, `write_file`, `patch`). A file written by a shell
+command the model runs is not one of them: `printf '<?php ...' > src/Domain/Order.php`
+lands with every hook enabled and trusted (measured on Codex 0.154.0,
+2026-09-20, with the plugin installed natively). The Bash hook receives a
+command line, not a file, and refusing on a regex over command lines would
+block `sed` in a Makefile and miss `python3 write.py`. What catches those
+writes is the layer that reads the tree rather than the call: the post-write
+validation of files the session touched, `ci/craftsman-ci.sh` on the diff,
+and `pre-push-verify.sh` before the push.
+
+Delivery of a background verdict is the host's, and not every host has one.
+Claude Code wakes the session on exit 2 (`asyncRewake`). Codex cancels
+unfinished background hooks at shutdown and does not wake an idle session, so
+a verdict that must be acted on belongs in a synchronous gate there, never in
+an async hook that assumes a continuation.
+
 Agent hooks run a model for semantic analysis beyond regex patterns. The backend is a boundary chosen once per hook run by `semantic_backend` (`CRAFTSMAN_REVIEW_BACKEND`, then `review: backend:` in the global `.craft-config.yml`, else auto: `claude -p` when `claude` is on PATH, `codex exec` read-only and ephemeral when `codex` is, else none). The prompts, the shape filter on the reply and the telemetry are shared; `unavailable` and `failed` are recorded as such and never read as clean, and every `haiku_runs` row names the backend that answered (a review Claude answered from a Codex session is not a Claude Code session). Delivery is the host's: Claude Code wakes the session on exit 2 (asyncRewake); Codex delivers a background hook's output at its next safe point and does not wake an idle session. Agent hooks:
 
 | Event | Agent | Model | Purpose | Timeout |

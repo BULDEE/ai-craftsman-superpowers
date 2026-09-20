@@ -172,6 +172,36 @@ Nothing else is edited. `hook-env.*.json` lists variable NAMES only.
     aliases. `GROK_HOOK_EVENT` was read by the capture script; the rest is
     documented, not captured.
 
+### codex/0.154.0-app-server (2026-09-20)
+
+- Same `codex --version` (`codex-cli 0.154.0`), different path in: the plugin
+  installed NATIVELY (`codex plugin marketplace add <tree>` reads
+  `.claude-plugin/marketplace.json`, then `codex plugin add
+  craftsman@ai-craftsman-superpowers`), the session driven through Codex's
+  app server. Captured by a Codex session qualifying this plugin, on an
+  isolated `CODEX_HOME`.
+- Raw sha256 (first 16): session-start `4da00d171117937f`. One extra
+  redaction: `/Users/woprrr` becomes `__HOME__` inside the transcript path.
+- What differs from the project-hook capture of 2026-09-15, and is
+  load-bearing: `transcript_path` is a REAL path
+  (`<codex home>/sessions/2026/09/20/rollout-<ts>-<id>.jsonl`), not null, and
+  `model` reads `gpt-5.6-sol`. A detection that read a string transcript path
+  as Claude Code's mark called this session claude-code, and it then wrote
+  Claude Code's bridge under `~/.claude`.
+- Also measured in that session, and recorded in
+  `hooks/host-capabilities.json`: installing and enabling the plugin does NOT
+  trust its hooks (14 handlers `trustStatus=untrusted` until reviewed);
+  Codex's hook runtime distinguishes `Blocked` (exit 2 with stderr) from
+  `Failed`, and reads stderr before stdout JSON; unfinished background hooks
+  are cancelled at shutdown, so no async hook can force a continuation; the
+  shell `tool_response` is still the bare output string with no exit code,
+  while Codex's own `commandExecution` events (not visible to a hook) carry
+  `exitCode`.
+- Not ours, measured all the same: a file written by a shell command
+  (`printf > src/Domain/Order.php`) lands with every hook enabled and
+  trusted. The write gate judges write TOOLS; `docs/reference/hooks.md` says
+  so.
+
 ## Not captured (open)
 
 - A Codex PLUGIN-bundled hook's environment (only a project hook was run).

@@ -137,30 +137,39 @@ hc_check_agent_teams() {
     fi
 }
 
+# The bridge is Claude Code's: its skills run in a Bash tool that carries no
+# plugin data directory, so session-start.sh writes the path there for them.
+# Another host has no such file and must not be judged by it: a Codex session
+# read this row as a bridge into the wrong home (measured 2026-09-20). There,
+# what matters is that this installation has a data directory it can write.
+# On a host that is not Claude Code, what matters is that this installation
+# has a data directory it can write; the ~/.claude bridge belongs to another
+# host and judging Codex by it reported a bridge into the wrong home
+# (measured 2026-09-20).
+_hc_bridge_elsewhere() {
+    local host="$1" data="${CLAUDE_PLUGIN_DATA:-${PLUGIN_DATA:-}}"
+    if [[ -z "$data" ]]; then
+        _hc_record "session-bridge" "warn" "${host}: no plugin data directory in this process; session state falls back to the shared file"
+    elif [[ -d "$data" && -w "$data" ]]; then
+        _hc_record "session-bridge" "ok" "${host}: session state under ${data} (the ~/.claude bridge is Claude Code's and is not written here)"
+    else
+        _hc_record "session-bridge" "error" "${host}: plugin data directory ${data} is not writable"
+    fi
+}
+
+# The bridge is Claude Code's: its skills run in a Bash tool that carries no
+# plugin data directory, so session-start.sh writes the path there for them.
 hc_check_session_bridge() {
-    local bridge="${HOME}/.claude/craftsman-session-state-path"
-
-    if [[ ! -f "$bridge" ]]; then
-        _hc_record "session-bridge" "warn" "missing - restart session to create"
+    local bridge="${HOME}/.claude/craftsman-session-state-path" host="${CRAFTSMAN_SESSION_HOST:-}" target
+    [[ -z "$host" ]] && type host_detect >/dev/null 2>&1 && host=$(host_detect "")
+    if [[ "$host" != "claude-code" && "$host" != "unknown" ]]; then
+        _hc_bridge_elsewhere "$host"
         return
     fi
-
-    local target
+    [[ -f "$bridge" ]] || { _hc_record "session-bridge" "warn" "missing - restart session to create"; return; }
     target=$(< "$bridge")
-
-    if [[ -z "$target" ]]; then
-        _hc_record "session-bridge" "error" "empty - restart session to fix"
-        return
-    fi
-
-    local target_dir
-    target_dir=$(dirname "$target")
-
-    if [[ ! -d "$target_dir" ]]; then
-        _hc_record "session-bridge" "warn" "target dir missing: ${target_dir}"
-        return
-    fi
-
+    [[ -n "$target" ]] || { _hc_record "session-bridge" "error" "empty - restart session to fix"; return; }
+    [[ -d "$(dirname "$target")" ]] || { _hc_record "session-bridge" "warn" "target dir missing: $(dirname "$target")"; return; }
     _hc_record "session-bridge" "ok" "$target"
 }
 

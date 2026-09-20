@@ -21,30 +21,33 @@
 # =============================================================================
 
 # The payload's own marks, in the order a stronger mark beats a weaker one.
+#
+# Measured on every captured event of each host (tests/fixtures/hosts):
+# `model` is Codex's mark and `prompt_id` is Claude Code's. Codex sends
+# `model` and never `prompt_id`; Claude Code sends `prompt_id` on its tool
+# events and `model` on none of them. Both halves are needed, because
+# neither alone holds: a Codex session run through its app server sends a
+# REAL transcript path (fixture codex/0.154.0-app-server) where a project
+# hook of the same version sent null, so the string-transcript clause called
+# it claude-code and it wrote Claude Code's bridge (measured 2026-09-20);
+# and a host may grow a `model` field between two releases, which a
+# `model`-first rule would read as a change of host.
+#
+# An adapter that translated the payload names the host itself
+# (adapters/copilot/translate.py). Grok 1.0.30 (captured) sends every key in
+# both cases plus `workspaceRoot` and a lowercase `hookEventName`; it also
+# carries a `timestamp`, so it was read as Copilot until it was captured
+# (audit of 2026-09-15). A raw Copilot envelope carries a `timestamp` with
+# neither of those, which neither Claude Code nor Codex sends.
 _host_from_payload() {
-    # Measured on every captured event of each host (tests/fixtures/hosts):
-    # Codex carries `model` on every event but SessionEnd and a null
-    # `transcript_path` on all of them; Claude Code carries `prompt_id` on
-    # every event but SessionStart and a string `transcript_path` on all.
-    # Claude Code's marks are read BEFORE `model`, which is a field any host
-    # may add between two releases: read first, it renamed a 2.1.278 session
-    # codex, and the banner then said its own events were not loaded
-    # (2026-09-20). What Codex alone carries is its tool and a NULL
-    # transcript path.
-    # An adapter that translated the payload names the host itself
-    # (adapters/copilot/translate.py). Grok 1.0.30 (captured) sends every key
-    # in both cases plus `workspaceRoot` and a lowercase `hookEventName`
-    # (pre_tool_use); it also carries a `timestamp`, so it was read as Copilot
-    # until it was captured (audit of 2026-09-15). A raw Copilot envelope
-    # carries a `timestamp` with neither of those, which neither Claude Code
-    # nor Codex sends.
     printf '%s' "$1" | jq -r '
         if (.craftsman_host // "") != "" then .craftsman_host
         elif has("workspaceRoot") and has("hookEventName") then "grok"
         elif has("timestamp") and (has("toolName") or has("tool_name") or has("sessionId")) then "copilot"
         elif .tool_name == "apply_patch" then "codex"
+        elif has("model") and (has("prompt_id") | not) then "codex"
         elif has("prompt_id") or (.transcript_path | type) == "string" then "claude-code"
-        elif has("model") or (has("transcript_path") and .transcript_path == null) then "codex"
+        elif has("transcript_path") and .transcript_path == null then "codex"
         else "" end' 2>/dev/null
 }
 
@@ -52,8 +55,17 @@ _host_from_payload() {
 # GROK_SESSION_ID and GROK_HOOK_EVENT to every hook (its hooks guide) and, as
 # a Claude-compatible host, may inherit CLAUDECODE from a parent shell: its
 # own name is read first.
+# A skill has no payload: it runs in the host's shell tool and reads what
+# that shell was given. Codex names its own session there (CODEX_SESSION_ID
+# and CODEX_THREAD_ID, both equal to the payload's session_id, captured
+# 2026-09-15) and it is read BEFORE Claude Code's variables, because a Codex
+# session started from a Claude Code Bash tool inherits that parent's
+# CLAUDECODE and CLAUDE_CODE_SESSION_ID while carrying its own CODEX ones.
+# Without this, `craftsman-healthcheck` in a Codex session reported "unknown
+# host" about Codex (measured 2026-09-20).
 _host_from_environment() {
     [[ -n "${GROK_SESSION_ID:-}" || -n "${GROK_HOOK_EVENT:-}" ]] && { echo grok; return 0; }
+    [[ -n "${CODEX_SESSION_ID:-}" || -n "${CODEX_THREAD_ID:-}" ]] && { echo codex; return 0; }
     [[ "${CLAUDECODE:-}" == "1" || -n "${CLAUDE_CODE_SESSION_ID:-}" ]] && { echo claude-code; return 0; }
     [[ -n "${PLUGIN_ROOT:-}" && -z "${CLAUDE_PROJECT_DIR:-}" ]] && { echo codex; return 0; }
     echo unknown

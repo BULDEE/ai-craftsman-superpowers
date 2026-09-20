@@ -30,6 +30,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their provenance (`tests/fixtures/hosts/PROVENANCE.md`), which also records
   what each host was seen NOT to do.
 
+- Codex qualified by Codex (2026-09-20): a Codex session installed this
+  branch natively (`codex plugin marketplace add`, which reads the Claude
+  marketplace manifest, then `codex plugin add`) and reported what it found.
+  Four defects fixed, each with a witness seen red first. `model` without
+  `prompt_id` names Codex and a string transcript path no longer names Claude
+  Code: run through its app server, Codex 0.154.0 sends a REAL transcript
+  path where a project hook of the same version sent null, so that session
+  called itself claude-code and wrote Claude Code's bridge. A shell with
+  `CODEX_SESSION_ID` or `CODEX_THREAD_ID` names Codex, so
+  `craftsman-healthcheck` no longer reports "unknown host" about its own
+  host, and the session-bridge row is read per host instead of judging every
+  host by `~/.claude`. The rules store honours `TMPDIR` and the plugin data
+  directory before `/tmp`, which a sandboxed Codex could not write, turning
+  `mktemp: mkdtemp failed` into the refusal the model read. The Codex row of
+  the capability matrix records twelve event kinds (Interrupt included), that
+  installing and enabling a plugin does not trust its hooks, and that a
+  background hook cannot force a continuation there.
+  Two limits are now stated rather than implied (`docs/reference/hooks.md`,
+  README): the gate judges the host's write TOOLS, so a file written by a
+  shell command the model runs is caught by CI and the pre-push gate, not
+  before disk; and async delivery is the host's, which Codex does not offer.
+
 - Grok 1.0.30 as a host, measured (audit of 2026-09-15): the write gates
   judge its `write` and `search_replace` tools (they exited 0 in silence on
   the captured envelope), `host_detect` names `grok` from the envelope

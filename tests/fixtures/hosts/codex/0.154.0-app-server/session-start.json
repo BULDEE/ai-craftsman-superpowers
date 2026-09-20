@@ -1,0 +1,9 @@
+{
+  "session_id": "01a0bf07-3fc4-77e0-b9ed-df11990cf94b",
+  "transcript_path": "__HOME__/craftsman-qualif/selftest/codex-home/sessions/2026/09/20/rollout-2026-09-20T15-35-18-01a0bf07-3fc4-77e0-b9ed-df11990cf94b.jsonl",
+  "cwd": "__WORKSPACE__",
+  "hook_event_name": "SessionStart",
+  "model": "gpt-5.6-sol",
+  "permission_mode": "bypassPermissions",
+  "source": "startup"
+}
