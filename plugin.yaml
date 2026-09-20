@@ -1,5 +1,5 @@
 name: craftsman
-version: 4.10.3
+version: 4.11.0
 manifest_version: 2
 api_version: 1
 description: "Craftsman quality gate for coding agents. Refuses to conclude a turn that leaves architecture violations (layer imports, strict types, any, hardcoded secrets), surfaces advisory findings once, records every violation and fix so the agent's instincts improve, and answers /craftsman on demand."
