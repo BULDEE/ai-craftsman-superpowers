@@ -78,6 +78,7 @@ _gate_own_machinery() {
     case "$1" in
         */.claude/settings.json|*/.claude/settings.local.json) return 0 ;;
         */.codex/hooks.json|*/.codex/config.toml) return 0 ;;
+        */.grok/config.toml|*/.grok/settings.json|*/.grok/hooks/*.json) return 0 ;;
         */.github/hooks/*.json|*/.copilot/hooks/*|*/.github/copilot/settings.json|*/.github/copilot/settings.local.json) return 0 ;;
     esac
     [[ -n "${CLAUDE_PLUGIN_ROOT:-}" && "$1" == "${CLAUDE_PLUGIN_ROOT%/}/"* ]]
