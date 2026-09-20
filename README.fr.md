@@ -265,6 +265,12 @@ derrière ces commandes : `team-lead`, `architect` (sans Write/Edit),
 agents relecteurs spécifiques aux packs Symfony, React et AI/ML. Liste complète :
 [référence des agents](docs/reference/agents.md).
 
+Le paquet contient les 12 missions d'agents sous forme de fichiers ordinaires
+avant la première session. `scripts/native-manifests.py --check` compare les
+six copies des packs à leurs sources. Claude Code et Grok les chargent
+nativement ; la limite des rôles de plugins dans Codex est décrite dans la
+section d'installation ci-dessus.
+
 ## Moteur de règles
 
 Surchargez n'importe quelle règle par projet ou par répertoire, avec 3 niveaux

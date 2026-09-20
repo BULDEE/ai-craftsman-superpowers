@@ -492,6 +492,9 @@ _sync_symlink_type() {
         [[ ! -f "$src_file" ]] && continue
         local basename rel_path
         basename=$(basename "$src_file")
+        # Shipped agent copies are built and checked before installation.
+        # Keep regular files intact; only runtime-owned links are refreshed.
+        [[ -f "$target_dir/$basename" && ! -L "$target_dir/$basename" ]] && continue
         rel_path=$(_pack_relpath "$target_dir" "$src_file")
         ln -sf "$rel_path" "$target_dir/$basename"
     done

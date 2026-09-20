@@ -5,7 +5,8 @@ source "$ROOT/tests/lib/test-helpers.sh"
 python3 "$ROOT/scripts/native-manifests.py" --check
 assert_exit_code 'native manifests match their publisher metadata' 0 "$?"
 FIXTURE=$(mktemp -d)
-mkdir -p "$FIXTURE/.claude-plugin"
+mkdir -p "$FIXTURE/.claude-plugin" "$FIXTURE/packs/example/agents"
+printf '# Native agent\n' > "$FIXTURE/packs/example/agents/probe.md"
 cp "$ROOT/.claude-plugin/"*.json "$FIXTURE/.claude-plugin/"
 python3 "$ROOT/scripts/native-manifests.py" --root "$FIXTURE" >/dev/null
 printf '{"name":"wrong"}\n' > "$FIXTURE/plugin.json"
@@ -14,6 +15,16 @@ assert_exit_code 'guard rejects a stale native manifest' 1 "$?"
 python3 "$ROOT/scripts/native-manifests.py" --root "$FIXTURE" >/dev/null
 python3 "$ROOT/scripts/native-manifests.py" --root "$FIXTURE" --check >/dev/null
 assert_exit_code 'regeneration restores the native manifest' 0 "$?"
+printf '# Stale agent\n' > "$FIXTURE/agents/probe.md"
+python3 "$ROOT/scripts/native-manifests.py" --root "$FIXTURE" --check >/dev/null
+assert_exit_code 'guard rejects a stale bundled agent' 1 "$?"
+rm "$FIXTURE/agents/probe.md"
+ln -s ../packs/example/agents/probe.md "$FIXTURE/agents/probe.md"
+python3 "$ROOT/scripts/native-manifests.py" --root "$FIXTURE" --check >/dev/null
+assert_exit_code 'guard rejects a bundled agent symlink' 1 "$?"
+python3 "$ROOT/scripts/native-manifests.py" --root "$FIXTURE" >/dev/null
+python3 "$ROOT/scripts/native-manifests.py" --root "$FIXTURE" --check >/dev/null
+assert_exit_code 'regeneration restores an ordinary bundled agent' 0 "$?"
 mkdir -p "$FIXTURE/bin" "$FIXTURE/ci" "$FIXTURE/tools"
 cp "$ROOT/bin/craftsman-grok-install" "$FIXTURE/bin/"
 printf '#!/bin/sh\nprintf "grok %%s\\n" "$*" >> "$CALL_LOG"\n' > "$FIXTURE/tools/grok"

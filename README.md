@@ -260,6 +260,11 @@ vs `event-sourced` for entities, for instance). Agents that back these commands:
 `legacy-surgeon`, `ui-ux-director`, plus pack-specific reviewers for Symfony,
 React and AI/ML. Full roster: [Agents Reference](docs/reference/agents.md).
 
+The package ships all 12 agent missions as ordinary files before the first
+session. `scripts/native-manifests.py --check` checks the six pack copies
+against their sources. Claude Code and Grok load these natively; Codex's
+plugin role limitation is described in the installation section above.
+
 ## Rules Engine
 
 Override any rule per-project or per-directory with 3-level config inheritance:

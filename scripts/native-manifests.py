@@ -45,6 +45,17 @@ def main() -> int:
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content)
+    for source in sorted(args.root.glob('packs/*/agents/*.md')):
+        target = args.root / 'agents' / source.name
+        content = source.read_bytes()
+        if args.check:
+            if target.is_symlink() or not target.is_file() or target.read_bytes() != content:
+                drift.append(str(target.relative_to(args.root)))
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.is_symlink():
+            target.unlink()
+        target.write_bytes(content)
     if drift:
         print('Native manifest drift: ' + ', '.join(drift))
         return 1

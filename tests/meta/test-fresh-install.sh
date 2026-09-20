@@ -39,6 +39,13 @@ INSTALL="$WORK/install/craftsman-9.9.9"
 [[ -d "$INSTALL/hooks" ]] || { log_fail "extract" "no hooks/ in the archive"; test_summary; }
 
 # inventory
+AGENTS=$(find "$INSTALL/agents" -maxdepth 1 -name '*.md' -type f | wc -l | tr -d ' ')
+AGENT_LINKS=$(find "$INSTALL/agents" -maxdepth 1 -name '*.md' -type l | wc -l | tr -d ' ')
+if [[ "$AGENTS" -ge 12 && "$AGENT_LINKS" == "0" ]]; then
+    log_pass "the archive ships $AGENTS ordinary agents before the first session"
+else
+    log_fail "native agent inventory" "regular=$AGENTS symlinks=$AGENT_LINKS"
+fi
 SKILLS=$(find "$INSTALL/skills" -mindepth 2 -maxdepth 2 -name SKILL.md -type f | wc -l | tr -d ' ')
 LINKS=$(find "$INSTALL/skills" -name SKILL.md -type l | wc -l | tr -d ' ')
 EXPECTED=$(find "$ROOT_DIR/skills" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')
@@ -114,14 +121,11 @@ fi
 # the exports run from the installed tree
 ( cd "$PROJ" && printf '# Team\n\nWITNESS keep\n' > AGENTS.md && bash "$INSTALL/ci/craftsman-ci.sh" export --target agents-md >/dev/null 2>&1 && bash "$INSTALL/ci/craftsman-ci.sh" export --target codex-agents >/dev/null 2>&1 )
 ROLES=$(ls "$PROJ/.codex/agents/"craftsman-*.toml 2>/dev/null | wc -l | tr -d ' ')
-PACK_AGENTS=$(ls "$INSTALL"/packs/*/agents/*.md 2>/dev/null | wc -l | tr -d ' ')
-CORE_AGENTS=$(find "$INSTALL/agents" -maxdepth 1 -name "*.md" -type f | wc -l | tr -d ' ')
-# F8 (challenge review): a fresh tree has no pack symlinks under agents/, and
-# the export produced the core six only; the packs' agents come from the packs.
-if grep -q "WITNESS keep" "$PROJ/AGENTS.md" && grep -q "craftsman:doctrine:begin" "$PROJ/AGENTS.md" && [[ "$ROLES" == "$((CORE_AGENTS + PACK_AGENTS))" && "$ROLES" -ge 12 ]]; then
-    log_pass "the doctrine block and $ROLES Codex roles (core $CORE_AGENTS + packs $PACK_AGENTS) export from the installed tree with no prior sync, the team's AGENTS.md text kept"
+UNIQUE_AGENTS=$(find "$INSTALL/agents" "$INSTALL/packs" -type f -path '*/agents/*.md' -exec basename {} \; | sort -u | wc -l | tr -d ' ')
+if grep -q "WITNESS keep" "$PROJ/AGENTS.md" && grep -q "craftsman:doctrine:begin" "$PROJ/AGENTS.md" && [[ "$ROLES" == "$UNIQUE_AGENTS" && "$ROLES" -ge 12 ]]; then
+    log_pass "the doctrine block and $ROLES unique Codex roles export from the installed tree with no prior sync, the team's AGENTS.md text kept"
 else
-    log_fail "installed exports" "roles=$ROLES core=$CORE_AGENTS packs=$PACK_AGENTS $(head -3 "$PROJ/AGENTS.md" | tr '\n' '|')"
+    log_fail "installed exports" "roles=$ROLES expected=$UNIQUE_AGENTS $(head -3 "$PROJ/AGENTS.md" | tr '\n' '|')"
 fi
 # F7 (challenge review): the role's bootstrap named ${CLAUDE_PLUGIN_ROOT}, a
 # variable a Codex role's shell does not have; exit 127 on the first command.
