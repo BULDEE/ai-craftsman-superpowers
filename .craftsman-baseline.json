@@ -140,7 +140,7 @@
 {"complexity":6,"fan_out":0,"file_lines":231,"ignores":0,"instrument":2,"max_fn_lines":21,"path":"packs/symfony/static-analysis/phpstan.sh"},
 {"complexity":5,"fan_out":0,"file_lines":185,"ignores":0,"instrument":2,"max_fn_lines":29,"path":"scripts/bump-version.sh","reason":"plugin.yaml joins the tracked version files, one more bump_file block"},
 {"complexity":5,"fan_out":0,"file_lines":198,"ignores":0,"instrument":2,"max_fn_lines":22,"path":"scripts/consolidate-metrics.sh"},
-{"complexity":9,"fan_out":4,"file_lines":88,"ignores":0,"instrument":2,"max_fn_lines":88,"path":"scripts/export-hermes-skills.sh"},
+{"complexity":9,"fan_out":4,"file_lines":95,"ignores":0,"instrument":2,"max_fn_lines":95,"path":"scripts/export-hermes-skills.sh","reason":"the Claude-specific note about host variables is dropped from the exported skills, and craftsman-path resolves to the Hermes install path"},
 {"complexity":1,"fan_out":0,"file_lines":53,"ignores":0,"instrument":2,"max_fn_lines":7,"path":"scripts/release-build.sh"},
 {"complexity":0,"fan_out":0,"file_lines":80,"ignores":0,"instrument":2,"max_fn_lines":3,"path":"scripts/release-guard.sh"},
 {"complexity":5,"fan_out":0,"file_lines":214,"ignores":0,"instrument":2,"max_fn_lines":19,"path":"scripts/validate-pack.sh"},
