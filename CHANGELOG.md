@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.11.0] - 2026-09-20
+
+### Changed
+
+- The verification evidence is revoked whenever a failing command ENDS on a
+  test runner, not only when the runner is the whole command. A session that
+  ran `echo 1 > pytest.rc && ./bin/pytest -q`, saw it exit 1 on a red suite,
+  and kept `verified` true was measured on 2026-09-20; `verified` gates a
+  push, so doubt revokes it. The session is still woken with "REGRESSED" only
+  when the failure can be attributed to the runner alone; a compound failure
+  revokes quietly and says how to grant the evidence again. If your habit is
+  to chain a command before your test runner, expect to re-run the runner on
+  its own to restore the evidence.
+
 ### Added
 
 - Host adapters, one core (ADR-0029, campaign of 2026-09-15). The write gates
