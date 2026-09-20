@@ -259,33 +259,51 @@ def _safe_rule(rule: str) -> str:
 # it, but nothing stopped the directory itself from pointing anywhere writable.
 # A generated skill only means something inside the project or the user's own
 # Claude configuration; anywhere else is a write primitive, not a feature.
+# The directories a host reads project and user skills from, and from nowhere
+# deeper. Claude Code: .claude/skills/<name>/SKILL.md and ~/.claude/skills/,
+# measured with `claude -p --debug` (two project skills on disk, one at that
+# depth and one under .claude/skills/craftsman-learned/, loaded as
+# `project: 1`; four releases of approvals went to the second place). Codex:
+# .agents/skills/<name>/SKILL.md and ~/.agents/skills/, documented at
+# learn.chatgpt.com/docs/build-skills and listed by `codex debug prompt-input`
+# on 0.154.0; an approval into .claude/skills on a Codex machine was a file
+# Codex never loaded (audit CR-117, C5). A destination the consumer will never
+# read is refused, not written.
+HOST_SKILL_PARENTS = (".claude", ".agents")
+
+
 def _resolve_skills_dir(skills_dir: str) -> Path:
     target = Path(skills_dir).expanduser().resolve()
-    allowed = [Path.cwd().resolve()]
-    home = Path.home().resolve()
-    allowed.append(home / ".claude")
-    for root in allowed:
-        if target == root or root in target.parents:
-            break
-    else:
-        print(f"error: refusing to write skills outside the project or ~/.claude: {target}",
+    roots = (Path.cwd().resolve(), Path.home().resolve())
+    allowed = [root / parent / "skills" for root in roots for parent in HOST_SKILL_PARENTS]
+    # Exactly these four directories, not "anything named .claude/skills": a
+    # nested project/x/.agents/skills passed the name test and is a place no
+    # host reads (review of ff99dd5, F4).
+    if target not in allowed:
+        print("error: a host loads a skill from .claude/skills/<name>/SKILL.md (Claude Code) "
+              "or .agents/skills/<name>/SKILL.md (Codex), at the project root or under $HOME, "
+              f"never from {target}: approve into \"$PWD/.claude/skills\" or \"$PWD/.agents/skills\"",
               file=sys.stderr)
-        sys.exit(1)
-    # Claude Code loads a project skill from .claude/skills/<name>/SKILL.md and
-    # a user skill from ~/.claude/skills/<name>/SKILL.md, and from nowhere
-    # deeper: measured with `claude -p --debug`, two project skills on disk,
-    # one at that depth and one under .claude/skills/craftsman-learned/, loaded
-    # as `project: 1`. Four releases of approvals went to the second place.
-    # A destination the consumer will never read is refused, not written.
-    if target.name != "skills" or target.parent.name != ".claude":
-        print("error: Claude Code loads a skill from .claude/skills/<name>/SKILL.md "
-              f"(or ~/.claude/skills/<name>/), never from {target}: approve into "
-              "\"$PWD/.claude/skills\"", file=sys.stderr)
         sys.exit(1)
     return target
 
 
+def _own_skill_dir(skills_dir: Path, name: str) -> Path:
+    """The skill's directory, created, and neither it nor its SKILL.md a
+    symlink: the directory under the validated root could be a link placed
+    there beforehand, and the write followed it out of the project
+    (independent verification, 2026-09-15)."""
+    skill_dir = skills_dir / name
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    target = skill_dir / "SKILL.md"
+    if skill_dir.is_symlink() or target.is_symlink() or skill_dir.resolve() != skill_dir:
+        print(f"error: {skill_dir} is a symlink; refusing to write a skill through it", file=sys.stderr)
+        sys.exit(1)
+    return skill_dir
+
+
 SKILL_TEMPLATE = """---
+name: learned-{slug}
 description: Learned instinct for rule {rule}. This project corrected {rule} {occurrences} times across {distinct_files} files; apply the fix pattern proactively when writing matching code.
 user-invocable: false
 ---
@@ -320,6 +338,7 @@ def _render_skill(rule: str, summary: str, occurrences: int, distinct_files: int
     ) or "- (contexts not recorded)"
     return SKILL_TEMPLATE.format(
         rule=rule,
+        slug=_slugify(rule),
         occurrences=occurrences,
         distinct_files=distinct_files,
         confidence=confidence,
@@ -355,8 +374,7 @@ def approve(conn: sqlite3.Connection, instinct_id: int, skills_dir: str) -> None
         conn, instinct_id
     )
     contexts = _evidence_contexts(conn, project_hash, rule)
-    skill_dir = _resolve_skills_dir(skills_dir) / f"learned-{_slugify(rule)}"
-    skill_dir.mkdir(parents=True, exist_ok=True)
+    skill_dir = _own_skill_dir(_resolve_skills_dir(skills_dir), f"learned-{_slugify(rule)}")
     content = _render_skill(rule, summary, occurrences, distinct_files, confidence, contexts)
     (skill_dir / "SKILL.md").write_text(content)
     conn.execute(
@@ -381,6 +399,7 @@ def reject(conn: sqlite3.Connection, instinct_id: int) -> None:
 
 
 GLOBAL_TEMPLATE = """---
+name: learned-global-{slug}
 description: Cross-project learned instinct for rule {rule}. Confirmed in {project_count} independent projects; apply the fix pattern proactively when writing matching code.
 user-invocable: false
 ---
@@ -429,10 +448,10 @@ def _cmd_promote(conn: sqlite3.Connection, args: list[str]) -> None:
         sys.exit(1)
     _rule, projects, occurrences, summary = match[0]
     rule = _safe_rule(rule)
-    skill_dir = _resolve_skills_dir(skills_dir) / f"learned-global-{_slugify(rule)}"
-    skill_dir.mkdir(parents=True, exist_ok=True)
+    skill_dir = _own_skill_dir(_resolve_skills_dir(skills_dir), f"learned-global-{_slugify(rule)}")
     (skill_dir / "SKILL.md").write_text(GLOBAL_TEMPLATE.format(
         rule=rule,
+        slug=_slugify(rule),
         project_count=projects,
         occurrences=occurrences,
         pattern=_untrusted(summary) or f"See the {rule} rule definition in the active pack validators.",

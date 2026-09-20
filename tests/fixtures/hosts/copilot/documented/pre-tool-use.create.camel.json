@@ -1,0 +1,7 @@
+{
+  "sessionId": "copilot-doc-2",
+  "timestamp": 1757894400,
+  "cwd": "__WORKSPACE__",
+  "toolName": "create",
+  "toolArgs": "{\"path\": \"__WORKSPACE__/src/Domain/Order.php\", \"file_text\": \"<?php\\ndeclare(strict_types=1);\\nnamespace App\\\\Domain;\\nuse App\\\\Infrastructure\\\\Persistence\\\\DoctrineOrderRepository;\\nclass Order\\n{\\n}\\n\"}"
+}

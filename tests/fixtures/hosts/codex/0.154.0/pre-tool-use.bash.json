@@ -1,0 +1,14 @@
+{
+  "session_id": "01a0a47a-55c7-7243-9eee-16b3154dc245",
+  "turn_id": "01a0a47a-568a-7943-9bb7-1ff11778599a",
+  "transcript_path": null,
+  "cwd": "__WORKSPACE__",
+  "hook_event_name": "PreToolUse",
+  "model": "gpt-6-astra",
+  "permission_mode": "default",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "cat Existing.php"
+  },
+  "tool_use_id": "exec-f5014e49-a661-4497-a2da-078beaa80232"
+}

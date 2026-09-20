@@ -134,6 +134,31 @@ def handle_append(arguments: list[str]) -> None:
     write_state_atomically(state_path, state)
 
 
+def handle_list_upsert(arguments: list[str]) -> None:
+    """list-upsert <file> <list_key> <field> <item json> [max]: replace the entry
+    whose <field> equals the item's, else append; the list is capped at max."""
+    state_path, list_key, field, item = arguments[0], arguments[1], arguments[2], json.loads(arguments[3])
+    max_entries = int(arguments[4]) if len(arguments) > 4 else None
+    state = read_state(state_path)
+    entries = state.setdefault(list_key, [])
+    entries[:] = [entry for entry in entries if not (isinstance(entry, dict) and entry.get(field) == item.get(field))]
+    entries.append(item)
+    if max_entries and len(entries) > max_entries:
+        entries[:] = entries[-max_entries:]
+    write_state_atomically(state_path, state)
+
+
+def handle_list_remove(arguments: list[str]) -> None:
+    """list-remove <file> <list_key> <field> <value>: drop every entry whose <field> equals <value>."""
+    state_path, list_key, field, value = arguments[0], arguments[1], arguments[2], arguments[3]
+    state = read_state(state_path)
+    entries = state.get(list_key)
+    if not isinstance(entries, list):
+        return
+    entries[:] = [entry for entry in entries if not (isinstance(entry, dict) and entry.get(field) == value)]
+    write_state_atomically(state_path, state)
+
+
 def handle_increment(arguments: list[str]) -> None:
     state_path, counter_key = arguments[0], arguments[1]
     state = read_state(state_path)
@@ -289,35 +314,54 @@ def handle_read_session_metrics(arguments: list[str]) -> None:
     print(','.join(agent_types))
 
 
-def _resolve_session_state_path() -> str:
-    """Resolve session-state.json path via the bridge file written by session-start.sh.
-
-    The bridge file is the single source of truth, ensuring skills running in the
-    Bash tool (without CLAUDE_PLUGIN_DATA) use the same path as hooks.
-    """
+def _shared_state_path() -> str:
+    """The shared session-state.json, from the bridge file session-start.sh
+    writes for skills in the Bash tool (without CLAUDE_PLUGIN_DATA), else the
+    default data directory."""
     bridge = os.path.expanduser('~/.claude/craftsman-session-state-path')
     if os.path.isfile(bridge):
         with open(bridge) as bridge_file:
-            shared = bridge_file.read().strip()
-    else:
-        shared = os.path.join(
-            os.environ.get('CLAUDE_PLUGIN_DATA', os.path.expanduser('~/.claude/plugins/data/craftsman')),
-            'session-state.json',
-        )
-    # The bridge names the shared file; this session's own sits beside it,
-    # named by CLAUDE_CODE_SESSION_ID, which Claude Code sets in Bash tool
-    # subprocesses as in hooks (see hooks/lib/session-files.sh).
-    session_id = re.sub(r'[^A-Za-z0-9_-]', '', os.environ.get('CLAUDE_CODE_SESSION_ID', ''))[:64]
+            return bridge_file.read().strip()
+    return os.path.join(
+        os.environ.get('CLAUDE_PLUGIN_DATA', os.path.expanduser('~/.claude/plugins/data/craftsman')),
+        'session-state.json',
+    )
+
+
+def _environment_session_id() -> str:
+    """The id the hook bound from its payload (CRAFTSMAN_SESSION_ID, see
+    hooks/lib/session-files.sh) or, for a skill in a host's Bash tool, the
+    INNERMOST host's variable: CODEX_SESSION_ID (measured equal to the hook
+    payload's session_id on codex-cli 0.154.0) before CLAUDE_CODE_SESSION_ID,
+    because a Codex session started from a Claude Code Bash tool inherits the
+    Claude one and the verify wrapper then granted the evidence to the parent
+    Claude session (challenge review of e2acf22, F5)."""
+    raw = (os.environ.get('CRAFTSMAN_SESSION_ID')
+           or os.environ.get('CODEX_SESSION_ID')
+           or os.environ.get('CLAUDE_CODE_SESSION_ID', ''))
+    return re.sub(r'[^A-Za-z0-9_-]', '', raw)[:64]
+
+
+def _resolve_session_state_path() -> str:
+    """This session's state file: the shared file's directory, the bound id."""
+    shared = _shared_state_path()
+    session_id = _environment_session_id()
     if not session_id:
         return shared
     return os.path.join(os.path.dirname(shared), f'session-state-{session_id}.json')
 
 
 def handle_set_verified(arguments: list[str]) -> None:
-    """Set verified=true in session state. Resolves path via bridge file automatically."""
+    """Set verified=true in session state.
+
+    The path is the argument when given (the hook already resolved this
+    session's file from the payload it received); otherwise it is resolved
+    from the bridge file and the environment, for skills running in the Bash
+    tool.
+    """
     import datetime
 
-    state_path = _resolve_session_state_path()
+    state_path = arguments[0] if arguments else _resolve_session_state_path()
     state = read_state(state_path)
     state['verified'] = True
     state['verified_at'] = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -331,6 +375,8 @@ COMMAND_HANDLERS = {
     'write': handle_write,
     'merge': handle_merge,
     'append': handle_append,
+    'list-upsert': handle_list_upsert,
+    'list-remove': handle_list_remove,
     'increment': handle_increment,
     'check-flag': handle_check_flag,
     'record-violation': handle_record_violation,

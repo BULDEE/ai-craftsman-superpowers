@@ -18,7 +18,6 @@ Legacy code rescue - audit hotspots, cover with characterization tests, break de
 
 
 # the craftsman-legacy skill - Legacy Code Rescue
-
 ## Outcome Contract
 
 - **Outcome**: control regained over untested code: a prioritized hotspot backlog, characterization tests, or a strangler-fig migration plan.

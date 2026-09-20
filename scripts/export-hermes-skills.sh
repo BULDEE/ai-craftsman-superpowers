@@ -56,6 +56,13 @@ for ref in dir_refs:
     body = body.replace(ref, f"references/ ({prefix}-*) ")
 
 body = re.sub(r"/craftsman:([a-z-]+)", r"the craftsman-\1 skill", body)
+# The note that tells a Claude Code skill not to reach for a host variable is
+# about Claude Code, and substituting a Hermes path into it produced a
+# sentence that named the wrong host and contradicted itself. It is dropped
+# here, with the paragraph it belongs to.
+body = re.sub(r"(?m)\n*^> The (?:commands below call|diagnostic is one command)[\s\S]*?\n\n", "\n", body)
+body = re.sub(r"\$\(craftsman-path ([^)]*)\)", r"~/.hermes/plugins/craftsman/\1", body)
+body = body.replace("craftsman-healthcheck", "~/.hermes/plugins/craftsman/bin/craftsman-healthcheck")
 body = body.replace("${CLAUDE_PLUGIN_ROOT}", "~/.hermes/plugins/craftsman")
 
 header = (

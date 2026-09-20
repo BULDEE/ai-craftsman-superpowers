@@ -716,4 +716,20 @@ OPT_PROJECT="$( unset CLAUDE_PLUGIN_OPTION_strictness; printf 'strictness: moder
 assert_eq "and the project file outranks the option, as in config.sh" "moderate" "$OPT_PROJECT"
 rm -rf "$OPT_GLOBAL"
 
+
+# A hook runs where its host puts it, and /tmp is not always writable there:
+# a Codex session under an OS sandbox got `mktemp: mkdtemp failed on
+# /tmp/craftsman-rules-XXXXXX: Operation not permitted`, and that message
+# became the refusal the model read (2026-09-20).
+RS_TMP=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-rules-tmpdir.XXXXXX")
+RS_OUT=$(env -i HOME="$HOME" PATH="$PATH" TMPDIR="$RS_TMP" bash -c "
+    source '$ROOT_DIR/hooks/lib/rules-engine.sh' 2>/dev/null
+    _rules_ensure_store && printf '%s' \"\$_RULES_STORE\"")
+if [[ "$RS_OUT" == "$RS_TMP"/craftsman-rules-* ]]; then
+    log_pass "the rules store is made under TMPDIR, not under a hardcoded /tmp"
+else
+    log_fail "rules store honours TMPDIR" "store=$RS_OUT tmpdir=$RS_TMP"
+fi
+rm -rf "$RS_TMP"
+
 test_summary

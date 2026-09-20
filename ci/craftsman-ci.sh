@@ -128,9 +128,19 @@ fi
 if [[ "${1:-}" == "export" ]]; then
     shift
     EXPORT_TARGET="agents-md"
-    if [[ "${1:-}" == "--target" ]]; then
-        EXPORT_TARGET="${2:-agents-md}"
-    fi
+    EXPORT_INTO=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --target) EXPORT_TARGET="${2:-agents-md}"; shift 2 ;;
+            # codex-agents only: where the role files go. The default is the
+            # project's .codex/agents/ (documented); on codex-cli 0.154.0 only
+            # ~/.codex/agents/ was observed offered to spawn_agent, and this is
+            # how the roles reach it without a copy step.
+            --into) EXPORT_INTO="${2:-}"; shift 2 ;;
+            *) shift ;;
+        esac
+    done
+    export EXPORT_INTO
     # The doctrine is rendered FROM the rules engine, so it must be resolved
     # first: without it every rule falls back to its default severity and the
     # exported files would contradict what the gate actually enforces. Rule

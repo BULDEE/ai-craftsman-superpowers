@@ -131,10 +131,21 @@ _rules_reset_dir_cache() {
     fi
 }
 
+# A hook runs wherever its host puts it, and /tmp is not always writable
+# there: a Codex session qualifying this plugin under an OS sandbox got
+# `mktemp: mkdtemp failed on /tmp/craftsman-rules-XXXXXX: Operation not
+# permitted`, and that message became the refusal the model read
+# (2026-09-20). TMPDIR first, then the plugin's own data directory, then
+# /tmp; a store that cannot be made at all is reported, never silently empty.
 _rules_ensure_store() {
-    if [[ -z "$_RULES_STORE" ]]; then
-        _RULES_STORE=$(mktemp -d "/tmp/craftsman-rules-XXXXXX")
-    fi
+    local base
+    [[ -n "$_RULES_STORE" ]] && return 0
+    for base in "${TMPDIR:-}" "${CLAUDE_PLUGIN_DATA:-}" /tmp; do
+        [[ -n "$base" && -d "$base" && -w "$base" ]] || continue
+        _RULES_STORE=$(mktemp -d "${base%/}/craftsman-rules-XXXXXX" 2>/dev/null) && return 0
+    done
+    echo "craftsman: no writable directory for the rules store (tried TMPDIR, the plugin data directory and /tmp)" >&2
+    return 1
 }
 
 # ---------------------------------------------------------------------------

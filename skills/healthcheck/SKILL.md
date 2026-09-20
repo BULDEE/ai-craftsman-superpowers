@@ -7,6 +7,14 @@ disable-model-invocation: true
 
 # /craftsman:healthcheck - Plugin Diagnostic
 
+
+> The diagnostic is one command, `craftsman-healthcheck`. The plugin's `bin/`
+> is on PATH in the Claude Code Bash tool; on a host where it is not, call it
+> by its full path (`<plugin root>/bin/craftsman-healthcheck`). Do not use
+> `${CLAUDE_PLUGIN_ROOT}` in a skill body: a skill is text handed to a model,
+> the host expands nothing there, and Claude Code does not export that
+> variable to the Bash tool.
+
 ## Outcome Contract
 
 - **Outcome**: a diagnostic of the plugin installation and runtime, with each failing check tied to a fix.
@@ -17,20 +25,31 @@ Run a full health check of your AI Craftsman Superpowers installation.
 
 ## Process
 
-1. Run the healthcheck script using the Bash tool:
+1. Run this command with the Bash tool, exactly as written, as your FIRST
+   action:
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/config.sh" && \
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/pack-loader.sh" && \
-pack_loader_init 2>/dev/null && \
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/healthcheck.sh" && \
-hc_json
+craftsman-healthcheck
 ```
 
-2. Parse the JSON output and present each check with its status:
-   - `ok` → display with checkmark
-   - `warn` → display with warning and actionable message
-   - `error` → display with error and fix instructions
+   It prints the finished report: one line per check, `[ok]`, `[warn]` or
+   `[err]`, then the counts. Run it verbatim: do not source
+   libraries yourself, do not look for plugin files in the user's project
+   (this command lives in the installation and resolves its own paths), and
+   do not invent checks. If it is not found, the plugin's `bin/` is not on
+   PATH: call it by full path rather than replacing it with a diagnosis of
+   your own. Report a failure of this command as the finding it is.
+
+2. Show that output to the user as it came, every line of it. The command
+   already did the rendering; a diagnostic the assistant redraws is a
+   diagnostic the assistant can improve, and one that flatters the
+   installation is worse than none, because the user acts on it. Never raise
+   a `[warn]` or an `[err]` to ok, never head the report "ALL GREEN" while a
+   check is not ok, and never add a check the command did not print. Comment
+   BELOW the output, not inside it.
+
+   `craftsman-healthcheck --json` gives the same checks as an array when you
+   need to read them programmatically.
 
 3. Format as a clear diagnostic report:
 
@@ -40,7 +59,7 @@ hc_json
 │  [check name]     [status icon] [message]   │
 │  ...                                         │
 │                                              │
-│  Status: ALL GREEN / N issues found          │
+│  Status: N ok, M warnings, K errors          │
 ╰──────────────────────────────────────────────╯
 ```
 

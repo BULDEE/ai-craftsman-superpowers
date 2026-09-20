@@ -1,0 +1,13 @@
+{
+  "hook_event_name": "PreToolUse",
+  "session_id": "copilot-doc-3",
+  "timestamp": "2026-09-15T00:00:00Z",
+  "cwd": "__WORKSPACE__",
+  "tool_name": "str_replace_editor",
+  "tool_input": {
+    "command": "str_replace",
+    "path": "__WORKSPACE__/src/Domain/Existing.php",
+    "old_str": "final class Existing",
+    "new_str": "class Existing"
+  }
+}

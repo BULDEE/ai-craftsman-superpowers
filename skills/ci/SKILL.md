@@ -90,7 +90,8 @@ Teammates using Copilot, Cursor, Codex, Gemini, or Antigravity cannot run crafts
 craftsman-ci export --target agents-md   # AGENTS.md (read by most agents)
 craftsman-ci export --target cursor      # .cursor/rules/craftsman.mdc
 craftsman-ci export --target copilot     # .github/copilot-instructions.md
+craftsman-ci export --target codex-agents [--into "$HOME/.codex/agents"]  # craftsman-<name>.toml, one role per agents/*.md; only ~/.codex/agents/ was seen offered on codex-cli 0.154.0
 craftsman-ci export --target all
 ```
 
-The rules engine remains the single source of truth: severity overrides and ignored rules in `.craft-config.yml` are reflected in the generated files, which carry a do-not-edit header and are regenerated (not hand-maintained). Enforcement is unchanged: hooks locally where craftsman runs, `craftsman-ci` in the pipeline for everyone else. Commit the generated files and re-run the export whenever the rules change.
+The rules engine remains the single source of truth: severity overrides and ignored rules in `.craft-config.yml` are reflected in the generated files. In `AGENTS.md` and `.github/copilot-instructions.md` the export owns one delimited block (`<!-- craftsman:doctrine:begin ... -->` to `<!-- craftsman:doctrine:end -->`), created when the file is absent, appended when the file has none, rewritten in place otherwise: everything the team wrote outside the markers is kept byte for byte, and a second export changes nothing. `.cursor/rules/craftsman.mdc` is a dedicated file and is regenerated whole. Enforcement is unchanged: hooks locally where craftsman runs, `craftsman-ci` in the pipeline for everyone else. Commit the generated files and re-run the export whenever the rules change.

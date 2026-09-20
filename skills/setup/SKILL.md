@@ -7,6 +7,14 @@ disable-model-invocation: true
 
 # /craftsman:setup - Configuration Wizard
 
+
+> The commands below call `craftsman-path`, which prints an absolute path
+> inside this installation. The plugin's `bin/` is on PATH in the Claude Code
+> Bash tool; on a host where it is not, call it by its full path
+> (`<plugin root>/bin/craftsman-path`). Do not use `${CLAUDE_PLUGIN_ROOT}` in a
+> skill body: a skill is text handed to a model, the host expands nothing there,
+> and Claude Code does not export that variable to the Bash tool.
+
 ## Outcome Contract
 
 - **Outcome**: a configuration derived from what the repository actually is, with only the undeterminable parts asked.
@@ -34,9 +42,9 @@ Every mode (including `--quick`) ends with the observation step. The repository 
    ```
 2. On confirmation (automatic in `--quick` and `--refresh`), generate the project conventions skill:
    ```bash
-   bash ~/.claude/craftsman-conventions.sh generate "$PWD/.claude/skills"
+   bash ~/.claude/craftsman-conventions.sh generate "$PWD/.claude/skills"   # Codex reads "$PWD/.agents/skills" instead
    ```
-   This writes `.claude/skills/project-conventions/SKILL.md` (`user-invocable: false`, loaded as background knowledge, shareable via git, freely editable).
+   This writes `.claude/skills/project-conventions/SKILL.md` (`.agents/skills/...` on Codex; `user-invocable: false`, loaded as background knowledge, shareable via git, freely editable).
 3. Warm the codemap cache (review skills inject it as live context):
    ```bash
    bash ~/.claude/craftsman-codemap.sh >/dev/null
@@ -56,7 +64,7 @@ Two questions, no more:
 2. **Which quality tools do you like in each stack?** Propose the community standards from the tooling detector catalog:
 
    ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/hooks/lib/tooling_detect.py" "$PWD" --json
+   python3 "$(craftsman-path hooks/lib/tooling_detect.py)" "$PWD" --json
    ```
 
    The detector reports both what is declared here and what it suggests per stack (linters, architecture checkers, test runners, and the security section: secret scanners, dependency audit). For the workshop profile only the suggestion catalog matters, not this repository.
@@ -188,7 +196,7 @@ guided: true
 The baseline is the photograph of the code as it is today. It is what lets the plugin demand better without punishing anyone for debt they inherited.
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/hooks/lib/ratchet.py" init src --baseline .craftsman-baseline.json
+python3 "$(craftsman-path hooks/lib/ratchet.py)" init src --baseline .craftsman-baseline.json
 ```
 
 Pass the source paths the project actually uses (`src`, `app`, `lib`, `packages/*/src`). The command prints how many files it recorded.

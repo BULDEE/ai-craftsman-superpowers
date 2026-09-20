@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "_comment": "Craftsman for GitHub Copilot CLI and cloud agent: copy to .github/hooks/craftsman.json (the only location the cloud agent loads) and set CRAFTSMAN_ROOT to where this plugin is checked out (the cloud job clones the repository, so a vendored copy or a checkout step is needed). PascalCase form, so matchers map create to Write and edit/str_replace_editor to Edit. timeoutSec stays far above the gates' measured latency because a hook timeout is documented as fail-open on every event, preToolUse included. Documented contract, not yet captured from a Copilot consumer (tests/fixtures/hosts/copilot/documented).",
+  "hooks": {
+    "PreToolUse": [
+      {"type": "command", "matcher": "Edit|Write", "bash": "bash \"${CRAFTSMAN_ROOT}/adapters/copilot/pre-tool-use.sh\"", "timeoutSec": 60}
+    ],
+    "PostToolUse": [
+      {"type": "command", "matcher": "Edit|Write", "bash": "bash \"${CRAFTSMAN_ROOT}/adapters/copilot/post-tool-use.sh\"", "timeoutSec": 60}
+    ]
+  }
+}

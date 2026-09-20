@@ -213,8 +213,10 @@ printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Wri
     "$SQG_DIR/Bad.php" > "$SQG_DIR/transcript.jsonl"
 
 SQG_EXIT=0
+# `agent_transcript_path` is the subagent's transcript; `transcript_path` on a
+# SubagentStop is the parent's (tests/fixtures/hosts/claude-code/*/subagent-stop.json).
 SQG_OUT=$(jq -n --arg t "$SQG_DIR/transcript.jsonl" \
-    '{agent_type:"backend-craftsman", transcript_path:$t, cwd:"/tmp"}' | \
+    '{agent_type:"backend-craftsman", agent_transcript_path:$t, transcript_path:"/nonexistent/parent.jsonl", cwd:"/tmp"}' | \
     CLAUDE_PLUGIN_DATA="$SQG_DATA" bash "$ROOT_DIR/hooks/subagent-quality-gate.sh" 2>/dev/null) || SQG_EXIT=$?
 
 if [[ $SQG_EXIT -eq 0 ]]; then
@@ -567,5 +569,119 @@ else
 fi
 
 rm -rf "$TEL_DIR"
+
+echo ""
+echo "=== agent_hooks reaches the consumer: the call is not made ==="
+# Exit 0 proves nothing (a hook with nothing to do also exits 0). The consumer
+# of `agent_hooks` is the hook that spends a model call, so the witness is a
+# fake `claude` on PATH that records being invoked. Unguarded on purpose:
+# CRAFTSMAN_HEADLESS_VERIFY is the recursion lock, and setting it here would
+# silence the very path under test.
+AH_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-agent-hooks.XXXXXX")
+mkdir -p "$AH_DIR/bin" "$AH_DIR/global" "$AH_DIR/proj/src/Domain" "$AH_DIR/data"
+printf '#!/bin/sh\necho invoked >> "%s/calls"\necho "CLEAN"\n' "$AH_DIR" > "$AH_DIR/bin/claude"; chmod +x "$AH_DIR/bin/claude"
+printf '<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\nfinal class Order\n{\n}\n' > "$AH_DIR/proj/src/Domain/Order.php"
+( cd "$AH_DIR/proj" && git init -q . && git add -A && git commit -qm base ) >/dev/null 2>&1
+_ah_run() { # runs the verifier with the given env assignments
+    rm -f "$AH_DIR/calls"
+    ( cd "$AH_DIR/proj" && printf '{"session_id":"ah","prompt_id":"p","tool_name":"Write","tool_input":{"file_path":"%s"}}' "$AH_DIR/proj/src/Domain/Order.php" \
+        | env -u CRAFTSMAN_HEADLESS_VERIFY -u CLAUDE_PLUGIN_OPTION_agent_hooks -u CLAUDE_PLUGIN_OPTION_AGENT_HOOKS -u CLAUDE_EFFORT \
+              PATH="$AH_DIR/bin:$PATH" CLAUDE_PLUGIN_ROOT="$ROOT_DIR" CLAUDE_PLUGIN_DATA="$AH_DIR/data" CLAUDE_PLUGIN_OPTION_STACK=fullstack \
+              CRAFTSMAN_GLOBAL_CONFIG_DIR="$AH_DIR/global" "$@" bash "$ROOT_DIR/hooks/agent-ddd-verifier.sh" >/dev/null 2>&1 )
+    [[ -f "$AH_DIR/calls" ]] && echo called || echo not-called
+}
+CONTROL=$(_ah_run CLAUDE_PLUGIN_OPTION_AGENT_HOOKS=true)
+if [[ "$CONTROL" == "called" ]]; then
+    log_pass "control: with agent hooks on, the DDD verifier invokes the model CLI"
+else
+    log_fail "control: verifier invokes the CLI" "$CONTROL"
+fi
+UPPER=$(_ah_run CLAUDE_PLUGIN_OPTION_AGENT_HOOKS=false)
+DEFAULT_ON=$(_ah_run)
+printf 'hooks:\n  agent_hooks: false\n' > "$AH_DIR/global/.craft-config.yml"
+GLOBAL_OFF=$(_ah_run)
+if [[ "$UPPER" == "not-called" && "$DEFAULT_ON" == "called" && "$GLOBAL_OFF" == "not-called" ]]; then
+    log_pass "agent_hooks=false stops the call: as the exported plugin option, and as hooks.agent_hooks in the global file (a host without plugin options)"
+else
+    log_fail "agent_hooks consumer" "option-false=$UPPER default=$DEFAULT_ON global-false=$GLOBAL_OFF"
+fi
+# F9 (challenge review): a global file saved with CRLF said false and was read as "false\r"
+printf 'hooks:\r\n  agent_hooks: false\r\n' > "$AH_DIR/global/.craft-config.yml"
+CRLF_OFF=$(_ah_run)
+rm -f "$AH_DIR/global/.craft-config.yml"
+if [[ "$CRLF_OFF" == "not-called" ]]; then
+    log_pass "F9: hooks.agent_hooks: false in a CRLF global file stops the call too"
+else
+    log_fail "F9 CRLF config" "$CRLF_OFF"
+fi
+# a repository cannot switch the machine's model calls off
+rm -f "$AH_DIR/global/.craft-config.yml"
+printf 'hooks:\n  agent_hooks: false\n' > "$AH_DIR/proj/.craft-config.yml"
+PROJECT_OFF=$(_ah_run)
+rm -f "$AH_DIR/proj/.craft-config.yml"
+if [[ "$PROJECT_OFF" == "called" ]]; then
+    log_pass "a project .craft-config.yml cannot turn the agent hooks off (global only, like hooks.disabled)"
+else
+    log_fail "project agent_hooks asymmetry" "$PROJECT_OFF"
+fi
+rm -rf "$AH_DIR"
+
+echo ""
+echo "=== a reply the layer cannot read is unavailable, and closes nothing ==="
+# Independent verification (2026-09-15): "DDD_VIOLATIONS" followed by nothing
+# readable was recorded clean and closed the file's earlier findings as fixed.
+C6_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-c6.XXXXXX")
+mkdir -p "$C6_DIR/bin" "$C6_DIR/proj/src/Domain" "$C6_DIR/data"
+printf '<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\nuse App\\Infrastructure\\Mailer;\nfinal class Order\n{\n}\n' > "$C6_DIR/proj/src/Domain/Order.php"
+( cd "$C6_DIR/proj" && git init -q . && git add -A && git commit -qm base ) >/dev/null 2>&1
+_c6_run() { # $1 = reply the fake CLI gives
+    printf '#!/bin/sh\nprintf "%%s\\n" "%s"\n' "$1" > "$C6_DIR/bin/claude"; chmod +x "$C6_DIR/bin/claude"
+    ( cd "$C6_DIR/proj" && printf '{"session_id":"c6","prompt_id":"p","tool_name":"Write","tool_input":{"file_path":"%s"}}' "$C6_DIR/proj/src/Domain/Order.php" \
+        | env -u CRAFTSMAN_HEADLESS_VERIFY -u CLAUDE_EFFORT PATH="$C6_DIR/bin:$PATH" CLAUDE_PLUGIN_ROOT="$ROOT_DIR" CLAUDE_PLUGIN_DATA="$C6_DIR/data" \
+              CLAUDE_PLUGIN_OPTION_STACK=fullstack CLAUDE_PLUGIN_OPTION_AGENT_HOOKS=true bash "$ROOT_DIR/hooks/agent-ddd-verifier.sh" >/dev/null 2>&1 )
+}
+# a real finding first, so there is something to close
+_c6_run 'DDD_VIOLATIONS
+src/Domain/Order.php:4 layer violation - Domain imports Infrastructure'
+FIRST=$(sqlite3 "$C6_DIR/data/metrics.db" "select verdict from haiku_runs order by id desc limit 1")
+printf '\n' >> "$C6_DIR/proj/src/Domain/Order.php"   # the file changed, so a clean reply COULD close
+_c6_run 'DDD_VIOLATIONS
+output truncated'
+SECOND=$(sqlite3 "$C6_DIR/data/metrics.db" "select verdict from haiku_runs order by id desc limit 1")
+CLOSED=$(sqlite3 "$C6_DIR/data/metrics.db" "select count(*) from corrections where source='haiku'")
+if [[ "$FIRST" == "findings" && "$SECOND" == "unavailable" && "$CLOSED" == "0" ]]; then
+    log_pass "a DDD_VIOLATIONS reply with nothing readable is recorded unavailable and closes no earlier finding"
+else
+    log_fail "truncated verdict" "first=$FIRST second=$SECOND closed=$CLOSED"
+fi
+_c6_run 'DDD_VIOLATIONS
+/etc/passwd:1 layer violation - not in this project'
+THIRD=$(sqlite3 "$C6_DIR/data/metrics.db" "select verdict from haiku_runs order by id desc limit 1")
+[[ "$THIRD" == "unavailable" ]] && log_pass "findings naming no file of the project are unavailable, not clean" || log_fail "outside findings" "$THIRD"
+_c6_run 'CLEAN'
+FOURTH=$(sqlite3 "$C6_DIR/data/metrics.db" "select verdict from haiku_runs order by id desc limit 1")
+CLOSED=$(sqlite3 "$C6_DIR/data/metrics.db" "select count(*) from corrections where source='haiku'")
+[[ "$FOURTH" == "clean" && "$CLOSED" -ge 1 ]] && log_pass "control: the exact CLEAN token on the changed file is clean and closes the earlier finding" || log_fail "control clean" "verdict=$FOURTH closed=$CLOSED"
+rm -rf "$C6_DIR"
+
+echo ""
+echo "=== the DDD verifier reviews a Codex apply_patch too ==="
+# F6 (challenge review): the callback exited on a missing file_path, so no
+# Codex write was ever reviewed. Same fake CLI witness as above.
+F6_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-f6.XXXXXX")
+mkdir -p "$F6_DIR/bin" "$F6_DIR/proj/src/Domain" "$F6_DIR/data"
+printf '#!/bin/sh\necho invoked >> "%s/calls"\necho CLEAN\n' "$F6_DIR" > "$F6_DIR/bin/claude"; chmod +x "$F6_DIR/bin/claude"
+printf '<?php\ndeclare(strict_types=1);\nnamespace App\\Domain;\nfinal class Order\n{\n}\n' > "$F6_DIR/proj/src/Domain/Order.php"
+( cd "$F6_DIR/proj" && git init -q . && git add -A && git commit -qm base ) >/dev/null 2>&1
+PATCH=$(printf '*** Begin Patch\n*** Update File: %s/src/Domain/Order.php\n@@\n final class Order\n {\n+    public function total(): int { return 0; }\n }\n*** End Patch' "$F6_DIR/proj")
+( cd "$F6_DIR/proj" && python3 -c 'import json,sys; print(json.dumps({"session_id":"f6","turn_id":"t","model":"m","hook_event_name":"PostToolUse","tool_name":"apply_patch","tool_input":{"command":sys.argv[1]},"tool_response":"Exit code: 0","cwd":sys.argv[2]}))' "$PATCH" "$F6_DIR/proj" \
+    | env -u CRAFTSMAN_HEADLESS_VERIFY -u CLAUDE_EFFORT PATH="$F6_DIR/bin:$PATH" CLAUDE_PLUGIN_ROOT="$ROOT_DIR" CLAUDE_PLUGIN_DATA="$F6_DIR/data" \
+          CLAUDE_PLUGIN_OPTION_STACK=fullstack CLAUDE_PLUGIN_OPTION_AGENT_HOOKS=true bash "$ROOT_DIR/hooks/agent-ddd-verifier.sh" >/dev/null 2>&1 )
+if [[ -f "$F6_DIR/calls" ]]; then
+    log_pass "F6: a Codex apply_patch PostToolUse reaches the DDD verifier, which reviews the patched file"
+else
+    log_fail "F6 apply_patch review" "no model call made"
+fi
+rm -rf "$F6_DIR"
 
 test_summary

@@ -15,9 +15,9 @@ set -uo pipefail
 # spelling is what this plugin's own tests and CI export, and for four
 # releases it was the only one read, so `agent_hooks: false` never reached
 # this line. The exported form is read first.
-if [[ "${CLAUDE_PLUGIN_OPTION_AGENT_HOOKS:-${CLAUDE_PLUGIN_OPTION_agent_hooks:-true}}" == "false" ]]; then
-    exit 0
-fi
+_agent_hooks_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${_agent_hooks_dir}/lib/config.sh"
+config_agent_hooks_enabled || exit 0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/hook-profile.sh"
@@ -29,6 +29,25 @@ pack_loader_init
 
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
+
+# A Codex apply_patch names its files in the patch, not in file_path, and this
+# hook exited before any review on every Codex write (challenge review of
+# e2acf22, F6). Like post-write-check.sh: one run per landed source file, the
+# strictest verdict wins, capped so one patch cannot buy ten model calls.
+if [[ -z "$FILE_PATH" && "$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)" == "apply_patch" ]]; then
+    PATCH_FILES=$(printf '%s' "$INPUT" | python3 "${SCRIPT_DIR}/lib/write_mirror.py" --list 2>/dev/null \
+        | awk -F'\t' '$1 != "delete" && $1 != "UNREADABLE" {print (NF >= 3 ? $3 : $2)}' | head -3)
+    [[ -z "$PATCH_FILES" ]] && exit 0
+    CHILD_RC=0
+    while IFS= read -r written; do
+        [[ -z "$written" || ! -f "$written" ]] && continue
+        rc=0
+        printf '%s' "$INPUT" | jq --arg fp "$written" '.tool_name = "Write" | .tool_input = {file_path: $fp}' \
+            | bash "$0" || rc=$?
+        [[ "$rc" -eq 2 ]] && CHILD_RC=2
+    done <<< "$PATCH_FILES"
+    exit "$CHILD_RC"
+fi
 
 [[ -z "$FILE_PATH" || ! -f "$FILE_PATH" ]] && exit 0
 
@@ -82,21 +101,33 @@ fi
 
 if [[ "$VERDICT" == DDD_VIOLATIONS* ]]; then
     FINDINGS=$(haiku_findings "${VERDICT#DDD_VIOLATIONS}")
+
+    # The token said findings and nothing survived the shape filter: a reply
+    # cut off after the first line, a refusal, a rate limit. That is a reply
+    # the layer cannot read, so it is unavailable, and it closes nothing: read
+    # as clean it retired every earlier finding on the file (independent
+    # verification, 2026-09-15).
+    if [[ -z "$(printf '%s' "$FINDINGS" | tr -d '[:space:]')" ]]; then
+        metrics_record_haiku_run "agent-ddd-verifier" "unavailable" 0 "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
+        exit 0
+    fi
     RECORDED=$(haiku_record_findings "agent-ddd-verifier" "$FINDINGS" "$_ABS_FILE" 2>/dev/null || printf '0')
+    # Findings that name no file of this project are a reply the layer cannot
+    # use: unavailable, and the earlier findings stay open.
+    if [[ "${RECORDED:-0}" -eq 0 ]]; then
+        metrics_record_haiku_run "agent-ddd-verifier" "unavailable" 0 "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
+        exit 0
+    fi
     haiku_close_resolved "$_ABS_FILE" "$(haiku_finding_rules "$FINDINGS")" 2>/dev/null || true
     if [[ "${RECORDED:-0}" -gt 0 ]]; then
         metrics_record_haiku_run "agent-ddd-verifier" "findings" "$RECORDED" "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
         {
-            echo "DDD verification (Haiku) found issues in ${FILE_PATH}:"
+            echo "DDD verification (${SEMANTIC_BACKEND_USED:-semantic}) found issues in ${FILE_PATH}:"
             printf '%s\n' "$FINDINGS"
             echo "Fix them or justify why they are acceptable."
         } >&2
         exit 2
     fi
-    # The token said violations and nothing survived the shape filter, so this
-    # run has nothing to show and nothing to record. Counting it as a hit
-    # printed "1 found something" beside "haiku findings: 0".
-    metrics_record_haiku_run "agent-ddd-verifier" "clean" 0 "$(_elapsed_ms)" "$_ABS_FILE" 2>/dev/null || true
     exit 0
 fi
 

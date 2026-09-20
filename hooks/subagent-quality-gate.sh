@@ -31,11 +31,17 @@ command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
 
 INPUT=$(cat)
 AGENT_TYPE=$(echo "$INPUT" | jq -r '.agent_type // empty' 2>/dev/null)
-TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
+# The SUBAGENT's transcript. `transcript_path` on a SubagentStop is the
+# parent's (captured: tests/fixtures/hosts/claude-code/*/subagent-stop.json,
+# where the parent wrote nothing and the child wrote the file), and reading it
+# judged the parent for the child's work, or nothing at all (audit CR-117, C9).
+# No agent transcript, no files to judge: Codex sends null here.
+TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.agent_transcript_path // empty' 2>/dev/null)
 
 [[ -z "$AGENT_TYPE" ]] && exit 0
 
 source "${SCRIPT_DIR}/lib/session-files.sh"
+session_files_bind "$INPUT"
 SESSION_STATE=$(session_file session-state.json)
 
 log_subagent_activity() {

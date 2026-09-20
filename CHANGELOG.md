@@ -9,6 +9,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Host adapters, one core (ADR-0029, campaign of 2026-09-15). The write gates
+  read a Codex `apply_patch` (V4A, multi-file, moves, `@@` anchors, End of
+  File) before it lands and refuse the gate's own configuration with `deny`
+  where the host cannot `ask`; test runs are decoded per host from the shapes
+  the hosts actually send (`hooks/lib/tool_result.py`), and a host whose shell
+  output carries no exit code grants and revokes nothing; every hook names
+  its session from its payload (`session_files_bind`); the doctrine export
+  owns one delimited block of `AGENTS.md`; pack skills ship as regular
+  files and learned skills may land in `.agents/skills`; agents export as
+  Codex roles (`craftsman-ci export --target codex-agents`); the challenge
+  skill collects its context with `craftsman-context review`; the semantic
+  review has a backend port (`claude-cli`, `codex-cli`, `none`) and each run
+  row names its backend; a per-host event matrix
+  (`hooks/host-capabilities.json`) and a host row in the healthcheck say
+  what each host loads and observes; a Copilot adapter honours the
+  documented contract, surfaces still to qualify; a fresh install from the
+  built archive is tested; every handler carries a `statusMessage`.
+  Fixtures under `tests/fixtures/hosts/` are captured from the real CLIs with
+  their provenance (`tests/fixtures/hosts/PROVENANCE.md`), which also records
+  what each host was seen NOT to do.
+
+- Codex qualified by Codex (2026-09-20): a Codex session installed this
+  branch natively (`codex plugin marketplace add`, which reads the Claude
+  marketplace manifest, then `codex plugin add`) and reported what it found.
+  Four defects fixed, each with a witness seen red first. `model` without
+  `prompt_id` names Codex and a string transcript path no longer names Claude
+  Code: run through its app server, Codex 0.154.0 sends a REAL transcript
+  path where a project hook of the same version sent null, so that session
+  called itself claude-code and wrote Claude Code's bridge. A shell with
+  `CODEX_SESSION_ID` or `CODEX_THREAD_ID` names Codex, so
+  `craftsman-healthcheck` no longer reports "unknown host" about its own
+  host, and the session-bridge row is read per host instead of judging every
+  host by `~/.claude`. The rules store honours `TMPDIR` and the plugin data
+  directory before `/tmp`, which a sandboxed Codex could not write, turning
+  `mktemp: mkdtemp failed` into the refusal the model read. The Codex row of
+  the capability matrix records twelve event kinds (Interrupt included), that
+  installing and enabling a plugin does not trust its hooks, and that a
+  background hook cannot force a continuation there.
+  Two limits are now stated rather than implied (`docs/reference/hooks.md`,
+  README): the gate judges the host's write TOOLS, so a file written by a
+  shell command the model runs is caught by CI and the pre-push gate, not
+  before disk; and async delivery is the host's, which Codex does not offer.
+
+- A host's hooks file is generated from the manifest, never typed twice:
+  `craftsman-ci export --target grok-hooks` (and `codex-hooks`) writes the
+  handlers with `${CLAUDE_PLUGIN_ROOT}` expanded and carried in each
+  handler's environment, the events that host does not fire dropped, and the
+  conditional handlers that are Claude Code's dropped. Grok needs it because
+  it discovers a plugin's `hooks/hooks.json` and runs none of it; the
+  generated file was replayed on the real CLI and gives the same refusals.
+  `/craftsman:healthcheck` gained an `agent-roles` row: on Codex it counts
+  the craftsman roles in that host's home and names the export command when
+  there are none, since installing the plugin does not write them and,
+  written, all twelve are offered to spawn_agent. README documents the native
+  install on both hosts, including the steps installing does not perform
+  (trusting the hooks, exporting the roles) and what each host does not
+  offer.
+
+- Grok 1.0.30 as a host, measured (audit of 2026-09-15): the write gates
+  judge its `write` and `search_replace` tools (they exited 0 in silence on
+  the captured envelope), `host_detect` names `grok` from the envelope
+  (`workspaceRoot` and a lowercase `hookEventName`; it was read as Copilot
+  because both carry a `timestamp`) and from `GROK_SESSION_ID`, the
+  capability matrix has a `grok` row and the healthcheck describes any host
+  from that row instead of a case per host, and `run_terminal_command`
+  results carry `exit_code`, so the verification loop is live there. The
+  mirror now holds one table of host tool names to a kind of write
+  (`WRITE_TOOL_KINDS`), and the pre-write gate no longer branches on a tool
+  name. What Grok does NOT do is recorded too: it discovers a plugin's
+  `hooks/hooks.json` and loads none of its handlers (headless, project plugin
+  enabled; `tests/fixtures/hosts/PROVENANCE.md`), so on Grok the engine runs
+  only from a project or global hooks file, and "compatible Grok" is not
+  claimed.
+
 - Hermes: a `git push` between two conclusions waits for the conclusion
   gate. `adapters/hermes/pre-tool-call.sh` now reads `terminal` and refuses a
   push (and a commit under `strict`) unless `pre-verify.sh`'s last verdict is

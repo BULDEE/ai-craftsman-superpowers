@@ -14,10 +14,24 @@ source "$SCRIPT_DIR/../lib/test-helpers.sh"
 export CLAUDE_PLUGIN_ROOT="$ROOT_DIR"
 unset CRAFTSMAN_DISABLED_HOOKS CRAFTSMAN_HOOK_PROFILE
 
+# The payloads here are the Claude Code shape with the host's own identity
+# field (`prompt_id`, see tests/fixtures/hosts/claude-code): the hook reads the
+# host off the payload, and `ask` is a decision only that host implements. A
+# suite that built anonymous payloads passed on a developer's machine, where
+# CLAUDECODE=1 is in the environment, and would have read `deny` on a runner.
 run_hook() {
     local file_path="$1"
     local output
-    output=$(jq -n --arg fp "$file_path" '{"tool_input":{"file_path":$fp}}' | bash "$ROOT_DIR/hooks/config-protection.sh" 2>/dev/null)
+    output=$(jq -n --arg fp "$file_path" '{"prompt_id":"p1","tool_name":"Write","tool_input":{"file_path":$fp}}' | bash "$ROOT_DIR/hooks/config-protection.sh" 2>/dev/null)
+    local exit_code=$?
+    echo "$exit_code|$output"
+}
+# The same file from a host the hook cannot name: no identity in the payload,
+# none in the environment.
+run_hook_unknown_host() {
+    local file_path="$1"
+    local output
+    output=$(jq -n --arg fp "$file_path" '{"tool_input":{"file_path":$fp}}' | env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID -u PLUGIN_ROOT bash "$ROOT_DIR/hooks/config-protection.sh" 2>/dev/null)
     local exit_code=$?
     echo "$exit_code|$output"
 }
@@ -65,6 +79,16 @@ for own in ".craft-rules.yml" "src/Domain/.craft-rules.yml" ".craft-config.yml" 
         log_fail "Should ask before $own is written" "got exit $exit_code: $(echo "${result#*|}" | tr '\n' ' ' | cut -c1-100)"
     fi
 done
+# A host that does not implement `ask` (Codex documents it as parsed and not
+# implemented; an unknown host is treated the same) gets deny for the same
+# file: a decision the host ignores would be no decision.
+result=$(run_hook_unknown_host "/tmp/project/.craft-rules.yml")
+exit_code="${result%%|*}"
+if [[ "$exit_code" == "2" ]] && echo "${result#*|}" | grep -q '"permissionDecision": *"deny"'; then
+    log_pass "Denies .craft-rules.yml on a host that cannot ask (exit 2, deny)"
+else
+    log_fail "Should deny .craft-rules.yml on an unknown host" "got exit $exit_code: $(echo "${result#*|}" | tr '\n' ' ' | cut -c1-100)"
+fi
 for denied in ".claude/settings.json" ".claude/settings.local.json" "$ROOT_DIR/hooks/lib/rules-engine.sh" "$ROOT_DIR/rules/core.yml"; do
     case "$denied" in /*) target="$denied" ;; *) target="/tmp/project/$denied" ;; esac
     result=$(run_hook "$target")

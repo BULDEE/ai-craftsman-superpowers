@@ -1,0 +1,17 @@
+{
+  "session_id": "0f7d23b2-7b81-4360-8a55-a4d6c2145245",
+  "transcript_path": "__HOME__/.claude/projects/-private-tmp-claude-501--Users-woprrr-Dev-claude-ai-craftsman-superpowers-b2a2ee5c-aa20-40c5-9619-3de33b67a297-scratchpad-claude-capture2-proj/0f7d23b2-7b81-4360-8a55-a4d6c2145245.jsonl",
+  "cwd": "__WORKSPACE__",
+  "prompt_id": "0ddc4556-90a0-4b58-8c1a-d3bc1d9d9445",
+  "permission_mode": "bypassPermissions",
+  "hook_event_name": "PostToolUseFailure",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "python3 -c \"import sys; print(\\\"1 failed, 2 passed\\\"); sys.exit(1)\"",
+    "description": "Run Python test output with exit code 1"
+  },
+  "tool_use_id": "toolu_01PQyz1ytCkYDC8aDsQcupvA",
+  "error": "Exit code 1\n1 failed, 2 passed",
+  "is_interrupt": false,
+  "duration_ms": 1108
+}

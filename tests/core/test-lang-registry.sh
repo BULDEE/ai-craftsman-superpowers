@@ -316,9 +316,12 @@ export CLAUDE_PLUGIN_DATA="$TMPDIR_BASE/plugin-data"
 mkdir -p "$CLAUDE_PLUGIN_DATA"
 FAILURE_LOG="$CLAUDE_PLUGIN_DATA/test-failures.log"
 
-# run_failing_test <command> - feed a failed Bash run to the verification hook
+# run_failing_test <command> - feed a failed Bash run to the verification hook,
+# in the shape Claude Code sends one (a PostToolUseFailure whose `error` names
+# the exit code; tests/fixtures/hosts/claude-code). The `tool_result.exit_code`
+# this used to send is a field no host sends.
 run_failing_test() {
-    printf '{"tool_name":"Bash","tool_input":{"command":"%s"},"tool_result":{"exit_code":1}}' "$1" \
+    printf '{"hook_event_name":"PostToolUseFailure","tool_name":"Bash","tool_input":{"command":"%s"},"error":"Exit code 1\\nFAILED","is_interrupt":false}' "$1" \
         | bash "$ROOT_DIR/hooks/post-bash-test-verify.sh" >/dev/null 2>&1
     return 0
 }
@@ -571,5 +574,36 @@ if echo "$dialect_findings" | grep -q "LOC001"; then
 else
     log_fail "a 60-line PHP method reaches LOC001 through the dialect the symfony pack declares" "got '$dialect_findings'"
 fi
+
+echo ""
+echo "--- E. A poisoned cache is rebuilt, a failed compile leaves the previous one ---"
+# Independent verification (2026-09-15) found zero-line lang-known-*.tsv caches
+# from a compile that failed a month earlier and disabled every pack validator
+# for any hook reading them: pre-write saw no language and exited 0.
+REG_DATA=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-reg-poison.XXXXXX")
+( export CLAUDE_PLUGIN_DATA="$REG_DATA" CLAUDE_PLUGIN_ROOT="$ROOT_DIR"
+  source "$ROOT_DIR/hooks/lib/config.sh"; source "$ROOT_DIR/hooks/lib/pack-loader.sh"; pack_loader_init >/dev/null 2>&1
+  for f in "$REG_DATA"/lang-known-*.tsv; do : > "$f"; done   # poison: keep the files, empty them
+  pack_loader_init >/dev/null 2>&1
+  lang_for_file /tmp/x/Order.php )
+if [[ "$( cd "$REG_DATA" && export CLAUDE_PLUGIN_DATA="$REG_DATA" CLAUDE_PLUGIN_ROOT="$ROOT_DIR"; source "$ROOT_DIR/hooks/lib/config.sh"; source "$ROOT_DIR/hooks/lib/pack-loader.sh"; pack_loader_init >/dev/null 2>&1; lang_for_file /tmp/x/Order.php )" == "php" ]] \
+    && [[ -s "$(ls "$REG_DATA"/lang-known-*.tsv | head -1)" ]]; then
+    log_pass "an empty registry cache is treated as stale and rebuilt; the language is known again"
+else
+    log_fail "poisoned cache" "$(ls -la "$REG_DATA" | grep lang-known | head -2 | tr '\n' ' ')"
+fi
+# a compile that fails must not replace the cache with nothing
+GOOD=$(ls "$REG_DATA"/lang-known-*.tsv | head -1); BEFORE=$(wc -l < "$GOOD" | tr -d ' ')
+( export CLAUDE_PLUGIN_DATA="$REG_DATA" CLAUDE_PLUGIN_ROOT="$ROOT_DIR"
+  source "$ROOT_DIR/hooks/lib/config.sh"; source "$ROOT_DIR/hooks/lib/lang-registry.sh"
+  touch "$ROOT_DIR/packs/python/pack.yml" 2>/dev/null   # a manifest newer than the cache: rebuild wanted
+  _LANG_REGISTRY_BUILDER=/bin/false _lang_registry_build_cache known "$ROOT_DIR"/packs/*/pack.yml >/dev/null 2>"$REG_DATA/err" )
+AFTER=$(wc -l < "$GOOD" | tr -d ' ')
+if [[ "$AFTER" == "$BEFORE" && "$AFTER" -gt 0 ]] && grep -q "could not be compiled" "$REG_DATA/err"; then
+    log_pass "a compile that fails leaves the previous registry in place and says so"
+else
+    log_fail "failed compile" "before=$BEFORE after=$AFTER err=$(cat "$REG_DATA/err" | head -1)"
+fi
+rm -rf "$REG_DATA"
 
 test_summary

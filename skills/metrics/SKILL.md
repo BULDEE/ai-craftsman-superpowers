@@ -7,6 +7,14 @@ disable-model-invocation: true
 
 # /craftsman:metrics - Quality Metrics Dashboard
 
+
+> The commands below call `craftsman-path`, which prints an absolute path
+> inside this installation. The plugin's `bin/` is on PATH in the Claude Code
+> Bash tool; on a host where it is not, call it by its full path
+> (`<plugin root>/bin/craftsman-path`). Do not use `${CLAUDE_PLUGIN_ROOT}` in a
+> skill body: a skill is text handed to a model, the host expands nothing there,
+> and Claude Code does not export that variable to the Bash tool.
+
 ## Outcome Contract
 
 - **Outcome**: a data-grounded picture of code quality trends, and a decision about pending learned instincts.
@@ -32,7 +40,7 @@ returned. Read its numbers with the shipped function, never by adding rows up
 yourself:
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/metrics-db.sh" && metrics_haiku_report 30
+source "$(craftsman-path hooks/lib/metrics-db.sh)" && metrics_haiku_report 30
 ```
 
 It prints six lines: runs, findings, the share of findings Level 1 never saw on
@@ -78,7 +86,7 @@ rows you add up yourself, because it proposes relaxing a gate, and the only
 legitimate source of every number in this section is its stdout:
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/metrics-db.sh" && metrics_acceptance_report 90
+source "$(craftsman-path hooks/lib/metrics-db.sh)" && metrics_acceptance_report 90
 ```
 
 It prints, in order: acceptance per rule (`fixed / (fixed + ignored)`, lowest
@@ -116,7 +124,7 @@ by a human, in one of two places:
   you. Ask which of the two it is and record the answer, one finding at a time:
 
 ```bash
-source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/metrics-db.sh" && \
+source "$(craftsman-path hooks/lib/metrics-db.sh)" && \
   metrics_record_verdict PHP002 wrong "src/Entity/Order.php" "an ORM subclasses entities, they cannot be final"
 ```
 
@@ -249,7 +257,7 @@ result must mean empty data, never a schema error swallowed on the way out.
 Surface where refactoring effort pays back most. This is command-time only (never in a hook):
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/hooks/lib/hotspot_analysis.py" --since 12.month --top 15
+python3 "$(craftsman-path hooks/lib/hotspot_analysis.py)" --since 12.month --top 15
 ```
 
 Add to the report:
@@ -273,7 +281,7 @@ bash ~/.claude/craftsman-instincts.sh candidates
 
 For each candidate, show the user the rule, confidence, occurrence count, ignored count, and evidence, then ask what to do. A rule is a candidate only when it was fixed MORE often than it was rejected (ignored or scoped), and a candidate whose rejections catch up is withdrawn from the list on the next refresh (#45). The confidence is a different statistic, the lower bound of the acceptance rate given the evidence (Wilson, 95%): it orders the list, more corrections rank higher, nothing saturates, so the first candidate listed is the one best supported by the data. Read it as an order, never as a bar.
 
-- **Approve** (generates `.claude/skills/learned-<rule>/SKILL.md` with provenance, loaded automatically as background knowledge):
+- **Approve** (generates `<skills dir>/learned-<rule>/SKILL.md` with provenance, loaded automatically as background knowledge; the directory is the host's: `$PWD/.claude/skills` on Claude Code, `$PWD/.agents/skills` on Codex, and the helper refuses any other depth):
   ```bash
   bash ~/.claude/craftsman-instincts.sh approve <id> "$PWD/.claude/skills"
   ```
@@ -295,10 +303,10 @@ bash ~/.claude/craftsman-instincts.sh global-candidates
 Present each candidate with its project count, then promote only on an explicit user decision:
 
 ```bash
-bash ~/.claude/craftsman-instincts.sh promote <RULE> "$HOME/.claude/skills"
+bash ~/.claude/craftsman-instincts.sh promote <RULE> "$HOME/.claude/skills"   # Codex: "$HOME/.agents/skills"
 ```
 
-This writes `~/.claude/skills/learned-global-<rule>/SKILL.md` (`user-invocable: false`), applied across all projects. The same rule as project scope holds: never promote automatically, and retirement is deleting the file.
+This writes `~/.claude/skills/learned-global-<rule>/SKILL.md` (or `~/.agents/skills/` for Codex; `user-invocable: false`), applied across all projects. The same rule as project scope holds: never promote automatically, and retirement is deleting the file.
 
 ### Step 11: Dashboard (`--dashboard`)
 

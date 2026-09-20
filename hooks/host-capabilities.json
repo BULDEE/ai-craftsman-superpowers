@@ -1,0 +1,95 @@
+{
+  "_comment": "What each host loads and observes, measured on the versions named; read by hooks/lib/healthcheck.sh. A declared handler on an event the host does not load is not an active function, and this file is where that is said. Provenance in tests/fixtures/hosts/PROVENANCE.md.",
+  "hosts": {
+    "claude-code": {
+      "version": "2.1.272",
+      "events_loaded": [
+        "SessionStart",
+        "PreToolUse",
+        "PostToolUse",
+        "PostToolUseFailure",
+        "TaskCompleted",
+        "UserPromptSubmit",
+        "FileChanged",
+        "SubagentStop",
+        "PreCompact",
+        "PostCompact",
+        "Stop",
+        "SessionEnd"
+      ],
+      "exit_code_observable": true,
+      "ask_supported": true,
+      "wakes_on_exit_2": true,
+      "skills_dir": ".claude/skills",
+      "source": "code.claude.com/docs/en/hooks and the captured events"
+    },
+    "codex": {
+      "version": "0.154.0",
+      "events_loaded": [
+        "SessionStart",
+        "PreToolUse",
+        "PostToolUse",
+        "UserPromptSubmit",
+        "SubagentStart",
+        "SubagentStop",
+        "PreCompact",
+        "PostCompact",
+        "Stop",
+        "SessionEnd",
+        "PermissionRequest",
+        "Interrupt"
+      ],
+      "exit_code_observable": false,
+      "ask_supported": false,
+      "wakes_on_exit_2": false,
+      "skills_dir": ".agents/skills",
+      "source": "codex app-server generate-json-schema 0.154.0; the released event list (codex-rs/hooks/src/lib.rs, rust-v0.154.0) read by a Codex session qualifying this plugin 2026-09-20, which named Interrupt as a twelfth kind and PermissionRequest and SubagentStart as supported; audit CR-117 hooks/list 14 of 17",
+      "events_this_plugin_declares_and_codex_loads": [
+        "SessionStart",
+        "PreToolUse",
+        "PostToolUse",
+        "UserPromptSubmit",
+        "SubagentStop",
+        "PreCompact",
+        "PostCompact",
+        "Stop",
+        "SessionEnd"
+      ],
+      "trust": "installing and enabling a plugin does not trust its hooks: the 14 handlers loaded from this manifest were reported trustStatus=untrusted until reviewed (/hooks), or bypassed for one invocation with --dangerously-bypass-hook-trust",
+      "async_continuation": "a background hook cannot force a continuation: exit 2 and asyncRewake are Claude Code's, and unfinished background hooks are cancelled at shutdown. A verdict that must be acted on belongs in a synchronous gate"
+    },
+    "grok": {
+      "version": "1.0.30",
+      "events_loaded": [
+        "SessionStart",
+        "PreToolUse",
+        "PostToolUse",
+        "PostToolUseFailure",
+        "UserPromptSubmit",
+        "SubagentStart",
+        "SubagentStop",
+        "PreCompact",
+        "PostCompact",
+        "Stop",
+        "SessionEnd"
+      ],
+      "exit_code_observable": false,
+      "ask_supported": true,
+      "wakes_on_exit_2": false,
+      "skills_dir": ".grok/skills",
+      "write_tools": [
+        "write",
+        "search_replace"
+      ],
+      "plugin_hooks_executed": "not observed: a Claude plugin's hooks/hooks.json is listed by `grok inspect` (hookType file) and no plugin handler appears in hook_execution; a project plugin is listed `project, disabled` and contributes no row either (measured 2026-09-15 and again 2026-09-20). The engine runs there through a project or global hooks file",
+      "source": "~/.grok/docs/user-guide/10-hooks.md (1.0.30) for the event list, the captured events for the payload; TaskCompleted and FileChanged are not events Grok fires",
+      "trust": "a project hooks file runs only once the folder is trusted (--trust, or /hooks-trust): untrusted, it is skipped in silence and every forbidden write lands (measured 2026-09-20)",
+      "refusal_rendering": "a hook that exits 2 shows as `failed` in Grok's hook_execution rows: that is a refusal, not a broken hook"
+    }
+  },
+  "event_functions": {
+    "TaskCompleted": "evidence gate before a task is marked complete (task-completed-verify.sh)",
+    "PostToolUseFailure": "failed tool tracking and test-failure revocation (tool-failure-tracker.sh, post-bash-test-verify.sh)",
+    "FileChanged": "external edit tracking for correction learning (file-changed.sh)"
+  }
+}

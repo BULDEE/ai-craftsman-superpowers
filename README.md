@@ -111,7 +111,7 @@ Opus rates to write a commit message.
 2. **Structural Ratchet** - a committed baseline records each file's structural high-water mark (complexity, size, longest function, import fan-out, suppression count). A file you touch may improve or stay equal, never regress: the mark tightens automatically on a green pass and only loosens through a documented, counted suppression. Untouched legacy is never punished for debt it already had.
 3. **Adversarial Design Panel** - three contradictors (YAGNI, invariants and boundaries, feasibility) attack a design during `/craftsman:design`, before any code exists. Every objection lands in a retained or dismissed table: silence is not an option. Contradicting a design costs far less than contradicting the code built on it.
 4. **Cognitive Bias Detector** - real-time detection of acceleration bias, scope creep, and over-optimization in your prompts. Two-stage language cascade: curated English patterns warn you directly, and every other language sits at one same tier behind it, carrying recall lexicons (CJK, Cyrillic and Thai included) that hand the call to the model already reading your prompt, which surfaces or silently drops it with the whole session as context. No second model and no network call. Language tags are BCP 47, so `fr-CA` or `zh-Hant` register like any other. Adding a language is two data files and zero code. The non-English lexicons ship as recall-oriented seed lists that no native speaker has reviewed yet, which is the point of the tier: a false positive there is a note the model drops silently, never a warning you see.
-5. **Real-Time Quality Gate** - progressive validation on every Write/Edit: regex (always on, cost measured by `tests/perf/test-hook-latency.sh`) → LSP semantics (live, via the official LSP plugin for your language) → static analysis and architecture (PHPStan/ESLint/deptrac, opt-in per machine because running a project's analysers runs its code, see [SECURITY.md](SECURITY.md)). Degrades gracefully with zero tools installed.
+5. **Real-Time Quality Gate** - progressive validation on every write the host performs through a write tool (Claude Code `Write`/`Edit`, Codex `apply_patch`, Grok `write`/`search_replace`, Hermes `write_file`/`patch`). A file written by a shell command the model runs (`printf > file`, `sed -i`, a script) is NOT gated: the hook that sees shell commands sees a command line, not a file, and the plugin does not pretend otherwise (measured on Codex, 2026-09-20). CI (`ci/craftsman-ci.sh`) and the pre-push gate are what catch those. Progressive validation: regex (always on, cost measured by `tests/perf/test-hook-latency.sh`) → LSP semantics (live, via the official LSP plugin for your language) → static analysis and architecture (PHPStan/ESLint/deptrac, opt-in per machine because running a project's analysers runs its code, see [SECURITY.md](SECURITY.md)). Degrades gracefully with zero tools installed.
 6. **Metrics & Trend Analysis** - SQLite-backed tracking of violations, corrections, and sessions, with 7-day/30-day trend views to identify your most-violated rules.
 7. **Security Rules** - SEC001-003 (hardcoded secrets, dynamic eval, SQL by concatenation) verified in hooks and CI, with their doctrine routed to Claude on block. Setup observes the repository and asks at most four plain-language questions.
 
@@ -136,6 +136,38 @@ exit
 claude
 /craftsman:setup --quick
 ```
+
+**Running [Codex](https://developers.openai.com/codex) instead of (or next to) Claude Code?** Codex reads this repository's Claude manifest, so the same plugin installs natively:
+
+```bash
+codex plugin marketplace add BULDEE/ai-craftsman-superpowers   # reads .claude-plugin/marketplace.json
+codex plugin add craftsman@ai-craftsman-superpowers
+```
+
+Then two steps that installing does NOT do for you, both measured on 0.154.0 (2026-09-20):
+
+```bash
+# 1. Trust the hooks. Installed and enabled is not trusted: until you review
+#    them in /hooks, they are loaded and do not run.
+codex          # then: /hooks   -> review and trust the craftsman handlers
+
+# 2. Install the agent roles. Codex reads TOML roles from its own home; the
+#    plugin ships Markdown agents, and the export converts them.
+craftsman-ci export --target codex-agents --into "${CODEX_HOME:-$HOME/.codex}/agents"
+```
+
+`/craftsman:healthcheck` says which of the two is still missing. What you get there: the write gate before disk on `apply_patch` (V4A patches, multi-file, moves), the config protection, the 22 skills and, after the export, the 12 roles for `spawn_agent`. What you do not get, because the host does not offer it: a `ask` decision (the gate denies instead), a shell exit code in the tool event (a test run grants and revokes nothing), and a background hook that wakes an idle session. Detail per capability: [`tests/fixtures/hosts/PROVENANCE.md`](tests/fixtures/hosts/PROVENANCE.md).
+
+**Running [Grok](https://docs.x.ai/build) instead of (or next to) Claude Code?** Grok reads the Claude catalogue, so `grok inspect` lists the 22 skills and the agents with no setup. The engine is a separate step, because Grok discovers a plugin's `hooks/hooks.json` and runs none of it (measured on 1.0.30, twice): point a project hooks file at this installation's scripts, then trust the folder.
+
+```bash
+mkdir -p .grok/hooks
+# one handler per event, generated from the plugin's own manifest
+craftsman-ci export --target grok-hooks --into .grok/hooks
+grok --trust        # or /hooks-trust in the session
+```
+
+Until the folder is trusted, project hooks are skipped in silence and every forbidden write lands. A refusal shows up as `failed` in Grok's hook rows: that is how the host renders exit 2. What works there: the write gate on `write` and `search_replace` before disk, the config protection, `ask` honoured, and a test run that grants then revokes the verification evidence (its shell result carries an exit code).
 
 **Running [Hermes](https://hermes-agent.nousresearch.com) agents instead of (or next to) Claude Code?** The same repository is a native Hermes plugin:
 

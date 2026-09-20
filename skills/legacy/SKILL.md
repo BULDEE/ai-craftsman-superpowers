@@ -7,6 +7,14 @@ disable-model-invocation: true
 
 # /craftsman:legacy - Legacy Code Rescue
 
+
+> The commands below call `craftsman-path`, which prints an absolute path
+> inside this installation. The plugin's `bin/` is on PATH in the Claude Code
+> Bash tool; on a host where it is not, call it by its full path
+> (`<plugin root>/bin/craftsman-path`). Do not use `${CLAUDE_PLUGIN_ROOT}` in a
+> skill body: a skill is text handed to a model, the host expands nothing there,
+> and Claude Code does not export that variable to the Bash tool.
+
 ## Outcome Contract
 
 - **Outcome**: control regained over untested code: a prioritized hotspot backlog, characterization tests, or a strangler-fig migration plan.
@@ -74,7 +82,7 @@ When `--from` is given, use that data as the **complexity** axis and still compu
 0. **Detect the project's own tooling FIRST.** The plugin consumes what the stack already declares; it never imposes a second opinion:
 
    ```bash
-   python3 "${CLAUDE_PLUGIN_ROOT}/hooks/lib/tooling_detect.py" "$PWD"
+   python3 "$(craftsman-path hooks/lib/tooling_detect.py)" "$PWD"
    ```
 
    - Tools declared → run their report command and use it as the complexity axis (same as `--from`, without asking the user for a path).
@@ -94,7 +102,7 @@ When `--from` is given, use that data as the **complexity** axis and still compu
 
    ```bash
    # Command-time only (never in a hook). Ranks top-right first; --json for data.
-   python3 "${CLAUDE_PLUGIN_ROOT}/hooks/lib/hotspot_analysis.py" --since 12.month --top 30
+   python3 "$(craftsman-path hooks/lib/hotspot_analysis.py)" --since 12.month --top 30
    ```
 
    The **top-right** quadrant (complex AND churning) is where the effort belongs.

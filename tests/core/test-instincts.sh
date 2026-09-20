@@ -490,10 +490,64 @@ else
     log_fail "prompt injection" "untrusted text reached the skill body as its own line"
 fi
 
+
+# The destination is the host's, and Codex reads .agents/skills/<name>/SKILL.md
+# (documented at learn.chatgpt.com/docs/build-skills, and listed by
+# `codex debug prompt-input` on 0.154.0). An approval into .claude/skills on a
+# Codex machine produced a file Codex never loaded (audit CR-117, C5); the
+# same depth rule holds there: .agents/skills exactly, nothing deeper.
+# The first approve above migrated the table (one more column), so the columns are named.
+sqlite3 "$INJ_DB" "INSERT INTO instincts(id,project_hash,rule,pattern_summary,occurrences,distinct_files,confidence,status,created_at,reviewed_at) VALUES(30,'p1','PY002','x',5,3,0.95,'candidate',datetime('now'),NULL);" 2>/dev/null
+mkdir -p "$INJ_DIR/.agents/skills"
+(cd "$INJ_DIR" && python3 "$INSTINCTS" approve "$INJ_DB" 30 "$INJ_DIR/.agents/skills") >/dev/null 2>&1
+AGENTS_SKILL="$INJ_DIR/.agents/skills/learned-py002/SKILL.md"
+if [[ -f "$AGENTS_SKILL" ]] && grep -q '^name: learned-py002$' "$AGENTS_SKILL"; then
+    log_pass "an approval into .agents/skills (Codex) writes the skill with the name field Codex requires"
+else
+    log_fail "Codex skills destination" "$(ls -R "$INJ_DIR/.agents" 2>/dev/null | tr '\n' ' ') $(head -3 "$AGENTS_SKILL" 2>/dev/null | tr '\n' '|')"
+fi
+sqlite3 "$INJ_DB" "INSERT INTO instincts(id,project_hash,rule,pattern_summary,occurrences,distinct_files,confidence,status,created_at,reviewed_at) VALUES(31,'p1','PY003','x',5,3,0.95,'candidate',datetime('now'),NULL);" 2>/dev/null
+DEEP_RC=0
+(cd "$INJ_DIR" && python3 "$INSTINCTS" approve "$INJ_DB" 31 "$INJ_DIR/.agents/skills/deeper") >/dev/null 2>&1 || DEEP_RC=$?
+if [[ "$DEEP_RC" != "0" && ! -d "$INJ_DIR/.agents/skills/deeper" ]]; then
+    log_pass "a depth under .agents/skills that Codex does not read is refused like the Claude one"
+else
+    log_fail "Codex depth refusal" "rc=$DEEP_RC"
+fi
+# Exactly the four host directories: a nested project/x/.agents/skills passed
+# the name test and is a place no host reads (review of ff99dd5, F4).
+sqlite3 "$INJ_DB" "INSERT INTO instincts(id,project_hash,rule,pattern_summary,occurrences,distinct_files,confidence,status,created_at,reviewed_at) VALUES(32,'p1','PY004','x',5,3,0.95,'candidate',datetime('now'),NULL);" 2>/dev/null
+NESTED_RC=0
+(cd "$INJ_DIR" && python3 "$INSTINCTS" approve "$INJ_DB" 32 "$INJ_DIR/nested/.agents/skills") >/dev/null 2>&1 || NESTED_RC=$?
+if [[ "$NESTED_RC" != "0" && ! -d "$INJ_DIR/nested" ]]; then
+    log_pass "a .agents/skills nested below the project root is refused: only the root and \$HOME are read"
+else
+    log_fail "nested skills dir" "rc=$NESTED_RC"
+fi
+# a learned-<rule> directory pre-created as a symlink out of the project is refused
+sqlite3 "$INJ_DB" "INSERT INTO instincts(id,project_hash,rule,pattern_summary,occurrences,distinct_files,confidence,status,created_at,reviewed_at) VALUES(33,'p1','PY005','x',5,3,0.95,'candidate',datetime('now'),NULL);" 2>/dev/null
+OUTSIDE_SKILL="$INJ_DIR/../outside-skill-$$"; mkdir -p "$OUTSIDE_SKILL"
+ln -s "$OUTSIDE_SKILL" "$INJ_DIR/.agents/skills/learned-py005"
+LINK_RC=0
+(cd "$INJ_DIR" && python3 "$INSTINCTS" approve "$INJ_DB" 33 "$INJ_DIR/.agents/skills") >/dev/null 2>&1 || LINK_RC=$?
+if [[ "$LINK_RC" != "0" && ! -e "$OUTSIDE_SKILL/SKILL.md" ]]; then
+    log_pass "a learned skill directory that is a symlink out of the project is refused, nothing written through it"
+else
+    log_fail "symlinked skill dir" "rc=$LINK_RC $(ls "$OUTSIDE_SKILL" | tr '\n' ' ')"
+fi
+rm -rf "$OUTSIDE_SKILL"
+if grep -q '^name: ' "$INJ_SKILL"; then
+    log_pass "the Claude destination's skill carries the same name field (valid for both hosts)"
+else
+    log_fail "name field on Claude destination" "missing"
+fi
+
 # skills_dir is raw argv, and a generated skill only means something inside the
 # project or the user's own Claude configuration. Anywhere else is a write
 # primitive, not a feature.
-sqlite3 "$INJ_DB" "INSERT INTO instincts VALUES(2,'p1','TS002','x',5,3,0.95,'candidate',datetime('now'),NULL);" 2>/dev/null
+# Named columns: the approve above migrated the table, and a positional insert
+# failed in silence, which made the refusal below pass for the wrong reason.
+sqlite3 "$INJ_DB" "INSERT INTO instincts(id,project_hash,rule,pattern_summary,occurrences,distinct_files,confidence,status,created_at,reviewed_at) VALUES(2,'p1','TS002','x',5,3,0.95,'candidate',datetime('now'),NULL);" 2>/dev/null
 OUTSIDE="$INJ_DIR/../outside-$$"
 (cd "$INJ_DIR" && python3 "$INSTINCTS" approve "$INJ_DB" 2 "$OUTSIDE") >/dev/null 2>&1
 if [[ ! -d "$OUTSIDE" ]]; then
@@ -506,7 +560,7 @@ rm -rf "$OUTSIDE"
 # metrics-db.sh validates a rule id before writing one, but this module reads
 # rows a previous version wrote, and rows written by anything else pointed at
 # the same database.
-sqlite3 "$INJ_DB" "INSERT INTO instincts VALUES(3,'p1','../../etc/passwd','x',5,3,0.95,'candidate',datetime('now'),NULL);" 2>/dev/null
+sqlite3 "$INJ_DB" "INSERT INTO instincts(id,project_hash,rule,pattern_summary,occurrences,distinct_files,confidence,status,created_at,reviewed_at) VALUES(3,'p1','../../etc/passwd','x',5,3,0.95,'candidate',datetime('now'),NULL);" 2>/dev/null
 INJ_RC=0
 (cd "$INJ_DIR" && python3 "$INSTINCTS" approve "$INJ_DB" 3 "$INJ_DIR/.claude/skills") >/dev/null 2>&1 || INJ_RC=$?
 if [[ "$INJ_RC" -ne 0 ]]; then

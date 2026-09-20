@@ -18,7 +18,6 @@ Senior Domain-Driven Design methodology. Use for creating entities, value object
 
 
 # the craftsman-design skill - Senior Domain-Driven Design
-
 ## Outcome Contract
 
 - **Outcome**: a domain model (entity, value object, or aggregate) with an explicit persistence mapping and stated trade-offs.

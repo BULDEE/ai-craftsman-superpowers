@@ -2,7 +2,7 @@
 
 The plugin uses Claude Code hooks to automatically enforce code quality rules. Hooks run as shell scripts and agent prompts triggered by Claude Code events.
 
-**12 hook events wired**, documented below as two groups by what the hook checks: deterministic quality-gate scripts, and headless-Haiku semantic checks ([ADR-0018](../adr/0018-native-prompt-agent-hooks.md)).
+**12 hook events wired** on Claude Code, every handler with its own `statusMessage` (the spinner text on Claude Code, the details and running text in the Codex hooks UI, whose row titles stay "Hook N" by that UI's own choice); a host loads what it loads, and `hooks/host-capabilities.json` records it per host from the host's own schema (Codex 0.154.0 loads none of `TaskCompleted`, `PostToolUseFailure`, `FileChanged`, so the evidence gate at task completion, failure tracking with test-failure revocation, and external edit tracking are not active there, which `/craftsman:healthcheck` states rather than counts). Documented below as two groups by what the hook checks: deterministic quality-gate scripts, and headless-Haiku semantic checks ([ADR-0018](../adr/0018-native-prompt-agent-hooks.md)).
 
 ## Hook Events
 
@@ -11,16 +11,17 @@ The plugin uses Claude Code hooks to automatically enforce code quality rules. H
 | Event | Hook | Purpose |
 |-------|------|---------|
 | SessionStart | `session-start.sh` | Initialization, config loading, first-run detection |
-| PreToolUse | `config-protection.sh` | Refuse writes that would tamper with plugin configuration |
-| PreToolUse | `pre-write-check.sh` | Judge the would-be file **before** it lands, through the same pack validators post-write runs, on a mirror of the workspace |
+| PreToolUse | `config-protection.sh` | Refuse writes that would tamper with plugin configuration; reads a Write/Edit `file_path` or every file a Codex `apply_patch` names. The matchers stay Claude's names (`Write|Edit`, `Bash`): every host measured maps them to its own tools (Codex `apply_patch`, Grok `write`/`search_replace`/`run_terminal_command`), and the hook receives the host's name, which `hooks/lib/write_mirror.py` reads through one table (`WRITE_TOOL_KINDS`) |
+| PreToolUse | `pre-write-check.sh` | Judge the would-be file **before** it lands, through the same pack validators post-write runs, on a mirror of the workspace; a multi-file patch is judged file by file and refused as a whole |
 | PreToolUse | `pre-push-verify.sh` | Validate git push commands for safety |
-| PostToolUse | `post-write-check.sh` | Validate file **after** write (all rules) |
-| PostToolUse | `post-bash-test-verify.sh` | Read recorded test runs; a failing run revokes verification evidence |
+| PostToolUse | `post-write-check.sh` | Validate file **after** write (all rules); one run per file for a Codex `apply_patch` |
+| PostToolUse | `post-bash-test-verify.sh` | A passing test run (Bash, or the TaskOutput that ends a background run) grants verification evidence; the result is decoded per host by `lib/tool_result.py`, and a host whose event carries no exit code (Codex) grants and revokes nothing. A background run the model never polls with TaskOutput fires no hook event and stays pending |
 | PostToolUseFailure | `tool-failure-tracker.sh` | Record failed tool calls for correction learning |
+| PostToolUseFailure | `post-bash-test-verify.sh` | A failing test run is this event on Claude Code (`error: "Exit code N"`); it revokes the evidence whenever the failing command ENDS on a test runner, because after such a failure "the suite passed in this session" is no longer a claim this layer can make, and doubt must revoke what gates a push. The session is woken (exit 2, "REGRESSED") only when the runner is the whole command: which command failed in `cd api && pytest` is not knowable from here, so that one revokes quietly and says how to grant the evidence again |
 | TaskCompleted | `task-completed-verify.sh` | Evidence gate: block a task from being marked complete without verification ([ADR-0023](../adr/0023-deterministic-verification-loop.md)) |
 | UserPromptSubmit | `bias-detector.sh` | Detect cognitive biases in prompts |
 | FileChanged | `file-changed.sh` | Track file modifications for correction learning |
-| SubagentStop | `subagent-quality-gate.sh` | Apply the quality gate to work produced by a subagent |
+| SubagentStop | `subagent-quality-gate.sh` | Apply the quality gate to work produced by a subagent | Reads `agent_transcript_path` (the subagent's transcript; `transcript_path` on this event is the parent's) and judges nothing when it is absent, which is the Codex case
 | PreCompact | `pre-compact-save.sh` | Persist session state before context compaction |
 | PostCompact | `post-compact-verify.sh` | Restore and re-verify state after compaction |
 | SessionEnd | `session-metrics.sh` | Record session summary to metrics database |
@@ -31,13 +32,32 @@ finding blocks or only warns.
 
 ### Agent Hooks (v1.3.0+)
 
-Agent hooks run AI models (Haiku) for semantic analysis beyond regex patterns:
+## What the write gate does not see
+
+The gate judges the host's WRITE tools (`Write`, `Edit`, `apply_patch`,
+`write`, `search_replace`, `write_file`, `patch`). A file written by a shell
+command the model runs is not one of them: `printf '<?php ...' > src/Domain/Order.php`
+lands with every hook enabled and trusted (measured on Codex 0.154.0,
+2026-09-20, with the plugin installed natively). The Bash hook receives a
+command line, not a file, and refusing on a regex over command lines would
+block `sed` in a Makefile and miss `python3 write.py`. What catches those
+writes is the layer that reads the tree rather than the call: the post-write
+validation of files the session touched, `ci/craftsman-ci.sh` on the diff,
+and `pre-push-verify.sh` before the push.
+
+Delivery of a background verdict is the host's, and not every host has one.
+Claude Code wakes the session on exit 2 (`asyncRewake`). Codex cancels
+unfinished background hooks at shutdown and does not wake an idle session, so
+a verdict that must be acted on belongs in a synchronous gate there, never in
+an async hook that assumes a continuation.
+
+Agent hooks run a model for semantic analysis beyond regex patterns. The backend is a boundary chosen once per hook run by `semantic_backend` (`CRAFTSMAN_REVIEW_BACKEND`, then `review: backend:` in the global `.craft-config.yml`, else auto: `claude -p` when `claude` is on PATH, `codex exec` read-only and ephemeral when `codex` is, else none). The prompts, the shape filter on the reply and the telemetry are shared; `unavailable` and `failed` are recorded as such and never read as clean, and every `haiku_runs` row names the backend that answered (a review Claude answered from a Codex session is not a Claude Code session). Delivery is the host's: Claude Code wakes the session on exit 2 (asyncRewake); Codex delivers a background hook's output at its next safe point and does not wake an idle session. Agent hooks:
 
 | Event | Agent | Model | Purpose | Timeout |
 |-------|-------|-------|---------|---------|
 | PostToolUse | DDD Verifier | Haiku | Layer violations, aggregate boundaries, value objects, naming | 30s |
 | InstructionsLoaded | Project Analyzer | Haiku | Architectural context map + correction trends + channel status | 20s |
-| Stop | Sentry Context | Haiku | Error context from Sentry MCP for edited files | 30s |
+| Stop | Sentry Context | none (no model call) | Asks for Sentry error context on the files this session wrote (the write log post-write-check.sh keeps; a Stop payload names no file). The request is shown to the user at Stop and handed to the model as `additionalContext` on the next UserPromptSubmit, once: a Stop hook has no model-visible channel on either host short of forcing a continuation | 30s |
 | Stop | Final Reviewer | Haiku | Architecture validation before session end (strict mode only) | 30s |
 
 **DDD Verifier** checks:

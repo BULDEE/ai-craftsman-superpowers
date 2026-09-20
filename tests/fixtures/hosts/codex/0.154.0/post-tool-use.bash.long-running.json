@@ -1,0 +1,15 @@
+{
+  "session_id": "01a0a47b-7f66-7522-a1fa-6d94ae7cafbf",
+  "turn_id": "01a0a47b-7fe7-7301-a880-4bdf88865d13",
+  "transcript_path": null,
+  "cwd": "__WORKSPACE__",
+  "hook_event_name": "PostToolUse",
+  "model": "gpt-6-astra",
+  "permission_mode": "default",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "sleep 12; echo slow-done"
+  },
+  "tool_response": "slow-done\n",
+  "tool_use_id": "exec-5a38b4cd-1a1f-431f-af9f-76114f3824c3"
+}

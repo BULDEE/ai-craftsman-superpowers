@@ -28,16 +28,13 @@ if echo "$TASK_SUBJECT" | grep -qiE '^(docs?|documentation|readme|changelog|adr)
     exit 0
 fi
 
-_BRIDGE_FILE="${HOME}/.claude/craftsman-session-state-path"
-if [[ -f "$_BRIDGE_FILE" ]]; then
-    SESSION_STATE=$(< "$_BRIDGE_FILE")
-    # The bridge names the shared file; this session's own sits beside it.
-    source "${SCRIPT_DIR}/lib/session-files.sh"
-    [[ -n "${CLAUDE_CODE_SESSION_ID:-}" ]] && SESSION_STATE="$(dirname "$SESSION_STATE")/$(basename "$(session_file session-state.json)")"
-else
-    source "${SCRIPT_DIR}/lib/session-files.sh"
-    SESSION_STATE=$(session_file session-state.json)
-fi
+# This session's file, named by the payload's session_id (lib/session-files.sh).
+# The ~/.claude bridge is for skills in the Bash tool, which have no payload;
+# a hook has one and does not read a machine-wide pointer another host's
+# session may have written.
+source "${SCRIPT_DIR}/lib/session-files.sh"
+session_files_bind "$INPUT"
+SESSION_STATE=$(session_file session-state.json)
 
 VERIFIED=$(python3 "${SCRIPT_DIR}/lib/session_state.py" check-flag "$SESSION_STATE" verified 2>/dev/null || echo "false")
 [[ "$VERIFIED" == "true" ]] && exit 0

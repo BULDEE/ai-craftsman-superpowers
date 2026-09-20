@@ -1,0 +1,11 @@
+{
+  "session_id": "01a0a47b-7f66-7522-a1fa-6d94ae7cafbf",
+  "turn_id": "01a0a47b-7fe7-7301-a880-4bdf88865d13",
+  "transcript_path": null,
+  "cwd": "__WORKSPACE__",
+  "hook_event_name": "Stop",
+  "model": "gpt-6-astra",
+  "permission_mode": "default",
+  "stop_hook_active": false,
+  "last_assistant_message": "done"
+}
