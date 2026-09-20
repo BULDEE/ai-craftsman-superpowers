@@ -201,10 +201,10 @@ HC_CWD=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-hc-cwd.XXXXXX")
 HC_OUT=$(cd "$HC_CWD" && env -u CLAUDE_PLUGIN_ROOT PATH="$ROOT_DIR/bin:$PATH" \
     CLAUDE_PLUGIN_DATA="$CLAUDE_PLUGIN_DATA" \
     CLAUDECODE=1 CLAUDE_CODE_SESSION_ID=hc-skill bash -c "$SKILL_CMD" 2>/dev/null)
-HC_HOST=$(printf '%s' "$HC_OUT" | jq -r '.. | objects | select(.name? == "host") | "\(.status) \(.message)"' 2>/dev/null)
-HC_HOOKS=$(printf '%s' "$HC_OUT" | jq -r '.. | objects | select(.name? == "hooks") | "\(.status) \(.message)"' 2>/dev/null)
+HC_HOST=$(printf '%s' "$HC_OUT" | awk '$2 == "host" {sub(/^ +/, ""); print}')
+HC_HOOKS=$(printf '%s' "$HC_OUT" | awk '$2 == "hooks" {sub(/^ +/, ""); print}')
 rm -rf "$HC_CWD"
-if [[ "$HC_HOST" == ok*claude-code* && "$HC_HOOKS" == ok* \
+if [[ "$HC_HOST" == "[ok]"*claude-code* && "$HC_HOOKS" == "[ok]"* \
     && "$HC_HOOKS" != *"not recorded"* && "$HC_HOOKS" != *"loaded events unknown"* ]]; then
     log_pass "the skill's own command line, run from the user's project, names the host and reads this installation's hooks.json"
 else
@@ -215,12 +215,31 @@ fi
 # it: a session displayed `lsp: warn, none installed` as ok with an invented
 # count and called the report ALL GREEN (2026-09-20).
 HC_SKILL="$ROOT_DIR/skills/healthcheck/SKILL.md"
-if grep -q "Never raise a" "$HC_SKILL" && grep -q "never write \"ALL GREEN\" while any check is not" "$HC_SKILL" \
+if grep -q "Never raise" "$HC_SKILL" && grep -q "as it came" "$HC_SKILL" \
     && ! grep -q "Status: ALL GREEN" "$HC_SKILL"; then
-    log_pass "the healthcheck skill forbids raising a status, inventing a check or reporting ALL GREEN over a warning"
+    log_pass "the healthcheck skill shows the command's own rendering and forbids raising a status or heading it ALL GREEN"
 else
     log_fail "healthcheck skill rendering rules" "$(grep -c "ALL GREEN" "$HC_SKILL") ALL GREEN mentions"
 fi
+
+# A hook process gets a narrower PATH than the Bash tool of the same session:
+# the SessionStart banner said "lsp: none installed" while the same check,
+# run from that session's shell, found four servers (2026-09-20). The user
+# was told to install what was installed.
+LSP_HOME=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-lsp-home.XXXXXX")
+mkdir -p "$LSP_HOME/.local/bin"
+LSP_SERVER=$(lang_all_known_capability lsp 2>/dev/null | head -1)
+printf '#!/bin/sh\nexit 0\n' > "$LSP_HOME/.local/bin/$LSP_SERVER"; chmod +x "$LSP_HOME/.local/bin/$LSP_SERVER"
+LSP_OUT=$(cd "$ROOT_DIR" && env -i HOME="$LSP_HOME" PATH=/usr/bin:/bin CLAUDE_PLUGIN_ROOT="$ROOT_DIR" \
+    CLAUDE_PLUGIN_DATA="$CLAUDE_PLUGIN_DATA" bash -c '
+        source hooks/lib/config.sh; source hooks/lib/pack-loader.sh; pack_loader_init 2>/dev/null
+        source hooks/lib/healthcheck.sh; hc_check_lsp; printf "%s|%s" "${_HC_STATUSES[0]}" "${_HC_MESSAGES[0]}"' 2>/dev/null)
+if [[ "$LSP_OUT" == ok\|*"$LSP_SERVER"* ]]; then
+    log_pass "a language server installed under ~/.local/bin is found by a hook whose PATH does not carry it"
+else
+    log_fail "lsp lookup beyond the hook PATH" "server=$LSP_SERVER out=$(printf '%s' "$LSP_OUT" | cut -c1-90)"
+fi
+rm -rf "$LSP_HOME"
 
 # Declared is not loaded: hooks/host-capabilities.json says which events each
 # host loads (Codex 0.154.0: not TaskCompleted, PostToolUseFailure, FileChanged,

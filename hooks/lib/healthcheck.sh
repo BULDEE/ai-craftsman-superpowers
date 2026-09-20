@@ -239,12 +239,24 @@ hc_check_hooks_declared() {
 # a plugin error when the binary is missing, so LSP wiring belongs to the
 # official per-language plugins the user opts into.
 # Which server serves which language is the packs' knowledge, not a literal list.
+# A hook process gets a narrower PATH than the user's shell: measured
+# 2026-09-20, the SessionStart banner said "lsp: none installed" while the
+# same check run from the Bash tool of the same session found four servers
+# (/opt/homebrew/bin and ~/.local/bin are on one PATH and not the other), so
+# the banner told the user to install what was already installed. The
+# language servers are user installs, so the usual user locations are
+# searched too, and the wording says where it looked.
+_hc_lookup_path() {
+    printf '%s' "${PATH}:${HOME}/.local/bin:/opt/homebrew/bin:/usr/local/bin:${HOME}/.cargo/bin:${HOME}/go/bin:${HOME}/.composer/vendor/bin"
+}
+
 _hc_installed_servers() {
-    local language server
+    local language server lookup
+    lookup=$(_hc_lookup_path)
     while IFS= read -r language; do
         server=$(lang_capability "$language" lsp 2>/dev/null)
         [[ -z "$server" ]] && continue
-        command -v "$server" >/dev/null 2>&1 && printf ' %s(%s)' "$server" "$language"
+        PATH="$lookup" command -v "$server" >/dev/null 2>&1 && printf ' %s(%s)' "$server" "$language"
     done <<< "$(lang_known_registered 2>/dev/null)"
 }
 
@@ -257,7 +269,7 @@ hc_check_lsp() {
         # The servers come from the packs' `lsp` capability, so a pack added
         # later names its own; the plugin side is Claude Code's official LSP
         # plugin for that server.
-        hints="none installed - Level 1.5 inactive; install one of the language servers the packs declare ($(lang_all_known_capability lsp 2>/dev/null | tr '\n' ' ' | sed 's/ $//')) plus the official Claude Code LSP plugin for it"
+        hints="none found on this process's PATH nor in the usual user install locations - Level 1.5 inactive; install one of the language servers the packs declare ($(lang_all_known_capability lsp 2>/dev/null | tr '\n' ' ' | sed 's/ $//')) plus the official Claude Code LSP plugin for it"
         _hc_record "lsp" "warn" "$hints"
     fi
 }

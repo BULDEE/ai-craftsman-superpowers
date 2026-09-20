@@ -32,26 +32,24 @@ Run a full health check of your AI Craftsman Superpowers installation.
 craftsman-healthcheck
 ```
 
-   It prints one JSON array and nothing else. Run it verbatim: do not source
+   It prints the finished report: one line per check, `[ok]`, `[warn]` or
+   `[err]`, then the counts. Run it verbatim: do not source
    libraries yourself, do not look for plugin files in the user's project
    (this command lives in the installation and resolves its own paths), and
    do not invent checks. If it is not found, the plugin's `bin/` is not on
    PATH: call it by full path rather than replacing it with a diagnosis of
    your own. Report a failure of this command as the finding it is.
 
-2. Present every check the JSON contains, with the status the JSON gives it
-   and the message the JSON gives it:
-   - `ok` → checkmark
-   - `warn` → warning sign, and the message names the action that clears it
-   - `error` → error sign, and the message names the fix
+2. Show that output to the user as it came, every line of it. The command
+   already did the rendering; a diagnostic the assistant redraws is a
+   diagnostic the assistant can improve, and one that flatters the
+   installation is worse than none, because the user acts on it. Never raise
+   a `[warn]` or an `[err]` to ok, never head the report "ALL GREEN" while a
+   check is not ok, and never add a check the command did not print. Comment
+   BELOW the output, not inside it.
 
-   The report is a reading of that JSON and nothing else. Never raise a
-   `warn` or an `error` to ok, never write "ALL GREEN" while any check is not
-   ok, never add a check the JSON does not contain, and never restate a
-   message as a count you inferred (a session rendered `lsp: warn, none
-   installed` as "LSP ok, 4 servers active" and called the whole report ALL
-   GREEN, 2026-09-20). A diagnostic that flatters the installation is worse
-   than no diagnostic: the user acts on it.
+   `craftsman-healthcheck --json` gives the same checks as an array when you
+   need to read them programmatically.
 
 3. Format as a clear diagnostic report:
 
