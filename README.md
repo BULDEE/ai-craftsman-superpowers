@@ -169,21 +169,18 @@ grok plugin marketplace add /path/to/ai-craftsman-superpowers
 grok plugin install craftsman --trust
 ```
 
-Grok 1.0.34 has a native startup defect: a trusted, enabled plugin can report
-hooks while none of its handlers reaches the execution registry. Reloading in
-`/hooks` or `/plugins` adds the native handlers. A real native control accepted
-a valid write and refused its forbidden fixture after this reload, without
-exported hooks. Verify `plugin/craftsman/` handler execution in your session.
-The missed initial `SessionStart` is not replayed, so this is not full automatic
-startup parity. A refusal appears as `failed` with `blocked: true` in hook events.
-After reload, the next native prompt hook binds the session to its own data
-store, so state and metrics helpers work even when that initial event was missed.
-It uses the store supplied by the native hook, never a guessed Claude path.
-
-`bin/craftsman-grok-install` defaults to native installation and does not export
-hooks. Existing compatibility wiring remains supported explicitly through
-`bin/craftsman-grok-install --compat-hooks` or `craftsman-ci export --target
-grok-hooks`. These files are a compatibility option, not native plugin hooks.
+Grok 1.0.40 does not run plugin-bundled hooks. A fresh `grok -p` wrote its
+target file while an inline PreToolUse marker stayed empty, and `hooks.json`
+stays a file reference. `bin/craftsman-grok-install` installs the plugin and
+writes `~/.grok/hooks/craftsman.json`, which is the gate that runs. Global
+hooks are always trusted. `--compat-hooks` writes that same file.
+`craftsman-ci export --target grok-hooks` is the same write. Project hooks in
+`.grok/hooks` still need `grok --trust` or `/hooks-trust`. A refusal appears
+as `failed` with `blocked: true`. A reload in `/hooks` was measured on 1.0.34
+and does not replay the missed initial `SessionStart`. Slash names are `/name`,
+except `/plan`, `/loop` and `/workflow`, which Grok already owns, so those
+three skills stay `/craftsman:name`. A name another plugin already owns is
+also shown as `/craftsman:name`.
 Session state and metrics are bound to the host and session; an unbound native
 session reports missing state instead of using another host's data.
 

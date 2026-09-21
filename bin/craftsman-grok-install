@@ -13,11 +13,11 @@ case "$MODE" in
     *) echo "Usage: craftsman-grok-install [--native|--compat-hooks]" >&2; exit 2 ;;
 esac
 grok plugin install "$ROOT" --trust
-if [[ "$MODE" == "--compat-hooks" ]]; then
-    bash "$ROOT/ci/craftsman-ci.sh" export --target grok-hooks --into "${HOME}/.grok/hooks"
-    echo "Compatibility hooks written to ${HOME}/.grok/hooks/craftsman.json"
-    exit 0
-fi
-echo "Native plugin installed; no global or project hooks exported."
-echo "Grok 1.0.34 misses plugin hooks at startup: reload in /hooks or /plugins."
-echo "Check plugin/craftsman handlers and a refused write. Initial SessionStart is not replayed."
+# Grok 1.0.40 does not execute plugin-bundled hooks, whether hooks.json is a
+# path or the handlers are inlined in the manifest (a fresh grok -p wrote the
+# file and an inline PreToolUse marker never ran). The gate that runs is this
+# global file. --native and --compat-hooks both write it; the flag remains so
+# older instructions still work. Global hooks need no extra trust.
+bash "$ROOT/ci/craftsman-ci.sh" export --target grok-hooks --into "${HOME}/.grok/hooks"
+echo "Write gate: ${HOME}/.grok/hooks/craftsman.json"
+echo "Grok 1.0.40 does not run plugin-bundled hooks. This file is the gate."

@@ -53,8 +53,25 @@ B=$(_with "$WORK/bin-both" -- 'semantic_backend')
 [[ "$B" == "claude-cli" ]] && log_pass "auto: claude-cli when both CLIs are present" || log_fail "auto with both" "$B"
 B=$(_with "$WORK/bin-codex" -- 'semantic_backend')
 [[ "$B" == "codex-cli" ]] && log_pass "auto: codex-cli on a machine with codex and no claude" || log_fail "auto with codex" "$B"
+mkdir -p "$WORK/bin-grok"
+cat > "$WORK/bin-grok/grok" <<FAKE
+#!/bin/sh
+printf '%s\\n' "\$*" > "$WORK/grok.argv"; printf '%s' "\${CRAFTSMAN_HEADLESS_VERIFY:-unset}" > "$WORK/grok.guard"
+echo "DDD_VIOLATIONS"; echo "src/Domain/Order.php:5 imports Infrastructure (layer violation)"
+FAKE
+chmod +x "$WORK/bin-grok/grok"
+B=$(_with "$WORK/bin-grok" -- 'semantic_backend')
+[[ "$B" == "grok-cli" ]] && log_pass "auto: grok-cli when grok is the only review CLI" || log_fail "auto with grok" "$B"
 B=$(_with "" -- 'semantic_backend; echo; haiku_verify_possible && echo possible || echo impossible')
 [[ "$B" == $'none\nimpossible' ]] && log_pass "auto: none, and no verification is possible, with neither CLI" || log_fail "auto with none" "$B"
+OUT=$(_with "$WORK/bin-grok" -- 'haiku_verify "REVIEW THIS"; echo "[backend=$SEMANTIC_BACKEND_USED]"')
+if [[ "$OUT" == *"DDD_VIOLATIONS"* && "$OUT" == *"[backend=grok-cli]"* ]] \
+    && grep -q -- '--max-turns 4' "$WORK/grok.argv" && grep -q -- '--output-format plain' "$WORK/grok.argv" \
+    && grep -q -- 'search_replace,write,run_terminal_cmd' "$WORK/grok.argv" && [[ "$(cat "$WORK/grok.guard")" == "1" ]]; then
+    log_pass "grok-cli: grok -p read-only, guarded, backend recorded"
+else
+    log_fail "grok transport" "out=[$(printf '%s' "$OUT" | tr '\n' '|')] argv=[$(cat "$WORK/grok.argv" 2>/dev/null)] guard=$(cat "$WORK/grok.guard" 2>/dev/null)"
+fi
 B=$(_with "$WORK/bin-both" CRAFTSMAN_REVIEW_BACKEND=codex-cli -- 'semantic_backend')
 [[ "$B" == "codex-cli" ]] && log_pass "CRAFTSMAN_REVIEW_BACKEND overrides auto" || log_fail "env override" "$B"
 printf 'review:\n  backend: codex-cli\n' > "$WORK/global/.craft-config.yml"
