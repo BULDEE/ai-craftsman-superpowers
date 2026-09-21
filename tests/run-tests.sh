@@ -34,7 +34,8 @@ export CRAFTSMAN_METRICS_SOURCE="test"
 # Code exports into this very process when the suite runs from a session.
 # Unset, so every suite reads the shared path it asserts on (a test that wants
 # two sessions sets the id itself).
-unset CLAUDE_CODE_SESSION_ID
+unset CRAFTSMAN_PLUGIN_DATA GROK_PLUGIN_DATA PLUGIN_DATA
+unset CLAUDE_CODE_SESSION_ID CODEX_SESSION_ID CODEX_THREAD_ID GROK_SESSION_ID GROK_HOOK_EVENT CRAFTSMAN_SESSION_ID CRAFTSMAN_SESSION_HOST
 
 # Counters
 TESTS_PASSED=0
@@ -685,6 +686,7 @@ test_session_metrics() {
     run_subtest "Doctrine export tests pass" "$SCRIPT_DIR/ci/test-doctrine-export.sh" || true
     run_subtest "Rule registry tests pass" "$SCRIPT_DIR/ci/test-rule-registry.sh" || true
     run_subtest "Ratchet CI parity tests pass" "$SCRIPT_DIR/ci/test-ratchet-ci.sh" || true
+    run_subtest "Native manifest drift guard passes" "$SCRIPT_DIR/meta/test-native-manifests.sh" || true
     run_subtest "Release path tests pass" "$SCRIPT_DIR/meta/test-release.sh" || true
     run_subtest "Fresh install from the built archive passes" "$SCRIPT_DIR/meta/test-fresh-install.sh" || true
     run_subtest "Turn budget delivery tests pass" "$SCRIPT_DIR/core/test-turn-budget.sh" || true
@@ -694,6 +696,7 @@ test_session_metrics() {
     echo ""
     log_info "Testing session state library (unit)"
 
+    run_subtest "Native runtime paths tests pass" "$SCRIPT_DIR/core/test-runtime-paths.sh" || true
     run_subtest "Session state library tests pass" "$SCRIPT_DIR/core/test-session-state-lib.sh" || true
 }
 

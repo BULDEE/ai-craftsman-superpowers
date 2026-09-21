@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -uo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+COMMAND="${1:-}"
+shift || true
+case "$COMMAND" in
+    set-verified) exec python3 "$ROOT/hooks/lib/session_state.py" set-verified ;;
+    conventions) exec python3 "$ROOT/hooks/lib/conventions.py" "${1:-analyze}" "$PWD" "${@:2}" ;;
+    codemap) exec python3 "$ROOT/hooks/lib/codemap.py" "$PWD" ;;
+    knowledge) exec python3 "$ROOT/hooks/lib/knowledge_lookup.py" "$ROOT/knowledge" "$@" ;;
+esac
+DATA=$(python3 "$ROOT/hooks/lib/runtime_paths.py" data) || exit 1
+export CLAUDE_PLUGIN_DATA="$DATA"
+case "$COMMAND" in
+    dashboard) exec python3 "$ROOT/hooks/lib/dashboard.py" "$DATA/metrics.db" "$@" ;;
+    instincts)
+        source "$ROOT/hooks/lib/metrics-db.sh"
+        ACTION="${1:-candidates}"
+        shift || true
+        case "$ACTION" in
+            approve|reject|global-candidates|promote)
+                exec python3 "$ROOT/hooks/lib/instincts.py" "$ACTION" "$DATA/metrics.db" "$@" ;;
+            *) exec python3 "$ROOT/hooks/lib/instincts.py" "$ACTION" "$DATA/metrics.db" "$(metrics_project_hash)" "$@" ;;
+        esac ;;
+    *) echo 'Usage: craftsman-helper set-verified|conventions|codemap|knowledge|dashboard|instincts' >&2; exit 2 ;;
+esac

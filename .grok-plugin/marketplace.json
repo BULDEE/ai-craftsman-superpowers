@@ -17,9 +17,21 @@
         "name": "Alexandre Mallet",
         "email": "contact@buldee.com"
       },
-      "source": { "type": "local", "path": "./" },
+      "source": {
+        "type": "local",
+        "path": "./"
+      },
       "category": "development",
-      "tags": ["architecture", "quality", "php", "symfony", "react", "typescript", "ci", "rule-engine"]
+      "tags": [
+        "architecture",
+        "quality",
+        "php",
+        "symfony",
+        "react",
+        "typescript",
+        "ci",
+        "rule-engine"
+      ]
     }
   ]
 }

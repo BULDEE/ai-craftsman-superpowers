@@ -10,9 +10,9 @@
 #   metrics_record_session 120 '["design","entity"]' '[]' 3 2
 # =============================================================================
 
-METRICS_DB_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
-METRICS_DB="${METRICS_DB_DIR}/metrics.db"
 METRICS_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+METRICS_DB_DIR=$(python3 "${METRICS_LIB_DIR}/runtime_paths.py" data 2>/dev/null) || METRICS_DB_DIR=""
+METRICS_DB="${METRICS_DB_DIR:+${METRICS_DB_DIR}/metrics.db}"
 
 # DDL and reads used to require the sqlite3 binary while DML went through
 # python, so a host without the CLI (the Hermes image, before its Docker layer
@@ -321,6 +321,7 @@ _metrics_migrate_source_column() {
 # Everything now routes through _metrics_sql, so a missing CLI degrades to
 # the python fallback instead of an empty file and swallowed inserts.
 metrics_init() {
+    [[ -z "$METRICS_DB" ]] && return 0
     if ! _metrics_has_cli; then
         echo "craftsman: sqlite3 CLI not found, metrics use the python fallback" >&2
     fi
@@ -462,11 +463,13 @@ _METRICS_VIOLATIONS_QUEUE=""
 _METRICS_PROJECT_HASH=""
 
 metrics_violations_queue_open() {
+    [[ -z "$METRICS_DB" ]] && return 0
     _METRICS_VIOLATIONS_QUEUE="${METRICS_DB_DIR}/violations-queue.$$"
     : > "$_METRICS_VIOLATIONS_QUEUE" 2>/dev/null || _METRICS_VIOLATIONS_QUEUE=""
 }
 
 metrics_violations_queue_flush() {
+    [[ -z "$METRICS_DB" ]] && return 0
     local queue="$_METRICS_VIOLATIONS_QUEUE"
     _METRICS_VIOLATIONS_QUEUE=""
     [[ -n "$queue" && -s "$queue" ]] || { rm -f "$queue" 2>/dev/null; return 0; }
@@ -477,6 +480,7 @@ metrics_violations_queue_flush() {
 }
 
 metrics_record_violation() {
+    [[ -z "$METRICS_DB" ]] && return 0
     local rule="$1"
     local file_pattern="$2"
     local severity="$3"
@@ -513,7 +517,7 @@ _metrics_tally_session() {
     [[ "$ignored" == "1" ]] && kind="ignored"
     local tally="${METRICS_DB_DIR}/session-violations"
     if type session_file >/dev/null 2>&1; then
-        tally=$(session_file session-violations)
+        tally=$(CLAUDE_PLUGIN_DATA="$METRICS_DB_DIR" session_file session-violations)
     elif [[ -n "${CRAFTSMAN_SESSION_ID:-${CODEX_SESSION_ID:-${CLAUDE_CODE_SESSION_ID:-}}}" ]]; then
         tally="${METRICS_DB_DIR}/session-violations-$(printf '%s' "${CRAFTSMAN_SESSION_ID:-${CODEX_SESSION_ID:-$CLAUDE_CODE_SESSION_ID}}" | tr -cd 'A-Za-z0-9_-' | cut -c1-64)"
     fi
@@ -522,6 +526,7 @@ _metrics_tally_session() {
 
 # metrics_record_haiku_run <hook> <verdict> <findings> <duration_ms> [file]
 metrics_record_haiku_run() {
+    [[ -z "$METRICS_DB" ]] && return 0
     local hook="$1" verdict="$2" findings="${3:-0}" duration_ms="${4:-0}" file="${5:-}"
     case "$verdict" in
         clean|findings|unavailable) ;;
@@ -551,6 +556,7 @@ metrics_record_haiku_run() {
 # metrics_haiku_last_finding_hash <file>: the content hash recorded with the
 # most recent run that reported findings on this file, empty when none.
 metrics_haiku_last_finding_hash() {
+    [[ -z "$METRICS_DB" ]] && return 0
     local file="$1"
     local project_hash pattern
     project_hash=$(metrics_project_hash)
@@ -572,6 +578,7 @@ metrics_haiku_last_finding_hash() {
 # on the same file, so the honest comparison is against its own previous
 # verdict.
 metrics_haiku_previous_rules() {
+    [[ -z "$METRICS_DB" ]] && return 0
     local file="$1"
     local project_hash relative
     project_hash=$(metrics_project_hash)
@@ -586,6 +593,7 @@ metrics_haiku_previous_rules() {
 }
 
 metrics_record_session() {
+    [[ -z "$METRICS_DB" ]] && return 0
     local duration="$1"
     local skills="$2"
     local agents="$3"
@@ -600,6 +608,7 @@ metrics_record_session() {
 }
 
 metrics_violations_7d() {
+    [[ -z "$METRICS_DB" ]] && return 0
     local project_hash
     project_hash=$(metrics_project_hash)
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
@@ -608,6 +617,7 @@ metrics_violations_7d() {
 }
 
 metrics_trend() {
+    [[ -z "$METRICS_DB" ]] && return 0
     local project_hash
     project_hash=$(metrics_project_hash)
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
@@ -616,6 +626,7 @@ metrics_trend() {
 }
 
 metrics_record_correction() {
+    [[ -z "$METRICS_DB" ]] && return 0
     local rule="$1"
     local file_pattern="$2"
     local action="$3"
@@ -640,6 +651,7 @@ metrics_record_correction() {
 #   2. the fixed rate of Haiku findings, comparable to Level 1's own.
 #   3. Haiku seconds spent per accepted finding.
 metrics_haiku_report() {
+    [[ -z "$METRICS_DB" ]] && return 0
     local days="${1:-30}"
     local project_hash
     project_hash=$(metrics_project_hash)
@@ -653,7 +665,8 @@ metrics_haiku_report() {
 # from "this rule is inconvenient". Refuses anything but the two words: a
 # verdict column that accepts free text stops being a measurement.
 metrics_record_verdict() {
-    local rule="$1" verdict="$2" file="${3:-}" reason="${4:-}" source="${5:-review}"
+    [[ -z "$METRICS_DB" ]] && return 0
+    local rule="$1" verdict="$2" file="${3:-}" reason="${4:-}" source="${5:-review}" project_hash relative
     _metrics_rule_is_valid "$rule" || return 0
     case "$verdict" in
         right|wrong) ;;
@@ -672,7 +685,6 @@ metrics_record_verdict() {
         echo "craftsman: metrics_record_verdict: no such file '${file}', verdict not recorded" >&2
         return 0
     fi
-    local project_hash relative
     project_hash=$(metrics_project_hash)
     relative=$(metrics_relative_path "$file")
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
@@ -709,6 +721,7 @@ metrics_ignore_verdict() {
 # with no recorded outcome (#44). A script, not rows for a model to add up:
 # it proposes relaxing a gate.
 metrics_acceptance_report() {
+    [[ -z "$METRICS_DB" ]] && return 0
     # The day count is optional and comes first; `--threshold 40` alone must
     # not read 40 as the day count.
     local days=90
@@ -719,6 +732,7 @@ metrics_acceptance_report() {
 }
 
 metrics_corrections_30d() {
+    [[ -z "$METRICS_DB" ]] && return 0
     local project_hash
     project_hash=$(metrics_project_hash)
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
@@ -728,6 +742,7 @@ metrics_corrections_30d() {
 
 # Correction learning summary for SessionStart injection
 metrics_correction_trends() {
+    [[ -z "$METRICS_DB" ]] && return 0
     local project_hash
     project_hash=$(metrics_project_hash)
     python3 -c "
@@ -762,6 +777,7 @@ db.close()
 # project-scoped query from its cwd returns nothing; habits are per machine
 # anyway (ADR-0029 inject).
 metrics_correction_trends_global() {
+    [[ -z "$METRICS_DB" ]] && return 0
     python3 -c "
 import sqlite3, sys
 db = sqlite3.connect(sys.argv[1])

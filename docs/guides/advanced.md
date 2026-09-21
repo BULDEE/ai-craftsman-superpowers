@@ -343,12 +343,14 @@ The plugin's methodology knowledge lives in `knowledge/` as an [Open Knowledge F
 
 Deterministic lookup, no embeddings:
 
+If `craftsman-path` is not on PATH, use `<installed plugin root>/bin/craftsman-helper` directly.
+
 ```bash
 # Which concept explains a rule the gate just flagged?
-bash ~/.claude/craftsman-knowledge.sh by-rule LAYER004
+bash "$(craftsman-path bin/craftsman-helper)" knowledge by-rule LAYER004
 
 # Everything about persistence
-bash ~/.claude/craftsman-knowledge.sh by-tag persistence
+bash "$(craftsman-path bin/craftsman-helper)" knowledge by-tag persistence
 ```
 
 To extend it, add a Markdown file with frontmatter under `knowledge/` (or your project's own bundle) and it becomes routable immediately: no re-indexing step exists because there is no index. Lesson 1 (RAG pipeline design) still applies when YOU build retrieval products; the plugin itself does not need one for 35 curated files.

@@ -134,8 +134,10 @@ Format, ADR-0024): no index, no embeddings, no external service. When a rule
 fires, the block message already points at the concept that explains it. To
 look one up yourself:
 
+If `craftsman-path` is not on PATH, use `<installed plugin root>/bin/craftsman-helper` directly.
+
 ```bash
-bash ~/.claude/craftsman-knowledge.sh by-rule LAYER001
+bash "$(craftsman-path bin/craftsman-helper)" knowledge by-rule LAYER001
 ```
 
 Returns the note whose frontmatter declares that rule, from the core bundle or

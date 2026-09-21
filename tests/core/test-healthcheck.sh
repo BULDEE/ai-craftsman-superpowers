@@ -126,7 +126,7 @@ export HOME="$_ORIG_HOME"
 # Test: agent-teams check is ok in BOTH modes - absence of the experimental
 # flag is a mode (degraded parallel dispatch), never a fault
 _HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
-CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="" hc_check_agent_teams
+CRAFTSMAN_SESSION_HOST=claude-code CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="" hc_check_agent_teams
 if [[ "${_HC_STATUSES[0]}" == "ok" && "${_HC_MESSAGES[0]}" == *"degraded"* ]]; then
     log_pass "hc_check_agent_teams: ok + degraded-mode message without the flag"
 else
@@ -134,7 +134,7 @@ else
 fi
 
 _HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
-CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="1" hc_check_agent_teams
+CRAFTSMAN_SESSION_HOST=claude-code CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="1" hc_check_agent_teams
 if [[ "${_HC_STATUSES[0]}" == "ok" && "${_HC_MESSAGES[0]}" == *"native"* ]]; then
     log_pass "hc_check_agent_teams: ok + native message with the flag"
 else
@@ -257,7 +257,7 @@ CX_OUT=$(cd "$ROOT_DIR" && env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID -u CRAFTS
         printf "%s|%s\n%s|%s\n" "${_HC_STATUSES[0]}" "${_HC_MESSAGES[0]}" "${_HC_STATUSES[1]}" "${_HC_MESSAGES[1]}"' 2>/dev/null)
 CX_HOST=$(printf '%s' "$CX_OUT" | sed -n 1p)
 CX_BRIDGE=$(printf '%s' "$CX_OUT" | sed -n 2p)
-if [[ "$CX_HOST" == ok\|codex* && "$CX_BRIDGE" == ok\|codex:* && "$CX_BRIDGE" == *"$CX_DATA"* ]]; then
+if [[ "$CX_HOST" == ok\|*codex* && "$CX_BRIDGE" == ok\|codex:* && "$CX_BRIDGE" == *"$CX_DATA"* ]]; then
     log_pass "a Codex shell names codex from CODEX_THREAD_ID, and the bridge row points at this installation's data directory, not at ~/.claude"
 else
     log_fail "healthcheck under a Codex shell" "host=[$(printf '%s' "$CX_HOST" | cut -c1-70)] bridge=[$(printf '%s' "$CX_BRIDGE" | cut -c1-80)]"
@@ -281,8 +281,8 @@ AR_FULL=$(_roles_row "$AR_HOME")
 AR_CC=$(cd "$ROOT_DIR" && env CRAFTSMAN_SESSION_HOST=claude-code bash -c '
     source hooks/lib/config.sh; source hooks/lib/healthcheck.sh
     hc_check_agent_roles; printf "%s" "${_HC_STATUSES[0]}"' 2>/dev/null)
-if [[ "$AR_EMPTY" == warn\|*"craftsman-ci export --target codex-agents"* && "$AR_FULL" == ok\|1* && "$AR_CC" == ok ]]; then
-    log_pass "a Codex home without the exported roles is a warning naming the export command; with them it is ok; another host is ok without looking"
+if [[ "$AR_EMPTY" == warn\|*"loads roles from config layers"* && "$AR_FULL" == warn\|1* && "$AR_CC" == ok ]]; then
+    log_pass "a Codex home without roles reports the native plugin limitation; with them loading is still unmeasured; another host is ok without looking"
 else
     log_fail "agent roles per host" "empty=[$(printf '%s' "$AR_EMPTY" | cut -c1-90)] full=[$AR_FULL] claude=$AR_CC"
 fi
@@ -380,5 +380,13 @@ else
 fi
 
 echo ""
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CRAFTSMAN_SESSION_HOST=codex CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 hc_check_agent_teams
+if [[ "${_HC_MESSAGES[0]}" == *"Claude team flag does not apply"* ]]; then
+    log_pass "a parent Claude team flag does not enable teams in Codex"
+else
+    log_fail "Codex incorrectly inherits Claude teams"
+fi
+
 echo "Results: ${TESTS_PASSED} passed, ${TESTS_FAILED} failed"
 [[ $TESTS_FAILED -eq 0 ]] && exit 0 || exit 1

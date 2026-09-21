@@ -142,17 +142,54 @@ claude
 /craftsman:setup --quick
 ```
 
-**Vous faites tourner [Grok](https://docs.x.ai/build) au lieu de (ou à côté de) Claude Code ?** Installez le plugin en natif (pas via le catalogue Claude) :
+**Vous utilisez [Codex](https://developers.openai.com/codex) ?** Le manifeste
+natif est `.codex-plugin/plugin.json`, avec le catalogue
+`.agents/plugins/marketplace.json`. Aucun import Claude n'est nécessaire.
+Codex 0.155.1 ignore les hooks du format portable `plugin.json` à la racine ;
+ce point d'entrée concurrent n'est donc pas livré. Le chargeur natif lit les
+22 skills et 14 handlers même en l'absence du manifeste Claude.
+
+```bash
+codex plugin marketplace add BULDEE/ai-craftsman-superpowers
+codex plugin add craftsman@ai-craftsman-superpowers
+codex   # examiner et approuver les hooks Craftsman dans /hooks
+```
+
+L'installation ne donne pas confiance aux hooks. Sur Codex 0.155.1, les handlers
+4.11.0 installes acceptent un `apply_patch` valide et refusent TS001 ainsi que
+le relachement de la configuration avant ecriture. Le nouveau manifeste
+natif est lu par le consommateur ; un candidat de developpement doit
+encore etre qualifie apres son installation. Les 22 skills sont chargees.
+Le chargeur de roles de cette version lit les repertoires de configuration,
+pas les agents du plugin. Les missions `agents/` restent utilisables pour une
+delegation generique. L'export TOML est une option de compatibilite, pas une
+condition de l'installation native. Les differences d'evenements et de
+resultats sont explicites dans `hooks/host-capabilities.json`.
+
+**Vous utilisez [Grok](https://docs.x.ai/build) ?** Installez par son catalogue natif :
 
 ```bash
 grok plugin marketplace add /chemin/vers/ai-craftsman-superpowers
 grok plugin install craftsman --trust
-# Grok 1.0.34 liste hooks/hooks.json du plugin (hookType file) et n'en execute
-# aucun. Le moteur est le repertoire de hooks Grok (toujours de confiance) :
-craftsman-ci export --target grok-hooks --into ~/.grok/hooks
 ```
 
-`grok plugin validate` sur cet arbre est le controle d'install. `~/.grok/hooks/craftsman.json` est genere depuis le meme `hooks/hooks.json` (matchers `write` et `search_replace`). Un refus apparait en `failed` dans les lignes de hooks Grok : c'est ainsi que l'hote rend le code 2. Ce qui marche : la porte d'ecriture sur `write` et `search_replace` avant le disque, la protection de config, `ask` honore, et un run de tests qui accorde puis revoque la preuve (le resultat shell porte un `exit_code`). Une copie par projet (`.grok/hooks`, puis `grok --trust`) est optionnelle ; sans confiance, les hooks projet sont ignores en silence.
+Grok 1.0.34 a un defaut de demarrage natif : un plugin actif et de confiance
+peut declarer des hooks sans aucun handler dans le registre d'execution.
+Le rechargement dans `/hooks` ou `/plugins` ajoute les handlers natifs. Un
+plugin temoin reel accepte une ecriture valide et refuse sa fixture interdite
+apres rechargement, sans export de hooks. Verifiez l'execution des handlers
+`plugin/craftsman/` dans la session. Le `SessionStart` initial manque et n'est
+pas rejoue : la parite automatique complete n'est donc pas acquise. Un refus
+apparait en `failed` avec `blocked: true` dans les evenements.
+Apres rechargement, le prochain hook natif de prompt lie la session a son propre
+stockage : les helpers d'etat et de metriques fonctionnent meme si l'evenement
+initial a manque. Le chemin vient du hook natif, jamais d'un chemin Claude devine.
+
+`bin/craftsman-grok-install` installe en natif par defaut, sans exporter de hooks.
+Le cablage de compatibilite reste disponible explicitement avec
+`bin/craftsman-grok-install --compat-hooks` ou `craftsman-ci export --target grok-hooks`.
+L'etat et les metriques sont lies a l'hote et a la session. Une session native
+sans liaison signale l'absence de donnees et ne reutilise pas celles d'un autre hote.
 
 **Vous faites tourner des agents [Hermes](https://hermes-agent.nousresearch.com) au lieu de (ou à côté de) Claude Code ?** Le même dépôt est un plugin Hermes natif :
 
@@ -233,6 +270,12 @@ derrière ces commandes : `team-lead`, `architect` (sans Write/Edit),
 `doc-writer`, `security-pentester`, `legacy-surgeon`, `ui-ux-director`, plus les
 agents relecteurs spécifiques aux packs Symfony, React et AI/ML. Liste complète :
 [référence des agents](docs/reference/agents.md).
+
+Le paquet contient les 12 missions d'agents sous forme de fichiers ordinaires
+avant la première session. `scripts/native-manifests.py --check` compare les
+six copies des packs à leurs sources. Claude Code et Grok les chargent
+nativement ; la limite des rôles de plugins dans Codex est décrite dans la
+section d'installation ci-dessus.
 
 ## Moteur de règles
 

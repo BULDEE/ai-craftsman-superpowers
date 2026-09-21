@@ -170,6 +170,13 @@ bump_file "${ROOT_DIR}/.grok-plugin/marketplace.json" \
     "\"version\": \"${CURRENT_VERSION}\"" \
     "\"version\": \"${NEW_VERSION}\"" \
     ".grok-plugin/marketplace.json"
+if [[ -f "${ROOT_DIR}/scripts/native-manifests.py" ]]; then
+    if [[ "$CHECK_ONLY" == true ]]; then
+        python3 "${ROOT_DIR}/scripts/native-manifests.py" --check || DRIFTED=$((DRIFTED + 1))
+    else
+        python3 "${ROOT_DIR}/scripts/native-manifests.py" || exit 1
+    fi
+fi
 
 echo ""
 if [[ "$DRIFTED" -gt 0 ]]; then

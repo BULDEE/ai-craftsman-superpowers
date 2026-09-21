@@ -146,27 +146,16 @@ Do NOT claim "tests pass" without showing the output.
 **IMMEDIATELY after a passing verdict**, run this command. Do NOT skip this step.
 Do NOT defer it. Do NOT wait for the user. Execute it NOW:
 
-```
-bash ~/.claude/craftsman-set-verified.sh
+```bash
+bash "$(craftsman-path bin/craftsman-helper)" set-verified
 ```
 
-If the wrapper is missing, fall back to:
-```
-bash -c 'BRIDGE="${HOME}/.claude/craftsman-session-state-path"; if [ ! -f "$BRIDGE" ]; then echo "ERROR: bridge file $BRIDGE not found - session-start may not have run" >&2; exit 1; fi; SF=$(cat "$BRIDGE"); mkdir -p "$(dirname "$SF")"; python3 -c "
-import json,os,datetime,tempfile; sf=\"$SF\"
-try:
- with open(sf) as f: s=json.load(f)
-except: s={}
-s[\"verified\"]=True; s[\"verified_at\"]=datetime.datetime.now(datetime.timezone.utc).strftime(\"%Y-%m-%dT%H:%M:%SZ\")
-d=os.path.dirname(sf); os.makedirs(d,exist_ok=True)
-fd,t=tempfile.mkstemp(dir=d,suffix=\".tmp\")
-with os.fdopen(fd,\"w\") as f: json.dump(s,f)
-os.rename(t,sf); print(\"verified=true at \"+sf)
-"'
-```
-If both commands fail, say "Session state update skipped".
+On hosts where `craftsman-path` is not on PATH, run
+`<this plugin root>/bin/craftsman-helper set-verified` using the installed
+skill's path. Never use another host's wrapper or write a shared state file.
+If this fails, report "Session state update skipped" with the error.
 
-This unblocks `git push` - the pre-push hook checks this flag.
+This records evidence for the session. The pre-push hook warns when it is absent.
 
 ## Common Verification Commands
 

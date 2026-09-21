@@ -209,12 +209,20 @@ commands:
 YAML
 touch "$SYMLINK_PACK_DIR/agents/my-agent.md"
 touch "$SYMLINK_PACK_DIR/commands/my-command.md"
+printf 'pack source\n' > "$SYMLINK_PACK_DIR/agents/shipped-agent.md"
+printf 'shipped copy\n' > "$SYMLINK_ROOT/agents/shipped-agent.md"
 
 # Create a stale symlink that should be cleaned
 ln -sf "/nonexistent/stale.md" "$SYMLINK_ROOT/agents/stale-agent.md"
 
 CLAUDE_PLUGIN_ROOT="$SYMLINK_ROOT" pack_loader_init "$TEST_PACKS_DIR"
 CLAUDE_PLUGIN_ROOT="$SYMLINK_ROOT" pack_sync_symlinks
+
+if [[ ! -L "$SYMLINK_ROOT/agents/shipped-agent.md" && "$(cat "$SYMLINK_ROOT/agents/shipped-agent.md")" == "shipped copy" ]]; then
+    log_pass "A shipped ordinary agent survives runtime pack synchronization"
+else
+    log_fail "Shipped agent preservation" "regular agent replaced during synchronization"
+fi
 
 if [[ -L "$SYMLINK_ROOT/agents/my-agent.md" ]]; then
     log_pass "Symlink created for pack agent: my-agent.md"

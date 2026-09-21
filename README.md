@@ -137,38 +137,55 @@ claude
 /craftsman:setup --quick
 ```
 
-**Running [Codex](https://developers.openai.com/codex) instead of (or next to) Claude Code?** Codex reads this repository's Claude manifest, so the same plugin installs natively:
+**Running [Codex](https://developers.openai.com/codex)?** The native entry point
+is `.codex-plugin/plugin.json`; `.agents/plugins/marketplace.json` is its
+catalogue. No Claude import is required. Codex 0.155.1 deliberately omits hooks
+from the portable root `plugin.json` format, so this package does not ship that
+competing entry point. The native loader reads 22 skills and 14 handlers even
+when the Claude manifest is absent.
 
 ```bash
-codex plugin marketplace add BULDEE/ai-craftsman-superpowers   # reads .claude-plugin/marketplace.json
+codex plugin marketplace add BULDEE/ai-craftsman-superpowers
 codex plugin add craftsman@ai-craftsman-superpowers
+codex   # review and trust the Craftsman handlers in /hooks
 ```
 
-Then two steps that installing does NOT do for you, both measured on 0.154.0 (2026-09-20):
+Installing does not grant hook trust. On Codex 0.155.1, the installed 4.11.0
+handlers were qualified through the real CLI: a valid `apply_patch` succeeds,
+TS001 and a change that relaxes the gate are refused before disk. The new
+native entry point is consumer-readable; installing a development candidate
+still requires its own qualification. The 22 skills load. Named plugin agent
+roles are not loaded by this version's plugin manifest: its role loader reads
+configuration directories. Read the shipped `agents/` missions for generic
+subagent dispatch; exporting TOML roles remains an optional compatibility mode,
+not a prerequisite presented as native installation. The host's missing events,
+shell-result limits and asynchronous delivery are recorded in
+[`hooks/host-capabilities.json`](hooks/host-capabilities.json).
 
-```bash
-# 1. Trust the hooks. Installed and enabled is not trusted: until you review
-#    them in /hooks, they are loaded and do not run.
-codex          # then: /hooks   -> review and trust the craftsman handlers
-
-# 2. Install the agent roles. Codex reads TOML roles from its own home; the
-#    plugin ships Markdown agents, and the export converts them.
-craftsman-ci export --target codex-agents --into "${CODEX_HOME:-$HOME/.codex}/agents"
-```
-
-`/craftsman:healthcheck` says which of the two is still missing. What you get there: the write gate before disk on `apply_patch` (V4A patches, multi-file, moves), the config protection, the 22 skills and, after the export, the 12 roles for `spawn_agent`. What you do not get, because the host does not offer it: a `ask` decision (the gate denies instead), a shell exit code in the tool event (a test run grants and revokes nothing), and a background hook that wakes an idle session. Detail per capability: [`tests/fixtures/hosts/PROVENANCE.md`](tests/fixtures/hosts/PROVENANCE.md).
-
-**Running [Grok](https://docs.x.ai/build) instead of (or next to) Claude Code?** Install the plugin natively (not via the Claude catalogue):
+**Running [Grok](https://docs.x.ai/build)?** Install through its native catalogue:
 
 ```bash
 grok plugin marketplace add /path/to/ai-craftsman-superpowers
 grok plugin install craftsman --trust
-# Grok 1.0.34 lists a plugin's hooks/hooks.json as hookType file and runs
-# none of it. The engine is Grok's own hooks dir (always trusted):
-craftsman-ci export --target grok-hooks --into ~/.grok/hooks
 ```
 
-`grok plugin validate` on this tree is the install check. `~/.grok/hooks/craftsman.json` is generated from the same `hooks/hooks.json` (matchers include `write` and `search_replace`). A refusal shows up as `failed` in Grok's hook rows: that is how the host renders exit 2. What works there: the write gate on `write` and `search_replace` before disk, the config protection, `ask` honoured, and a test run that grants then revokes the verification evidence (its shell result carries an exit code). A per-project copy (`.grok/hooks`, then `grok --trust`) is optional; untrusted project hooks are skipped in silence.
+Grok 1.0.34 has a native startup defect: a trusted, enabled plugin can report
+hooks while none of its handlers reaches the execution registry. Reloading in
+`/hooks` or `/plugins` adds the native handlers. A real native control accepted
+a valid write and refused its forbidden fixture after this reload, without
+exported hooks. Verify `plugin/craftsman/` handler execution in your session.
+The missed initial `SessionStart` is not replayed, so this is not full automatic
+startup parity. A refusal appears as `failed` with `blocked: true` in hook events.
+After reload, the next native prompt hook binds the session to its own data
+store, so state and metrics helpers work even when that initial event was missed.
+It uses the store supplied by the native hook, never a guessed Claude path.
+
+`bin/craftsman-grok-install` defaults to native installation and does not export
+hooks. Existing compatibility wiring remains supported explicitly through
+`bin/craftsman-grok-install --compat-hooks` or `craftsman-ci export --target
+grok-hooks`. These files are a compatibility option, not native plugin hooks.
+Session state and metrics are bound to the host and session; an unbound native
+session reports missing state instead of using another host's data.
 
 **Running [Hermes](https://hermes-agent.nousresearch.com) agents instead of (or next to) Claude Code?** The same repository is a native Hermes plugin:
 
@@ -248,6 +265,11 @@ vs `event-sourced` for entities, for instance). Agents that back these commands:
 `team-lead`, `architect` (no Write/Edit), `doc-writer`, `security-pentester`,
 `legacy-surgeon`, `ui-ux-director`, plus pack-specific reviewers for Symfony,
 React and AI/ML. Full roster: [Agents Reference](docs/reference/agents.md).
+
+The package ships all 12 agent missions as ordinary files before the first
+session. `scripts/native-manifests.py --check` checks the six pack copies
+against their sources. Claude Code and Grok load these natively; Codex's
+plugin role limitation is described in the installation section above.
 
 ## Rules Engine
 

@@ -121,7 +121,7 @@ SQLite-backed tracking of violations, corrections, and sessions. 7-day and 30-da
 hooks/              → Real-time validation (SessionStart → PostToolUse → Stop → SessionEnd)
 hooks/lib/          → Shared libraries (pack-loader, config, rules-engine, metrics, static-analysis)
 skills/             → Core workflows as skills/<name>/SKILL.md (ADR-0017); pack workflows symlinked in at runtime
-agents/             → Core agents (6) + 6 pack symlinks
+agents/             → Core agents (6) + 6 shipped pack copies (checked by scripts/native-manifests.py)
 knowledge/          → Core methodology, language-agnostic (Clean Architecture, Hexagonal, DDD, TDD, testing strategy, Clean Code, Refactoring, legacy techniques, Design Patterns, principles, anti-patterns)
 knowledge/ddd/      → Agnostic DDD tactical/CQRS (Symfony specifics live in packs/symfony/knowledge/ddd-symfony-implementation.md)
 knowledge/legacy/, knowledge/refactoring/ → Legacy rescue and refactoring campaign methodology

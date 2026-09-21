@@ -68,7 +68,8 @@ source "${SCRIPT_DIR}/lib/host.sh"
 _session_host=$(host_detect "$INPUT")
 export CRAFTSMAN_SESSION_HOST="$_session_host"
 SESSION_STATE_PATH="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
-_writes_claude_bridge() { [[ "$_session_host" != "codex" ]]; }
+_writes_claude_bridge() { [[ "$_session_host" == "claude-code" || "$_session_host" == "unknown" ]]; }
+python3 "${SCRIPT_DIR}/lib/runtime_paths.py" bind "$_session_host" "${CRAFTSMAN_SESSION_ID:-}" "$(dirname "$SCRIPT_DIR")" "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}" 2>/dev/null || true
 _writes_claude_bridge && { printf '%s' "$SESSION_STATE_PATH" > "${HOME}/.claude/craftsman-session-state-path" 2>/dev/null || true; }
 
 # Same bridge for the metrics database. Without it the reporting skills fall
@@ -98,6 +99,7 @@ rm -f "$(session_file session-violations)" "$(session_file session-writes)" 2>/d
 # Skills run via the Bash tool without CLAUDE_PLUGIN_ROOT, so they cannot
 # locate session_state.py directly. This wrapper bakes in the resolved path
 # at session start, making the verify skill a one-liner call.
+if _writes_claude_bridge; then
 cat > "${HOME}/.claude/craftsman-set-verified.sh" <<WRAPPER
 #!/usr/bin/env bash
 set -uo pipefail
@@ -175,6 +177,7 @@ set -uo pipefail
 exec python3 "${SCRIPT_DIR}/lib/conventions.py" "\${1:-analyze}" "\$PWD" "\${@:2}"
 WRAPPER
 chmod +x "${HOME}/.claude/craftsman-conventions.sh" 2>/dev/null || true
+fi
 
 # The languages present in the working directory, one per line, from the
 # entry markers each pack declares (`entry_markers` in pack.yml). The engine

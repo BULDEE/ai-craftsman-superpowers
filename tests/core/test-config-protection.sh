@@ -89,7 +89,7 @@ if [[ "$exit_code" == "2" ]] && echo "${result#*|}" | grep -q '"permissionDecisi
 else
     log_fail "Should deny .craft-rules.yml on an unknown host" "got exit $exit_code: $(echo "${result#*|}" | tr '\n' ' ' | cut -c1-100)"
 fi
-for denied in ".claude/settings.json" ".claude/settings.local.json" "$ROOT_DIR/hooks/lib/rules-engine.sh" "$ROOT_DIR/rules/core.yml"; do
+for denied in ".claude/settings.json" ".claude/settings.local.json" ".grok/config.toml" ".grok/settings.json" ".grok/hooks/native.json" "$ROOT_DIR/hooks/lib/rules-engine.sh" "$ROOT_DIR/rules/core.yml"; do
     case "$denied" in /*) target="$denied" ;; *) target="/tmp/project/$denied" ;; esac
     result=$(run_hook "$target")
     exit_code="${result%%|*}"
