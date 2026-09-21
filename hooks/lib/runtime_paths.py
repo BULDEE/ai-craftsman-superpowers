@@ -100,7 +100,27 @@ def state_path() -> str:
     return str(Path(data_dir()) / name)
 
 
+def emit_context() -> None:
+    try:
+        payload = json.load(sys.stdin)
+    except ValueError:
+        payload = {}
+    raw = payload.get('session_id', '') if isinstance(payload, dict) else ''
+    identity = re.sub(r'[^A-Za-z0-9_-]', '', str(raw or ''))[:64]
+    if identity:
+        os.environ['CRAFTSMAN_SESSION_ID'] = identity
+    try:
+        data = data_dir()
+    except (RuntimeError, ValueError, OSError, KeyError):
+        data = ''
+    cache = data or cache_dir()
+    sys.stdout.write('\0'.join((session_id(), data, cache)) + '\0')
+
+
 def main(arguments: list[str]) -> int:
+    if arguments[0] == 'context':
+        emit_context()
+        return 0
     if arguments[0] == 'bind':
         bind(*arguments[1:5])
         return 0

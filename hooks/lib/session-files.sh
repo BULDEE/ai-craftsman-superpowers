@@ -54,14 +54,14 @@ _session_files_id() {
 }
 
 session_files_bind() {
-    local id
-    id=$(printf '%s' "${1:-}" | jq -r '.session_id // empty' 2>/dev/null | tr -cd 'A-Za-z0-9_-' | cut -c1-64)
-    [[ -n "$id" ]] && export CRAFTSMAN_SESSION_ID="$id"
     CRAFTSMAN_SESSION_HOST=$(host_detect "${1:-}")
     export CRAFTSMAN_SESSION_HOST
-    _CRAFTSMAN_SESSION_DATA_DIR=$(python3 "${SESSION_FILES_LIB_DIR}/runtime_paths.py" data 2>/dev/null) || _CRAFTSMAN_SESSION_DATA_DIR=""
-    _CRAFTSMAN_CACHE_DIR="$_CRAFTSMAN_SESSION_DATA_DIR"
-    [[ -n "$_CRAFTSMAN_CACHE_DIR" ]] || _CRAFTSMAN_CACHE_DIR=$(python3 "${SESSION_FILES_LIB_DIR}/runtime_paths.py" cache 2>/dev/null) || _CRAFTSMAN_CACHE_DIR=""
+    {
+        IFS= read -r -d '' CRAFTSMAN_SESSION_ID || true
+        IFS= read -r -d '' _CRAFTSMAN_SESSION_DATA_DIR || true
+        IFS= read -r -d '' _CRAFTSMAN_CACHE_DIR || true
+    } < <(printf '%s' "${1:-}" | python3 "${SESSION_FILES_LIB_DIR}/runtime_paths.py" context 2>/dev/null)
+    export CRAFTSMAN_SESSION_ID
     return 0
 }
 

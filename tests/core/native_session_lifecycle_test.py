@@ -205,6 +205,15 @@ class NativeSessionLifecycleTest(unittest.TestCase):
         self.assertEqual(list(self.parent.iterdir()), [])
         self.assertTrue(list(self.native.iterdir()))
 
+    def test_context_transport_preserves_whitespace_in_bound_directory(self):
+        self.select_host('codex')
+        self.native = self.root / 'native store\nsecond line'
+        self.native.mkdir()
+        self.bind()
+        result = self.run_hook('tool-failure-tracker.sh', tool_name='Bash', error='failed')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads((self.native / 'session-state-child.json').read_text())['tool_failure_count'], 1)
+
     def test_failure_tracker_binds_before_writing_state(self):
         self.select_host('codex')
         self.bind()
