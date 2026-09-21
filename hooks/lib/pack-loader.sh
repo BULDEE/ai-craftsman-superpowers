@@ -377,7 +377,9 @@ _pack_default_packs_dir() {
 }
 
 pack_loader_init() {
-    _CRAFTSMAN_CACHE_DIR=$(session_cache_dir)
+    local cache_directory
+    cache_directory=$(session_cache_dir)
+    local _CRAFTSMAN_CACHE_DIR="$cache_directory"
     local packs_dir="${1:-$(_pack_default_packs_dir)}"
     _PACKS_DIR="$packs_dir"
 

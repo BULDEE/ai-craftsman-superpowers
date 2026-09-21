@@ -62,7 +62,7 @@ fi
 # or a Claude skill's set-verified lands where that Claude session's hooks
 # never look (review of 421ca76, F6).
 _session_host="$CRAFTSMAN_SESSION_HOST"
-SESSION_STATE_PATH=$(session_file session-state.json)
+SESSION_STATE_PATH="${METRICS_DB_DIR:+${METRICS_DB_DIR}/session-state.json}"
 _writes_claude_bridge() { [[ "$_session_host" == "claude-code" || "$_session_host" == "unknown" ]]; }
 session_files_register
 _writes_claude_bridge && { printf '%s' "$SESSION_STATE_PATH" > "${HOME}/.claude/craftsman-session-state-path" 2>/dev/null || true; }

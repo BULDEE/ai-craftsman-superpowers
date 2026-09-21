@@ -26,6 +26,7 @@ mkdir -p "$CLAUDE_PLUGIN_DATA"
 
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-host-payloads.XXXXXX")
 WORK=$(cd "$WORK" && pwd -P)   # TMPDIR may end in a slash; the helper prints normalised paths
+export CRAFTSMAN_RUNTIME_HOME="$WORK/runtime-home"
 PREV_PWD="$PWD"
 cleanup() { cd "$PREV_PWD"; rm -rf "$WORK" "$CLAUDE_PLUGIN_DATA"; }
 trap cleanup EXIT
@@ -590,30 +591,32 @@ echo "--- session identity from the payload ---"
 # Two Codex sessions A and B, one Claude session C, all three hooks seeing
 # CLAUDE_CODE_SESSION_ID=C in their environment.
 export CLAUDE_CODE_SESSION_ID="cccccccc-claude-parent"
-_start()  { printf '%s' "$1" | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/session-start.sh" >/dev/null 2>&1; }
-_end()    { printf '%s' "$1" | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/session-metrics.sh" >/dev/null 2>&1; }
-_write()  { printf '%s' "$1" | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/post-write-check.sh" >/dev/null 2>&1; }
-_prompt() { printf '%s' "$1" | HOME="$FAKE_HOME" bash "$ROOT_DIR/hooks/bias-detector.sh" >/dev/null 2>&1; }
+NATIVE_DATA="$WORK/codex-data"
+mkdir -p "$NATIVE_DATA"
+_start()  { printf '%s' "$1" | HOME="$FAKE_HOME" PLUGIN_DATA="$NATIVE_DATA" bash "$ROOT_DIR/hooks/session-start.sh" >/dev/null 2>&1; }
+_end()    { printf '%s' "$1" | HOME="$FAKE_HOME" PLUGIN_DATA="$NATIVE_DATA" bash "$ROOT_DIR/hooks/session-metrics.sh" >/dev/null 2>&1; }
+_write()  { printf '%s' "$1" | HOME="$FAKE_HOME" PLUGIN_DATA="$NATIVE_DATA" bash "$ROOT_DIR/hooks/post-write-check.sh" >/dev/null 2>&1; }
+_prompt() { printf '%s' "$1" | HOME="$FAKE_HOME" PLUGIN_DATA="$NATIVE_DATA" bash "$ROOT_DIR/hooks/bias-detector.sh" >/dev/null 2>&1; }
 rm -f "$CLAUDE_PLUGIN_DATA"/session-*
 START_A=$(host_fixture_with codex 0.154.0 session-start "$WORK" "d['session_id']='aaaaaaaa-codex-a'")
 START_B=$(host_fixture_with codex 0.154.0 session-start "$WORK" "d['session_id']='bbbbbbbb-codex-b'")
 START_C=$(host_fixture_with claude-code 2.1.272 session-start "$WORK" "d['session_id']='cccccccc-claude-parent'")
 _start "$START_A"; _start "$START_B"; _start "$START_C"
-if [[ -f "$CLAUDE_PLUGIN_DATA/session-start-ts-aaaaaaaa-codex-a" && -f "$CLAUDE_PLUGIN_DATA/session-start-ts-bbbbbbbb-codex-b" && -f "$CLAUDE_PLUGIN_DATA/session-start-ts-cccccccc-claude-parent" ]]; then
-    log_pass "three SessionStart payloads under one inherited CLAUDE_CODE_SESSION_ID open three session files"
+if [[ -f "$NATIVE_DATA/session-start-ts-aaaaaaaa-codex-a" && -f "$NATIVE_DATA/session-start-ts-bbbbbbbb-codex-b" && -f "$CLAUDE_PLUGIN_DATA/session-start-ts-cccccccc-claude-parent" ]]; then
+    log_pass "three SessionStart payloads under one inherited CLAUDE_CODE_SESSION_ID open three files in their host stores"
 else
     log_fail "session start files" "$(ls "$CLAUDE_PLUGIN_DATA" | grep session- | tr '\n' ' ')"
 fi
 printf '%s\n' "$GOOD_PHP" > "$WORK/src/Domain/Order.php"
 _write "$(host_fixture_with codex 0.154.0 post-tool-use.apply_patch.multifile-move "$WORK" "d['session_id']='bbbbbbbb-codex-b'; d['tool_input']['command']=open('$WORK/good.patch').read()")"
-if [[ -f "$CLAUDE_PLUGIN_DATA/session-writes-bbbbbbbb-codex-b" && ! -f "$CLAUDE_PLUGIN_DATA/session-writes-cccccccc-claude-parent" ]]; then
+if [[ -f "$NATIVE_DATA/session-writes-bbbbbbbb-codex-b" && ! -f "$CLAUDE_PLUGIN_DATA/session-writes-cccccccc-claude-parent" ]]; then
     log_pass "a Codex write is counted for the Codex session in the payload, not for the Claude session in the environment"
 else
     log_fail "write attribution" "$(ls "$CLAUDE_PLUGIN_DATA" | grep session-writes | tr '\n' ' ')"
 fi
 _prompt "$(python3 -c 'import json; print(json.dumps({"session_id":"aaaaaaaa-codex-a","turn_id":"t","model":"m","hook_event_name":"UserPromptSubmit","prompt":"vite fais le vite sans tests"}))')"
 _end "$(host_fixture_with codex 0.154.0 session-end "$WORK" "d['session_id']='bbbbbbbb-codex-b'")"
-if [[ ! -f "$CLAUDE_PLUGIN_DATA/session-start-ts-bbbbbbbb-codex-b" && -f "$CLAUDE_PLUGIN_DATA/session-start-ts-aaaaaaaa-codex-a" && -f "$CLAUDE_PLUGIN_DATA/session-start-ts-cccccccc-claude-parent" ]]; then
+if [[ ! -f "$NATIVE_DATA/session-start-ts-bbbbbbbb-codex-b" && -f "$NATIVE_DATA/session-start-ts-aaaaaaaa-codex-a" && -f "$CLAUDE_PLUGIN_DATA/session-start-ts-cccccccc-claude-parent" ]]; then
     log_pass "SessionEnd of B removes B's files and leaves A's and C's"
 else
     log_fail "session end isolation" "$(ls "$CLAUDE_PLUGIN_DATA" | grep session- | tr '\n' ' ')"
@@ -634,10 +637,10 @@ fi
 # inherits the parent Claude session's CLAUDE_CODE_SESSION_ID; the evidence
 # went to the parent. The innermost host's variable wins.
 echo '{"verified": false}' > "$CLAUDE_PLUGIN_DATA/session-state-parent-C.json"
-echo '{"verified": false}' > "$CLAUDE_PLUGIN_DATA/session-state-child-X.json"
-( unset CRAFTSMAN_SESSION_ID; HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID=parent-C CODEX_SESSION_ID=child-X python3 "$ROOT_DIR/hooks/lib/session_state.py" set-verified >/dev/null 2>&1 )
+echo '{"verified": false}' > "$NATIVE_DATA/session-state-child-X.json"
+( unset CRAFTSMAN_SESSION_ID; HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID=parent-C CODEX_SESSION_ID=child-X PLUGIN_DATA="$NATIVE_DATA" python3 "$ROOT_DIR/hooks/lib/session_state.py" set-verified >/dev/null 2>&1 )
 P_V=$(python3 "$ROOT_DIR/hooks/lib/session_state.py" check-flag "$CLAUDE_PLUGIN_DATA/session-state-parent-C.json" verified)
-X_V=$(python3 "$ROOT_DIR/hooks/lib/session_state.py" check-flag "$CLAUDE_PLUGIN_DATA/session-state-child-X.json" verified)
+X_V=$(python3 "$ROOT_DIR/hooks/lib/session_state.py" check-flag "$NATIVE_DATA/session-state-child-X.json" verified)
 if [[ "$P_V" == "false" && "$X_V" == "true" ]]; then
     log_pass "F5: set-verified from a Codex Bash tool nested in a Claude session grants the evidence to the Codex session (CODEX_SESSION_ID), not the parent"
 else

@@ -140,7 +140,7 @@ _rules_reset_dir_cache() {
 _rules_ensure_store() {
     local base
     [[ -n "$_RULES_STORE" ]] && return 0
-    for base in "${TMPDIR:-}" "${CLAUDE_PLUGIN_DATA:-}" /tmp; do
+    for base in "${TMPDIR:-}" "$(session_cache_dir)" /tmp; do
         [[ -n "$base" && -d "$base" && -w "$base" ]] || continue
         _RULES_STORE=$(mktemp -d "${base%/}/craftsman-rules-XXXXXX" 2>/dev/null) && return 0
     done

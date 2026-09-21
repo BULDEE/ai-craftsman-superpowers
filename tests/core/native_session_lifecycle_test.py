@@ -192,6 +192,19 @@ class NativeSessionLifecycleTest(unittest.TestCase):
         self.assertEqual(cache.returncode, 0, cache.stderr)
         self.assertEqual(cache.stdout, '|')
 
+    def test_pre_write_caches_use_payload_binding_before_parent_environment(self):
+        self.select_host('codex')
+        self.bind()
+        self.bind('outer', self.parent)
+        self.env.update(CLAUDE_PLUGIN_DATA=str(self.parent), CLAUDE_CODE_SESSION_ID='parent')
+        result = self.run_hook('pre-write-check.sh', tool_name='Write', tool_input={
+            'file_path': str(self.root / 'project/Example.php'), 'content': '<?php\nclass Example {}\n',
+        })
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn('PHP002', result.stdout + result.stderr)
+        self.assertEqual(list(self.parent.iterdir()), [])
+        self.assertTrue(list(self.native.iterdir()))
+
     def test_failure_tracker_binds_before_writing_state(self):
         self.select_host('codex')
         self.bind()
