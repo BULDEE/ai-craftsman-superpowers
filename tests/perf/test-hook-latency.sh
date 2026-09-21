@@ -274,27 +274,26 @@ PHPDIRTY
 DIRTY_PAYLOAD="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \
     "$PROJECT/src/Dirty.php" "$PROJECT")"
 
-# The ceilings are per operating system, and that is a measured statement
-# about what the ratio does and does not absorb. On one machine under load it
-# absorbs 94% of the slowdown, because the basket grows the way the hooks grow.
-# Across operating systems it absorbs less: a fork costs half as much on an
-# ubuntu runner as on a Mac while an interpreter start costs about the same,
-# and the basket carries both in a fixed mix. Across machines of one operating
-# system the three-start basket absorbs the rest: the same commit projected at
-# 0.92x and 0.94x for bias-detector on two macOS runner instances whose fork
-# cost differed 2.2x, where the one-start basket read 1.37x and 2.46x. Two
-# variances, two mechanisms: the ratio for load and for machine, a table for
-# the OS. The doubling check further down is the one assertion that transfers
-# unchanged.
+# The ceilings are per operating system. The basket absorbs load, and it
+# absorbs a cheaper fork less well: fifty echoes plus three python3 starts,
+# while post-write starts python3 five times, pre-write twice and the bias
+# detector twice. The rest of a hook is the shell script. A runner whose
+# forks are cheap shrinks the basket more than the hooks, so every ratio
+# steps up together while every absolute time falls.
 #
-# The rows carry about 1.35x of room over what was measured with this basket
-# (ubuntu runner, two runs: 7.11x, 5.38x, 1.96x, 10.39x then 7.11x, 5.22x,
-# 1.88x, 10.37x; macOS runner, two instances: 4.04x, 1.83x, 1.12x, 10.08x
-# then 3.87x, 1.85x, 1.32x, 8.62x; this laptop: 3.02x, 1.60x, 1.11x, 6.68x),
-# and each is below
-# twice the fastest measurement of its tightest hook, which is what lets the
-# doubling check hold on every instance. CI prints the table on every run:
-# tune a row from those numbers, never from a failure alone.
+# Same tree 7e9b4e7 on two ubuntu-latest runners (35639724845, then
+# 35657109085). Calibration 84.1ms, then 56.0ms. Ratios 8.42, 7.89, 2.40,
+# 12.10, then 9.59, 9.52, 2.69, 14.33. Absolute times fell on every row
+# (708 to 537, 663 to 533, 202 to 151, 1018 to 803). The 9.5/9.0/2.65/14
+# table sat inside that spread: the quiet runner passed, the fast-fork
+# runner failed the same commit. Linux is 1.35x the quiet reading and at
+# least 1.15x the fast one, so the fast run passes and a 50 percent
+# regression of the quiet reading still fails. Each row stays under twice
+# the quiet reading, which is what the doubling check below requires.
+# Darwin is unchanged. Its bias spread, 1.23x beside 2.10x on the same
+# commit, is wider than the gap between a 50 percent regression and a
+# doubling, so one ceiling cannot cover the noisy sample and still catch
+# the doubling.
 #
 # pre-write was raised on purpose (2.5x to 3.5x on Darwin, 7.3x to 9.0x on
 # Linux) when the gate stopped running its own regexes and started judging
@@ -307,7 +306,7 @@ DIRTY_PAYLOAD="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"c
 # 1.35x over the worst of them and under twice the fastest (2 x 2.64x).
 _PERF_ENV="$(uname -s)"
 case "$_PERF_ENV" in
-    Linux)  C_POST=9.5;  C_PRE=9.0;  C_BIAS=2.65; C_DIRTY=14 ;;
+    Linux)  C_POST=11.4; C_PRE=11.1; C_BIAS=3.25; C_DIRTY=16.6 ;;
     *)      C_POST=5.5;  C_PRE=5.0;  C_BIAS=1.8;  C_DIRTY=13.5 ;;
 esac
 echo "ceilings for ${_PERF_ENV}: post-write ${C_POST}x, pre-write ${C_PRE}x, bias ${C_BIAS}x, dirty ${C_DIRTY}x"
