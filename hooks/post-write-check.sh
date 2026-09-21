@@ -36,7 +36,7 @@ command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
 
 # Session state for correction learning
 source "${SCRIPT_DIR}/lib/session-files.sh"
-SESSION_STATE=$(session_file session-state.json)
+SESSION_STATE=""
 
 # The blocked rule ids of this write, as a JSON array.
 # One entry per rule, however many lines it fired on: TS001 and PHP003 report
@@ -81,6 +81,7 @@ _pending_key() {
 # the same file.
 _settle_session_state() {
     $HAS_PYTHON3 || return 0
+    [[ -n "$SESSION_STATE" ]] || return 0
     local file="$1"
     mkdir -p "$(dirname "$SESSION_STATE")"
 
@@ -201,7 +202,7 @@ pack_loader_init
 # Read tool input from stdin (JSON from the host)
 INPUT=$(cat)
 session_files_bind "$INPUT"
-SESSION_STATE=$(session_file session-state.json)
+SESSION_STATE=$(python3 "${SCRIPT_DIR}/lib/runtime_paths.py" state 2>/dev/null) || SESSION_STATE=""
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 
 # A Codex apply_patch names its files inside `tool_input.command`, any number
@@ -288,7 +289,9 @@ fi
 # and task-completed-verify.sh counts them as evidence of work; the Stop-time
 # Sentry hook reads the paths, since a Stop payload names no file (audit
 # CR-117, C11). Append is atomic enough for hook concurrency; no locking.
-printf '%s\n' "$FILE_PATH" >> "$(session_file session-writes)" 2>/dev/null || true
+if [[ -n "$SESSION_STATE" ]]; then
+    printf '%s\n' "$FILE_PATH" >> "$(CLAUDE_PLUGIN_DATA="${SESSION_STATE%/*}" session_file session-writes)" 2>/dev/null || true
+fi
 
 # Get file extension
 EXT="${FILE_PATH##*.}"

@@ -49,18 +49,26 @@ def bind(runtime: str, identity: str, root: str, data: str) -> None:
             os.unlink(temporary)
 
 
+def bound_data(runtime: str, identity: str) -> str:
+    if not identity:
+        return ''
+    target = binding_path(runtime, identity)
+    if not target.is_file():
+        return ''
+    binding = json.loads(target.read_text())
+    if binding.get('host') != runtime or binding.get('session_id') != identity:
+        raise RuntimeError('Craftsman session binding identity mismatch')
+    return binding['data']
+
+
 def data_dir() -> str:
+    runtime, identity = host(), session_id()
+    bound = bound_data(runtime, identity)
+    if bound:
+        return bound
     for key in ('CRAFTSMAN_PLUGIN_DATA', 'GROK_PLUGIN_DATA', 'PLUGIN_DATA', 'CLAUDE_PLUGIN_DATA'):
         if os.environ.get(key):
             return os.environ[key]
-    runtime, identity = host(), session_id()
-    if identity:
-        target = binding_path(runtime, identity)
-        if target.is_file():
-            binding = json.loads(target.read_text())
-            if binding.get('host') != runtime or binding.get('session_id') != identity:
-                raise RuntimeError('Craftsman session binding identity mismatch')
-            return binding['data']
     if runtime != 'claude-code':
         raise RuntimeError(f'No Craftsman data binding for {runtime} session {identity}; start a session with trusted plugin hooks')
     bridge = Path(os.path.expanduser('~/.claude/craftsman-session-state-path'))

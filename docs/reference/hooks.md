@@ -284,10 +284,12 @@ ${CLAUDE_PLUGIN_DATA}/metrics.db
 `~/.claude/plugins/data/craftsman/metrics.db` is only the fallback used when the
 variable is unset, and it may hold stale history from an earlier slug.
 
-Anything running via the Bash tool (skills, one-off queries) has no
-`CLAUDE_PLUGIN_DATA`, so it must read the resolved path from the bridge file
-`~/.claude/craftsman-metrics-db-path` written at session start. Hardcoding the
-fallback there reads a database no hook writes to.
+Skills and one-off queries resolve their current host/session store with
+`bash "$(craftsman-path bin/craftsman-runtime)" metrics`. A validated session
+binding takes precedence over inherited environment variables. The legacy
+bridge remains a Claude Code fallback; native Codex and Grok sessions never
+read it. Without a resolved store, metrics are inactive and the write gate
+still validates code.
 
 ### Schema
 
@@ -421,10 +423,13 @@ which deptrac    # Architecture (PHP)
 
 ### Metrics database issues
 
+If `craftsman-path` is not on PATH, call `<installed plugin root>/bin/craftsman-runtime` directly. The resolver prefers the current host/session binding over inherited data variables and refuses an unbound native session without an explicit store. Missing metrics never disable the write gate.
+
 ```bash
 # Check database location
-echo "${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/craftsman}/metrics.db"
+DB=$(bash "$(craftsman-path bin/craftsman-runtime)" metrics) || exit 1
+printf '%s\n' "$DB"
 
-# Query directly (from a shell without CLAUDE_PLUGIN_DATA, e.g. the Bash tool)
-sqlite3 "$(cat ~/.claude/craftsman-metrics-db-path)" "SELECT COUNT(*) FROM violations;"
+# Query the current session
+sqlite3 "$DB" "SELECT COUNT(*) FROM violations;"
 ```
