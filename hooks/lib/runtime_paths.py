@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 import re
 import sys
-import tempfile
 
 
 def session_id() -> str:
@@ -34,6 +33,8 @@ def binding_path(runtime: str, identity: str) -> Path:
 
 
 def bind(runtime: str, identity: str, root: str, data: str) -> None:
+    import tempfile
+
     identity = re.sub(r'[^A-Za-z0-9_-]', '', identity)[:64]
     if runtime not in ('codex', 'grok', 'claude-code') or not identity:
         return

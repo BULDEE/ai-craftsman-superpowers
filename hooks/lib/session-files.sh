@@ -49,8 +49,10 @@ _session_files_dir() {
 # 0.154.0) before CLAUDE_CODE_SESSION_ID, which a Codex session started from a
 # Claude Code Bash tool inherits from its parent (challenge review, F5).
 _session_files_id() {
+    local LC_ALL=C
     local id="${1:-${CRAFTSMAN_SESSION_ID:-${GROK_SESSION_ID:-${CODEX_SESSION_ID:-${CODEX_THREAD_ID:-${CLAUDE_CODE_SESSION_ID:-}}}}}}"
-    printf '%s' "$id" | tr -cd 'A-Za-z0-9_-' | cut -c1-64
+    id="${id//[^A-Za-z0-9_-]/}"
+    printf '%s' "${id:0:64}"
 }
 
 session_files_bind() {

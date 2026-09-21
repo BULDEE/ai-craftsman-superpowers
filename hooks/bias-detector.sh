@@ -196,7 +196,10 @@ fi
 # A context request left by a Stop-time hook (the Sentry request: a Stop has
 # no model-visible channel short of forcing a continuation) is handed to the
 # model here, once, and cleared.
-PENDING_CONTEXT=$(python3 "${SCRIPT_DIR}/lib/session_state.py" read "$SESSION_STATE" pending_context "" 2>/dev/null || true)
+PENDING_CONTEXT=""
+if [[ -f "$SESSION_STATE" ]]; then
+    PENDING_CONTEXT=$(python3 "${SCRIPT_DIR}/lib/session_state.py" read "$SESSION_STATE" pending_context "" 2>/dev/null || true)
+fi
 [[ -n "$PENDING_CONTEXT" ]] && python3 "${SCRIPT_DIR}/lib/session_state.py" merge "$SESSION_STATE" pending_context '""' >/dev/null 2>&1 || true
 
 # Exclusive output formats: stdout is parsed as ONE payload by UserPromptSubmit.
