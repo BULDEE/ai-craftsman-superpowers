@@ -117,12 +117,17 @@ fi
 #           a guess is an invented regression. A compound failure revokes
 #           quietly and says how to restore the evidence.
 # Anything else is unknown: nothing granted, nothing revoked, and said so.
-_last_command() { printf '%s' "$1" | tr '\n' ';' | sed 's/&&/;/g' | awk -F';' '{for (i=NF; i>0; i--) if ($i ~ /[^[:space:]]/) {print $i; exit}}'; }
-LAST=$(_last_command "$COMMAND")
+# Parse shell operators before matching the last command. A textual split on
+# `;` makes `printf '%s' 'hello; ./run-tests.sh'` look like a runner call and
+# turns data into positive evidence (CR-168/B3).
+GRAMMAR=$(printf '%s' "$COMMAND" | python3 "$LIB_DIR/command_grammar.py" 2>/dev/null) || exit 0
+LAST=$(printf '%s' "$GRAMMAR" | jq -r '.last // empty')
+HAS_OR=$(printf '%s' "$GRAMMAR" | jq -r '.has_or // false')
 RUNNER_LAST=false; RUNNER_ALONE=false
-if [[ "$COMMAND" != *"||"* && "$LAST" != *"|"* ]] && printf '%s' "$LAST" | grep -qE "$(_test_command_pattern)"; then
+if [[ "$HAS_OR" != true ]] && printf '%s' "$LAST" | grep -qE "$(_test_command_pattern)"; then
     RUNNER_LAST=true
-    [[ "$COMMAND" != *"&&"* && "$COMMAND" != *";"* && "$COMMAND" != *$'\n'* ]] && RUNNER_ALONE=true
+    SEPARATOR_COUNT=$(printf '%s' "$GRAMMAR" | jq -r '.separators | length')
+    [[ "$SEPARATOR_COUNT" -eq 0 ]] && RUNNER_ALONE=true
 fi
 if [[ "$RUNNER_LAST" != true ]]; then
     echo "craftsman: '${COMMAND}' is a compound command; its result is not the test runner's, so verification evidence is unchanged (run the runner as the last or only command)." >&2

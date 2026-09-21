@@ -570,6 +570,17 @@ else
     log_fail "F4 quoted runner" "verified=$(_flag)"
 fi
 
+# CR-168/B3: shell-looking text inside a quoted argument is not a command.
+# The semicolon is data passed to printf, so the runner sentinel must remain
+# absent and verified must stay false.
+echo '{"verified": false}' > "$STATE"
+_verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.python-tests-passed "; d['tool_input']['command'] = \"printf '%s\\n' 'hello; ./run-tests.sh --quick'\"")"
+if [[ "$(_flag)" == "false" ]]; then
+    log_pass "CR-168: a printf string containing a runner and semicolon grants no verification evidence"
+else
+    log_fail "CR-168 quoted shell text" "verified=$(_flag)"
+fi
+
 # an interruption is neither a pass nor a failure
 echo '{"verified": true}' > "$STATE"
 _verify "$(_as_test claude-code 2.1.272 post-tool-use-failure.bash.exit1-tests-failed "; d['is_interrupt'] = True")"; RC=$?
