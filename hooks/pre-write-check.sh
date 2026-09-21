@@ -16,6 +16,9 @@ set -uo pipefail
 trap 'echo "The craftsman pre-write gate could not run (pre-write-check.sh, line $LINENO). Retry the write once; if it repeats, the gate needs attention, not the write." >&2; exit 2' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/session-files.sh"
+INPUT=$(cat)
+session_files_bind "$INPUT"
 source "${SCRIPT_DIR}/lib/config.sh"
 # Severity is the rules engine's decision, resolved per file (CLAUDE.md).
 # This hook used to resolve it through config.sh's strictness table and a
@@ -30,8 +33,7 @@ rules_init "$PWD" "$(rules_global_dir)"
 # load costs a file read on the steady path.
 source "${SCRIPT_DIR}/lib/pack-loader.sh"
 
-# Read tool input from stdin
-INPUT=$(cat)
+# Validate and decode the bound tool input
 command -v jq >/dev/null 2>&1 || false
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)

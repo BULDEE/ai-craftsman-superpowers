@@ -15,9 +15,13 @@
 #   cache_evict "sentry" 100                 # LRU eviction, keep max 100
 # =============================================================================
 
-_CACHE_BASE_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/channel-cache"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/session-files.sh"
+
+_CACHE_BASE_DIR=$(session_cache_dir)
+_CACHE_BASE_DIR="${_CACHE_BASE_DIR:+${_CACHE_BASE_DIR}/channel-cache}"
 
 _cache_channel_dir() {
+    [[ -n "$_CACHE_BASE_DIR" ]] || return 0
     echo "${_CACHE_BASE_DIR}/${1}"
 }
 
@@ -26,6 +30,7 @@ _cache_key_hash() {
 }
 
 _cache_entry_file() {
+    [[ -n "$_CACHE_BASE_DIR" ]] || return 0
     local channel="$1" key="$2"
     local hash
     hash=$(_cache_key_hash "$key")
@@ -47,6 +52,7 @@ cache_set() {
     ttl=$(_cache_numeric "${4:-300}" 300)
     local dir
     dir=$(_cache_channel_dir "$channel")
+    [[ -n "$dir" ]] || return 0
     mkdir -p "$dir"
 
     local now expires file

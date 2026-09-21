@@ -17,6 +17,8 @@
 #   pack_dispatch_file "src/main.dart"   → runs every pack_validate_dart*
 # =============================================================================
 
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/session-files.sh"
+
 _LANG_REGISTRY_FILE=""
 _LANG_REGISTRY_KNOWN_FILE=""
 _LANG_REGISTRY_BUILDER=""
@@ -32,7 +34,8 @@ _lang_registry_builder() {
 # this one said ~/.claude/craftsman, so a hook without CLAUDE_PLUGIN_DATA read a
 # registry nobody else wrote (independent verification, 2026-09-15).
 _lang_registry_cache_dir() {
-    local base="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
+    local base
+    base=$(session_cache_dir)
     mkdir -p "$base" 2>/dev/null || true
     printf '%s' "$base"
 }
@@ -66,6 +69,7 @@ _lang_registry_build_cache() {
     shift
     local cache_dir key cache
     cache_dir=$(_lang_registry_cache_dir)
+    [[ -n "$cache_dir" ]] || return 0
     key=$(_lang_registry_cache_key "$@")
     cache="${cache_dir}/lang-${label}-${key}.tsv"
 

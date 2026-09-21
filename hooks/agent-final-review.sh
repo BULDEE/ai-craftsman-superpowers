@@ -19,6 +19,9 @@ config_agent_hooks_enabled || exit 0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/hook-profile.sh"
 hook_profile_should_run "agent-final-review" "standard,strict" || exit 0
+source "${SCRIPT_DIR}/lib/session-files.sh"
+INPUT=$(cat)
+session_files_bind "$INPUT"
 
 # Gate: skip if strictness is not 'strict'
 if [[ "${CLAUDE_PLUGIN_OPTION_STRICTNESS:-${CLAUDE_PLUGIN_OPTION_strictness:-strict}}" != "strict" ]]; then
@@ -50,11 +53,10 @@ CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null \
 [[ -z "$CHANGED_FILES" ]] && exit 0
 
 # Rewake budget: at most 2 wake-ups per session
-INPUT=$(cat)
-SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"' 2>/dev/null)
-DATA_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
+DATA_DIR=$(_session_files_dir)
+[[ -n "$DATA_DIR" ]] || exit 0
 mkdir -p "$DATA_DIR" 2>/dev/null || true
-BUDGET_FILE="${DATA_DIR}/final-review-rewakes-${SESSION_ID}"
+BUDGET_FILE=$(session_file final-review-rewakes)
 REWAKES=$(cat "$BUDGET_FILE" 2>/dev/null || echo 0)
 [[ "$REWAKES" -ge 2 ]] && exit 0
 

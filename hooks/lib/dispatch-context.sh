@@ -26,6 +26,7 @@ LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOKS_DIR="$(dirname "$LIB_DIR")"
 PLUGIN_ROOT="$(dirname "$HOOKS_DIR")"
 
+source "${LIB_DIR}/session-files.sh"
 source "${LIB_DIR}/config.sh" 2>/dev/null || true
 source "${LIB_DIR}/rules-engine.sh" 2>/dev/null || true
 source "${LIB_DIR}/metrics-db.sh" 2>/dev/null || true
@@ -51,7 +52,9 @@ emit_codemap() {
     command -v python3 >/dev/null 2>&1 || return 0
     [[ -f "$codemap_script" ]] || return 0
 
-    local cache_dir="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
+    local cache_dir
+    cache_dir=$(session_cache_dir)
+    [[ -n "$cache_dir" ]] || return 0
     local project_key cache_file head_ref cached_ref codemap
     project_key=$(pwd | shasum 2>/dev/null | cut -c1-12) || project_key="default"
     cache_file="${cache_dir}/codemap-${project_key}.md"

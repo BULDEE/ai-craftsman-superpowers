@@ -20,6 +20,8 @@
 #   rules_in_group NAME      → rule ids of that group, declaration order
 # =============================================================================
 
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/session-files.sh"
+
 _RULE_REGISTRY_FILE=""
 
 _rule_registry_builder() {
@@ -58,7 +60,8 @@ rule_registry_init() {
     [[ $# -eq 0 ]] && { _RULE_REGISTRY_FILE=""; return 0; }
 
     local cache_dir key cache
-    cache_dir="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/craftsman}"
+    cache_dir=$(session_cache_dir)
+    [[ -n "$cache_dir" ]] || { _RULE_REGISTRY_FILE=""; return 0; }
     mkdir -p "$cache_dir" 2>/dev/null || true
     key=$(printf '%s\n' "$@" | cksum | tr -d ' \t' | cut -c1-16)
     cache="${cache_dir}/rule-registry-${key}.tsv"

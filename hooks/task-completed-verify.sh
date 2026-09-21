@@ -50,7 +50,9 @@ VERIFIED=$(python3 "${SCRIPT_DIR}/lib/session_state.py" check-flag "$SESSION_STA
 # read a `writes_count` key of the session state that no hook ever wrote, saw
 # nothing, and let every task through.
 WRITES_FILE=$(session_file session-writes)
-if [[ -f "$WRITES_FILE" ]]; then
+if [[ -z "$WRITES_FILE" ]]; then
+    WRITES="unknown"
+elif [[ -f "$WRITES_FILE" ]]; then
     WRITES=$(wc -l < "$WRITES_FILE" 2>/dev/null | tr -d ' ') || WRITES="unknown"
 else
     WRITES=0

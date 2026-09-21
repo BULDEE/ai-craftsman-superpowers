@@ -22,12 +22,14 @@ config_agent_hooks_enabled || exit 0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/hook-profile.sh"
 hook_profile_should_run "agent-ddd-verifier" "standard,strict" || exit 0
+source "${SCRIPT_DIR}/lib/session-files.sh"
+INPUT=$(cat)
+session_files_bind "$INPUT"
 source "${SCRIPT_DIR}/lib/haiku-verify.sh"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/pack-loader.sh"
 pack_loader_init
 
-INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 
 # A Codex apply_patch names its files in the patch, not in file_path, and this

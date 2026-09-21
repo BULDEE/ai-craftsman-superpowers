@@ -13,19 +13,19 @@ trap 'exit 0' ERR
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/hook-profile.sh"
 hook_profile_should_run "tool-failure-tracker" "standard,strict" || exit 0
+source "${SCRIPT_DIR}/lib/session-files.sh"
+INPUT=$(cat)
+session_files_bind "$INPUT"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
 
 HAS_PYTHON3=true
 command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
 
-INPUT=$(cat)
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
 ERROR=$(echo "$INPUT" | jq -r '.error // empty' 2>/dev/null)
 
 [[ -z "$TOOL_NAME" ]] && exit 0
 
-source "${SCRIPT_DIR}/lib/session-files.sh"
-session_files_bind "$INPUT"
 SESSION_STATE=$(session_file session-state.json)
 
 if $HAS_PYTHON3; then

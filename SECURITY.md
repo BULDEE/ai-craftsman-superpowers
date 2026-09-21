@@ -86,8 +86,8 @@ whose names start with `agent-` are shell scripts that shell out to a headless
   `$CLAUDE_PLUGIN_DATA`, `$CLAUDE_PLUGIN_OPTION_*`, `$HOME`, `$PWD`, `$TMPDIR`,
   Claude Code's own `$CLAUDE_EFFORT`, `$CLAUDE_CODE_SESSION_ID` and
   `$CLAUDECODE`, the other hosts' session names read by `hooks/lib/host.sh`
-  and `hooks/lib/session-files.sh` (`$CODEX_SESSION_ID`, `$PLUGIN_ROOT`,
-  `$GROK_SESSION_ID`, `$GROK_HOOK_EVENT`), and the
+  and `hooks/lib/session-files.sh` (`$CODEX_SESSION_ID`, `$CODEX_THREAD_ID`, `$PLUGIN_ROOT`, `$PLUGIN_DATA`,
+  `$GROK_SESSION_ID`, `$GROK_HOOK_EVENT`, `$GROK_PLUGIN_DATA`), and the
   `CRAFTSMAN_*` switches listed below. The list is the whole list:
   `tests/core/test-doc-claims.sh` fails when the code reads one this document
   does not name, because a partial list is read as the complete one.
@@ -112,12 +112,19 @@ whose names start with `agent-` are shell scripts that shell out to a headless
 | `CRAFTSMAN_RULE_REGISTRY` | Path to the compiled rule registry |
 | `CRAFTSMAN_SA_BUDGET_FILE` | Level 2/3 budget per file, in seconds (15) |
 | `CRAFTSMAN_SA_BUDGET_PROJECT` | Level 2/3 budget per project, in seconds (30) |
-| `CRAFTSMAN_PLUGIN_DATA` | Explicit plugin data directory for host-neutral helper invocations; overrides host aliases |
+| `CRAFTSMAN_PLUGIN_DATA` | Explicit plugin data directory for host-neutral helper invocations; checked after a valid session binding and before host aliases |
 | `CRAFTSMAN_RUNTIME_HOME` | Root for per-host, per-session data bindings; isolated by the test helpers, defaults to the user home |
-| `CRAFTSMAN_SESSION_HOST` | The host session-start.sh read off its payload (`claude-code`, `codex`, `unknown`), for the healthcheck's host row; never set by hand |
+| `CRAFTSMAN_SESSION_HOST` | The host resolved from each hook payload by `session_files_bind` (`claude-code`, `codex`, `grok`, `copilot`, or `unknown`); exported for helper resolution, never set by hand |
 | `CRAFTSMAN_SESSION_ID` | The session a hook bound from its payload's `session_id`; read by the helpers it spawns, exported by `session_files_bind`, never set by hand |
 | `CRAFTSMAN_VERIFY_MODEL` | The model the headless verification calls through `claude -p` |
 | `CRAFTSMAN_VERIFY_MODEL_CODEX` | The model handed to `codex exec` for a semantic review; unset, Codex's default applies |
+
+The shell helper also maintains three internal, non-exported variables:
+`_CRAFTSMAN_SESSION_DATA_DIR` caches the resolved session store,
+`_CRAFTSMAN_CACHE_DIR` caches the store or the host-local mechanical cache,
+and `_CRAFTSMAN_SESSION_FILES_LOADED` prevents repeated library initialization.
+They are process-local implementation state, not configuration switches. A new
+payload binding refreshes both directories; an unavailable store stays empty.
 
 ## Optional Features
 

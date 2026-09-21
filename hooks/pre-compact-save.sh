@@ -12,15 +12,15 @@ set -uo pipefail
 trap 'exit 0' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/session-files.sh"
+INPUT=$(cat 2>/dev/null) || true
+session_files_bind "$INPUT"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
 
 HAS_PYTHON3=true
 command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
 
-INPUT=$(cat 2>/dev/null) || true
 
-source "${SCRIPT_DIR}/lib/session-files.sh"
-session_files_bind "$INPUT"
 SESSION_STATE=$(session_file session-state.json)
 
 if $HAS_PYTHON3 && [[ -f "$SESSION_STATE" ]]; then

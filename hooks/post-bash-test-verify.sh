@@ -76,6 +76,7 @@ _test_command_pattern() {
 source "${SCRIPT_DIR}/lib/session-files.sh"
 session_files_bind "$INPUT"
 SESSION_STATE=$(session_file session-state.json)
+[[ -n "$SESSION_STATE" ]] || exit 0
 
 LIB_DIR="${SCRIPT_DIR}/lib"
 
@@ -158,7 +159,7 @@ CURRENT=$(python3 "$LIB_DIR/session_state.py" check-flag "$SESSION_STATE" verifi
 # log to the background monitor, and wake the session (exit 2 + asyncRewake)
 # only on a regression - the suite was green earlier in this session.
 if [[ "$STATE" == "failed" ]]; then
-    DATA_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
+    DATA_DIR=$(_session_files_dir)
     mkdir -p "$DATA_DIR" 2>/dev/null || true
     printf '%s test failure: %s (exit %s)\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$COMMAND" "${EXIT_CODE:-?}" \
         >> "${DATA_DIR}/test-failures.log" 2>/dev/null || true

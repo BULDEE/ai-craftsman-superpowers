@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 import re
 import sys
-import tempfile
 
 
 def session_id() -> str:
@@ -34,6 +33,8 @@ def binding_path(runtime: str, identity: str) -> Path:
 
 
 def bind(runtime: str, identity: str, root: str, data: str) -> None:
+    import tempfile
+
     identity = re.sub(r'[^A-Za-z0-9_-]', '', identity)[:64]
     if runtime not in ('codex', 'grok', 'claude-code') or not identity:
         return
@@ -66,7 +67,16 @@ def data_dir() -> str:
     bound = bound_data(runtime, identity)
     if bound:
         return bound
-    for key in ('CRAFTSMAN_PLUGIN_DATA', 'GROK_PLUGIN_DATA', 'PLUGIN_DATA', 'CLAUDE_PLUGIN_DATA'):
+    aliases = {
+        'codex': ('PLUGIN_DATA', 'CLAUDE_PLUGIN_DATA'),
+        'grok': ('GROK_PLUGIN_DATA', 'PLUGIN_DATA', 'CLAUDE_PLUGIN_DATA'),
+        'claude-code': ('CLAUDE_PLUGIN_DATA',),
+    }
+    for key in ('CRAFTSMAN_PLUGIN_DATA', *aliases[runtime]):
+        if key == 'CLAUDE_PLUGIN_DATA' and runtime != 'claude-code':
+            parent = os.environ.get('CLAUDE_CODE_SESSION_ID')
+            if parent and parent != identity:
+                continue
         if os.environ.get(key):
             return os.environ[key]
     if runtime != 'claude-code':
@@ -77,17 +87,45 @@ def data_dir() -> str:
     return os.path.expanduser('~/.claude/plugins/data/craftsman')
 
 
+def cache_dir() -> str:
+    try:
+        return data_dir()
+    except (RuntimeError, ValueError, OSError, KeyError):
+        directory = binding_path(host(), 'cache').parent.parent / 'cache'
+        return str(directory)
+
+
 def state_path() -> str:
     identity = session_id()
     name = f'session-state-{identity}.json' if identity else 'session-state.json'
     return str(Path(data_dir()) / name)
 
 
+def emit_context() -> None:
+    try:
+        payload = json.load(sys.stdin)
+    except ValueError:
+        payload = {}
+    raw = payload.get('session_id', '') if isinstance(payload, dict) else ''
+    identity = re.sub(r'[^A-Za-z0-9_-]', '', str(raw or ''))[:64]
+    if identity:
+        os.environ['CRAFTSMAN_SESSION_ID'] = identity
+    try:
+        data = data_dir()
+    except (RuntimeError, ValueError, OSError, KeyError):
+        data = ''
+    cache = data or cache_dir()
+    sys.stdout.write('\0'.join((session_id(), data, cache)) + '\0')
+
+
 def main(arguments: list[str]) -> int:
+    if arguments[0] == 'context':
+        emit_context()
+        return 0
     if arguments[0] == 'bind':
         bind(*arguments[1:5])
         return 0
-    paths = {'data': data_dir, 'state': state_path, 'metrics': lambda: str(Path(data_dir()) / 'metrics.db')}
+    paths = {'host': host, 'data': data_dir, 'cache': cache_dir, 'state': state_path, 'metrics': lambda: str(Path(data_dir()) / 'metrics.db')}
     print(paths[arguments[0]]())
     return 0
 
