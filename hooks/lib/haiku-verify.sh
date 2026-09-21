@@ -24,7 +24,7 @@ HAIKU_VERIFY_MODEL="${CRAFTSMAN_VERIFY_MODEL:-claude-haiku-4-5-20251001}"
 # else, so on a machine without that CLI it vanished in silence (audit CR-117,
 # C8). The backend is a boundary: CRAFTSMAN_REVIEW_BACKEND, else
 # `review: backend:` in the global .craft-config.yml, else auto (claude-cli
-# when `claude` is on PATH, codex-cli when `codex` is, else none). A backend
+# when `claude` is on PATH, else codex-cli, else grok-cli, else none). A backend
 # is a transport for one prompt and one reply; the prompts, the shape filter
 # on the reply and the telemetry are shared, and the verdict of the
 # deterministic gate never depends on any of this.
@@ -34,10 +34,11 @@ semantic_backend() {
         backend=$(_config_resolve_nested "review" "backend" "auto")
     fi
     case "${backend:-auto}" in
-        claude-cli|codex-cli|none) printf '%s' "$backend" ;;
+        claude-cli|codex-cli|grok-cli|none) printf '%s' "$backend" ;;
         *)
             if command -v claude >/dev/null 2>&1; then printf 'claude-cli'
             elif command -v codex >/dev/null 2>&1; then printf 'codex-cli'
+            elif command -v grok >/dev/null 2>&1; then printf 'grok-cli'
             else printf 'none'; fi ;;
     esac
 }
@@ -61,6 +62,7 @@ haiku_verify_possible() {
     case "$backend" in
         claude-cli) command -v claude >/dev/null 2>&1 ;;
         codex-cli)  command -v codex >/dev/null 2>&1 ;;
+        grok-cli)   command -v grok >/dev/null 2>&1 ;;
         *) return 1 ;;
     esac
 }
@@ -81,6 +83,7 @@ haiku_verify() {
     case "$SEMANTIC_BACKEND_USED" in
         claude-cli) _semantic_claude_cli "$prompt" ;;
         codex-cli)  _semantic_codex_cli "$prompt" ;;
+        grok-cli)   _semantic_grok_cli "$prompt" ;;
         *) return 1 ;;
     esac
 }
@@ -125,6 +128,17 @@ _semantic_codex_cli() {
     fi
     cat "$reply"
     rm -f "$reply"
+}
+
+# grok -p, read-only tools, one reply on stdout. The Claude model id above is
+# not a Grok model. The child inherits CRAFTSMAN_HEADLESS_VERIFY so this
+# plugin's hooks in that process do not record the review as a session.
+_semantic_grok_cli() {
+    command -v grok >/dev/null 2>&1 || return 1
+    CRAFTSMAN_HEADLESS_VERIFY=1 grok -p "$1" \
+        --max-turns 4 \
+        --output-format plain \
+        --disallowed-tools "search_replace,write,run_terminal_cmd" 2>/dev/null || return 1
 }
 
 # haiku_findings <verdict-body>

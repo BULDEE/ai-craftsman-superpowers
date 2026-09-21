@@ -9,8 +9,8 @@ from the manifest it is supposed to mirror:
   - `${CLAUDE_PLUGIN_ROOT}` is expanded, because nothing expands it there;
   - the handlers carry the plugin's root and data directory in their own
     environment, since only a plugin hook is given them;
-  - events the host does not fire, and Claude Code's `if:` conditions, are
-    dropped rather than written and ignored.
+  - events the host does not fire are dropped. On Grok an `if:` handler is
+    kept without the `if` (pre-push-verify.sh exits 0 unless it is git push).
 
 Usage: host_hooks.py <host> <plugin root> <output file> [--data DIR]
 """
@@ -51,8 +51,8 @@ def _matcher_for(host: str, matcher: str) -> str:
     return "|".join(seen)
 
 
-def _handler(entry: dict, root: str, data: str) -> dict | None:
-    if "if" in entry:
+def _handler(entry: dict, root: str, data: str, host: str) -> dict | None:
+    if "if" in entry and host != "grok":
         return None
     command = str(entry.get("command", "")).replace("${CLAUDE_PLUGIN_ROOT}", root)
     if not command:
@@ -67,7 +67,7 @@ def _handler(entry: dict, root: str, data: str) -> dict | None:
 def _groups(groups: list, root: str, data: str, host: str) -> list:
     kept = []
     for group in groups:
-        handlers = [made for made in (_handler(entry, root, data) for entry in group.get("hooks", [])) if made]
+        handlers = [made for made in (_handler(entry, root, data, host) for entry in group.get("hooks", [])) if made]
         if not handlers:
             continue
         rewritten = {"hooks": handlers}

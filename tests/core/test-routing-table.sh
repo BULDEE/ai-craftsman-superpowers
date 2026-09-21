@@ -116,6 +116,15 @@ else
     log_fail "debug is invocable and refactor is user-typed, as their frontmatter says"
 fi
 
+GROK_OUT=$(CRAFTSMAN_SESSION_HOST=grok routing_table)
+if echo "$GROK_OUT" | grep -q "→ /debug" && echo "$GROK_OUT" | grep -q "→ /challenge" \
+    && echo "$GROK_OUT" | grep -q "/craftsman:plan" && echo "$GROK_OUT" | grep -q "/craftsman:loop" \
+    && echo "$GROK_OUT" | grep -q "/craftsman:workflow" && ! echo "$GROK_OUT" | grep -q "/craftsman:debug"; then
+    log_pass "on Grok, skills are /name except plan, loop and workflow"
+else
+    log_fail "on Grok, skills are /name except plan, loop and workflow" "$(printf '%s' "$GROK_OUT" | tr '\n' ' ' | cut -c1-240)"
+fi
+
 echo ""
 echo "Results: ${TESTS_PASSED} passed, ${TESTS_FAILED} failed"
 [[ $TESTS_FAILED -eq 0 ]] && exit 0 || exit 1

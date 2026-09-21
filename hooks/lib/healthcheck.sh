@@ -322,7 +322,7 @@ hc_check_write_gate() {
         _hc_record "write-gate" "ok" "engine wired via ${gate}"
         return
     fi
-    _hc_record "write-gate" "warn" "${host}: native plugin handlers are absent from the initial registry. The write gate is inert at startup on 1.0.34. Native: reload in /hooks or /plugins, then verify plugin/craftsman handlers. Initial SessionStart is missed. Optional compatibility: craftsman-ci export --target grok-hooks --into .grok/hooks (then grok --trust)"
+    _hc_record "write-gate" "warn" "${host}: native plugin handlers are absent from the initial registry. The write gate is inert at startup on 1.0.40 until craftsman-ci export --target grok-hooks writes ~/.grok/hooks/craftsman.json (bin/craftsman-grok-install does this). A fresh process runs neither a hooks.json path nor inline plugin hooks."
 }
 # --- Aggregate ---
 

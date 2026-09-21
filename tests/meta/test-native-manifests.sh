@@ -38,7 +38,7 @@ printf '#!/bin/sh\nprintf "ci %%s\\n" "$*" >> "$CALL_LOG"\n' > "$FIXTURE/ci/craf
 chmod +x "$FIXTURE/tools/grok"
 export CALL_LOG="$FIXTURE/calls"
 PATH="$FIXTURE/tools:$PATH" bash "$FIXTURE/bin/craftsman-grok-install" >/dev/null
-assert_not_contains 'native install exports no hook configuration' "$(cat "$CALL_LOG")" 'ci export'
+assert_contains 'native install writes the grok hook export' "$(cat "$CALL_LOG")" 'ci export --target grok-hooks'
 PATH="$FIXTURE/tools:$PATH" bash "$FIXTURE/bin/craftsman-grok-install" --compat-hooks >/dev/null
 assert_contains 'explicit compatibility retains the hook export' "$(cat "$CALL_LOG")" 'ci export --target grok-hooks'
 PATH="$FIXTURE/tools:$PATH" bash "$FIXTURE/bin/craftsman-grok-install" --invalid >/dev/null 2>&1

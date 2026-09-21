@@ -173,21 +173,19 @@ grok plugin marketplace add /chemin/vers/ai-craftsman-superpowers
 grok plugin install craftsman --trust
 ```
 
-Grok 1.0.34 a un defaut de demarrage natif : un plugin actif et de confiance
-peut declarer des hooks sans aucun handler dans le registre d'execution.
-Le rechargement dans `/hooks` ou `/plugins` ajoute les handlers natifs. Un
-plugin temoin reel accepte une ecriture valide et refuse sa fixture interdite
-apres rechargement, sans export de hooks. Verifiez l'execution des handlers
-`plugin/craftsman/` dans la session. Le `SessionStart` initial manque et n'est
-pas rejoue : la parite automatique complete n'est donc pas acquise. Un refus
-apparait en `failed` avec `blocked: true` dans les evenements.
-Apres rechargement, le prochain hook natif de prompt lie la session a son propre
-stockage : les helpers d'etat et de metriques fonctionnent meme si l'evenement
-initial a manque. Le chemin vient du hook natif, jamais d'un chemin Claude devine.
-
-`bin/craftsman-grok-install` installe en natif par defaut, sans exporter de hooks.
-Le cablage de compatibilite reste disponible explicitement avec
-`bin/craftsman-grok-install --compat-hooks` ou `craftsman-ci export --target grok-hooks`.
+Grok 1.0.40 n'execute pas les hooks embarques dans le plugin. Un `grok -p` frais
+a ecrit le fichier demande alors que le marqueur d'un hook PreToolUse inline
+restait vide, et `hooks.json` reste une reference de fichier.
+`bin/craftsman-grok-install` installe le plugin et ecrit
+`~/.grok/hooks/craftsman.json`, qui est la porte qui tourne. Les hooks globaux
+sont toujours de confiance. `--compat-hooks` ecrit le meme fichier.
+`craftsman-ci export --target grok-hooks` fait la meme ecriture. Les hooks de
+projet dans `.grok/hooks` exigent `grok --trust` ou `/hooks-trust`. Un refus
+apparait en `failed` avec `blocked: true`. Un rechargement dans `/hooks` a ete
+mesure sur 1.0.34 et ne rejoue pas le `SessionStart` initial manque. Les noms
+slash sont `/name`, sauf `/plan`, `/loop` et `/workflow`, que Grok possede
+deja : ces trois skills restent `/craftsman:name`. Un nom deja pris par un
+autre plugin s'affiche aussi en `/craftsman:name`.
 L'etat et les metriques sont lies a l'hote et a la session. Une session native
 sans liaison signale l'absence de donnees et ne reutilise pas celles d'un autre hote.
 

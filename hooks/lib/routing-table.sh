@@ -79,12 +79,14 @@ _pack_route_pairs() {
 _detect_superpowers_synergy() {
     if [[ -d "${HOME}/.claude/plugins/cache/claude-plugins-official/superpowers" ]] || \
        [[ -d "${HOME}/.claude/plugins/superpowers" ]]; then
+        local review="/craftsman:challenge"
+        [[ "${CRAFTSMAN_SESSION_HOST:-}" == "grok" ]] && review="/challenge"
         echo "
 SYNERGY: Superpowers plugin detected. Craftsman quality gates activate automatically on Superpowers workflows.
 - Use Superpowers for workflow: brainstorming → writing-plans → subagent-driven-development
 - Craftsman hooks validate every Write/Edit in real-time (Level 1-3 quality gates)
 - Correction learning tracks patterns across subagent work
-- Use /craftsman:challenge after implementation for architecture review"
+- Use ${review} after implementation for architecture review"
     fi
 }
 
@@ -128,6 +130,20 @@ _route_command_name() {
     printf '%s' "${line%%(*}"
 }
 
+# Grok keeps its own slash commands. The user guide (1.0.40) documents /plan,
+# /loop and /workflow, so those three skills stay qualified. Every other
+# skill is /name. A bare name another plugin already owns is shown by Grok
+# as /craftsman:name as well; the table cannot see that other plugin.
+_route_display_line() {
+    local line="$1" name
+    [[ "${CRAFTSMAN_SESSION_HOST:-}" == "grok" ]] || { printf '%s' "$line"; return 0; }
+    name=$(_route_command_name "$line")
+    case " ${name} " in
+        *" plan "*|*" loop "*|*" workflow "*) printf '%s' "$line" ;;
+        *) printf '%s' "${line//craftsman:/}" ;;
+    esac
+}
+
 routing_table() {
     local packs
     packs=$(pack_loaded 2>/dev/null || echo "")
@@ -138,6 +154,7 @@ routing_table() {
     while IFS= read -r line; do
         [[ "$line" == "- "* ]] || continue
         name=$(_route_command_name "$line")
+        line=$(_route_display_line "$line")
         if _route_is_model_invocable "$name"; then
             invocable="${invocable}
 ${line}"
@@ -146,9 +163,13 @@ ${line}"
 ${line}"
         fi
     done <<< "$routes"
-    local sp_note=""
+    local sp_note="" grok_note=""
     sp_note=$(_detect_superpowers_synergy)
-    echo "CRAFTSMAN COMMANDS - two tables, because the Skill tool refuses a skill locked with disable-model-invocation.
+    if [[ "${CRAFTSMAN_SESSION_HOST:-}" == "grok" ]]; then
+        grok_note="On Grok, type /name. /plan, /loop and /workflow belong to Grok, so those three stay /craftsman:name. If another plugin already owns a bare name, the menu shows /craftsman:name for that skill too.
+"
+    fi
+    echo "${grok_note}CRAFTSMAN COMMANDS - two tables, because the Skill tool refuses a skill locked with disable-model-invocation.
 Invoke yourself (Skill tool) when the context matches:${invocable}
 Suggest to the user, who types it (do NOT auto-execute, propose to user; the Skill tool refuses these):${typed}${sp_note}"
 }
