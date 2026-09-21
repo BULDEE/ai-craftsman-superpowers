@@ -17,24 +17,16 @@ set -uo pipefail
 trap 'echo "WARNING: session-metrics.sh failed at line $LINENO" >&2; exit 0' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/session-files.sh"
+INPUT=$(cat)
+session_files_bind "$INPUT"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
-
-DATA_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
 
 # This session's own files, and only its own: one shared session-state.json
 # meant this hook deleted the pending findings of every other live session.
-source "${SCRIPT_DIR}/lib/session-files.sh"
-SESSION_STATE=$(session_file session-state.json)
-START_TS_FILE=$(session_file session-start-ts)
-WRITES_FILE=$(session_file session-writes)
-VIOLATIONS_FILE=$(session_file session-violations)
 
 metrics_init 2>/dev/null || true
 
-# Read session info from stdin, and name this session's files after it: the
-# variable in the environment may be another session's (see session-files.sh).
-INPUT=$(cat)
-session_files_bind "$INPUT"
 SESSION_STATE=$(session_file session-state.json)
 START_TS_FILE=$(session_file session-start-ts)
 WRITES_FILE=$(session_file session-writes)

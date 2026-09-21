@@ -66,7 +66,16 @@ def data_dir() -> str:
     bound = bound_data(runtime, identity)
     if bound:
         return bound
-    for key in ('CRAFTSMAN_PLUGIN_DATA', 'GROK_PLUGIN_DATA', 'PLUGIN_DATA', 'CLAUDE_PLUGIN_DATA'):
+    aliases = {
+        'codex': ('PLUGIN_DATA', 'CLAUDE_PLUGIN_DATA'),
+        'grok': ('GROK_PLUGIN_DATA', 'PLUGIN_DATA', 'CLAUDE_PLUGIN_DATA'),
+        'claude-code': ('CLAUDE_PLUGIN_DATA',),
+    }
+    for key in ('CRAFTSMAN_PLUGIN_DATA', *aliases[runtime]):
+        if key == 'CLAUDE_PLUGIN_DATA' and runtime != 'claude-code':
+            parent = os.environ.get('CLAUDE_CODE_SESSION_ID')
+            if parent and parent != identity:
+                continue
         if os.environ.get(key):
             return os.environ[key]
     if runtime != 'claude-code':
@@ -75,6 +84,14 @@ def data_dir() -> str:
     if bridge.is_file() and bridge.read_text().strip():
         return str(Path(bridge.read_text().strip()).parent)
     return os.path.expanduser('~/.claude/plugins/data/craftsman')
+
+
+def cache_dir() -> str:
+    try:
+        return data_dir()
+    except (RuntimeError, ValueError, OSError, KeyError):
+        directory = binding_path(host(), 'cache').parent.parent / 'cache'
+        return str(directory)
 
 
 def state_path() -> str:
@@ -87,7 +104,7 @@ def main(arguments: list[str]) -> int:
     if arguments[0] == 'bind':
         bind(*arguments[1:5])
         return 0
-    paths = {'data': data_dir, 'state': state_path, 'metrics': lambda: str(Path(data_dir()) / 'metrics.db')}
+    paths = {'host': host, 'data': data_dir, 'cache': cache_dir, 'state': state_path, 'metrics': lambda: str(Path(data_dir()) / 'metrics.db')}
     print(paths[arguments[0]]())
     return 0
 

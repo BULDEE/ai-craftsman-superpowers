@@ -24,12 +24,14 @@ trap 'exit 0' ERR
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/hook-profile.sh"
 hook_profile_should_run "subagent-quality-gate" "standard,strict" || exit 0
+source "${SCRIPT_DIR}/lib/session-files.sh"
+INPUT=$(cat)
+session_files_bind "$INPUT"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
 
 HAS_PYTHON3=true
 command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
 
-INPUT=$(cat)
 AGENT_TYPE=$(echo "$INPUT" | jq -r '.agent_type // empty' 2>/dev/null)
 # The SUBAGENT's transcript. `transcript_path` on a SubagentStop is the
 # parent's (captured: tests/fixtures/hosts/claude-code/*/subagent-stop.json,
@@ -40,8 +42,6 @@ TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.agent_transcript_path // empty' 2>/dev
 
 [[ -z "$AGENT_TYPE" ]] && exit 0
 
-source "${SCRIPT_DIR}/lib/session-files.sh"
-session_files_bind "$INPUT"
 SESSION_STATE=$(session_file session-state.json)
 
 log_subagent_activity() {

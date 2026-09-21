@@ -14,9 +14,13 @@
 #   cb_record_success "sentry"  # reset failures, close circuit
 # =============================================================================
 
-_CB_STATE_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/channel-state"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/session-files.sh"
+
+_CB_STATE_DIR=$(session_cache_dir)
+_CB_STATE_DIR="${_CB_STATE_DIR:+${_CB_STATE_DIR}/channel-state}"
 
 _cb_state_file() {
+    [[ -n "$_CB_STATE_DIR" ]] || return 0
     echo "${_CB_STATE_DIR}/${1}.json"
 }
 
@@ -45,6 +49,7 @@ cb_init() {
     local channel="$1" threshold cooldown
     threshold=$(_cb_numeric "${2:-3}" 3)
     cooldown=$(_cb_numeric "${3:-300}" 300)
+    [[ -n "$_CB_STATE_DIR" ]] || return 0
     mkdir -p "$_CB_STATE_DIR"
     local file
     file=$(_cb_state_file "$channel")

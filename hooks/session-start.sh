@@ -18,6 +18,9 @@ set -uo pipefail
 [[ -n "${CRAFTSMAN_HEADLESS_VERIFY:-}" ]] && exit 0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/session-files.sh"
+INPUT=$(cat 2>/dev/null) || INPUT=""
+session_files_bind "$INPUT"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
 source "${SCRIPT_DIR}/lib/pack-loader.sh"
@@ -40,12 +43,6 @@ _init_packs() {
     fi
 }
 
-# The payload names the session; this hook's files are named after it (see
-# lib/session-files.sh: the environment may carry another session's id).
-INPUT=$(cat 2>/dev/null) || INPUT=""
-source "${SCRIPT_DIR}/lib/session-files.sh"
-session_files_bind "$INPUT"
-
 # Python3 availability check - skip python-dependent features if missing
 HAS_PYTHON3=true
 command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
@@ -64,26 +61,24 @@ fi
 # Another host starting later must not repoint it at its own data directory,
 # or a Claude skill's set-verified lands where that Claude session's hooks
 # never look (review of 421ca76, F6).
-source "${SCRIPT_DIR}/lib/host.sh"
-_session_host=$(host_detect "$INPUT")
-export CRAFTSMAN_SESSION_HOST="$_session_host"
-SESSION_STATE_PATH="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/session-state.json"
+_session_host="$CRAFTSMAN_SESSION_HOST"
+SESSION_STATE_PATH=$(session_file session-state.json)
 _writes_claude_bridge() { [[ "$_session_host" == "claude-code" || "$_session_host" == "unknown" ]]; }
-python3 "${SCRIPT_DIR}/lib/runtime_paths.py" bind "$_session_host" "${CRAFTSMAN_SESSION_ID:-}" "$(dirname "$SCRIPT_DIR")" "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}" 2>/dev/null || true
+session_files_register
 _writes_claude_bridge && { printf '%s' "$SESSION_STATE_PATH" > "${HOME}/.claude/craftsman-session-state-path" 2>/dev/null || true; }
 
 # Same bridge for the metrics database. Without it the reporting skills fall
 # back to the plugin-slug-less default and read a database no hook has written
 # since the slug changed: /craftsman:metrics reported 114 violations while the
 # live database held 14222, and concluded the hooks had stopped writing.
-METRICS_DB_PATH="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db"
+METRICS_DB_PATH="$METRICS_DB"
 _writes_claude_bridge && { printf '%s' "$METRICS_DB_PATH" > "${HOME}/.claude/craftsman-metrics-db-path" 2>/dev/null || true; }
 
 # Record session start epoch. SessionEnd input has no duration field
 # (only session_id/transcript_path/cwd/reason), so session-metrics.sh
 # derives duration and its violation-count window from this marker.
-_CRAFTSMAN_DATA_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
-printf '%s' "$(date +%s)" > "$(session_file session-start-ts)" 2>/dev/null || true
+_start_marker=$(session_file session-start-ts)
+[[ -n "$_start_marker" ]] && { printf '%s' "$(date +%s)" > "$_start_marker" 2>/dev/null || true; }
 # Sessions that ended without a SessionEnd (a crash, a kill) leave their files
 # behind; a week later nobody will resume them.
 session_files_sweep 7
@@ -115,7 +110,7 @@ chmod +x "${HOME}/.claude/craftsman-set-verified.sh" 2>/dev/null || true
 cat > "${HOME}/.claude/craftsman-instincts.sh" <<WRAPPER
 #!/usr/bin/env bash
 set -uo pipefail
-DB="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db"
+DB="$METRICS_DB"
 source "${SCRIPT_DIR}/lib/metrics-db.sh" 2>/dev/null
 PROJECT_HASH=\$(metrics_project_hash)
 [[ -n "\${CRAFTSMAN_PRINT_PROJECT_HASH:-}" ]] && { printf '%s' "\$PROJECT_HASH"; exit 0; }
@@ -137,7 +132,7 @@ chmod +x "${HOME}/.claude/craftsman-instincts.sh" 2>/dev/null || true
 cat > "${HOME}/.claude/craftsman-codemap.sh" <<WRAPPER
 #!/usr/bin/env bash
 set -uo pipefail
-DATA_DIR="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
+DATA_DIR="${METRICS_DB_DIR}"
 source "${SCRIPT_DIR}/lib/metrics-db.sh" 2>/dev/null
 PROJECT_HASH=\$(metrics_project_hash)
 CACHE="\${DATA_DIR}/codemap-\${PROJECT_HASH}"
@@ -165,7 +160,7 @@ chmod +x "${HOME}/.claude/craftsman-knowledge.sh" 2>/dev/null || true
 cat > "${HOME}/.claude/craftsman-dashboard.sh" <<WRAPPER
 #!/usr/bin/env bash
 set -uo pipefail
-DB="${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db"
+DB="$METRICS_DB"
 exec python3 "${SCRIPT_DIR}/lib/dashboard.py" "\$DB" "\$@"
 WRAPPER
 chmod +x "${HOME}/.claude/craftsman-dashboard.sh" 2>/dev/null || true
@@ -219,7 +214,9 @@ PACK_STATUS=$(_init_packs 2>/dev/null || echo "PACKS:error")
 DETECTED_PACKS=$(detect_project_packs 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
 MSG="Craftsman active | Stack: ${STACK}"
 [[ -n "$DETECTED_PACKS" ]] && MSG="${MSG} | Detected: ${DETECTED_PACKS// /,}"
-MSG="${MSG} | Strictness: ${STRICTNESS} | Metrics: initialized | ${PACK_STATUS}"
+_metrics_status=unavailable
+[[ -n "$METRICS_DB" && -f "$METRICS_DB" ]] && _metrics_status=initialized
+MSG="${MSG} | Strictness: ${STRICTNESS} | Metrics: ${_metrics_status} | ${PACK_STATUS}"
 
 # Correction learning: trends kept separate so the context budget can drop
 # them first (ADR-0021 priority order)
@@ -233,7 +230,7 @@ fi
 PENDING_INSTINCTS=""
 if $HAS_PYTHON3; then
     _pending=$(python3 "${SCRIPT_DIR}/lib/instincts.py" pending-count \
-        "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}/metrics.db" \
+        "$METRICS_DB" \
         "$(metrics_project_hash)" 2>/dev/null || echo 0)
     if [[ "$_pending" =~ ^[0-9]+$ ]] && [[ "$_pending" -gt 0 ]]; then
         PENDING_INSTINCTS="Instincts: ${_pending} candidate(s) pending review - run /craftsman:metrics"

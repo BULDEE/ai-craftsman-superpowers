@@ -178,7 +178,10 @@ _pack_yml_nested_compile() {
 
 _pack_yml_nested_cache() {
     local file="$1"
-    local cache_dir="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data}/cache/pack-yml"
+    local cache_dir
+    cache_dir=$(session_cache_dir)
+    [[ -n "$cache_dir" ]] || return 1
+    cache_dir="${cache_dir}/cache/pack-yml"
     local cache="${cache_dir}/v${_PACK_YML_CACHE_VERSION}-$(_pack_yml_cache_key "$file")"
     local want header temp
 
@@ -374,6 +377,7 @@ _pack_default_packs_dir() {
 }
 
 pack_loader_init() {
+    _CRAFTSMAN_CACHE_DIR=$(session_cache_dir)
     local packs_dir="${1:-$(_pack_default_packs_dir)}"
     _PACKS_DIR="$packs_dir"
 

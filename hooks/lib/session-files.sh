@@ -28,8 +28,18 @@
 #                                      without a SessionEnd (a crash, a kill)
 # =============================================================================
 
+[[ "${_CRAFTSMAN_SESSION_FILES_LOADED:-}" == 1 ]] && return 0
+_CRAFTSMAN_SESSION_FILES_LOADED=1
+
+SESSION_FILES_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SESSION_FILES_LIB_DIR}/host.sh"
+
 _session_files_dir() {
-    printf '%s' "${CLAUDE_PLUGIN_DATA:-${HOME}/.claude/plugins/data/craftsman}"
+    if [[ "${_CRAFTSMAN_SESSION_DATA_DIR+x}" == x ]]; then
+        printf '%s' "$_CRAFTSMAN_SESSION_DATA_DIR"
+        return 0
+    fi
+    python3 "${SESSION_FILES_LIB_DIR}/runtime_paths.py" data 2>/dev/null || true
 }
 
 # The id, cleaned to what a filename may carry: a hook input is untrusted data
@@ -47,19 +57,43 @@ session_files_bind() {
     local id
     id=$(printf '%s' "${1:-}" | jq -r '.session_id // empty' 2>/dev/null | tr -cd 'A-Za-z0-9_-' | cut -c1-64)
     [[ -n "$id" ]] && export CRAFTSMAN_SESSION_ID="$id"
+    CRAFTSMAN_SESSION_HOST=$(host_detect "${1:-}")
+    export CRAFTSMAN_SESSION_HOST
+    _CRAFTSMAN_SESSION_DATA_DIR=$(python3 "${SESSION_FILES_LIB_DIR}/runtime_paths.py" data 2>/dev/null) || _CRAFTSMAN_SESSION_DATA_DIR=""
+    _CRAFTSMAN_CACHE_DIR="$_CRAFTSMAN_SESSION_DATA_DIR"
+    [[ -n "$_CRAFTSMAN_CACHE_DIR" ]] || _CRAFTSMAN_CACHE_DIR=$(python3 "${SESSION_FILES_LIB_DIR}/runtime_paths.py" cache 2>/dev/null) || _CRAFTSMAN_CACHE_DIR=""
     return 0
 }
 
+session_files_register() {
+    local directory
+    directory=$(_session_files_dir)
+    [[ -n "$directory" ]] || return 0
+    python3 "${SESSION_FILES_LIB_DIR}/runtime_paths.py" bind \
+        "${CRAFTSMAN_SESSION_HOST:-unknown}" "$(_session_files_id)" \
+        "$(dirname "$(dirname "$SESSION_FILES_LIB_DIR")")" "$directory" 2>/dev/null || true
+}
+
+session_cache_dir() {
+    if [[ -n "${_CRAFTSMAN_CACHE_DIR:-}" ]]; then
+        printf '%s' "$_CRAFTSMAN_CACHE_DIR"
+        return 0
+    fi
+    python3 "${SESSION_FILES_LIB_DIR}/runtime_paths.py" cache 2>/dev/null || true
+}
+
 session_file() {
-    local name="$1" id
+    local name="$1" id directory
+    directory=$(_session_files_dir)
+    [[ -n "$directory" ]] || return 0
     id=$(_session_files_id "${2:-}")
     if [[ -z "$id" ]]; then
-        printf '%s/%s' "$(_session_files_dir)" "$name"
+        printf '%s/%s' "$directory" "$name"
         return 0
     fi
     case "$name" in
-        session-state.json) printf '%s/session-state-%s.json' "$(_session_files_dir)" "$id" ;;
-        *)                  printf '%s/%s-%s' "$(_session_files_dir)" "$name" "$id" ;;
+        session-state.json) printf '%s/session-state-%s.json' "$directory" "$id" ;;
+        *)                  printf '%s/%s-%s' "$directory" "$name" "$id" ;;
     esac
 }
 

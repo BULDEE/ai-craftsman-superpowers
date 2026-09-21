@@ -11,7 +11,11 @@
 # =============================================================================
 
 METRICS_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-METRICS_DB_DIR=$(python3 "${METRICS_LIB_DIR}/runtime_paths.py" data 2>/dev/null) || METRICS_DB_DIR=""
+if [[ "${_CRAFTSMAN_SESSION_DATA_DIR+x}" == x ]]; then
+    METRICS_DB_DIR="$_CRAFTSMAN_SESSION_DATA_DIR"
+else
+    METRICS_DB_DIR=$(python3 "${METRICS_LIB_DIR}/runtime_paths.py" data 2>/dev/null) || METRICS_DB_DIR=""
+fi
 METRICS_DB="${METRICS_DB_DIR:+${METRICS_DB_DIR}/metrics.db}"
 
 # DDL and reads used to require the sqlite3 binary while DML went through
@@ -238,6 +242,8 @@ _metrics_migrate_legacy_location() {
         : > "$marker" 2>/dev/null || true
         return 0
     fi
+
+    [[ "$(python3 "${METRICS_LIB_DIR}/runtime_paths.py" host 2>/dev/null)" == claude-code ]] || return 0
 
     # A failed copy is not a settled answer. Writing the marker anyway meant a
     # full disk or a refused permission discarded the history for good, in
@@ -517,7 +523,7 @@ _metrics_tally_session() {
     [[ "$ignored" == "1" ]] && kind="ignored"
     local tally="${METRICS_DB_DIR}/session-violations"
     if type session_file >/dev/null 2>&1; then
-        tally=$(CLAUDE_PLUGIN_DATA="$METRICS_DB_DIR" session_file session-violations)
+        tally=$(session_file session-violations)
     elif [[ -n "${CRAFTSMAN_SESSION_ID:-${CODEX_SESSION_ID:-${CLAUDE_CODE_SESSION_ID:-}}}" ]]; then
         tally="${METRICS_DB_DIR}/session-violations-$(printf '%s' "${CRAFTSMAN_SESSION_ID:-${CODEX_SESSION_ID:-$CLAUDE_CODE_SESSION_ID}}" | tr -cd 'A-Za-z0-9_-' | cut -c1-64)"
     fi

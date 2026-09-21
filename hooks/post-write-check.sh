@@ -19,6 +19,9 @@ set -uo pipefail
 trap 'echo "WARNING: post-write-check.sh failed at line $LINENO" >&2; exit 0' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/session-files.sh"
+INPUT=$(cat)
+session_files_bind "$INPUT"
 
 # Load helpers
 source "${SCRIPT_DIR}/lib/metrics-db.sh"
@@ -35,7 +38,6 @@ HAS_PYTHON3=true
 command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
 
 # Session state for correction learning
-source "${SCRIPT_DIR}/lib/session-files.sh"
 SESSION_STATE=""
 
 # The blocked rule ids of this write, as a JSON array.
@@ -200,9 +202,7 @@ trap 'metrics_violations_queue_flush 2>/dev/null' EXIT
 pack_loader_init
 
 # Read tool input from stdin (JSON from the host)
-INPUT=$(cat)
-session_files_bind "$INPUT"
-SESSION_STATE=$(python3 "${SCRIPT_DIR}/lib/runtime_paths.py" state 2>/dev/null) || SESSION_STATE=""
+SESSION_STATE=$(session_file session-state.json)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 
 # A Codex apply_patch names its files inside `tool_input.command`, any number
@@ -290,7 +290,7 @@ fi
 # Sentry hook reads the paths, since a Stop payload names no file (audit
 # CR-117, C11). Append is atomic enough for hook concurrency; no locking.
 if [[ -n "$SESSION_STATE" ]]; then
-    printf '%s\n' "$FILE_PATH" >> "$(CLAUDE_PLUGIN_DATA="${SESSION_STATE%/*}" session_file session-writes)" 2>/dev/null || true
+    printf '%s\n' "$FILE_PATH" >> "$(session_file session-writes)" 2>/dev/null || true
 fi
 
 # Get file extension
