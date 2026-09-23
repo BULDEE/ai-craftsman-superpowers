@@ -23,7 +23,8 @@ echo ""
 echo "=== Session Start Hook Tests ==="
 
 # Test: Hook outputs valid JSON
-result=$(echo '{}' | bash "$ROOT_DIR/hooks/session-start.sh" 2>/dev/null)
+START_HOME=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-session-home.XXXXXX")
+result=$(echo '{}' | HOME="$START_HOME" bash "$ROOT_DIR/hooks/session-start.sh" 2>/dev/null)
 exit_code=$?
 if [[ "$exit_code" == "0" ]]; then
     log_pass "Session start exits 0"

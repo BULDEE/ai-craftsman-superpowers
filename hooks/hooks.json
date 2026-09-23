@@ -6,6 +6,7 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\"",
+            "timeout": 15,
             "statusMessage": "Craftsman: loading packs, rules and session context"
           }
         ]
@@ -18,11 +19,13 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/config-protection.sh\"",
+            "timeout": 15,
             "statusMessage": "Craftsman: checking the write does not reconfigure the gate"
           },
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-write-check.sh\"",
+            "timeout": 15,
             "statusMessage": "Craftsman: judging the would-be file before it lands"
           }
         ]
@@ -34,6 +37,7 @@
             "type": "command",
             "if": "Bash(git push*)",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-push-verify.sh\"",
+            "timeout": 15,
             "statusMessage": "Craftsman: checking verification evidence before the push"
           }
         ]
@@ -107,6 +111,7 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/bias-detector.sh\"",
+            "timeout": 15,
             "statusMessage": "Craftsman: scanning the prompt for cognitive bias signals"
           }
         ]

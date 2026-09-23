@@ -350,14 +350,58 @@ if [[ "$G_BARE" == warn\|*"write gate is inert"* && "$G_BARE" == *"craftsman-ci 
 else
     log_fail "unwired Grok write gate" "$(printf '%s' "$G_BARE" | cut -c1-220)"
 fi
-mkdir -p "$G_PROJ/.grok/hooks"
+mkdir -p "$G_PROJ/.grok/hooks" "$G_HOME/.grok/hooks"
 printf '%s\n' '{"hooks":{"PreToolUse":[{"hooks":[{"command":"bash /opt/craftsman/hooks/pre-write-check.sh"}]}]}}' \
     > "$G_PROJ/.grok/hooks/craftsman.json"
-G_WIRED=$(_g_hooks_row)
-if [[ "$G_WIRED" == ok\|*"wired via"* && "$G_WIRED" != *"write gate is inert"* ]]; then
-    log_pass "a Grok project with .grok/hooks/craftsman.json calling pre-write-check.sh is wired"
+G_UNOWNED=$(_g_hooks_row)
+if [[ "$G_UNOWNED" == error\|*"no owner marker"* && "$G_UNOWNED" == *"this install is"* ]]; then
+    log_pass "a Grok gate that calls pre-write-check.sh without an owner marker is an error"
 else
-    log_fail "wired Grok write gate" "$(printf '%s' "$G_WIRED" | cut -c1-220)"
+    log_fail "unowned Grok write gate" "$(printf '%s' "$G_UNOWNED" | cut -c1-220)"
+fi
+python3 "$ROOT_DIR/ci/host_hooks.py" grok "$ROOT_DIR" "$G_PROJ/.grok/hooks/craftsman.json" >/dev/null
+G_OWNED=$(_g_hooks_row)
+if [[ "$G_OWNED" == ok\|*"wired via"* ]]; then
+    log_pass "a Grok gate whose marker matches this install is wired"
+else
+    log_fail "owned Grok write gate" "$(printf '%s' "$G_OWNED" | cut -c1-220)"
+fi
+jq '.craftsman.root = "/tmp/craftsman-other-install"' "$G_PROJ/.grok/hooks/craftsman.json" > "$G_PROJ/.grok/hooks/craftsman.json.tmp"
+mv "$G_PROJ/.grok/hooks/craftsman.json.tmp" "$G_PROJ/.grok/hooks/craftsman.json"
+G_FOREIGN=$(_g_hooks_row)
+if [[ "$G_FOREIGN" == error\|*"belongs to /tmp/craftsman-other-install"* && "$G_FOREIGN" == *"this install is"* ]]; then
+    log_pass "a Grok gate that belongs to another checkout is an error naming both paths"
+else
+    log_fail "foreign Grok write gate" "$(printf '%s' "$G_FOREIGN" | cut -c1-220)"
+fi
+python3 "$ROOT_DIR/ci/host_hooks.py" grok "$ROOT_DIR" "$G_PROJ/.grok/hooks/craftsman.json" >/dev/null
+jq '.craftsman.version = "0.0.1"' "$G_PROJ/.grok/hooks/craftsman.json" > "$G_PROJ/.grok/hooks/craftsman.json.tmp"
+mv "$G_PROJ/.grok/hooks/craftsman.json.tmp" "$G_PROJ/.grok/hooks/craftsman.json"
+G_BEHIND=$(_g_hooks_row)
+if [[ "$G_BEHIND" == warn\|*"craftsman upgrade"* ]]; then
+    log_pass "a Grok gate from this install at an older version warns craftsman upgrade"
+else
+    log_fail "stale Grok write gate" "$(printf '%s' "$G_BEHIND" | cut -c1-220)"
+fi
+HERE_ROOT=$(cd "$ROOT_DIR" && pwd -P)
+jq -n --arg root "/tmp/craftsman-other-install" '{craftsman:{root:$root,commit:"x",version:"0"},hooks:{}}' \
+    > "$G_HOME/.grok/hooks/craftsman.json"
+(
+    cd "$G_PROJ" && HOME="$G_HOME" CRAFTSMAN_SESSION_HOST=grok CLAUDE_PLUGIN_ROOT="$ROOT_DIR" \
+        bash -c 'source "$CLAUDE_PLUGIN_ROOT/hooks/lib/config.sh"; source "$CLAUDE_PLUGIN_ROOT/hooks/lib/healthcheck.sh"; hc_refresh_owned_gate'
+)
+G_FOREIGN_LEFT=$(jq -r '.craftsman.root' "$G_HOME/.grok/hooks/craftsman.json")
+jq -n --arg root "$HERE_ROOT" '{craftsman:{root:$root,commit:"000000000000",version:"0.0.1"},hooks:{}}' \
+    > "$G_HOME/.grok/hooks/craftsman.json"
+(
+    cd "$G_PROJ" && HOME="$G_HOME" CRAFTSMAN_SESSION_HOST=grok CLAUDE_PLUGIN_ROOT="$ROOT_DIR" \
+        bash -c 'source "$CLAUDE_PLUGIN_ROOT/hooks/lib/config.sh"; source "$CLAUDE_PLUGIN_ROOT/hooks/lib/healthcheck.sh"; hc_refresh_owned_gate'
+)
+G_REFRESHED=$(jq -r '.craftsman.version' "$G_HOME/.grok/hooks/craftsman.json")
+if [[ "$G_FOREIGN_LEFT" == "/tmp/craftsman-other-install" && "$G_REFRESHED" == "$(jq -r '.version' "$ROOT_DIR/.claude-plugin/plugin.json")" ]]; then
+    log_pass "SessionStart refresh rewrites only the global gate whose root is this install"
+else
+    log_fail "owned gate refresh" "foreign=$G_FOREIGN_LEFT version=$G_REFRESHED"
 fi
 rm -rf "$G_PROJ" "$G_HOME"
 

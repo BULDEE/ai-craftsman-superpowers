@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A fresh Grok process does not run plugin hooks, and its default hook
+  timeout is 5 seconds, fail-open. `SessionStart`, `UserPromptSubmit` and
+  `PreToolUse` now declare `timeout: 15`, and `ci/host_hooks.py` copies that
+  field into the Grok and Codex gates. The same export sets each host's own
+  root and data variables (`GROK_PLUGIN_*` or `PLUGIN_*`) and still sets
+  `CLAUDE_PLUGIN_*`, which the engine scripts read on every host. A Codex
+  gate no longer carries `GROK_*`.
+- Each generated gate names the install that wrote it (`craftsman.root`,
+  `craftsman.commit`, `craftsman.version`). The healthcheck reports ok when
+  they match, `craftsman upgrade` when the same install is behind, and an
+  error that names both paths when the gate belongs to another checkout or
+  has no marker. SessionStart rewrites the global gate only when the marker
+  root is this install. `craftsman-grok-install` still exports the gate when
+  `grok plugin install` says the repo is already installed.
+
 ## [4.11.0] - 2026-09-20
 
 ### Changed

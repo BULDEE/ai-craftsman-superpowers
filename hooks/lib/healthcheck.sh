@@ -319,10 +319,70 @@ hc_check_write_gate() {
     fi
     gate=$(_hc_host_gate_file "$host" "$capabilities") || gate=""
     if [[ -n "$gate" ]]; then
-        _hc_record "write-gate" "ok" "engine wired via ${gate}"
+        _hc_record_gate_owner "$host" "$root" "$gate"
         return
     fi
     _hc_record "write-gate" "warn" "${host}: native plugin handlers are absent from the initial registry. The write gate is inert at startup on 1.0.40 until craftsman-ci export --target grok-hooks writes ~/.grok/hooks/craftsman.json (bin/craftsman-grok-install does this). A fresh process runs neither a hooks.json path nor inline plugin hooks."
+}
+
+# A generated gate names the install that wrote it. Same root and same
+# commit: ok. Same root, older commit or version: warn, and say how to
+# refresh. Another root, or no marker: error, and name both paths. A file
+# that merely calls pre-write-check.sh is not owned.
+_hc_physical_dir() {
+    local path="$1"
+    if [[ -d "$path" ]]; then
+        (cd "$path" && pwd -P)
+        return 0
+    fi
+    printf '%s' "$path"
+}
+
+_hc_record_gate_owner() {
+    local host="$1" root="$2" gate="$3"
+    local marker_root marker_commit marker_version here_root here_commit here_version
+    marker_root=$(jq -r '.craftsman.root // empty' "$gate" 2>/dev/null)
+    here_root=$(_hc_physical_dir "$root")
+    if [[ -z "$marker_root" ]]; then
+        _hc_record "write-gate" "error" "${host}: gate ${gate} has no owner marker; this install is ${here_root}"
+        return 0
+    fi
+    marker_root=$(_hc_physical_dir "$marker_root")
+    if [[ "$marker_root" != "$here_root" ]]; then
+        _hc_record "write-gate" "error" "${host}: gate ${gate} belongs to ${marker_root}, this install is ${here_root}"
+        return 0
+    fi
+    marker_version=$(jq -r '.craftsman.version // empty' "$gate" 2>/dev/null)
+    marker_commit=$(jq -r '.craftsman.commit // empty' "$gate" 2>/dev/null)
+    here_version=$(jq -r '.version // empty' "$root/.claude-plugin/plugin.json" 2>/dev/null)
+    here_commit=$(git -C "$root" rev-parse --short=12 HEAD 2>/dev/null || printf 'unknown')
+    if [[ "$marker_version" != "$here_version" || "$marker_commit" != "$here_commit" ]]; then
+        _hc_record "write-gate" "warn" "${host}: gate ${gate} is behind this install. craftsman upgrade"
+        return 0
+    fi
+    _hc_record "write-gate" "ok" "engine wired via ${gate}"
+}
+
+# Rewrite the host's global gate only when the marker root is this install.
+# A missing file is left missing. A foreign root is left byte for byte.
+hc_refresh_owned_gate() {
+    local root host caps skills gate marker here
+    root="${CLAUDE_PLUGIN_ROOT:-$(cd "${_HC_LIB_DIR}/../.." && pwd)}"
+    root=$(cd "$root" && pwd -P)
+    host="${CRAFTSMAN_SESSION_HOST:-}"
+    [[ -z "$host" ]] && type host_detect >/dev/null 2>&1 && host=$(host_detect "")
+    [[ -n "$host" && "$host" != "unknown" ]] || return 0
+    caps="$root/hooks/host-capabilities.json"
+    [[ -f "$caps" ]] || return 0
+    skills=$(jq -r --arg h "$host" '.hosts[$h].skills_dir // empty' "$caps" 2>/dev/null)
+    [[ -n "$skills" ]] || return 0
+    gate="${HOME}/$(dirname "$skills")/hooks/craftsman.json"
+    [[ -f "$gate" ]] || return 0
+    marker=$(jq -r '.craftsman.root // empty' "$gate" 2>/dev/null)
+    [[ -n "$marker" ]] || return 0
+    here=$(_hc_physical_dir "$marker")
+    [[ "$here" == "$root" ]] || return 0
+    python3 "$root/ci/host_hooks.py" "$host" "$root" "$gate" >/dev/null 2>&1 || return 0
 }
 # --- Aggregate ---
 

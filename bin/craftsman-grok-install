@@ -12,7 +12,13 @@ case "$MODE" in
     --native|--compat-hooks) ;;
     *) echo "Usage: craftsman-grok-install [--native|--compat-hooks]" >&2; exit 2 ;;
 esac
-grok plugin install "$ROOT" --trust
+# `grok plugin install` exits when the repo is already installed, and with
+# set -e that exit used to skip the export. The gate is the part that runs.
+install_log=$(grok plugin install "$ROOT" --trust 2>&1) || install_rc=$?
+if [[ "${install_rc:-0}" -ne 0 && "$install_log" != *"already installed"* ]]; then
+    printf '%s\n' "$install_log" >&2
+    exit "$install_rc"
+fi
 # Grok 1.0.40 does not execute plugin-bundled hooks, whether hooks.json is a
 # path or the handlers are inlined in the manifest (a fresh grok -p wrote the
 # file and an inline PreToolUse marker never ran). The gate that runs is this

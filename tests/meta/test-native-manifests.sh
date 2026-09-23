@@ -43,5 +43,10 @@ PATH="$FIXTURE/tools:$PATH" bash "$FIXTURE/bin/craftsman-grok-install" --compat-
 assert_contains 'explicit compatibility retains the hook export' "$(cat "$CALL_LOG")" 'ci export --target grok-hooks'
 PATH="$FIXTURE/tools:$PATH" bash "$FIXTURE/bin/craftsman-grok-install" --invalid >/dev/null 2>&1
 assert_exit_code 'unknown install modes are rejected' 2 "$?"
+printf '#!/bin/sh\necho "repo already installed" >&2\nexit 1\n' > "$FIXTURE/tools/grok"
+chmod +x "$FIXTURE/tools/grok" "$FIXTURE/ci/craftsman-ci.sh"
+: > "$CALL_LOG"
+HOME="$FIXTURE/home" PATH="$FIXTURE/tools:$PATH" bash "$FIXTURE/bin/craftsman-grok-install" >/dev/null 2>&1 || true
+assert_contains 'already installed still exports the gate' "$(cat "$CALL_LOG")" 'ci export --target grok-hooks'
 rm -rf "$FIXTURE"
 test_summary

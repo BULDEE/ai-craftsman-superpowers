@@ -467,7 +467,7 @@ backup_home_bridges
 
 run_session_start() {
     local output
-    output=$(echo '{}' | bash "$ROOT_DIR/hooks/session-start.sh" 2>/dev/null)
+    output=$(echo '{}' | HOME="$SESSION_TEST_DIR" bash "$ROOT_DIR/hooks/session-start.sh" 2>/dev/null)
     local exit_code=$?
     echo "$exit_code|$output"
 }
