@@ -383,11 +383,45 @@ HH_IF=$(jq -r '[.hooks[][] | .hooks[] | select(.command | test("git push"))] | l
 HH_PUSH=$(jq -r '[.hooks[][] | .hooks[] | select(.command | test("pre-push-verify\\.sh"))] | length' "$HH_FILE" 2>/dev/null)
 if [[ "$HH_EVENTS" != *TaskCompleted* && "$HH_EVENTS" != *FileChanged* && "$HH_EVENTS" == *PreToolUse* \
     && "$HH_CMD" != *'${CLAUDE_PLUGIN_ROOT}'* && "$HH_CMD" == *"CLAUDE_PLUGIN_ROOT=$ROOT_DIR"* \
+    && "$HH_CMD" == *"GROK_PLUGIN_ROOT=$ROOT_DIR"* && "$HH_CMD" != *" PLUGIN_ROOT="* \
     && "$HH_MATCH" == *write* && "$HH_MATCH" == *search_replace* \
-    && "$HH_IF" == "0" && "$HH_PUSH" == "1" && "$HH_OUT" == *"--trust"* ]]; then
+    && "$HH_IF" == "0" && "$HH_PUSH" == "1" && "$HH_OUT" == *"--trust"* \
+    && "$(jq -r '.hooks.SessionStart[0].hooks[0].timeout' "$HH_FILE")" == "15" \
+    && "$(jq -r '.hooks.PreToolUse[0].hooks[0].timeout' "$HH_FILE")" == "15" \
+    && "$(jq -r '.craftsman.commit' "$HH_FILE")" == "$(git -C "$ROOT_DIR" rev-parse --short=12 HEAD)" \
+    && "$(jq -r '.craftsman.version' "$HH_FILE")" == "$(jq -r '.version' "$ROOT_DIR/.claude-plugin/plugin.json")" \
+    && "$(jq -r '.craftsman.root' "$HH_FILE")" == "$(cd "$ROOT_DIR" && pwd -P)" ]]; then
     log_pass "grok-hooks writes the manifest's handlers with the root expanded and carried, drops the events Grok does not fire, keeps pre-push-verify.sh, names write/search_replace, and names the trust step"
 else
-    log_fail "grok-hooks export" "events=$HH_EVENTS if=$HH_IF match=$HH_MATCH cmd=$(printf '%s' "$HH_CMD" | cut -c1-70)"
+    log_fail "grok-hooks export" "events=$HH_EVENTS if=$HH_IF match=$HH_MATCH cmd=$(printf '%s' "$HH_CMD" | cut -c1-120)"
+fi
+CX_OUT=$(cd "$HH" && bash "$CLI" export --target codex-hooks 2>&1)
+CX_FILE="$HH/.codex/hooks/craftsman.json"
+CX_CMD=$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$CX_FILE" 2>/dev/null)
+if [[ "$CX_CMD" == *"PLUGIN_ROOT=$ROOT_DIR"* && "$CX_CMD" == *" PLUGIN_DATA="* \
+    && "$CX_CMD" == *"CLAUDE_PLUGIN_ROOT=$ROOT_DIR"* \
+    && "$CX_CMD" != *"GROK_PLUGIN_ROOT="* && "$CX_CMD" != *"GROK_PLUGIN_DATA="* \
+    && "$(jq -r '.hooks.PreToolUse[0].hooks[0].timeout' "$CX_FILE")" == "null" \
+    && "$(jq -r '.craftsman.root' "$CX_FILE")" == "$(cd "$ROOT_DIR" && pwd -P)" \
+    && "$CX_OUT" != *"GROK_PLUGIN"* ]]; then
+    log_pass "codex-hooks carries PLUGIN_* and no timeout, and does not carry GROK_*"
+else
+    log_fail "codex-hooks export" "timeout=$(jq -r '.hooks.PreToolUse[0].hooks[0].timeout' "$CX_FILE") $(printf '%s' "$CX_CMD" | cut -c1-120)"
+fi
+LOW_TIMEOUT=$(jq '[.hooks.PreToolUse[].hooks[].timeout // empty | select(. < 600)] | length' "$ROOT_DIR/hooks/hooks.json")
+if [[ "$LOW_TIMEOUT" == "0" ]]; then
+    log_pass "hooks.json declares no PreToolUse timeout under 600"
+else
+    log_fail "hooks.json PreToolUse timeout" "count below 600: $LOW_TIMEOUT"
+fi
+GROK_REL=$(python3 "$ROOT_DIR/ci/host_hooks.py" --gate-rel "$ROOT_DIR" grok)
+CODEX_REL=$(python3 "$ROOT_DIR/ci/host_hooks.py" --gate-rel "$ROOT_DIR" codex)
+if [[ -f "$HH/$GROK_REL" && -f "$HH/$CODEX_REL" && "$GROK_REL" == ".grok/hooks/craftsman.json" && "$CODEX_REL" == ".codex/hooks/craftsman.json" \
+    && -z "$(find "$HH/.grok/hooks" "$HH/.codex/hooks" -name '.craftsman-gate-*' -print)" \
+    && "$(jq -e . "$HH/$GROK_REL" >/dev/null && echo ok)" == "ok" ]]; then
+    log_pass "export, healthcheck and refresh share .host/hooks/craftsman.json, and the write leaves no temporary file"
+else
+    log_fail "gate path" "grok=$GROK_REL codex=$CODEX_REL"
 fi
 rm -rf "$HH"
 
