@@ -9,20 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- A fresh Grok process does not run plugin hooks, and its default hook
-  timeout is 5 seconds, fail-open. `SessionStart`, `UserPromptSubmit` and
-  `PreToolUse` now declare `timeout: 15`, and `ci/host_hooks.py` copies that
-  field into the Grok and Codex gates. The same export sets each host's own
-  root and data variables (`GROK_PLUGIN_*` or `PLUGIN_*`) and still sets
-  `CLAUDE_PLUGIN_*`, which the engine scripts read on every host. A Codex
-  gate no longer carries `GROK_*`.
-- Each generated gate names the install that wrote it (`craftsman.root`,
-  `craftsman.commit`, `craftsman.version`). The healthcheck reports ok when
-  they match, `craftsman upgrade` when the same install is behind, and an
-  error that names both paths when the gate belongs to another checkout or
-  has no marker. SessionStart rewrites the global gate only when the marker
-  root is this install. `craftsman-grok-install` still exports the gate when
-  `grok plugin install` says the repo is already installed.
+- Grok's default hook timeout is 5 seconds and fail-open. The Grok export
+  alone sets `timeout: 15` on every handler. `hooks/hooks.json` stays
+  without a timeout, so Claude Code and Codex keep their 600 second default.
+  The export sets each host's own root and data variables (`GROK_PLUGIN_*`
+  or `PLUGIN_*`) and still sets `CLAUDE_PLUGIN_*`, which the engine scripts
+  read on every host. A Codex gate does not carry `GROK_*`. The gate file
+  is replaced atomically (`mkstemp` in the same directory, then `os.replace`),
+  keeping the existing mode.
+- Each generated gate names the install that wrote it. The healthcheck is
+  ok when the marker matches, and names `craftsman-ci export --target
+  <host>-hooks` when the same install is behind. A 4.11.0 gate with no
+  marker is a warning, and SessionStart adopts it, when its
+  `CLAUDE_PLUGIN_ROOT` is this install. Any other root is an error that
+  names both paths and the export command, and the file is left untouched.
+  The export, the healthcheck and the refresh share one relative path,
+  `.<host>/hooks/craftsman.json`. `craftsman-grok-install` still exports
+  the gate when the plugin is already installed, and prints the installer's
+  own output on success.
 
 ## [4.11.0] - 2026-09-20
 

@@ -248,11 +248,16 @@ hc_check_host() {
 # a plugin's hooks/hooks.json and runs none of it. The write gate is live
 # there only when a project or global hooks file actually calls
 # pre-write-check.sh. skills_dir `.grok/skills` -> `.grok/hooks/craftsman.json`.
+_hc_gate_relpath() {
+    local root="$1" host="$2"
+    python3 "$root/ci/host_hooks.py" --gate-rel "$root" "$host" 2>/dev/null
+}
+
 _hc_host_gate_file() {
-    local host="$1" capabilities="$2" skills rel f
-    skills=$(jq -r --arg h "$host" '.hosts[$h].skills_dir // empty' "$capabilities" 2>/dev/null)
-    [[ -n "$skills" ]] || return 1
-    rel="$(dirname "$skills")/hooks/craftsman.json"
+    local host="$1" capabilities="$2" root rel f
+    root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+    rel=$(_hc_gate_relpath "$root" "$host")
+    [[ -n "$rel" ]] || return 1
     for f in "${PWD}/${rel}" "${HOME}/${rel}"; do
         [[ -f "$f" ]] || continue
         jq -e '.. | strings | select(test("pre-write-check\\.sh"))' "$f" >/dev/null 2>&1 || continue
@@ -344,7 +349,12 @@ _hc_record_gate_owner() {
     marker_root=$(jq -r '.craftsman.root // empty' "$gate" 2>/dev/null)
     here_root=$(_hc_physical_dir "$root")
     if [[ -z "$marker_root" ]]; then
-        _hc_record "write-gate" "error" "${host}: gate ${gate} has no owner marker; this install is ${here_root}"
+        marker_root=$(_hc_legacy_root "$gate")
+        if [[ -n "$marker_root" ]] && [[ "$(_hc_physical_dir "$marker_root")" == "$here_root" ]]; then
+            _hc_record "write-gate" "warn" "${host}: gate ${gate} has no owner marker. craftsman-ci export --target ${host}-hooks"
+            return 0
+        fi
+        _hc_record "write-gate" "error" "${host}: gate ${gate} belongs to ${marker_root:-nowhere}, this install is ${here_root}. craftsman-ci export --target ${host}-hooks"
         return 0
     fi
     marker_root=$(_hc_physical_dir "$marker_root")
@@ -357,7 +367,7 @@ _hc_record_gate_owner() {
     here_version=$(jq -r '.version // empty' "$root/.claude-plugin/plugin.json" 2>/dev/null)
     here_commit=$(git -C "$root" rev-parse --short=12 HEAD 2>/dev/null || printf 'unknown')
     if [[ "$marker_version" != "$here_version" || "$marker_commit" != "$here_commit" ]]; then
-        _hc_record "write-gate" "warn" "${host}: gate ${gate} is behind this install. craftsman upgrade"
+        _hc_record "write-gate" "warn" "${host}: gate ${gate} is behind this install. craftsman-ci export --target ${host}-hooks"
         return 0
     fi
     _hc_record "write-gate" "ok" "engine wired via ${gate}"
@@ -365,23 +375,37 @@ _hc_record_gate_owner() {
 
 # Rewrite the host's global gate only when the marker root is this install.
 # A missing file is left missing. A foreign root is left byte for byte.
+_hc_legacy_root() {
+    jq -r '[.. | strings | capture("CLAUDE_PLUGIN_ROOT=(?<root>[^ \"]+)").root] | map(select(length > 0)) | .[0] // empty' "$1" 2>/dev/null
+}
+
+_hc_gate_current() {
+    local root="$1" gate="$2" marker_commit marker_version here_commit here_version
+    marker_commit=$(jq -r '.craftsman.commit // empty' "$gate" 2>/dev/null)
+    marker_version=$(jq -r '.craftsman.version // empty' "$gate" 2>/dev/null)
+    [[ -n "$marker_commit" && -n "$marker_version" ]] || return 1
+    here_version=$(jq -r '.version // empty' "$root/.claude-plugin/plugin.json" 2>/dev/null)
+    here_commit=$(git -C "$root" rev-parse --short=12 HEAD 2>/dev/null || printf 'unknown')
+    [[ "$marker_commit" == "$here_commit" && "$marker_version" == "$here_version" ]]
+}
+
 hc_refresh_owned_gate() {
-    local root host caps skills gate marker here
+    local root host rel gate marker here
     root="${CLAUDE_PLUGIN_ROOT:-$(cd "${_HC_LIB_DIR}/../.." && pwd)}"
     root=$(cd "$root" && pwd -P)
     host="${CRAFTSMAN_SESSION_HOST:-}"
     [[ -z "$host" ]] && type host_detect >/dev/null 2>&1 && host=$(host_detect "")
     [[ -n "$host" && "$host" != "unknown" ]] || return 0
-    caps="$root/hooks/host-capabilities.json"
-    [[ -f "$caps" ]] || return 0
-    skills=$(jq -r --arg h "$host" '.hosts[$h].skills_dir // empty' "$caps" 2>/dev/null)
-    [[ -n "$skills" ]] || return 0
-    gate="${HOME}/$(dirname "$skills")/hooks/craftsman.json"
+    rel=$(_hc_gate_relpath "$root" "$host")
+    [[ -n "$rel" ]] || return 0
+    gate="${HOME}/${rel}"
     [[ -f "$gate" ]] || return 0
     marker=$(jq -r '.craftsman.root // empty' "$gate" 2>/dev/null)
+    [[ -n "$marker" ]] || marker=$(_hc_legacy_root "$gate")
     [[ -n "$marker" ]] || return 0
     here=$(_hc_physical_dir "$marker")
     [[ "$here" == "$root" ]] || return 0
+    _hc_gate_current "$root" "$gate" && return 0
     python3 "$root/ci/host_hooks.py" "$host" "$root" "$gate" >/dev/null 2>&1 || return 0
 }
 # --- Aggregate ---

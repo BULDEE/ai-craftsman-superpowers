@@ -354,7 +354,7 @@ mkdir -p "$G_PROJ/.grok/hooks" "$G_HOME/.grok/hooks"
 printf '%s\n' '{"hooks":{"PreToolUse":[{"hooks":[{"command":"bash /opt/craftsman/hooks/pre-write-check.sh"}]}]}}' \
     > "$G_PROJ/.grok/hooks/craftsman.json"
 G_UNOWNED=$(_g_hooks_row)
-if [[ "$G_UNOWNED" == error\|*"no owner marker"* && "$G_UNOWNED" == *"this install is"* ]]; then
+if [[ "$G_UNOWNED" == error\|*"belongs to nowhere"* && "$G_UNOWNED" == *"craftsman-ci export --target grok-hooks"* ]]; then
     log_pass "a Grok gate that calls pre-write-check.sh without an owner marker is an error"
 else
     log_fail "unowned Grok write gate" "$(printf '%s' "$G_UNOWNED" | cut -c1-220)"
@@ -378,8 +378,8 @@ python3 "$ROOT_DIR/ci/host_hooks.py" grok "$ROOT_DIR" "$G_PROJ/.grok/hooks/craft
 jq '.craftsman.version = "0.0.1"' "$G_PROJ/.grok/hooks/craftsman.json" > "$G_PROJ/.grok/hooks/craftsman.json.tmp"
 mv "$G_PROJ/.grok/hooks/craftsman.json.tmp" "$G_PROJ/.grok/hooks/craftsman.json"
 G_BEHIND=$(_g_hooks_row)
-if [[ "$G_BEHIND" == warn\|*"craftsman upgrade"* ]]; then
-    log_pass "a Grok gate from this install at an older version warns craftsman upgrade"
+if [[ "$G_BEHIND" == warn\|*"craftsman-ci export --target grok-hooks"* ]]; then
+    log_pass "a Grok gate from this install at an older version names the export"
 else
     log_fail "stale Grok write gate" "$(printf '%s' "$G_BEHIND" | cut -c1-220)"
 fi
@@ -403,6 +403,35 @@ if [[ "$G_FOREIGN_LEFT" == "/tmp/craftsman-other-install" && "$G_REFRESHED" == "
 else
     log_fail "owned gate refresh" "foreign=$G_FOREIGN_LEFT version=$G_REFRESHED"
 fi
+rm -f "$G_PROJ/.grok/hooks/craftsman.json"
+HERE_ROOT=$(cd "$ROOT_DIR" && pwd -P)
+LEGACY_SAME="$G_HOME/.grok/hooks/craftsman.json"
+printf '%s\n' "{\"hooks\":{\"PreToolUse\":[{\"hooks\":[{\"command\":\"env CLAUDE_PLUGIN_ROOT=${HERE_ROOT} bash pre-write-check.sh\"}]}]}}" > "$LEGACY_SAME"
+G_LEGACY=$(_g_hooks_row)
+LEGACY_BEFORE=$(cksum "$LEGACY_SAME")
+(
+    cd /tmp && HOME="$G_HOME" CRAFTSMAN_SESSION_HOST=grok CLAUDE_PLUGIN_ROOT="$ROOT_DIR" \
+        bash -c 'source "$CLAUDE_PLUGIN_ROOT/hooks/lib/config.sh"; source "$CLAUDE_PLUGIN_ROOT/hooks/lib/healthcheck.sh"; hc_refresh_owned_gate'
+)
+G_LEGACY_MARK=$(jq -r '.craftsman.root' "$LEGACY_SAME")
+if [[ "$G_LEGACY" == warn\|*"craftsman-ci export --target grok-hooks"* && "$G_LEGACY_MARK" == "$HERE_ROOT" ]]; then
+    log_pass "a legacy gate of this install warns, then the refresh adopts it"
+else
+    log_fail "legacy same-root gate" "row=$G_LEGACY mark=$G_LEGACY_MARK"
+fi
+printf '%s\n' '{"hooks":{"PreToolUse":[{"hooks":[{"command":"env CLAUDE_PLUGIN_ROOT=/tmp/craftsman-other-install bash pre-write-check.sh"}]}]}}' > "$LEGACY_SAME"
+LEGACY_BYTES=$(cksum "$LEGACY_SAME")
+G_LEGACY_OTHER=$(_g_hooks_row)
+(
+    cd /tmp && HOME="$G_HOME" CRAFTSMAN_SESSION_HOST=grok CLAUDE_PLUGIN_ROOT="$ROOT_DIR" \
+        bash -c 'source "$CLAUDE_PLUGIN_ROOT/hooks/lib/config.sh"; source "$CLAUDE_PLUGIN_ROOT/hooks/lib/healthcheck.sh"; hc_refresh_owned_gate'
+)
+if [[ "$G_LEGACY_OTHER" == error\|*"belongs to /tmp/craftsman-other-install"* && "$G_LEGACY_OTHER" == *"craftsman-ci export --target grok-hooks"* && "$(cksum "$LEGACY_SAME")" == "$LEGACY_BYTES" ]]; then
+    log_pass "a legacy gate of another install is an error and is left byte for byte"
+else
+    log_fail "legacy foreign gate" "row=$G_LEGACY_OTHER before=$LEGACY_BYTES after=$(cksum "$LEGACY_SAME")"
+fi
+unset LEGACY_BEFORE
 rm -rf "$G_PROJ" "$G_HOME"
 
 # The Grok row of the matrix is what hc_check_host prints. exit_code_observable

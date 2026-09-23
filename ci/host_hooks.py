@@ -22,6 +22,7 @@ import os
 import shlex
 import subprocess
 import sys
+import tempfile
 
 # What each host does not fire, measured (hooks/host-capabilities.json).
 UNFIRED = {
@@ -62,6 +63,12 @@ _NATIVE_ENV = {
     "codex": ("PLUGIN_ROOT", "PLUGIN_DATA"),
 }
 
+# Applied only when the manifest does not set timeout. Claude Code and Codex
+# default a command hook to 600s. Grok defaults to 5s and fails open, so only
+# the Grok export raises the gate. File-hook timeout has no documented maximum
+# (the guide's own example uses 1200); the 600 cap is the SDK timeoutS field.
+_HOST_TIMEOUT = {"grok": 15}
+
 
 def _env_prefix(host: str, root: str, data: str) -> str:
     names = ["CLAUDE_PLUGIN_ROOT", "CLAUDE_PLUGIN_DATA", *_NATIVE_ENV.get(host, ())]
@@ -97,8 +104,9 @@ def _handler(entry: dict, root: str, data: str, host: str) -> dict | None:
     if not command:
         return None
     out = {"type": entry.get("type", "command"), "command": _env_prefix(host, root, data) + command}
-    if entry.get("timeout"):
-        out["timeout"] = entry["timeout"]
+    timeout = entry.get("timeout") or _HOST_TIMEOUT.get(host)
+    if timeout:
+        out["timeout"] = timeout
     return out
 
 
@@ -107,7 +115,8 @@ def _marker(root: str) -> dict:
     manifest = os.path.join(root, ".claude-plugin", "plugin.json")
     if os.path.isfile(manifest):
         try:
-            version = str(json.load(open(manifest, encoding="utf-8")).get("version") or "unknown")
+            with open(manifest, encoding="utf-8") as handle:
+                version = str(json.load(handle).get("version") or "unknown")
         except (OSError, json.JSONDecodeError):
             version = "unknown"
     commit = "unknown"
@@ -135,13 +144,48 @@ def _groups(groups: list, root: str, data: str, host: str) -> list:
     return kept
 
 
+def gate_relpath(root: str, host: str) -> str:
+    """Relative path of the exported gate. Export and the healthcheck both call this."""
+    caps_path = os.path.join(root, "hooks", "host-capabilities.json")
+    try:
+        with open(caps_path, encoding="utf-8") as handle:
+            declared = json.load(handle).get("hosts", {}).get(host, {}).get("gate_file")
+        if isinstance(declared, str) and declared:
+            return declared
+    except (OSError, json.JSONDecodeError, AttributeError):
+        pass
+    return f".{host}/hooks/craftsman.json"
+
+
+def _write_gate(output: str, payload: dict) -> None:
+    directory = os.path.dirname(os.path.abspath(output)) or "."
+    os.makedirs(directory, exist_ok=True)
+    mode = os.stat(output).st_mode if os.path.exists(output) else None
+    descriptor, temporary = tempfile.mkstemp(dir=directory, prefix=".craftsman-gate-")
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+            handle.write("\n")
+        if mode is not None:
+            os.chmod(temporary, mode & 0o777)
+        os.replace(temporary, output)
+    except Exception:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+        raise
+
+
 def main() -> int:
+    if len(sys.argv) >= 4 and sys.argv[1] == "--gate-rel":
+        print(gate_relpath(sys.argv[2], sys.argv[3]))
+        return 0
     if len(sys.argv) < 4:
         print(__doc__, file=sys.stderr)
         return 2
     host, root, output = sys.argv[1:4]
     data = _data_dir(host)
-    manifest = json.load(open(os.path.join(root, "hooks", "hooks.json"), encoding="utf-8"))
+    with open(os.path.join(root, "hooks", "hooks.json"), encoding="utf-8") as handle:
+        manifest = json.load(handle)
     unfired = UNFIRED.get(host, ())
     hooks = {}
     for event, groups in manifest.get("hooks", {}).items():
@@ -150,10 +194,7 @@ def main() -> int:
         kept = _groups(groups, root, data, host)
         if kept:
             hooks[event] = kept
-    os.makedirs(os.path.dirname(os.path.abspath(output)) or ".", exist_ok=True)
-    with open(output, "w", encoding="utf-8") as handle:
-        json.dump({"craftsman": _marker(root), "hooks": hooks}, handle, indent=2)
-        handle.write("\n")
+    _write_gate(output, {"craftsman": _marker(root), "hooks": hooks})
     handlers = sum(len(group["hooks"]) for groups in hooks.values() for group in groups)
     print(f"wrote {handlers} handler(s) on {len(hooks)} event(s) to {output}")
     return 0

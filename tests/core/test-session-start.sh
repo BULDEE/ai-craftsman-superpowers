@@ -201,7 +201,7 @@ else
 fi
 rm -rf "$WRAP_HOME"
 
-rm -rf "$CLAUDE_PLUGIN_DATA" "/tmp/craftsman-fake-home-$$"
+rm -rf "$CLAUDE_PLUGIN_DATA" "/tmp/craftsman-fake-home-$$" "${START_HOME:-}"
 
 echo ""
 echo "=== Results: ${TESTS_PASSED} passed, ${TESTS_FAILED} failed ==="
