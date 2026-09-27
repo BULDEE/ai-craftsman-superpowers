@@ -112,7 +112,11 @@ stricter.
   a path checkout to undo an attempt. A mark taken before the attempt
   reverses exactly what the attempt changed, and the user's uncommitted and
   untracked work survives. `tests/core/test-attempt-revert.sh` runs every
-  documented sequence on a throwaway repository (CR-176).
+  documented sequence on a throwaway repository (CR-176). The skills exported
+  to Hermes carry the same correction: the committed export was regenerated
+  without a drift check, so it still prescribed `git reset --hard`, and
+  `tests/adapters/test-hermes-plugin.sh` now fails when regenerating it
+  changes a file.
 - An unreadable CI report is never commented as Passed. The shared comment
   formatter fell back to zero counters while the job failed with exit 2; it
   now renders `Craftsman Quality Gate -- Error`, checked for github, gitlab,
