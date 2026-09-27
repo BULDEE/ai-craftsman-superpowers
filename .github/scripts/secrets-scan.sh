@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly REPO_ROOT="${1:-.}"
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[1;33m'
@@ -32,6 +31,11 @@ log_warn() {
 
 log_ok() {
     echo -e "${GREEN}✓${NC} $1"
+}
+
+canonical_dir() {
+    local CDPATH=''
+    cd -- "$1" 2>/dev/null && pwd -P
 }
 
 search_tracked_files() {
@@ -238,6 +242,12 @@ print_summary() {
 }
 
 main() {
+    # git names tracked files relative to the repository and grep opens them
+    # relative to the working directory, so the two agree only inside the
+    # target. From anywhere else the scan read the caller's files of the same
+    # name, or none (CR-177). Entered once, before any read: the verdict
+    # belongs to the target, not to wherever the scanner was started.
+    cd "$REPO_ROOT" || die "cannot enter $REPO_ROOT"
     [[ -d "$REPO_ROOT/.git" ]] || die "Not a git repository: $REPO_ROOT"
 
     echo "=============================================="
@@ -255,5 +265,8 @@ main() {
 
     exit $EXIT_CODE
 }
+
+REPO_ROOT="$(canonical_dir "${1:-.}")" || die "cannot enter ${1:-.}"
+readonly REPO_ROOT
 
 main

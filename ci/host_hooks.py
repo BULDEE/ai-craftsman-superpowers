@@ -72,6 +72,23 @@ def _env_prefix(facts: dict, root: str, data: str) -> str:
     return f"env {body} "
 
 
+_ROOT_REF = "${CLAUDE_PLUGIN_ROOT}"
+
+
+def _command(template: str, root: str) -> str:
+    # Rebuilt word by word, so the root is quoted for the shell whatever it
+    # holds. Spliced raw between the manifest's double quotes, a root with a
+    # `$`, a `"` or a backtick was expanded or split and the hook exited 127
+    # without running. Quoting every word would also neutralise an operator or
+    # an expansion, so a command that is more than plain words is refused.
+    words = shlex.split(template)
+    for word in words:
+        rest = word.replace(_ROOT_REF, "")
+        if rest and shlex.quote(rest) != rest:
+            raise SystemExit(f"hooks.json command is not plain words, exporting it would change its meaning: {template}")
+    return shlex.join(word.replace(_ROOT_REF, root) for word in words)
+
+
 def _data_dir(facts: dict) -> str:
     if "--data" in sys.argv:
         return sys.argv[sys.argv.index("--data") + 1]
@@ -81,7 +98,7 @@ def _data_dir(facts: dict) -> str:
 def _handler(entry: dict, root: str, data: str, facts: dict) -> dict | None:
     if "if" in entry and facts.get("conditional_handlers") != "keep_without_if":
         return None
-    command = str(entry.get("command", "")).replace("${CLAUDE_PLUGIN_ROOT}", root)
+    command = _command(str(entry.get("command", "")), root)
     if not command:
         return None
     out = {"type": entry.get("type", "command"), "command": _env_prefix(facts, root, data) + command}
