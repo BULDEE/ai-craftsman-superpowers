@@ -665,6 +665,62 @@ CLOSED=$(sqlite3 "$C6_DIR/data/metrics.db" "select count(*) from corrections whe
 rm -rf "$C6_DIR"
 
 echo ""
+echo "=== a finding on B is not the witness for an unchanged A (CR-173) ==="
+# Review of main eb54d13 (2026-09-21, state S4): the content hash proving that
+# a file changed between two verdicts was looked up by file_pattern, the
+# DIRECTORY bucket. A finding on B, next door, made B's hash the witness for A,
+# and a CLEAN on A, never edited, closed A's finding as fixed. Real libraries
+# and a real SQLite database, no model.
+HH_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-haiku-hash.XXXXXX")
+mkdir -p "$HH_DIR/home" "$HH_DIR/data" "$HH_DIR/proj/src/Domain"
+( cd "$HH_DIR/proj" && git init -q . ) >/dev/null 2>&1
+printf '<?php class A {}\n' > "$HH_DIR/proj/src/Domain/A.php"
+printf '<?php class B {}\n' > "$HH_DIR/proj/src/Domain/B.php"
+printf '<?php class C {}\n' > "$HH_DIR/proj/src/Domain/C.php"
+_hh() { # one snippet against the real libraries, from inside the fixture project
+    ( cd -P "$HH_DIR/proj" && env -u CRAFTSMAN_SESSION_ID -u CRAFTSMAN_SESSION_HOST -u CLAUDE_CODE_SESSION_ID \
+          -u CODEX_SESSION_ID -u CODEX_THREAD_ID -u GROK_SESSION_ID -u GROK_PLUGIN_DATA -u PLUGIN_DATA \
+          -u CRAFTSMAN_PLUGIN_DATA HOME="$HH_DIR/home" CLAUDE_PLUGIN_DATA="$HH_DIR/data" \
+          bash -c "source '$ROOT_DIR/hooks/lib/metrics-db.sh'; source '$ROOT_DIR/hooks/lib/haiku-verify.sh'; metrics_init; $1" ) 2>/dev/null
+}
+_hh_fixed() { # corrections recorded as fixed on one file
+    sqlite3 "$HH_DIR/data/metrics.db" "SELECT COUNT(*) FROM corrections WHERE source='haiku' AND action='fixed' AND file_path='$1'"
+}
+_hh 'CRAFTSMAN_METRICS_SOURCE=haiku metrics_record_violation HAIKU_LAYER001 "src/Domain/**/*.php" warning 0 0 "$PWD/src/Domain/A.php"
+     metrics_record_haiku_run agent-ddd-verifier findings 1 20 "$PWD/src/Domain/A.php"
+     haiku_close_resolved "$PWD/src/Domain/A.php" ""'
+HH_CONTROL=$(_hh_fixed src/Domain/A.php)
+_hh 'metrics_record_haiku_run agent-ddd-verifier findings 1 20 "$PWD/src/Domain/B.php"
+     haiku_close_resolved "$PWD/src/Domain/A.php" ""'
+HH_AFTER_B=$(_hh_fixed src/Domain/A.php)
+if [[ "$HH_CONTROL" == "0" && "$HH_AFTER_B" == "0" ]]; then
+    log_pass "a finding run on B, same directory, does not make an unchanged A count as fixed"
+else
+    log_fail "B's hash became A's witness" "control=$HH_CONTROL after_B=$HH_AFTER_B (expected 0 and 0)"
+fi
+# A finding the verifier raised on C while it was judging B: no run ever
+# recorded C's content, so there is no witness that C changed, and an absent
+# witness is not a change.
+_hh 'CRAFTSMAN_METRICS_SOURCE=haiku metrics_record_violation HAIKU_LAYER001 "src/Domain/**/*.php" warning 0 0 "$PWD/src/Domain/C.php"
+     metrics_record_haiku_run agent-ddd-verifier findings 1 20 "$PWD/src/Domain/B.php"
+     haiku_close_resolved "$PWD/src/Domain/C.php" ""'
+HH_NO_WITNESS=$(_hh_fixed src/Domain/C.php)
+if [[ "$HH_NO_WITNESS" == "0" ]]; then
+    log_pass "a finding with no recorded content for its own file closes nothing: no witness is not a change"
+else
+    log_fail "an absent witness closed a finding" "fixed on C=$HH_NO_WITNESS (expected 0)"
+fi
+printf '<?php final class A {}\n' > "$HH_DIR/proj/src/Domain/A.php"
+_hh 'haiku_close_resolved "$PWD/src/Domain/A.php" ""'
+HH_EDITED=$(_hh_fixed src/Domain/A.php)
+if [[ "$HH_EDITED" == "1" ]]; then
+    log_pass "control: A really edited, then CLEAN, closes A's finding once"
+else
+    log_fail "control: edited A" "fixed on A=$HH_EDITED (expected 1)"
+fi
+rm -rf "$HH_DIR"
+
+echo ""
 echo "=== the DDD verifier reviews a Codex apply_patch too ==="
 # F6 (challenge review): the callback exited on a missing file_path, so no
 # Codex write was ever reviewed. Same fake CLI witness as above.

@@ -357,6 +357,13 @@ _metrics_migrate_haiku_content_hash() {
     if ! _metrics_sql_read "PRAGMA table_info(haiku_runs);" | grep -q '|backend|'; then
         _metrics_sql <<< "ALTER TABLE haiku_runs ADD COLUMN backend TEXT;" 2>/dev/null
     fi
+    # The witness belongs to ONE file. Looked up by the directory bucket, a run
+    # on B.php supplied the hash for A.php next door, and an unchanged A was
+    # closed as fixed (review of main eb54d13, CR-173). Rows written before
+    # this column carry NULL and are never anybody's witness.
+    if ! _metrics_sql_read "PRAGMA table_info(haiku_runs);" | grep -q '|file_path|'; then
+        _metrics_sql <<< "ALTER TABLE haiku_runs ADD COLUMN file_path TEXT;" 2>/dev/null
+    fi
 }
 
 # metrics_content_hash <file>: sha256 of the content, empty when unreadable.
@@ -547,31 +554,33 @@ metrics_record_haiku_run() {
     esac
     [[ "$findings" =~ ^[0-9]+$ ]] || findings=0
     [[ "$duration_ms" =~ ^[0-9]+$ ]] || duration_ms=0
-    local project_hash pattern="" content_hash=""
+    local project_hash pattern="" content_hash="" relative=""
     project_hash=$(metrics_project_hash)
     [[ -n "$file" ]] && pattern=$(metrics_file_pattern "$file")
     [[ -n "$file" ]] && content_hash=$(metrics_content_hash "$file")
+    [[ -n "$file" ]] && relative=$(metrics_relative_path "$file")
     # The backend that answered (claude-cli, codex-cli, or none for an
     # unavailable run): a review Claude answered from a Codex session is not a
     # Claude Code session, and the two are told apart here, not by the host.
     python3 "${METRICS_LIB_DIR}/metrics-query.py" "$METRICS_DB" \
-        "INSERT INTO haiku_runs (project_hash, hook, verdict, findings, duration_ms, file_pattern, content_hash, backend) VALUES (?, ?, ?, ?, ?, ?, ?, ?)" \
-        "$project_hash" "$hook" "$verdict" "$findings" "$duration_ms" "$pattern" "$content_hash" "${SEMANTIC_BACKEND_USED:-none}"
+        "INSERT INTO haiku_runs (project_hash, hook, verdict, findings, duration_ms, file_pattern, content_hash, backend, file_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)" \
+        "$project_hash" "$hook" "$verdict" "$findings" "$duration_ms" "$pattern" "$content_hash" "${SEMANTIC_BACKEND_USED:-none}" "$relative"
 }
 
 # metrics_haiku_last_finding_hash <file>: the content hash recorded with the
-# most recent run that reported findings on this file, empty when none.
+# most recent run that reported findings on this exact file, empty when none.
 metrics_haiku_last_finding_hash() {
     [[ -z "$METRICS_DB" ]] && return 0
     local file="$1"
-    local project_hash pattern
+    local project_hash relative
     project_hash=$(metrics_project_hash)
-    pattern=$(metrics_file_pattern "$file")
+    relative=$(metrics_relative_path "$file")
+    [[ -z "$relative" ]] && return 0
     python3 "${METRICS_LIB_DIR}/metrics-query.py" --raw "$METRICS_DB" \
         "SELECT COALESCE(content_hash, '') FROM haiku_runs
-         WHERE project_hash=? AND file_pattern=? AND verdict='findings'
+         WHERE project_hash=? AND file_path=? AND verdict='findings'
          ORDER BY id DESC LIMIT 1" \
-        "$project_hash" "$pattern" 2>/dev/null || true
+        "$project_hash" "$relative" 2>/dev/null || true
 }
 
 # The rules this layer last recorded for one file, from its most recent run.
