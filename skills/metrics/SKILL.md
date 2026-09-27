@@ -203,31 +203,29 @@ If correction data exists, highlight:
 
 ### Step 6: Quality Score
 
-Calculate a quality score based on the data already loaded:
+Read the score from the shipped helper, the same function that draws the
+dashboard's score card. Never compute it yourself: a formula restated here
+drifted from the code once already, counting corrections under an action value
+the table never holds, so its bonus stayed at zero on every database.
 
+```bash
+bash "$(craftsman-path bin/craftsman-helper)" dashboard --score 7
 ```
-Score = 100 - (blocked_violations × 5) - (warnings × 1) + (corrections_fixed × 3)
-```
 
-Where:
-- `blocked_violations` = SUM(blocked) from violations in last 7 days
-- `warnings` = COUNT of warned violations in last 7 days
-- `corrections_fixed` = COUNT of corrections with action='fix' in last 30 days
+It prints three lines: the score of the last 7 days with its basis, the score
+of the 7 days before with its basis, and the trend between the two. The score
+is findings per write mapped to 0-100, higher is better, and a correction
+recorded as `fixed` counts in its favour; the weights live in one place,
+`quality_score` in `hooks/lib/dashboard.py`.
 
-Add to the report:
+Add to the report, copying the numbers as printed:
 
 ```
 ### Quality Score
-  Score: <X>/100
-  Base: 100
-  Blocked violations (×5): -<N> (<count> violations)
-  Warnings (×1): -<N> (<count> warnings)
-  Corrections fixed (×3): +<N> (<count> fixes applied)
-
-  Trend: <↑ Improving | → Stable | ↓ Degrading> (vs. prior period)
+  Score, last 7 days: <X>/100 (<basis as printed>)
+  Score, the 7 days before: <Y>/100 (<basis as printed>)
+  Trend: <as printed>
 ```
-
-To calculate trend, compare current 7-day score against the prior 7-day window (days 8–14).
 
 ### Step 7: Agent & Team Stats
 

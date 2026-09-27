@@ -86,6 +86,42 @@ else
 fi
 
 echo ""
+echo "=== Quality score: one formula, and a fix counts ==="
+# /craftsman:metrics described a score of its own in prose, counting
+# corrections with action='fix', a value the corrections table refuses: the
+# bonus was zero on every database. The dashboard computed a second score that
+# ignored corrections altogether (review of main eb54d13, delivery D3). One
+# function now, asserted on its values: 3 blocked, 1 warned, 40 writes and one
+# correction, which counts only when it is recorded as fixed.
+_score_of() { # the score of the last 7 days, the first line of --score, as a number
+    local db="$1"
+    python3 "$DASH" "$db" --score 7 2>/dev/null | sed -nE '1s/.*: ([0-9]+)\/100.*/\1/p'
+}
+IGNORED_DB="$WORK/ignored.db"
+cp "$DB" "$IGNORED_DB"
+sqlite3 "$IGNORED_DB" "UPDATE corrections SET action='ignored';"
+WITH_FIX=$(_score_of "$DB")
+WITHOUT_FIX=$(_score_of "$IGNORED_DB")
+if [[ "$WITH_FIX" == "93" && "$WITHOUT_FIX" == "92" ]]; then
+    log_pass "a correction recorded as fixed raises the score (93), the same row recorded as ignored does not (92)"
+else
+    log_fail "fixed corrections in the score" "with fixed='${WITH_FIX}' with ignored='${WITHOUT_FIX}' (expected 93 and 92)"
+fi
+python3 "$DASH" "$DB" --out "$WORK/score.html" >/dev/null 2>&1
+CARD=$(grep -oE '<div class="n">[0-9]+</div><div class="l">quality score' "$WORK/score.html" | grep -oE '[0-9]+' | head -1)
+if [[ -n "$WITH_FIX" && "$CARD" == "$WITH_FIX" ]]; then
+    log_pass "the dashboard card and the skill's --score print the same number ($CARD): one formula"
+else
+    log_fail "one score formula" "dashboard card='${CARD}' --score='${WITH_FIX}'"
+fi
+SKILL_MD="$ROOT_DIR/skills/metrics/SKILL.md"
+if grep -q 'dashboard --score' "$SKILL_MD" && ! grep -qE 'Score = 100|corrections_fixed' "$SKILL_MD"; then
+    log_pass "the metrics skill reads the score from the helper and states no formula of its own"
+else
+    log_fail "the metrics skill carries its own score formula" "$(grep -nE 'Score = 100|corrections_fixed' "$SKILL_MD" | head -2 | tr '\n' ' ')"
+fi
+
+echo ""
 echo "=== Degradation ==="
 
 EMPTY_DB="$WORK/empty.db"
