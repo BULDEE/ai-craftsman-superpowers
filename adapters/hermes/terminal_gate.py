@@ -11,8 +11,10 @@ is not a clean verdict (ADR-0029).
 
 Usage:
     terminal_gate.py inspect            stdin: the pre_tool_call payload
-                                        stdout: "<push|commit|none> <workspace>"
-    terminal_gate.py judge <workspace> <push|commit> <strictness>
+                                        stdout: "<push|commit|unknown|none> <workspace>"
+    terminal_gate.py judge <workspace> <push|commit|unknown> <strictness>
+                                        stdin (optional): the same payload, so a
+                                        push is judged on the refs it publishes
                                         exit 0: allowed; exit 2: refused, reason on stdout
 
 The verdict file is written by pre-verify.sh (see record_verdict) into the
@@ -23,14 +25,31 @@ from __future__ import annotations
 
 import json
 import os
-import shlex
 import subprocess
 import sys
 import tempfile
 
 VERDICT_NAME = "craftsman-verdict"
-GATED_VERBS = ("push", "commit")
-SEGMENT_TOKENS = ("&&", "||", ";", "|", "\n")
+PUSH_VALUED = {"--repo", "--receive-pack", "--exec", "-o", "--push-option"}
+UNENUMERABLE = ("--all", "--mirror", "--tags", "--branches")
+UNKNOWN_FORM = ("craftsman refused this terminal command: it runs git push or commit in a form this gate "
+                "cannot place (a shell string, an alias that runs a shell, or git named as data). "
+                "Run the git command directly so the conclusion gate's verdict can be checked.")
+
+
+def _git_command():
+    """The sibling module that reads a command the way a shell runs it.
+
+    Loaded by path on first use: Hermes runs this file as a script from its
+    own working directory, and the tests load it by path too.
+    """
+    import importlib.util
+
+    location = os.path.join(os.path.dirname(os.path.abspath(__file__)), "git_command.py")
+    spec = importlib.util.spec_from_file_location("craftsman_git_command", location)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _git(workspace: str, *args: str, env: dict | None = None) -> str:
@@ -41,66 +60,23 @@ def _git(workspace: str, *args: str, env: dict | None = None) -> str:
     return proc.stdout.strip() if proc.returncode == 0 else ""
 
 
-def _segments(command: str) -> list[list[str]]:
-    """The command split on shell operators, each segment tokenised."""
-    try:
-        tokens = shlex.split(command, posix=True)
-    except ValueError:
-        tokens = command.split()
-    segments: list[list[str]] = [[]]
-    for token in tokens:
-        if token in SEGMENT_TOKENS or token.endswith(";"):
-            if token.endswith(";") and token not in SEGMENT_TOKENS:
-                segments[-1].append(token[:-1])
-            segments.append([])
-            continue
-        segments[-1].append(token)
-    return [segment for segment in segments if segment]
-
-
-def _git_verb(segment: list[str]) -> tuple[str, str]:
-    """(subcommand, -C directory) of a `git ...` segment, ("", "") otherwise."""
-    if not segment or os.path.basename(segment[0]) != "git":
-        return "", ""
-    directory = ""
-    index = 1
-    while index < len(segment):
-        token = segment[index]
-        if token == "-C" and index + 1 < len(segment):
-            directory = segment[index + 1]
-            index += 2
-        elif token in ("-c", "--git-dir", "--work-tree", "--namespace") and index + 1 < len(segment):
-            index += 2
-        elif token.startswith("-"):
-            index += 1
-        else:
-            return token, directory
-    return "", directory
-
-
-def _workspace_of(payload: dict, segments: list[list[str]], gated_index: int, git_dir_flag: str) -> str:
-    """Where the gated git command runs: -C, else the last `cd`, else the wire's cwd."""
-    if git_dir_flag:
-        return git_dir_flag
-    cwd = str(payload.get("cwd") or "")
-    for segment in segments[:gated_index]:
-        if segment[0] == "cd" and len(segment) > 1:
-            cwd = os.path.join(cwd, segment[1]) if cwd else segment[1]
-    return cwd
-
-
-def inspect(payload: dict) -> str:
-    """"<push|commit|none> <workspace>" for a terminal call."""
+def _command(payload: dict) -> str:
     arguments = payload.get("tool_input")
     if not isinstance(arguments, dict):
         arguments = payload.get("args")
-    command = str((arguments or {}).get("command") or "")
-    segments = _segments(command)
-    for index, segment in enumerate(segments):
-        verb, directory = _git_verb(segment)
-        if verb in GATED_VERBS:
-            return "%s %s" % (verb, _workspace_of(payload, segments, index, directory))
-    return "none "
+    return str((arguments or {}).get("command") or "")
+
+
+def _gated_call(payload: dict) -> dict:
+    """The first gated git call of a terminal command, {} when there is none."""
+    found = _git_command().calls(_command(payload), str(payload.get("cwd") or ""))
+    return found[0] if found else {}
+
+
+def inspect(payload: dict) -> str:
+    """"<push|commit|unknown|none> <workspace>" for a terminal call."""
+    call = _gated_call(payload)
+    return "%s %s" % (call["verb"], call["workspace"]) if call else "none "
 
 
 def worktree_tree(workspace: str) -> str:
@@ -149,43 +125,130 @@ def read_verdict(workspace: str) -> tuple[str, str]:
     return (fields[0], fields[1]) if len(fields) >= 2 else ("", "")
 
 
-def _published_tree(workspace: str, verb: str) -> str:
-    if verb == "push":
-        return _git(workspace, "rev-parse", "HEAD^{tree}")
-    return worktree_tree(workspace)
+def _positionals(args: list[str]) -> list[str]:
+    positionals, index = [], 0
+    while index < len(args):
+        token = args[index]
+        if token in PUSH_VALUED:
+            index += 2
+            continue
+        if not token.startswith("-"):
+            positionals.append(token)
+        index += 1
+    return positionals
 
 
-def judge(workspace: str, verb: str, strictness: str) -> int:
-    """Exit 0 to allow, 2 to refuse with the reason on stdout."""
-    if verb == "commit" and strictness != "strict":
-        return 0
+def _refspecs(args: list[str]) -> list[str]:
+    """The refspecs after the repository argument."""
+    return _positionals(args)[1:]
+
+
+def _unqualified_push(workspace: str, args: list[str]) -> str:
+    """Why a push cannot be judged on the refs it names, "" when it can.
+
+    After a pass on HEAD, `git push origin unsafe` published another branch's
+    tree (review of main eb54d13, B7): what is published is the refspec's
+    source, and a form whose sources this gate cannot list is refused.
+    """
+    if any(flag in args for flag in UNENUMERABLE):
+        return "it publishes refs this gate cannot enumerate (--all, --mirror or --tags); push them one at a time"
+    refspecs = _refspecs(args)
+    if any("*" in spec for spec in refspecs):
+        return "a glob refspec publishes refs this gate cannot enumerate; name each branch"
+    if refspecs:
+        return ""
+    if _git(workspace, "config", "--get", "push.default") == "matching":
+        return "push.default=matching publishes every matching branch; name the branch"
+    remote = (_positionals(args) or ["origin"])[0]
+    if _git(workspace, "config", "--get-all", "remote.%s.push" % remote):
+        return "remote.%s.push decides what is published; name the refspec" % remote
+    return ""
+
+
+def _published_sources(args: list[str]) -> list[str]:
+    """The source of every ref the push publishes: HEAD when none is named.
+
+    A deletion (`:branch`, `--delete`) publishes no content, so it has no source.
+    """
+    if "-d" in args or "--delete" in args:
+        return []
+    refspecs = _refspecs(args)
+    if not refspecs:
+        return ["HEAD"]
+    sources = [spec.lstrip("+").split(":", 1)[0] for spec in refspecs]
+    return [source for source in sources if source]
+
+
+def _tree_mismatch(request: dict, judged: str) -> str:
+    """The first published source whose tree is not the judged one, "" when all match."""
+    workspace = request["workspace"]
+    if request["verb"] == "commit":
+        return "" if worktree_tree(workspace) == judged else "the working tree"
+    for source in _published_sources(request["args"]):
+        if _git(workspace, "rev-parse", "--verify", "--quiet", source + "^{tree}") != judged:
+            return source
+    return ""
+
+
+def _publication_refusal(request: dict, judged: str) -> str:
+    verb = request["verb"]
+    why = _unqualified_push(request["workspace"], request["args"]) if verb == "push" else ""
+    if why:
+        return "craftsman refused `git push`: %s." % why
+    mismatch = _tree_mismatch(request, judged)
+    if mismatch:
+        return ("craftsman refused `git %s`: the conclusion gate passed a different tree than the one %s "
+                "would publish. Conclude again on that work, then %s." % (verb, mismatch, verb))
+    return ""
+
+
+def _refusal(request: dict) -> str:
+    """The reason to refuse the call, "" to allow it."""
+    verb, workspace = request["verb"], request["workspace"]
+    if verb == "unknown":
+        return UNKNOWN_FORM
     if not _git(workspace, "rev-parse", "--git-dir"):
-        print("craftsman refused `git %s`: %s is not inside a git repository this gate can read. "
-              "Run it with `git -C <repository> %s` so the conclusion gate's verdict can be found." % (verb, workspace or "the working directory", verb))
-        return 2
+        return ("craftsman refused `git %s`: %s is not inside a git repository this gate can read. "
+                "Run it with `git -C <repository> %s` so the conclusion gate's verdict can be found."
+                % (verb, workspace or "the working directory", verb))
     verdict, judged = read_verdict(workspace)
     if verdict != "pass":
         state = "refused the last turn" if verdict == "fail" else "has not judged this work yet"
-        print("craftsman refused `git %s`: the conclusion gate %s. Finish the turn so the gate "
-              "runs (it judges what would be published), fix what it reports, then %s." % (verb, state, verb))
-        return 2
-    if judged != _published_tree(workspace, verb):
-        print("craftsman refused `git %s`: the conclusion gate passed a different tree than the one this "
-              "would publish. Conclude again so the gate judges the current work, then %s." % (verb, verb))
-        return 2
-    return 0
+        return ("craftsman refused `git %s`: the conclusion gate %s. Finish the turn so the gate "
+                "runs (it judges what would be published), fix what it reports, then %s." % (verb, state, verb))
+    return _publication_refusal(request, judged)
+
+
+def judge(request: dict) -> int:
+    """Exit 0 to allow, 2 to refuse with the reason on stdout.
+
+    request: {"workspace", "verb", "strictness", "args"}.
+    """
+    if request["verb"] == "commit" and request["strictness"] != "strict":
+        return 0
+    reason = _refusal(request)
+    if not reason:
+        return 0
+    print(reason)
+    return 2
+
+
+def _read_payload(text: str) -> dict:
+    try:
+        payload = json.loads(text)
+    except (ValueError, TypeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
 
 
 def main(argv: list[str]) -> int:
     if len(argv) >= 1 and argv[0] == "inspect":
-        try:
-            payload = json.load(sys.stdin)
-        except (ValueError, TypeError):
-            payload = {}
-        print(inspect(payload if isinstance(payload, dict) else {}))
+        print(inspect(_read_payload(sys.stdin.read())))
         return 0
     if len(argv) >= 4 and argv[0] == "judge":
-        return judge(argv[1], argv[2], argv[3])
+        payload = {} if sys.stdin.isatty() else _read_payload(sys.stdin.read())
+        args = _gated_call(payload).get("args", []) if payload else []
+        return judge({"workspace": argv[1], "verb": argv[2], "strictness": argv[3], "args": args})
     if len(argv) >= 4 and argv[0] == "record":
         record_verdict(argv[1], argv[2], argv[3])
         return 0
