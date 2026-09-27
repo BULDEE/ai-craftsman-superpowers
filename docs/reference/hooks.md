@@ -57,7 +57,6 @@ Agent hooks run a model for semantic analysis beyond regex patterns. The backend
 | Event | Agent | Model | Purpose | Timeout |
 |-------|-------|-------|---------|---------|
 | PostToolUse | DDD Verifier | Haiku | Layer violations, aggregate boundaries, value objects, naming | 30s |
-| InstructionsLoaded | Project Analyzer | Haiku | Architectural context map + correction trends + channel status | 20s |
 | Stop | Sentry Context | none (no model call) | Asks for Sentry error context on the files this session wrote (the write log post-write-check.sh keeps; a Stop payload names no file). The request is shown to the user at Stop and handed to the model as `additionalContext` on the next UserPromptSubmit, once: a Stop hook has no model-visible channel on either host short of forcing a continuation | 30s |
 | Stop | Final Reviewer | Haiku | Architecture validation before session end (strict mode only) | 30s |
 
@@ -67,12 +66,11 @@ Agent hooks run a model for semantic analysis beyond regex patterns. The backend
 3. Missing Value Objects (primitive obsession)
 4. Non-domain naming in Domain layer
 
-**Project Analyzer** builds at session start:
-1. Bounded contexts map (from namespaces/directories)
-2. Available Value Objects inventory
-3. Aggregate roots identified
-4. Correction trends (30-day window)
-5. Active channels status
+There is no Project Analyzer hook any more: `hooks/hooks.json` wires no
+`InstructionsLoaded` handler. Agents get the resolved doctrine, the codemap,
+the hotspots and the correction trends from `hooks/lib/dispatch-context.sh`,
+which they run as their first action, or from their caller when they have no
+shell (doc-writer, ui-ux-director).
 
 **Final Reviewer** (strict mode only):
 1. Layer violations in changed files
@@ -343,9 +341,7 @@ Three-level inheritance: Global → Project → Directory. See CLAUDE.md for det
 
 ## Schema Validation (v2.2.0+)
 
-At session start, `session-start.sh` validates all hook event names in `hooks.json` against the supported set:
-
-`SessionStart`, `PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `FileChanged`, `InstructionsLoaded`, `Stop`, `SessionEnd`
+At session start, `session-start.sh` validates all hook event names in `hooks.json` against the host event names listed once in `hooks/lib/hook-events.sh` (`VALID_HOOK_EVENTS`). Being on that list means the name is valid, not that this plugin wires a handler on it: the handlers are the ones in the tables above.
 
 Unsupported events trigger a `SCHEMA WARNING` in the session startup message.
 
@@ -357,10 +353,7 @@ The Stop hook's Final Reviewer agent monitors file changes per session:
 
 ## Monorepo Safety (v2.2.0+)
 
-The InstructionsLoaded agent applies sampling for large codebases:
-- If any `src/` Glob returns >100 results: switches to directory-level analysis (file counts per subdirectory)
-- Caps file Read to 3 representative files maximum
-- Limits Value Object and Aggregate root listings to 10 each
+The sampling this section described belonged to the analyzer once wired on `InstructionsLoaded`, which is gone (see Agent Hooks above). The codemap an agent now reads comes from `hooks/lib/codemap.py` through `dispatch-context.sh`, cached until HEAD moves.
 
 ## Bias Detection
 
