@@ -191,18 +191,19 @@ strictness: "strict"
 guided: true
 ```
 
-### Step D: Bootstrap the structural baseline
+### Step D: Take the baseline
 
 The baseline is the photograph of the code as it is today. It is what lets the plugin demand better without punishing anyone for debt they inherited.
 
 ```bash
-python3 "$(craftsman-path hooks/lib/ratchet.py)" init src --baseline .craftsman-baseline.json
+bash "$(craftsman-path bin/craftsman-ci)" baseline src
 ```
 
-Pass the source paths the project actually uses (`src`, `app`, `lib`, `packages/*/src`). The command prints how many files it recorded.
+Pass the source directories the project actually uses (`src`, `app`, `lib`, `packages/*/src`), from the repository root. This is the canonical mark, the one the hooks and CI read: it scans with the same validators and severities, records the rule violations each file already carries, and takes the structural photograph in the same `.craftsman-baseline.json`. `ratchet.py init` alone is not a substitute: it records the structure and no rule, so every inherited violation still blocks the first edit.
 
 - **New project**: the baseline is empty, so the very first file is already held to the full standard. Zero tolerance costs nothing when there is nothing to fix.
-- **Existing project**: the current state is photographed as is. Nothing that already exists is reported as a violation. Only a file that gets structurally worse than its photograph is blocked, and improving one updates its entry. Legacy is never punished for debt it already had.
+- **Existing project**: every violation already there is recorded. From then on it is reported as a warning and no longer blocks; a new one, or one more of the same rule in the same file, still blocks. A file that gets structurally worse than its photograph is reported, and improving one updates its entry. Legacy is never punished for debt it already had.
+- **Already taken**: the mark is taken once. When `.craftsman-baseline.json` exists the command refuses and exits 1; leave it as it is and tell the user. Re-taking it is their decision (`--re-baseline --reason "..."`), never a setup default.
 
 Then tell the user, explicitly:
 

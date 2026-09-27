@@ -117,9 +117,29 @@ grep -q "guided: true" "$SETUP_CMD" \
     && log_pass "guided mode key documented" \
     || log_fail "guided" "missing"
 
-grep -q "ratchet.py.*init\|craftsman-baseline" "$SETUP_CMD" \
-    && log_pass "setup bootstraps the ratchet baseline" \
-    || log_fail "baseline bootstrap" "missing"
+# --- Step D takes the mark the gate reads (CR-175, M7) ---
+# The step promised that inherited debt stops blocking, and ran `ratchet.py
+# init`, which records structure and no rule: the next scan of an untouched
+# legacy file still refused it twice. The command is read from the skill and
+# run on a throwaway repository; the verdict is the next scan's.
+STEP_D_COMMAND=$(awk '/^### Step D/{inside=1;next} inside && /^### /{exit}
+                      inside && /^```bash/{code=1;next} code && /^```/{exit} code' "$SETUP_CMD")
+STEP_D_REPO=$(mktemp -d "${TMPDIR:-/tmp}/setup-step-d.XXXXXX")
+(
+    cd "$STEP_D_REPO" || exit 1
+    git init -q . && git commit -q --allow-empty -m init
+    mkdir src && printf '<?php\nclass Legacy {}\n' > src/Legacy.php
+) >/dev/null 2>&1
+STEP_D_SUMMARY=$(cd "$STEP_D_REPO" && export HOME="$STEP_D_REPO/home" && mkdir -p "$HOME/.claude" \
+    && PATH="$ROOT_DIR/bin:$PATH" bash -c "$STEP_D_COMMAND" >/dev/null 2>&1 \
+    && bash "$ROOT_DIR/ci/craftsman-ci.sh" --format json src 2>/dev/null \
+    | python3 -c 'import json,sys; s=json.load(sys.stdin)["summary"]; print(s["violations"], s["warnings"])' 2>/dev/null)
+rm -rf "$STEP_D_REPO"
+if [[ -n "$STEP_D_COMMAND" && "$STEP_D_SUMMARY" == "0 2" ]]; then
+    log_pass "Step D takes the canonical baseline: inherited debt reports as warnings and blocks nothing"
+else
+    log_fail "Step D baseline" "command '${STEP_D_COMMAND}' left 'violations warnings' = '${STEP_D_SUMMARY}', expected '0 2'"
+fi
 
 grep -q "committed" "$SETUP_CMD" \
     && log_pass "baseline commit instruction present" \
