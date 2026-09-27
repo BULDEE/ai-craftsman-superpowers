@@ -289,6 +289,47 @@ fi
 
 rm -rf "$SQG_DIR"
 
+# Severity is the rules engine's decision, for a subagent's file as for the
+# main loop's (review of main eb54d13, security S3, CR-174). add_warning wrote
+# straight to the findings with "warn": PY003 set to ignore still reached the
+# main loop as a violation to fix, and PY003 set to block went into the
+# metrics as a warning. The gate stays observational: exit 0 in every case.
+SEV_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-sqg-severity.XXXXXX")
+mkdir -p "$SEV_DIR/proj" "$SEV_DIR/home"
+printf 'def answer():\n    return 42\n' > "$SEV_DIR/proj/answer.py"
+( cd "$SEV_DIR/proj" && git init -q . ) >/dev/null 2>&1
+printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Write","input":{"file_path":"%s"}}]}}\n' \
+    "$SEV_DIR/proj/answer.py" > "$SEV_DIR/transcript.jsonl"
+_sev_gate() { # $1 = case name; prints "<exit>|<lines naming PY003 in the output>|<metric severity>"
+    local data="$SEV_DIR/data-$1" out rc=0
+    mkdir -p "$data"
+    out=$( cd "$SEV_DIR/proj" && jq -n --arg t "$SEV_DIR/transcript.jsonl" --arg c "$SEV_DIR/proj" '{agent_type:"architect", agent_transcript_path:$t, cwd:$c}' \
+        | env -u CRAFTSMAN_PLUGIN_DATA HOME="$SEV_DIR/home" CLAUDE_PLUGIN_DATA="$data" bash "$ROOT_DIR/hooks/subagent-quality-gate.sh" 2>/dev/null ) || rc=$?
+    out=$(printf '%s' "$out" | grep -c PY003)
+    printf '%s|%s|%s' "$rc" "$out" "$(sqlite3 "$data/metrics.db" "SELECT COALESCE((SELECT severity FROM violations WHERE rule='PY003' ORDER BY id DESC LIMIT 1), 'none')" 2>/dev/null)"
+}
+SEV_RESULTS=""
+for sev in ignore warn block; do
+    printf 'rules:\n  PY003: %s\n' "$sev" > "$SEV_DIR/proj/.craft-rules.yml"
+    SEV_RESULTS="${SEV_RESULTS}${sev}=$(_sev_gate "dir-$sev") "
+done
+rm -f "$SEV_DIR/proj/.craft-rules.yml"
+if [[ "$SEV_RESULTS" == "ignore=0|0|none warn=0|1|warning block=0|1|critical " ]]; then
+    log_pass "subagent gate: PY003 in .craft-rules.yml is honoured as ignore, warn and block, and the gate still exits 0"
+else
+    log_fail "subagent gate severity parity (.craft-rules.yml)" \
+        "got '$SEV_RESULTS', expected ignore=0|0|none warn=0|1|warning block=0|1|critical"
+fi
+printf 'rules:\n  PY003: ignore\n' > "$SEV_DIR/proj/.craft-config.yml"
+SEV_PROJECT=$(_sev_gate project-ignore)
+rm -f "$SEV_DIR/proj/.craft-config.yml"
+if [[ "$SEV_PROJECT" == "0|0|none" ]]; then
+    log_pass "subagent gate: PY003: ignore in the project .craft-config.yml silences it too"
+else
+    log_fail "subagent gate severity parity (.craft-config.yml)" "got '$SEV_PROJECT', expected 0|0|none"
+fi
+rm -rf "$SEV_DIR"
+
 echo ""
 echo "=== Semantic layer telemetry ==="
 

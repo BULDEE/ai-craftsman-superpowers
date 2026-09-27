@@ -83,6 +83,10 @@ TOUCHED_FILES=$(echo "$TOUCHED_FILES" | head -"$FILE_CAP")
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/rules-engine.sh"
 source "${SCRIPT_DIR}/lib/pack-loader.sh"
+# The same initialisation as post-write-check.sh. Without it the rules store
+# had no root, every override lookup missed, and every rule resolved to its
+# default: .craft-config.yml and .craft-rules.yml never reached a subagent.
+rules_init "$PWD" "$(rules_global_dir)"
 metrics_init 2>/dev/null || true
 # The plugin root is two levels up from this script; CLAUDE_PLUGIN_ROOT is
 # absent outside the harness (tests, CI), and without it pack_loader_init
@@ -127,8 +131,13 @@ add_violation() {
     record_finding "$rule" "$message" "$severity"
 }
 
+# A validator calling add_warning states an intent, not a verdict: the verdict
+# is rules_severity_for_file's, as in post-write-check.sh. Recording "warn"
+# here reported a rule set to ignore and filed a rule set to block as a
+# warning (review of main eb54d13, CR-174). Resolving the severity never makes
+# this hook blocking: it exits 0 whatever it finds.
 add_warning() {
-    record_finding "$1" "$2" "warn"
+    add_violation "$@"
 }
 
 validate_one_file() {
