@@ -290,10 +290,20 @@ DIRTY_PAYLOAD="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"c
 # least 1.15x the fast one, so the fast run passes and a 50 percent
 # regression of the quiet reading still fails. Each row stays under twice
 # the quiet reading, which is what the doubling check below requires.
-# Darwin is unchanged. Its bias spread, 1.23x beside 2.10x on the same
-# commit, is wider than the gap between a 50 percent regression and a
-# doubling, so one ceiling cannot cover the noisy sample and still catch
-# the doubling.
+#
+# Darwin follows the same rule since CR-179 (2026-09-27). Thirty macos-latest
+# runs of ci.yml, 3208c05 to 1ba57ae: absolute times follow the calibration
+# (correlation 0.81 for post-write) while the ratios run against it (-0.33
+# post-write, -0.49 bias): the same basket effect as on Linux. The same code
+# (1ba57ae, then 449314d which only moved the ratchet baseline) read 5.36x,
+# 4.07x and 5.57x for post-write, and the 5.57x failed a 5.5x ceiling with no
+# hook slower. Quiet reading (median over the runs whose calibration is at or
+# above the median): post-write 4.85x, pre-write 3.39x, bias 1.37x; worst
+# seen 5.57x, 4.24x, 1.79x. Ceiling = max(1.35 x quiet, 1.15 x worst), kept
+# under 1.5 x quiet so a 50 percent regression of the quiet reading still
+# fails: post-write 6.5x, bias 2.05x; pre-write's 5.0x already fits.
+# QUIET_READINGS records the reading each row was set from, and the check
+# below refuses a ceiling raised past 1.5 times it.
 #
 # pre-write was raised on purpose (2.5x to 3.5x on Darwin, 7.3x to 9.0x on
 # Linux) when the gate stopped running its own regexes and started judging
@@ -306,10 +316,24 @@ DIRTY_PAYLOAD="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"c
 # 1.35x over the worst of them and under twice the fastest (2 x 2.64x).
 _PERF_ENV="$(uname -s)"
 case "$_PERF_ENV" in
-    Linux)  C_POST=11.4; C_PRE=11.1; C_BIAS=3.25; C_DIRTY=16.6 ;;
-    *)      C_POST=5.5;  C_PRE=5.0;  C_BIAS=1.8;  C_DIRTY=13.5 ;;
+    Linux)  C_POST=11.4; C_PRE=11.1; C_BIAS=3.25; C_DIRTY=16.6; QUIET_READINGS="8.42 7.89 2.40" ;;
+    *)      C_POST=6.5;  C_PRE=5.0;  C_BIAS=2.05; C_DIRTY=13.5; QUIET_READINGS="4.85 3.39 1.37" ;;
 esac
 echo "ceilings for ${_PERF_ENV}: post-write ${C_POST}x, pre-write ${C_PRE}x, bias ${C_BIAS}x, dirty ${C_DIRTY}x"
+# A ceiling raised to absorb noise must still catch a 50 percent regression of
+# the reading it was set from: over 1.5 times that reading, it masks one.
+LOOSE_CEILINGS=$(python3 -c '
+import sys
+ceilings = [float(v) for v in sys.argv[1:4]]
+quiet = [float(v) for v in sys.argv[4].split()]
+names = ("post-write", "pre-write", "bias")
+print(" ".join("%s %.2fx > 1.5 x %.2fx" % (n, c, q) for n, c, q in zip(names, ceilings, quiet) if c > 1.5 * q))
+' "$C_POST" "$C_PRE" "$C_BIAS" "$QUIET_READINGS")
+if [[ -z "$LOOSE_CEILINGS" ]]; then
+    log_pass "every ceiling still catches a 50 percent regression of the quiet reading it was set from"
+else
+    log_fail "a ceiling masks a 50 percent regression" "$LOOSE_CEILINGS"
+fi
 
 measure_hook "post-write-check.sh" "$C_POST" \
     "cd '$PROJECT' && printf '%s' '$POST_PAYLOAD' | bash '$ROOT_DIR/hooks/post-write-check.sh' >/dev/null 2>&1"
