@@ -125,7 +125,10 @@ _check_py007() {
 
 _check_warn_py001() {
     local file="$1"
-    if grep -qE 'def\s+\w+\(([^,]+,){3,}' "$file" 2>/dev/null; then
+    # Commas inside the parameter list only: `[^,)]` stops at the closing
+    # parenthesis, so a return annotation's `tuple[str, list[str]]` no longer
+    # counts as parameters (CR-210).
+    if grep -qE 'def\s+\w+\(([^,)]+,){3,}' "$file" 2>/dev/null; then
         add_warning "WARN-PY001" "Function with 4+ parameters - consider refactoring to dataclass/object"
     fi
 }

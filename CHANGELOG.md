@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.12.1] - 2026-09-27
+
+Bugfix release: the Hermes gate findings B6 to B8 of the review of main
+eb54d13 (CR-170) and their Strix follow-up, a Python pack false positive, and
+a repository layout fix. No configuration or rule changes.
+
+### Security
+
+- Hermes terminal gate: the command is read the way a shell runs it. `echo
+  ok;git push`, `env git push`, `sh -c "git push"`, `eval git push`,
+  `$(git push)` and a git alias for push all went through while `git push`
+  was refused. Operators count even glued to a word, wrappers and assignments
+  are stripped, nested shell text is read, aliases are resolved, and a push
+  or commit the reader cannot place is refused as `unknown`.
+- Hermes terminal gate: a push is judged on what it publishes. After a pass
+  on HEAD, `git push origin unsafe` published another branch's tree. Every
+  refspec source must carry the judged tree; `--all`, `--mirror`, `--tags`,
+  glob refspecs, `push.default=matching` and `remote.<name>.push` rules are
+  refused because their sources cannot be listed. Deleting a remote branch
+  still passes.
+- Hermes terminal gate: every gated git call of a compound command is judged
+  (Strix review). Only the first was, so `git push origin HEAD; git push
+  origin unsafe` published a tree nobody judged. Several pushes are each
+  judged; a commit next to a push in one command is refused, since the
+  commit the push would publish does not exist yet; a push naming a ref that
+  does not exist says so.
+- Hermes conclusion gate: a CI report is a verdict only when it parses,
+  carries its summary, agrees with its exit status and covers the changed
+  source files. An unparsable report or a zero-file report with exit 2 was
+  read as no finding and recorded a pass; it is now an unknown verdict, and
+  the conclusion waits. A turn that changed no file of a known language still
+  passes.
+  A language registry that cannot be read is an unknown verdict too, never a
+  turn with nothing to judge.
+
+### Fixed
+
+- The Python pack's WARN-PY001 counted the commas of a return annotation as
+  parameters: `def resolve(verb, args, where) -> tuple[str, list[str]]` was
+  reported as a function with four or more parameters. The pattern now stops
+  at the closing parenthesis.
+
+### Removed
+
+- `.codex/config.toml` is no longer in the repository. It was a
+  contributor's own Codex project layer (it set a Claude Code flag in Codex
+  shells) committed by mistake, next to `.codex-plugin/`, the manifest Codex
+  actually installs. `.codex/` is ignored like `.grok/`.
+
 ## [4.12.0] - 2026-09-27
 
 Native install on the three hosts that load plugins (Claude Code, Codex,

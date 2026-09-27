@@ -158,7 +158,7 @@ if [[ "$TOOL_NAME" == "terminal" ]]; then
         || _bail_file "terminal command could not be read"
     GIT_VERB="${INSPECTED%% *}"
     GIT_WORKSPACE="${INSPECTED#* }"
-    [[ "$GIT_VERB" == "push" || "$GIT_VERB" == "commit" ]] || exit 0
+    [[ "$GIT_VERB" == "push" || "$GIT_VERB" == "commit" || "$GIT_VERB" == "unknown" ]] || exit 0
     STRICTNESS="strict"
     if [[ -d "$GIT_WORKSPACE" ]]; then
         # shellcheck source=/dev/null
@@ -169,7 +169,9 @@ if [[ "$TOOL_NAME" == "terminal" ]]; then
     # substitution would fire the ERR trap before the status is read, and the
     # refusal would carry the "could not judge" message instead of its own.
     JUDGED=0
-    REASON=$(python3 "$SCRIPT_DIR/terminal_gate.py" judge "$GIT_WORKSPACE" "$GIT_VERB" "$STRICTNESS" 2>/dev/null) || JUDGED=$?
+    # The payload goes along: a push is judged on the refs it publishes, not
+    # on HEAD (review of main eb54d13, B7).
+    REASON=$(printf '%s' "$INPUT" | python3 "$SCRIPT_DIR/terminal_gate.py" judge "$GIT_WORKSPACE" "$GIT_VERB" "$STRICTNESS" 2>/dev/null) || JUDGED=$?
     [[ "$JUDGED" -eq 0 ]] && exit 0
     [[ "$JUDGED" -eq 2 && -n "$REASON" ]] || _bail_file "terminal gate exited ${JUDGED} without a verdict"
     _block "$REASON"

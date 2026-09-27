@@ -323,6 +323,66 @@ else
 fi
 git reset -q --hard HEAD~1 >/dev/null 2>&1
 
+# --- Review of main eb54d13, B8: a broken CI report is not a pass -----------
+# The producer is replaced in a throwaway copy of the plugin, never here. A
+# report that does not parse, or a zero-file report with exit 2, recorded a
+# pass and let the push through. What the report says must agree with its exit
+# status and cover the files the turn changed.
+B8_ROOT="$WORK/plugin-copy"
+mkdir -p "$B8_ROOT"
+(cd "$ROOT_DIR" && tar cf - adapters/hermes ci hooks packs rules config 2>/dev/null) | (cd "$B8_ROOT" && tar xf -)
+B8_REPO="$WORK/b8-repo"
+mkdir -p "$B8_REPO/src" && (cd "$B8_REPO" && git init -q . && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m base)
+printf '<?php class Broken {}\n' > "$B8_REPO/src/New.php"
+printf '# notes\n' > "$B8_REPO/NOTES.md"
+b8_case() {
+    local report="$1" status="$2" changed="$3"
+    printf '#!/usr/bin/env bash\ncat <<'"'"'AUDIT_REPORT'"'"'\n%s\nAUDIT_REPORT\nexit %s\n' "$report" "$status" > "$B8_ROOT/ci/craftsman-ci.sh"
+    python3 -c '
+import json, sys
+print(json.dumps({"hook_event_name": "pre_verify", "session_id": "b8", "cwd": sys.argv[1],
+                  "extra": {"changed_paths": [sys.argv[2]], "coding": True, "attempt": 0}}))' "$B8_REPO" "$changed" \
+        | HOME="$WORK/home" bash "$B8_ROOT/adapters/hermes/pre-verify.sh" 2>/dev/null
+    printf '|%s' "$(cut -d' ' -f1 "$B8_REPO/.git/craftsman-verdict" 2>/dev/null)"
+}
+ZERO='{"summary":{"files_scanned":0,"violations":0,"warnings":0},"violations":[]}'
+B8_MISS=""
+out=$(b8_case '{broken' 2 src/New.php);                 [[ "${out##*|}" == "fail" && "$out" == *'"block"'* ]] || B8_MISS+=" [unparsable report: $out]"
+out=$(b8_case "$ZERO" 2 src/New.php);                   [[ "${out##*|}" == "fail" && "$out" == *'"block"'* ]] || B8_MISS+=" [zero files, exit 2: $out]"
+out=$(b8_case "$ZERO" 0 src/New.php);                   [[ "${out##*|}" == "fail" && "$out" == *'"block"'* ]] || B8_MISS+=" [zero files for a php change, exit 0: $out]"
+out=$(b8_case '{"summary":{"files_scanned":1,"violations":0,"warnings":0},"violations":[]}' 2 src/New.php)
+[[ "${out##*|}" == "fail" && "$out" == *'"block"'* ]] || B8_MISS+=" [exit 2 with no critical: $out]"
+out=$(b8_case '{"violations":[]}' 0 src/New.php);       [[ "${out##*|}" == "fail" && "$out" == *'"block"'* ]] || B8_MISS+=" [no summary: $out]"
+if [[ -z "$B8_MISS" ]]; then
+    log_pass "B8: an unparsable report, a report without summary, zero files for a source change, or exit 2 without a critical is never a pass"
+else
+    log_fail "B8: a broken CI report is never a pass" "passed:$B8_MISS"
+fi
+B8_OK=""
+out=$(b8_case '{"summary":{"files_scanned":1,"violations":1,"warnings":0},"violations":[{"rule":"PHP001","severity":"critical","file":"src/New.php","line":1,"message":"broken"}]}' 2 src/New.php)
+[[ "${out##*|}" == "fail" && "$out" == *PHP001* ]] || B8_OK+=" [critical blocks: $out]"
+out=$(b8_case '{"summary":{"files_scanned":1,"violations":0,"warnings":0},"violations":[]}' 0 src/New.php)
+[[ "${out##*|}" == "pass" && "$out" != *'"block"'* ]] || B8_OK+=" [clean report passes: $out]"
+# Strix review of #109 (LOW): a registry that cannot be read named no known
+# extension, so no changed file counted as source and every check was skipped.
+cp "$B8_ROOT/hooks/lib/lang_registry.py" "$WORK/lang_registry.py.keep"
+printf 'import sys\nsys.exit(1)\n' > "$B8_ROOT/hooks/lib/lang_registry.py"
+out=$(b8_case '{"summary":{"files_scanned":0,"violations":0,"warnings":0},"violations":[]}' 0 src/New.php)
+cp "$WORK/lang_registry.py.keep" "$B8_ROOT/hooks/lib/lang_registry.py"
+if [[ "${out##*|}" == "fail" && "$out" == *registry* ]]; then
+    log_pass "a language registry that cannot be read makes the report an unknown verdict, not a pass"
+else
+    log_fail "an unreadable registry fails closed" "$out"
+fi
+rm -f "$B8_REPO/src/New.php"
+out=$(b8_case "$ZERO" 2 NOTES.md)
+[[ "${out##*|}" == "pass" && "$out" != *'"block"'* ]] || B8_OK+=" [a docs-only turn passes: $out]"
+if [[ -z "$B8_OK" ]]; then
+    log_pass "B8 controls: a critical still blocks, a clean report passes, a turn with no judgeable file passes"
+else
+    log_fail "B8 controls" "$B8_OK"
+fi
+
 cd "$PREV_PWD"
 rm -rf "$WORK"
 
