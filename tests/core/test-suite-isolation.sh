@@ -78,6 +78,28 @@ else
         "got '$GROK_LEAK'; unknown-host assertions then ask instead of deny"
 fi
 
+# CR-204 F10: a test whose cd fails stops, and no test commits in the
+# repository it lives in. Witnessed on a throwaway repository that carries a
+# copy of the helpers, so a guard that fails costs nothing real.
+GUARD_REPO=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-guard.XXXXXX") || exit 1
+mkdir -p "$GUARD_REPO/tests/lib"
+cp "$ROOT_DIR/tests/lib/test-helpers.sh" "$GUARD_REPO/tests/lib/"; mkdir -p "$GUARD_REPO/hooks"; cp -R "$ROOT_DIR/hooks/lib" "$GUARD_REPO/hooks/"
+command git -C "$GUARD_REPO" init -q && command git -C "$GUARD_REPO" add -A && command git -C "$GUARD_REPO" commit -qm base
+GUARD_HEAD=$(command git -C "$GUARD_REPO" rev-parse HEAD)
+GUARD_OUT=$(builtin cd "$GUARD_REPO" && bash -c 'source tests/lib/test-helpers.sh; cd /nonexistent-craftsman-dir; echo REACHED > canary.txt; git add -A; git commit -qm add' 2>&1; echo "rc=$?")
+if [[ "$GUARD_OUT" == *"rc=97"* && ! -e "$GUARD_REPO/canary.txt" && "$(command git -C "$GUARD_REPO" rev-parse HEAD)" == "$GUARD_HEAD" ]]; then
+    log_pass "a failed cd inside the repository stops the test before it writes or commits there"
+else
+    log_fail "failed cd guard" "$(printf '%s' "$GUARD_OUT" | tr '\n' ' ' | cut -c1-160)"
+fi
+GUARD_OUT=$(builtin cd "$GUARD_REPO" && bash -c 'source tests/lib/test-helpers.sh; git commit -q --allow-empty -m add' 2>&1; echo "rc=$?")
+if [[ "$GUARD_OUT" == *"rc=97"* && "$(command git -C "$GUARD_REPO" rev-parse HEAD)" == "$GUARD_HEAD" ]]; then
+    log_pass "a git commit inside the repository the helpers live in is refused"
+else
+    log_fail "git write guard" "$(printf '%s' "$GUARD_OUT" | tr '\n' ' ' | cut -c1-160)"
+fi
+rm -rf "$GUARD_REPO"
+
 if [[ "${CRAFTSMAN_ISOLATION_AUDIT:-0}" != "1" ]]; then
     echo ""
     echo "Suite isolation audit skipped (costs a full suite run)."

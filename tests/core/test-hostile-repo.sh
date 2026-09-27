@@ -15,7 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
-WORK="/tmp/craftsman-hostile-$$"
+WORK=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-hostile.XXXXXX") && WORK=$(cd "$WORK" && pwd -P) || exit 1
 FAKE_HOME="$WORK/home"
 mkdir -p "$FAKE_HOME/.claude"
 PREV_PWD="$PWD"

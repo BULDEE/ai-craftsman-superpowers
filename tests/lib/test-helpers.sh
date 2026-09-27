@@ -45,6 +45,35 @@ export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-tests@craftsman.invalid}"
 export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-craftsman-tests}"
 export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-tests@craftsman.invalid}"
 
+# A failed cd leaves a test where it was. From inside the plugin repository
+# that turned a hostile-repository fixture into a commit on the real branch and
+# a rewritten .craftsman-baseline.json, when /tmp was not writable (review of
+# 4.12.0, CR-204 F10). Every script that sources this file stops instead, and
+# no git write lands in this repository from a test.
+_CRAFTSMAN_REPO_ROOT="$(builtin cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+cd() {
+    builtin cd "$@" && return 0
+    local rc=$?
+    case "$(pwd -P)/" in
+        "$_CRAFTSMAN_REPO_ROOT"/*)
+            echo "test-helpers: 'cd $*' failed inside the plugin repository; stopping before anything is written here" >&2
+            exit 97 ;;
+    esac
+    return $rc
+}
+git() {
+    local dir="." sub="${1:-}"
+    if [[ "${1:-}" == "-C" ]]; then dir="${2:-.}"; sub="${3:-}"; fi
+    case "$sub" in
+        init|add|commit|reset|checkout|switch|restore|rm|mv|stash|merge|rebase|cherry-pick|tag|push|clean|am|apply)
+            if [[ "$(command git -C "$dir" rev-parse --show-toplevel 2>/dev/null)" == "$_CRAFTSMAN_REPO_ROOT" ]]; then
+                echo "test-helpers: refusing 'git $sub' inside the plugin repository" >&2
+                exit 97
+            fi ;;
+    esac
+    command git "$@"
+}
+
 # Guard against double-sourcing
 [[ -n "${_TEST_HELPERS_LOADED:-}" ]] && return 0
 _TEST_HELPERS_LOADED=1
