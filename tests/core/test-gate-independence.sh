@@ -110,11 +110,38 @@ done
 # above proves today's verdicts; this line makes a future "soften when auto"
 # patch fail loudly instead of shipping quietly. A legitimate reader must
 # update this test in the same change.
-hits=$(grep -l 'permission_mode' "$ROOT_DIR"/hooks/*.sh "$ROOT_DIR"/hooks/lib/*.sh 2>/dev/null || true)
+# config-protection.sh is the one legitimate reader (CR-204 F4): under
+# bypassPermissions an ask proceeds unseen, so it turns the gate's own config
+# from ask into deny. The matrix below pins that it only ever hardens.
+hits=$(grep -l 'permission_mode' "$ROOT_DIR"/hooks/*.sh "$ROOT_DIR"/hooks/lib/*.sh 2>/dev/null \
+    | grep -v '/hooks/config-protection.sh$' || true)
 if [[ -z "$hits" ]]; then
-    log_pass "no hook script reads permission_mode"
+    log_pass "no hook script other than config-protection.sh reads permission_mode"
 else
     log_fail "hook reads permission_mode" "$hits"
+fi
+# config_verdict <file> <mode> -> "<exit>:<decision>"
+config_verdict() {
+    local out exit_code
+    out=$(jq -n --arg fp "/tmp/craftsman-gate-$$/$1" --arg pm "$2" \
+        '{"prompt_id":"p1","tool_name":"Write","tool_input":{"file_path":$fp},"permission_mode":$pm}' \
+        | bash "$ROOT_DIR/hooks/config-protection.sh" 2>/dev/null)
+    exit_code=$?
+    printf '%s:%s' "$exit_code" "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecision // "none"' 2>/dev/null)"
+}
+SOFTER=""
+for file in phpstan.neon .claude/settings.json src/Domain/Order.php; do
+    base=$(config_verdict "$file" default)
+    for mode in acceptEdits auto plan bypassPermissions dontAsk; do
+        [[ "$(config_verdict "$file" "$mode")" == "$base" ]] || SOFTER+=" [$file $mode]"
+    done
+done
+[[ "$(config_verdict .craft-rules.yml default)" == "0:ask" ]] || SOFTER+=" [.craft-rules.yml default]"
+[[ "$(config_verdict .craft-rules.yml bypassPermissions)" == "2:deny" ]] || SOFTER+=" [.craft-rules.yml bypassPermissions]"
+if [[ -z "$SOFTER" ]]; then
+    log_pass "config-protection gives every mode the same verdict, except the gate's own config, which bypassPermissions hardens from ask to deny"
+else
+    log_fail "config-protection verdict per permission mode" "differs:$SOFTER"
 fi
 
 echo ""

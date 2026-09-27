@@ -163,20 +163,21 @@ _doctrine_write_codex_agents() {
     return 0
 }
 
-# A host that discovers hooks/hooks.json and runs none of it (Grok 1.0.30)
-# still runs a project hooks file. It is written from the manifest, never by
-# hand: a wiring typed a second time is a wiring that drifts.
+# A host that discovers hooks/hooks.json and runs none of it (its capability
+# row declares gate_file) still runs a project or global hooks file. It is
+# written from the manifest, never by hand: a wiring typed a second time is a
+# wiring that drifts. A host with no gate_file is refused by host_hooks.py.
 _doctrine_write_host_hooks() {
-    local host="$1" here root into="${EXPORT_INTO:-}" out
+    local host="$1" here root into="${EXPORT_INTO:-}" out rel note
     here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     root="$(cd "$here/.." && pwd)"
     rel=$(python3 "${CI_LIB_DIR:-$here}/host_hooks.py" --gate-rel "$root" "$host")
-    [[ -z "$into" ]] && into=$(dirname "$rel")
-    out="${into%/}/$(basename "$rel")"
+    [[ -z "$into" ]] && into=$(dirname "${rel:-.}")
+    out="${into%/}/$(basename "${rel:-craftsman.json}")"
     python3 "${CI_LIB_DIR:-$here}/host_hooks.py" "$host" "$root" "$out" || return 1
-    if [[ "$host" == "grok" ]]; then
-        echo "Trust the folder before these run: 'grok --trust', or /hooks-trust in the session. Untrusted, project hooks are skipped in silence (measured on 1.0.30)."
-    fi
+    [[ "$(cd "$(dirname "$out")" && pwd -P)" == "$(cd "$HOME" && pwd -P)/$(dirname "$rel")" ]] && return 0
+    note=$(jq -r --arg h "$host" '.hosts[$h].gate_export.project_note // empty' "$root/hooks/host-capabilities.json" 2>/dev/null)
+    [[ -n "$note" ]] && echo "$note"
     return 0
 }
 
@@ -202,13 +203,12 @@ doctrine_export() {
         cursor)       _doctrine_write_cursor "$body" ;;
         copilot)      _doctrine_write_copilot "$body" ;;
         codex-agents) _doctrine_write_codex_agents ;;
-        grok-hooks)   _doctrine_write_host_hooks grok ;;
-        codex-hooks)  _doctrine_write_host_hooks codex ;;
+        *-hooks)      _doctrine_write_host_hooks "${target%-hooks}" ;;
         all)
             doctrine_export agents-md && doctrine_export cursor && doctrine_export copilot
             ;;
         *)
-            echo "Unknown export target: $target. Use: agents-md, cursor, copilot, codex-agents, grok-hooks, codex-hooks, all" >&2
+            echo "Unknown export target: $target. Use: agents-md, cursor, copilot, codex-agents, <host>-hooks for a host whose hooks/host-capabilities.json row declares gate_file (grok-hooks), all" >&2
             return 2
             ;;
     esac

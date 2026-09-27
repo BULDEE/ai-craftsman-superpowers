@@ -67,7 +67,7 @@ B=$(_with "" -- 'semantic_backend; echo; haiku_verify_possible && echo possible 
 OUT=$(_with "$WORK/bin-grok" -- 'haiku_verify "REVIEW THIS"; echo "[backend=$SEMANTIC_BACKEND_USED]"')
 if [[ "$OUT" == *"DDD_VIOLATIONS"* && "$OUT" == *"[backend=grok-cli]"* ]] \
     && grep -q -- '--max-turns 4' "$WORK/grok.argv" && grep -q -- '--output-format plain' "$WORK/grok.argv" \
-    && grep -q -- 'search_replace,write,run_terminal_cmd' "$WORK/grok.argv" && [[ "$(cat "$WORK/grok.guard")" == "1" ]]; then
+    && grep -q -- '--tools read_file,grep,list_dir' "$WORK/grok.argv" && ! grep -q -- 'disallowed-tools' "$WORK/grok.argv" && [[ "$(cat "$WORK/grok.guard")" == "1" ]]; then
     log_pass "grok-cli: grok -p read-only, guarded, backend recorded"
 else
     log_fail "grok transport" "out=[$(printf '%s' "$OUT" | tr '\n' '|')] argv=[$(cat "$WORK/grok.argv" 2>/dev/null)] guard=$(cat "$WORK/grok.guard" 2>/dev/null)"

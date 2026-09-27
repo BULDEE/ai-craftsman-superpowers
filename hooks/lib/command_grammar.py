@@ -15,10 +15,18 @@ class CommandGrammar(TypedDict):
     last: str
     has_or: bool
     has_pipe: bool
+    background: bool
+
+
+# `<` and `>` are punctuation so a redirection lexes as one operator token
+# (`2>&1` is `2`, `>&`, `1`; `&>` stays `&>`) instead of leaking its `&` as a
+# separator. Only the tokens below end a command.
+_SEPARATORS = {";", "&&", "||", "|", "|&", "&"}
+_PIPES = {"|", "|&"}
 
 
 def _tokens(command: str) -> list[str]:
-    lexer = shlex.shlex(command.replace("\n", ";"), posix=True, punctuation_chars=";&|")
+    lexer = shlex.shlex(command.replace("\n", ";"), posix=True, punctuation_chars=";&|<>")
     lexer.whitespace_split = True
     lexer.commenters = ""
     return list(lexer)
@@ -28,7 +36,7 @@ def _segments(tokens: list[str]) -> tuple[list[str], list[str]]:
     segments: list[list[str]] = [[]]
     separators: list[str] = []
     for token in tokens:
-        if token in {";", "&&", "||", "|", "&"}:
+        if token in _SEPARATORS:
             separators.append(token)
             segments.append([])
             continue
@@ -40,13 +48,15 @@ def _segments(tokens: list[str]) -> tuple[list[str], list[str]]:
 
 
 def parse(command: str) -> CommandGrammar:
-    rendered, separators = _segments(_tokens(command))
+    tokens = _tokens(command)
+    rendered, separators = _segments(tokens)
     return {
         "segments": rendered,
         "separators": separators,
         "last": rendered[-1] if rendered else "",
         "has_or": "||" in separators,
-        "has_pipe": "|" in separators,
+        "has_pipe": any(separator in _PIPES for separator in separators),
+        "background": bool(tokens) and tokens[-1] == "&",
     }
 
 

@@ -52,6 +52,40 @@ class RuntimePathsTest(unittest.TestCase):
         self.assertFalse((self.root / 'two/session-state-one.json').exists())
         self.assertFalse((self.root / 'grok/session-state-one.json').exists())
 
+    def test_nested_session_is_the_most_recent_binding(self) -> None:
+        # CR-204 F6: a Claude session started from a Grok shell inherits the
+        # Grok parent's id; the fixed order named the parent.
+        runtime_paths.bind('grok', 'grok-parent', '/plugins/grok', str(self.root / 'grok'))
+        parent = runtime_paths.binding_path('grok', 'grok-parent')
+        os.utime(parent, (1_000_000, 1_000_000))
+        runtime_paths.bind('claude-code', 'claude-child', '/plugins/claude', str(self.root / 'claude'))
+        os.environ.update(GROK_SESSION_ID='grok-parent', CLAUDE_CODE_SESSION_ID='claude-child')
+        self.assertEqual(session_state._resolve_session_state_path(), str(self.root / 'claude/session-state-claude-child.json'))
+
+    def test_verified_is_not_self_granted_after_a_failing_run(self) -> None:
+        # CR-204 F7: a skill cannot restore evidence a failing test revoked.
+        runtime_paths.bind('codex', 'one', '/plugins/codex', str(self.root / 'one'))
+        os.environ['CODEX_SESSION_ID'] = 'one'
+        state = self.root / 'one/session-state-one.json'
+        state.parent.mkdir(parents=True, exist_ok=True)
+        state.write_text(json.dumps({'verified': False, 'last_test_failed': True}))
+        with self.assertRaises(SystemExit):
+            session_state.handle_set_verified([])
+        self.assertFalse(json.loads(state.read_text())['verified'])
+        session_state.handle_set_verified([str(state)])
+        after = json.loads(state.read_text())
+        self.assertTrue(after['verified'])
+        self.assertFalse(after['last_test_failed'])
+
+    def test_sweep_drops_bindings_of_ended_sessions_only(self) -> None:
+        runtime_paths.bind('grok', 'old', '/plugins/grok', str(self.root / 'grok'))
+        runtime_paths.bind('grok', 'live', '/plugins/grok', str(self.root / 'grok'))
+        old = runtime_paths.binding_path('grok', 'old')
+        os.utime(old, (1_000_000, 1_000_000))
+        runtime_paths.sweep('7')
+        self.assertFalse(old.exists())
+        self.assertTrue(runtime_paths.binding_path('grok', 'live').exists())
+
     def test_unbound_native_session_does_not_read_claude_bridge(self) -> None:
         os.environ['CODEX_SESSION_ID'] = 'missing'
         with self.assertRaises(RuntimeError):

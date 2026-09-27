@@ -229,11 +229,19 @@ if [[ "${R%%|*}" == "2" ]] && [[ "${R#*|}" == *'"deny"'* && "${R#*|}" != *'"ask"
 else
     log_fail "gate config via apply_patch denied" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-200)"
 fi
-R=$(_run config-protection.sh "$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$WORK" "d['tool_input']['file_path']='$WORK/src/Domain/.craft-rules.yml'")")
+R=$(_run config-protection.sh "$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$WORK" "d['tool_input']['file_path']='$WORK/src/Domain/.craft-rules.yml'; d['permission_mode']='default'")")
 if [[ "${R%%|*}" == "0" ]] && [[ "${R#*|}" == *'"ask"'* ]]; then
-    log_pass "the same file through Claude Code Write still asks (the host supports it)"
+    log_pass "the same file through Claude Code Write still asks in the default permission mode (the host supports it)"
 else
     log_fail "Claude Code .craft-rules.yml still asks" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
+fi
+# The captured Claude Code payload runs under bypassPermissions, where an ask
+# proceeds unseen: the gate's own configuration is denied there (CR-204 F4).
+R=$(_run config-protection.sh "$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$WORK" "d['tool_input']['file_path']='$WORK/src/Domain/.craft-rules.yml'")")
+if [[ "${R%%|*}" == "2" ]] && [[ "${R#*|}" == *'"deny"'* && "${R#*|}" == *bypassPermissions* ]]; then
+    log_pass "under the captured bypassPermissions mode the same file is denied, since an ask would proceed unseen"
+else
+    log_fail "Claude Code .craft-rules.yml under bypassPermissions" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
 fi
 
 # --- post-write on apply_patch: every touched file is validated -----------
@@ -581,6 +589,41 @@ else
     log_fail "CR-168 quoted shell text" "verified=$(_flag)"
 fi
 
+# Release review of 4.12.0: a redirection is part of the command, not a
+# separator. The shlex lexer split `2>&1` into `2>`, `&`, `1`, so the last
+# segment was `1`: a failing `pytest -q 2>&1` kept the evidence green, and
+# `|&` read as one word hid a pipe whose status is the reader's.
+REDIRECT_MISS=""
+for redirected in "pytest -q 2>&1" "pytest -q >/dev/null 2>&1" "pytest -q &> test.log" "pytest -q 2>&1 >out.log"; do
+    echo '{"verified": true}' > "$STATE"
+    _verify "$(_as_test claude-code 2.1.272 post-tool-use-failure.bash.exit1-tests-failed "; d['tool_input']['command'] = \"$redirected\"")"
+    [[ "$(_flag)" == "false" ]] || REDIRECT_MISS="${REDIRECT_MISS} [revoke: $redirected]"
+    echo '{"verified": false}' > "$STATE"
+    _verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.python-tests-passed "; d['tool_input']['command'] = \"$redirected\"")"
+    [[ "$(_flag)" == "true" ]] || REDIRECT_MISS="${REDIRECT_MISS} [grant: $redirected]"
+done
+if [[ -z "$REDIRECT_MISS" ]]; then
+    log_pass "a runner with its output redirected is still the runner: a failure revokes, a pass grants"
+else
+    log_fail "redirected runner" "missed:${REDIRECT_MISS}"
+fi
+echo '{"verified": false}' > "$STATE"
+for not_runner in "pytest -q |& cat" "pytest -q &" "echo n | ./run-tests.sh" "yes | pytest -q"; do
+    _verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.python-tests-passed "; d['tool_input']['command'] = \"$not_runner\"")"
+done
+if [[ "$(_flag)" == "false" ]]; then
+    log_pass "a runner in a pipeline or sent to the background grants nothing"
+else
+    log_fail "piped or background runner" "verified=$(_flag)"
+fi
+echo '{"verified": true}' > "$STATE"
+_verify "$(_as_test claude-code 2.1.272 post-tool-use-failure.bash.exit1-tests-failed "; d['tool_input']['command'] = 'yes | pytest -q'")"
+if [[ "$(_flag)" == "false" ]]; then
+    log_pass "a failing runner at the end of a pipeline still revokes the evidence"
+else
+    log_fail "piped runner failure revokes" "verified=$(_flag)"
+fi
+
 # an interruption is neither a pass nor a failure
 echo '{"verified": true}' > "$STATE"
 _verify "$(_as_test claude-code 2.1.272 post-tool-use-failure.bash.exit1-tests-failed "; d['is_interrupt'] = True")"; RC=$?
@@ -823,7 +866,7 @@ echo "--- challenge review: symlink alias, patched root, anchor scope ---"
 # F1: a symlink named like a source file pointing at the gate's own config
 ln -sf "$WORK/src/Domain/.craft-rules.yml" "$WORK/alias.ts" 2>/dev/null; mkdir -p "$WORK/src/Domain"; printf 'rules:\n  LAYER001: block\n' > "$WORK/src/Domain/.craft-rules.yml"; ln -sf "$WORK/src/Domain/.craft-rules.yml" "$WORK/alias.ts"
 R=$(_run config-protection.sh "$(host_fixture_with codex 0.154.0 pre-tool-use.apply_patch.multifile-move "$WORK" "d['tool_name']='Write'; d['tool_input']=dict(file_path='$WORK/alias.ts', content='rules: ignore')")")
-R2=$(_run config-protection.sh "$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$WORK" "d['tool_input']['file_path'] = '$WORK/alias.ts'; d['tool_input']['content'] = 'rules:\\n  LAYER001: ignore\\n'")")
+R2=$(_run config-protection.sh "$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$WORK" "d['tool_input']['file_path'] = '$WORK/alias.ts'; d['tool_input']['content'] = 'rules:\\n  LAYER001: ignore\\n'; d['permission_mode'] = 'default'")")
 if [[ "${R%%|*}" == "2" && "${R#*|}" == *'"deny"'* && "${R2#*|}" == *'"ask"'* ]]; then
     log_pass "F1: a write through a symlink named alias.ts that points at .craft-rules.yml is judged by the file it reaches (deny on Codex, ask on Claude Code)"
 else
@@ -925,7 +968,7 @@ R=$(cd "$WORK" && _run post-write-check.sh "$(host_fixture_with grok 1.0.30 post
 
 # config-protection reads the same envelope
 G_CFG=$(host_fixture_with grok 1.0.30 pre-tool-use.write "$WORK" \
-    "d['tool_input'].update(file_path='$WORK/.craft-rules.yml', content='rules:\n  LAYER001: ignore\n'); d['toolInput'] = dict(d['tool_input'])")
+    "d['tool_input'].update(file_path='$WORK/.craft-rules.yml', content='rules:\n  LAYER001: ignore\n'); d['toolInput'] = dict(d['tool_input']); d['permission_mode'] = 'default'")
 R=$(_run config-protection.sh "$G_CFG")
 # Grok's hooks guide: allow, deny, ask, defer are all honoured from
 # hookSpecificOutput.permissionDecision, so the gate asks there as it does on

@@ -323,6 +323,34 @@ Two further limits worth stating plainly:
 | 3.x | ⚠️ Security fixes only |
 | < 3.0 | ❌ |
 
+## Host limits that weaken the gate
+
+The gate is only as strong as the host's hook runtime. Stated here so nobody
+reads the absence of a warning as a guarantee:
+
+- **Grok fails open on a hook timeout.** Grok's default hook timeout is 5
+  seconds; a hook that runs past its timeout lets the write through. The
+  exported Grok gate sets `timeout: 15` on every handler
+  (`ci/host_hooks.py`), and the blocking pre-write check is the Level 1 regex
+  pass, whose cost `tests/perf/test-hook-latency.sh` measures. A machine loaded
+  enough to push that pass past 15 seconds lands the write; CI and the
+  pre-push gate still judge it.
+- **Codex runs no hook until you trust it.** Installing and enabling the
+  plugin loads the handlers as untrusted; they refuse nothing until reviewed in
+  `/hooks`.
+- **`ask` is only as strong as the permission mode.** Under
+  `bypassPermissions` an ask proceeds unseen, so there the gate's own
+  configuration is denied, not asked. Other modes that auto-approve are the
+  host's to document; the gate reads `permission_mode` from the payload.
+- **The plugin's data is protected from write tools, not from the shell.**
+  Registry caches, session state, bindings and bridges are refused to
+  Write, Edit and apply_patch; a shell command can still write them, like any
+  shell-written file, and a forged registry cache is trusted until a pack
+  manifest changes.
+- **Shell-written files are not gated before disk on any host.** The gate
+  judges the host's write tools; `printf > file` or `sed -i` is caught by CI
+  and the pre-push gate.
+
 ## Running a session inside an untrusted repository
 
 Opening a repository means the plugin's hooks run while its files are on disk,

@@ -395,18 +395,33 @@ if [[ "$HH_EVENTS" != *TaskCompleted* && "$HH_EVENTS" != *FileChanged* && "$HH_E
 else
     log_fail "grok-hooks export" "events=$HH_EVENTS if=$HH_IF match=$HH_MATCH cmd=$(printf '%s' "$HH_CMD" | cut -c1-120)"
 fi
-CX_OUT=$(cd "$HH" && bash "$CLI" export --target codex-hooks 2>&1)
-CX_FILE="$HH/.codex/hooks/craftsman.json"
-CX_CMD=$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$CX_FILE" 2>/dev/null)
-if [[ "$CX_CMD" == *"PLUGIN_ROOT=$ROOT_DIR"* && "$CX_CMD" == *" PLUGIN_DATA="* \
-    && "$CX_CMD" == *"CLAUDE_PLUGIN_ROOT=$ROOT_DIR"* \
-    && "$CX_CMD" != *"GROK_PLUGIN_ROOT="* && "$CX_CMD" != *"GROK_PLUGIN_DATA="* \
-    && "$(jq -r '.hooks.PreToolUse[0].hooks[0].timeout' "$CX_FILE")" == "null" \
-    && "$(jq -r '.craftsman.root' "$CX_FILE")" == "$(cd "$ROOT_DIR" && pwd -P)" \
-    && "$CX_OUT" != *"GROK_PLUGIN"* ]]; then
-    log_pass "codex-hooks carries PLUGIN_* and no timeout, and does not carry GROK_*"
+# Codex runs the plugin's hooks/hooks.json natively and reads user or project
+# hooks only from hooks.json or config.toml next to a config layer, never from
+# .codex/hooks/*.json: an exported Codex gate was a file nothing read.
+CX_RC=0; CX_OUT=$(cd "$HH" && bash "$CLI" export --target codex-hooks 2>&1) || CX_RC=$?
+if [[ "$CX_RC" -ne 0 && ! -e "$HH/.codex/hooks/craftsman.json" && "$CX_OUT" == *"declares no gate_file"* ]]; then
+    log_pass "codex-hooks is refused and writes nothing: Codex has no gate file to export"
 else
-    log_fail "codex-hooks export" "timeout=$(jq -r '.hooks.PreToolUse[0].hooks[0].timeout' "$CX_FILE") $(printf '%s' "$CX_CMD" | cut -c1-120)"
+    log_fail "codex-hooks refusal" "rc=$CX_RC out=$(printf '%s' "$CX_OUT" | tr '\n' ' ' | cut -c1-160)"
+fi
+# A gate is never written through a symlink: a project could ship
+# .grok/hooks/craftsman.json as a link to any file its author chose.
+LINK_VICTIM=$(mktemp "${TMPDIR:-/tmp}/craftsman-gate-victim.XXXXXX"); printf 'keep\n' > "$LINK_VICTIM"
+rm -f "$HH/.grok/hooks/craftsman.json"; ln -s "$LINK_VICTIM" "$HH/.grok/hooks/craftsman.json"
+LINK_RC=0; (cd "$HH" && bash "$CLI" export --target grok-hooks >/dev/null 2>&1) || LINK_RC=$?
+if [[ "$LINK_RC" -ne 0 && "$(cat "$LINK_VICTIM")" == "keep" && -L "$HH/.grok/hooks/craftsman.json" ]]; then
+    log_pass "a symlinked gate is refused and its target untouched"
+else
+    log_fail "symlinked gate" "rc=$LINK_RC victim=$(cat "$LINK_VICTIM")"
+fi
+rm -f "$HH/.grok/hooks/craftsman.json" "$LINK_VICTIM"
+# A first write is readable like any config file, not the 0600 of mkstemp.
+(cd "$HH" && umask 022 && bash "$CLI" export --target grok-hooks >/dev/null 2>&1)
+FIRST_MODE=$(python3 -c 'import os,sys;print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$HH/.grok/hooks/craftsman.json")
+if [[ "$FIRST_MODE" == "0o644" ]]; then
+    log_pass "a first gate write honours the umask (0644 under 022)"
+else
+    log_fail "first gate mode" "$FIRST_MODE"
 fi
 LOW_TIMEOUT=$(jq '[.hooks.PreToolUse[].hooks[].timeout // empty | select(. < 600)] | length' "$ROOT_DIR/hooks/hooks.json")
 if [[ "$LOW_TIMEOUT" == "0" ]]; then
@@ -416,12 +431,35 @@ else
 fi
 GROK_REL=$(python3 "$ROOT_DIR/ci/host_hooks.py" --gate-rel "$ROOT_DIR" grok)
 CODEX_REL=$(python3 "$ROOT_DIR/ci/host_hooks.py" --gate-rel "$ROOT_DIR" codex)
-if [[ -f "$HH/$GROK_REL" && -f "$HH/$CODEX_REL" && "$GROK_REL" == ".grok/hooks/craftsman.json" && "$CODEX_REL" == ".codex/hooks/craftsman.json" \
-    && -z "$(find "$HH/.grok/hooks" "$HH/.codex/hooks" -name '.craftsman-gate-*' -print)" \
+if [[ -f "$HH/$GROK_REL" && "$GROK_REL" == "$(jq -r '.hosts.grok.gate_file' "$ROOT_DIR/hooks/host-capabilities.json")" && -z "$CODEX_REL" \
+    && -z "$(find "$HH/.grok/hooks" -name '.craftsman-gate-*' -print)" \
     && "$(jq -e . "$HH/$GROK_REL" >/dev/null && echo ok)" == "ok" ]]; then
-    log_pass "export, healthcheck and refresh share .host/hooks/craftsman.json, and the write leaves no temporary file"
+    log_pass "export, healthcheck and refresh share the gate_file the matrix declares, and the write leaves no temporary file"
 else
     log_fail "gate path" "grok=$GROK_REL codex=$CODEX_REL"
+fi
+# Host facts live in hooks/host-capabilities.json, not in the exporter: a
+# host name or tool name typed there is a second copy that drifts.
+HOST_LITERALS=$(python3 - "$ROOT_DIR" <<'PYLIT'
+import ast, json, sys
+root = sys.argv[1]
+hosts = json.load(open(f"{root}/hooks/host-capabilities.json"))["hosts"]
+names = set(hosts)
+for row in hosts.values():
+    facts = row.get("gate_export") or {}
+    names.update((facts.get("native_env") or {}).values())
+    for extra in (facts.get("matcher_aliases") or {}).values():
+        names.update(extra)
+tree = ast.parse(open(f"{root}/ci/host_hooks.py").read())
+found = sorted({node.value for node in ast.walk(tree)
+                if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value in names})
+print(" ".join(found))
+PYLIT
+)
+if [[ -z "$HOST_LITERALS" ]]; then
+    log_pass "ci/host_hooks.py holds no host name, host env name or host tool name: the matrix does"
+else
+    log_fail "host literals in ci/host_hooks.py" "$HOST_LITERALS"
 fi
 rm -rf "$HH"
 

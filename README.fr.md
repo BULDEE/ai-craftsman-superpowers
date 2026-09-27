@@ -6,21 +6,26 @@
 
 [🇬🇧 English](README.md) | 🇫🇷 **Français**
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A52.1.218-blueviolet?logo=claude)](https://code.claude.com)
 [![Version](https://img.shields.io/github/v/release/BULDEE/ai-craftsman-superpowers?label=version)](CHANGELOG.md)
 [![CI](https://img.shields.io/github/actions/workflow/status/BULDEE/ai-craftsman-superpowers/ci.yml?label=CI)](.github/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-**Claude écrit le code. Vos règles d'architecture décident de ce qui atterrit.**
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-%E2%89%A52.1.218-blueviolet?logo=claude)](#claude-code)
+[![Codex](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FBULDEE%2Fai-craftsman-superpowers%2Fmain%2Fhooks%2Fhost-capabilities.json&query=%24.hosts.codex.version&prefix=v&label=Codex%20qualified&logo=openai&color=412991)](docs/guides/codex-quickstart.md)
+[![Grok](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FBULDEE%2Fai-craftsman-superpowers%2Fmain%2Fhooks%2Fhost-capabilities.json&query=%24.hosts.grok.version&prefix=v&label=Grok%20qualified&logo=x&color=000000)](docs/guides/grok-quickstart.md)
+[![Hermes](https://img.shields.io/badge/Hermes-native%20plugin-6f42c1)](docs/guides/hermes-quickstart.md)
 
-Pour les équipes qui font tourner Claude Code sur une base où une violation de
-couche coûte plus cher que la fonctionnalité elle-même.
+**Votre agent écrit le code. Vos règles d'architecture décident de ce qui atterrit.**
 
-[Site](https://ai-craftsman.dev) •
+Pour les équipes qui font tourner des agents de code sur une base où une
+violation de couche coûte plus cher que la fonctionnalité elle-même.
+
 [Installation](#installation) •
+[Dix premières minutes](#vos-dix-premières-minutes) •
 [Commandes](#commandes) •
-[Docs](https://ai-craftsman.dev/docs) •
-[Contribution](#contribution)
+[Exemples](examples/) •
+[Hôtes](#support-des-hôtes) •
+[Docs](https://ai-craftsman.dev/docs)
 
 </div>
 
@@ -28,23 +33,23 @@ couche coûte plus cher que la fonctionnalité elle-même.
 
 ## Un prompt demande. Ceci impose.
 
-Vous pouvez écrire « toujours des classes final » dans votre `CLAUDE.md`. Claude
-va s'y tenir, jusqu'à ce que le contexte se remplisse, que la tâche s'allonge, ou
-qu'arrive le dixième fichier d'un refactor. Les instructions se dégradent. Ce
-n'est pas un problème de discipline, c'est un problème d'architecture : rien dans
-la boucle ne vérifie.
+Vous pouvez écrire « toujours des classes final » dans votre `CLAUDE.md` ou
+votre `AGENTS.md`. Le modèle va s'y tenir, jusqu'à ce que le contexte se
+remplisse, que la tâche s'allonge, ou qu'arrive le dixième fichier d'un
+refactor. Les instructions se dégradent. Ce n'est pas un problème de
+discipline, c'est un problème d'architecture : rien dans la boucle ne vérifie.
 
-Craftsman met la vérification dans la boucle. Les mêmes règles tournent en hooks
-sur chaque Write, en garde-fou dans votre CI, et comme critères lus par un agent
-relecteur. Les violations de couche et l'absence de `strict_types` sont refusées
-avant que l'écriture atterrisse, le reste est rendu directement à Claude comme un
-constat auquel il doit répondre, et la même règle fait échouer votre pipeline si
-elle atteint une pull request.
+Craftsman met la vérification dans la boucle. Les mêmes règles tournent en
+hooks sur chaque écriture, en garde-fou dans votre CI, et comme critères lus
+par un agent relecteur. Les violations de couche et l'absence de
+`strict_types` sont refusées avant que l'écriture atterrisse, le reste est
+rendu directement au modèle comme un constat auquel il doit répondre, et la
+même règle fait échouer votre pipeline si elle atteint une pull request.
 
 ## Voyez-le refuser
 
-Claude tente d'écrire une entité qui importe depuis la couche infrastructure. Le
-fichier n'atteint jamais votre disque :
+Le modèle tente d'écrire une entité qui importe depuis la couche
+infrastructure. Le fichier n'atteint jamais votre disque :
 
 <img src="https://raw.githubusercontent.com/BULDEE/ai-craftsman-superpowers/main/.github/assets/craftsman-demo.gif" alt="Le hook pre-write refuse une entité domaine qui importe l'infrastructure, puis accepte le fichier corrigé" width="100%">
 
@@ -61,302 +66,323 @@ Fix these before writing. Use // craftsman-ignore: <RULE_ID> to suppress.
 exit=2
 ```
 
-Ce n'est pas une maquette : l'enregistrement fait passer deux fichiers d'essai dans
-`hooks/pre-write-check.sh` et montre ce qui en sort. Le code de sortie 2 est le
-refus.
+Ce n'est pas une maquette : l'enregistrement fait passer deux fichiers d'essai
+dans `hooks/pre-write-check.sh` et montre ce qui en sort. Le code de sortie 2
+est le refus.
 
 </details>
 
-Claude lit les deux mêmes lignes que vous, corrige l'import et réécrit. La
-correction est enregistrée ; si cette règle revient sur plusieurs fichiers, elle
-vous est proposée comme instinct candidat dans `/craftsman:metrics`. Et si la
-violation atteint une pull request à la place, la règle identique fait échouer le
-pipeline : un seul moteur, un seul verdict, zéro dérive entre votre éditeur et
-votre CI.
-
-## Face à ce que vous avez déjà
-
-Votre vraie alternative n'est pas un autre plugin. C'est le `CLAUDE.md` que vous
-avez déjà écrit, et les linters que vous faites déjà tourner.
-
-| | CLAUDE.md seul | Linter et CI | Craftsman |
-|---|---|---|---|
-| Tient encore au fichier 300 d'un refactor | non | oui | oui |
-| Claude voit la violation *avant* d'écrire | non | non | oui |
-| Même verdict sur votre machine et dans le pipeline | n/a | partiel | oui |
-| Empêche Claude de refaire la même erreur | non | non | oui |
-| Avertit quand un modèle de domaine est écrit sans passe de design | non | non | oui |
-
-## Ce qu'il fait vraiment
-
-**Il bloque.** Un seul moteur de règles, appliqué à l'identique en hooks et en CI.
-Aucune dérive entre ce que votre éditeur autorise et ce que votre pipeline
-refuse. GitHub, GitLab, Bitbucket et Jenkins reçoivent tous des annotations
-natives.
-
-**Il apprend.** Chaque violation corrigée est enregistrée localement. Une
-correction qui revient 3 fois sur 3 fichiers devient un instinct candidat que
-vous validez dans `/craftsman:metrics`, puis un skill projet avec provenance. La
-détection est automatique, la codification reste sous contrôle humain.
-
-**Il prouve.** « Terminé » exige des preuves. Une tâche ne peut pas être marquée
-complète sans trace de vérification, et un test qui échoue révoque une trace
-existante.
-
-Et chaque travail tourne sur le modèle le moins cher qui en est capable :
-formater un commit sur Haiku en effort faible, une revue d'architecture sur Opus
-en effort élevé. Vous ne payez jamais le tarif Opus pour un message de commit.
-
-<details>
-<summary><b>Sept autres mécanismes</b> : le moteur de règles, le cliquet structurel, le panel de design adverse, la détection de biais, et trois autres</summary>
-
-<br>
-
-1. **Moteur de règles à 3 niveaux d'héritage** : Global → Projet → Répertoire. Forme courte (`PHP001: warn`) ou forme longue (règles regex personnalisées). Le code hérité coexiste avec du code strict via une relaxation au niveau répertoire.
-2. **Cliquet structurel** : une baseline committée (`.craftsman-baseline.json`) enregistre le plus haut niveau structurel de chaque fichier (complexité, taille, plus longue fonction, fan-out d'imports, nombre de suppressions). Un fichier que vous touchez peut s'améliorer ou rester égal, jamais régresser : la marque se resserre automatiquement sur un passage vert et ne se desserre que par une suppression documentée et comptée. Le code hérité non touché n'est jamais puni pour une dette qu'il avait déjà.
-3. **Panel de design adverse** : trois contradicteurs (YAGNI, invariants et frontières, faisabilité) attaquent un design pendant `/craftsman:design`, avant qu'une ligne de code existe. Chaque objection atterrit dans un tableau retenue ou écartée : le silence n'est pas une option. Contredire un design coûte bien moins cher que contredire le code bâti dessus.
-4. **Détecteur de biais cognitifs** : détection en temps réel du biais d'accélération, du scope creep et de la sur-optimisation dans vos prompts. Cascade linguistique à deux étages : les patterns curés en anglais vous avertissent directement, et toutes les autres langues occupent un seul et même étage derrière, avec des lexiques de rappel (CJK, cyrillique et thaï inclus) qui confient la décision au modèle lisant déjà votre prompt, lequel la remonte ou l'écarte en silence avec toute la session en contexte. Aucun second modèle, aucun appel réseau. Les tags de langue suivent BCP 47, donc `fr-CA` ou `zh-Hant` s'enregistrent comme n'importe quel autre. Ajouter une langue, c'est deux fichiers de données et zéro ligne de code. Les lexiques non anglais sont des ébauches orientées rappel qu'aucun locuteur natif n'a encore relues, et c'est le sens de cet étage : un faux positif y devient une note que le modèle écarte en silence, jamais un avertissement que vous voyez.
-5. **Contrôle qualité en temps réel** : validation progressive sur chaque Write/Edit : regex (toujours active, coût mesuré par `tests/perf/test-hook-latency.sh`) → sémantique LSP (via le plugin LSP officiel de votre langage) → analyse statique et architecture (PHPStan/ESLint/deptrac, à activer machine par machine parce que lancer les analyseurs d'un projet exécute son code, voir [SECURITY.md](SECURITY.md)). Se dégrade proprement sans aucun outil installé.
-6. **Métriques et tendances** : suivi SQLite des violations, corrections et sessions, avec des vues 7 jours / 30 jours pour identifier vos règles les plus violées.
-7. **Règles de sécurité** : SEC001-003 (secrets en dur, eval dynamique, SQL par concaténation) vérifiées en hooks et en CI, avec leur doctrine routée vers Claude au blocage. `/craftsman:setup` observe le dépôt et pose au plus quatre questions en langage clair.
-
-</details>
+Le modèle lit les deux mêmes lignes que vous, corrige l'import et réécrit. La
+correction est enregistrée ; si cette règle revient sur plusieurs fichiers,
+elle vous est proposée comme instinct candidat dans `/craftsman:metrics`. Et si
+la violation atteint une pull request à la place, la règle identique fait
+échouer le pipeline : un seul moteur, un seul verdict, zéro dérive entre votre
+éditeur et votre CI.
 
 ## Installation
 
 > [!WARNING]
 > N'installez ce plugin que depuis les sources officielles ci-dessous. Ne faites
-> pas confiance aux forks, miroirs ou « copies améliorées » distribuées ailleurs.
+> pas confiance aux forks, miroirs ou copies « améliorées » distribués ailleurs.
 > Étapes de vérification : [SECURITY.md](SECURITY.md#pre-installation-verification).
 
+Choisissez votre hôte. Chaque bloc est complet : après lui, le garde-fou
+refuse les mauvaises écritures.
+
+### Claude Code
+
 ```bash
-# 1. Ajouter la marketplace
 /plugin marketplace add BULDEE/ai-craftsman-superpowers
-
-# 2. Installer le plugin
 /plugin install craftsman@ai-craftsman-superpowers
-
-# 3. Redémarrer Claude Code, puis configurer
-exit
-claude
+# redémarrez Claude Code, puis :
 /craftsman:setup --quick
 ```
 
-**Vous utilisez [Codex](https://developers.openai.com/codex) ?** Le manifeste
-natif est `.codex-plugin/plugin.json`, avec le catalogue
-`.agents/plugins/marketplace.json`. Aucun import Claude n'est nécessaire.
-Codex 0.155.1 ignore les hooks du format portable `plugin.json` à la racine ;
-ce point d'entrée concurrent n'est donc pas livré. Le chargeur natif lit les
-22 skills et 14 handlers même en l'absence du manifeste Claude.
+### Codex
 
 ```bash
 codex plugin marketplace add BULDEE/ai-craftsman-superpowers
 codex plugin add craftsman@ai-craftsman-superpowers
-codex   # examiner et approuver les hooks Craftsman dans /hooks
+codex    # puis /hooks : relisez et approuvez les handlers craftsman
 ```
 
-L'installation ne donne pas confiance aux hooks. Sur Codex 0.155.1, les handlers
-4.11.0 installes acceptent un `apply_patch` valide et refusent TS001 ainsi que
-le relachement de la configuration avant ecriture. Le nouveau manifeste
-natif est lu par le consommateur ; un candidat de developpement doit
-encore etre qualifie apres son installation. Les 22 skills sont chargees.
-Le chargeur de roles de cette version lit les repertoires de configuration,
-pas les agents du plugin. Les missions `agents/` restent utilisables pour une
-delegation generique. L'export TOML est une option de compatibilite, pas une
-condition de l'installation native. Les differences d'evenements et de
-resultats sont explicites dans `hooks/host-capabilities.json`.
+Installer n'approuve pas les hooks : tant que vous ne les avez pas relus dans
+`/hooks`, ils sont chargés et ne tournent pas. Détail et limites :
+[guide Codex](docs/guides/codex-quickstart.md).
 
-**Vous utilisez [Grok](https://docs.x.ai/build) ?** Installez par son catalogue natif :
+### Grok
 
 ```bash
-grok plugin marketplace add /chemin/vers/ai-craftsman-superpowers
-grok plugin install craftsman --trust
+git clone https://github.com/BULDEE/ai-craftsman-superpowers ~/src/ai-craftsman-superpowers
+bash ~/src/ai-craftsman-superpowers/bin/craftsman-grok-install
 ```
 
-Grok 1.0.40 n'execute pas les hooks embarques dans le plugin. Un `grok -p` frais
-a ecrit le fichier demande alors que le marqueur d'un hook PreToolUse inline
-restait vide, et `hooks.json` reste une reference de fichier.
-`bin/craftsman-grok-install` installe le plugin et ecrit
-`~/.grok/hooks/craftsman.json`, qui est la porte qui tourne. Les hooks globaux
-sont toujours de confiance. `--compat-hooks` ecrit le meme fichier.
-`craftsman-ci export --target grok-hooks` fait la meme ecriture. Les hooks de
-projet dans `.grok/hooks` exigent `grok --trust` ou `/hooks-trust`. Un refus
-apparait en `failed` avec `blocked: true`. Un rechargement dans `/hooks` a ete
-mesure sur 1.0.34 et ne rejoue pas le `SessionStart` initial manque. Les noms
-slash sont `/name`, sauf `/plan`, `/loop` et `/workflow`, que Grok possede
-deja : ces trois skills restent `/craftsman:name`. Un nom deja pris par un
-autre plugin s'affiche aussi en `/craftsman:name`.
-L'etat et les metriques sont lies a l'hote et a la session. Une session native
-sans liaison signale l'absence de donnees et ne reutilise pas celles d'un autre hote.
+Grok n'exécute aucun des hooks embarqués d'un plugin dans un processus frais :
+l'installeur écrit donc aussi le garde-fou global `~/.grok/hooks/craftsman.json`
+(la même écriture que `craftsman-ci export --target grok-hooks --into ~/.grok/hooks`).
+Relancez-le pour mettre à jour. Détail et limites :
+[guide Grok](docs/guides/grok-quickstart.md).
 
-**Vous faites tourner des agents [Hermes](https://hermes-agent.nousresearch.com) au lieu de (ou à côté de) Claude Code ?** Le même dépôt est un plugin Hermes natif :
+### Hermes
 
 ```bash
 git clone https://github.com/BULDEE/ai-craftsman-superpowers ~/.hermes/plugins/craftsman
 hermes plugins enable craftsman
 ```
 
-Votre agent autonome reçoit la même porte, appliquée à la conclusion plutôt qu'à l'écriture : impossible de conclure un tour de code qui laisse des violations critiques, et Hermes borne lui-même les reprises. Le refus à l'écriture, pour les secrets en dur (SEC001) et Domain-importe-Infrastructure (LAYER001) seulement, est une option (`write_gate: on`). Plus la boucle d'apprentissage des corrections, `/craftsman` à la demande et sept skills craftsman sélectionnées selon la situation. Prise en main en cinq minutes : [Hermes quickstart](docs/guides/hermes-quickstart.md) ; un tour complet bloqué-corrigé-appris : [examples/hermes-agent](examples/hermes-agent/01-blocked-turn.md) ; conception et modèle de menace : [adapters/hermes/README.md](adapters/hermes/README.md). Le guide [For non-developers](docs/guides/for-non-developers.md) explique la valeur du plugin sans jargon, pour les profils non techniques.
+Le garde-fou s'applique à la conclusion : l'agent ne peut pas conclure un tour
+de code qui laisse des violations critiques. Détail :
+[guide Hermes](docs/guides/hermes-quickstart.md).
 
-C'est toute l'installation. `--quick` lit votre dépôt et choisit les défauts ;
-lancez `/craftsman:setup` sans l'option pour répondre à quatre questions en
-langage clair.
+### Vérifier que ça marche
+
+Lancez `/craftsman:healthcheck` (sur Grok : `/healthcheck`), ou depuis un
+shell `bash <racine du plugin>/bin/craftsman-healthcheck --report`. Chaque
+ligne qui n'est pas `ok` nomme la commande qui la corrige.
 
 <details>
-<summary>Prérequis, installation locale, et vérification</summary>
+<summary>Prérequis et installation locale</summary>
 
 <br>
 
 **Prérequis**
 
 - Claude Code v2.1.218 ou plus (`claude --version`). Versions antérieures : installez la ligne 3.9.x gelée.
-- `python3` 3.9 ou plus. C'est le plancher parce que c'est ce que `/usr/bin/python3` fournit sur un Mac sans homebrew ; la CI importe chaque bibliothèque de hook sous 3.9 pour que le plancher ne monte pas en silence.
+- `python3` 3.9 ou plus. C'est le plancher parce que c'est ce qu'est `/usr/bin/python3` sur un Mac sans homebrew ; la CI importe chaque bibliothèque de hook sous 3.9 pour que le plancher ne remonte pas en silence.
 - `bash`, `grep`, `jq`, `sqlite3`. GNU coreutils n'est pas requis : le plugin tourne sur un macOS d'origine.
 
-**Installation depuis un clone local**
+**Installer depuis un clone local (Claude Code)**
 
 ```bash
-git clone https://github.com/BULDEE/ai-craftsman-superpowers.git /chemin/vers/ai-craftsman-superpowers
-/plugin marketplace add /chemin/vers/ai-craftsman-superpowers
+git clone https://github.com/BULDEE/ai-craftsman-superpowers.git /path/to/ai-craftsman-superpowers
+/plugin marketplace add /path/to/ai-craftsman-superpowers
 /plugin install craftsman@ai-craftsman-superpowers
 ```
 
-**Vérifier**
-
-```bash
-/plugin
-# Onglet "Installed" → le plugin craftsman doit apparaître
-# Onglet "Errors" → à consulter si les skills n'apparaissent pas
-```
+`/plugin` affiche alors craftsman dans l'onglet « Installed » ; l'onglet
+« Errors » dit pourquoi un skill n'apparaît pas.
 
 </details>
 
-## Démarrage rapide
+## Vos dix premières minutes
 
-```bash
-# Le cycle complet : design → spec → plan → implémentation → tests → vérification → commit
-/craftsman:workflow
-Je dois ajouter une fonctionnalité de mot de passe oublié.
+**1. Configurer** (lit votre dépôt, ne pose aucune question) :
+
+```text
+/craftsman:setup --quick
 ```
 
-À ce stade tous les hooks tournent déjà. Points d'entrée individuels quand vous
-ne voulez pas le cycle entier : `/craftsman:design` (modélisation DDD),
-`/craftsman:debug` (investigation systématique), `/craftsman:challenge` (revue
-d'architecture), `/craftsman:verify` (preuves avant de déclarer terminé).
+**2. Le voir refuser.** Demandez exprès quelque chose que les règles
+interdisent :
 
-Nouveau sur la méthodologie ? Le [guide débutant](docs/guides/beginner.md)
-déroule les concepts DDD avec des exemples travaillés, et
-[`/examples`](examples/) montre chaque commande avec sa sortie attendue.
+```text
+Create src/Domain/Order/Order.php, a class that uses App\Infrastructure\Doctrine\OrderRepository.
+```
+
+L'écriture est refusée avant le disque, `LAYER001` parmi les raisons, et le
+modèle réécrit la classe derrière une interface de repository dans le domaine.
+Cet aller-retour, c'est le produit.
+
+**3. Construire une fonctionnalité avec le cycle complet** (design, spec,
+plan, implémentation, tests, vérification, commit) :
+
+```text
+/craftsman:workflow
+I need to add a forgot password feature.
+```
+
+**4. Prouver avant de dire que c'est fini :**
+
+```text
+/craftsman:verify
+```
+
+Vous ne voulez qu'une étape du cycle ? `/craftsman:design` (modélisation DDD),
+`/craftsman:debug` (investigation systématique), `/craftsman:challenge` (revue
+d'architecture). Nouveau dans la méthodologie ? Le
+[guide débutant](docs/guides/beginner.md) parcourt le DDD avec des exemples
+commentés.
+
+## Support des hôtes
+
+Quatre hôtes, un seul moteur. Ce que chaque hôte charge et observe est mesuré
+sur la vraie CLI et consigné dans
+[`hooks/host-capabilities.json`](hooks/host-capabilities.json) (provenance :
+[`tests/fixtures/hosts/PROVENANCE.md`](tests/fixtures/hosts/PROVENANCE.md)).
+
+| | Claude Code | Codex | Grok | Hermes |
+|---|---|---|---|---|
+| Installation | `/plugin install` | `codex plugin add` | `craftsman-grok-install` | `hermes plugins enable` |
+| Étape en plus | aucune | approuver les hooks dans `/hooks` | aucune (garde-fou global) | aucune |
+| Garde-fou avant le disque | `Write`, `Edit` | `apply_patch` | `write`, `search_replace` | optionnel `write_gate: on`, SEC001 et LAYER001 |
+| Preuve exigée avant de clore une tâche | oui (`TaskCompleted`) | non, événement non émis | non, événement non émis | oui (`pre_verify`) |
+| Décision `ask` | oui | non, refuse à la place | oui | sans objet |
+| Preuve de test (accordée et révoquée) | oui | non, pas de code de sortie dans l'événement shell | oui | sans objet |
+| Skills | 22 | 22 | 22 (`/name`) | 7 plus `/craftsman` |
+
+Sur tous les hôtes, le garde-fou juge les outils d'écriture de l'hôte. Un
+fichier écrit par une commande shell que lance le modèle (`printf > file`,
+`sed -i`, un script) n'est pas contrôlé avant le disque : la CI
+(`ci/craftsman-ci.sh`) et le garde-fou pre-push le rattrapent. GitHub Copilot
+a un adaptateur pour son contrat de hooks documenté ; aucune surface Copilot
+n'est encore qualifiée, donc pas de badge.
 
 ## Commandes
 
 Quinze commandes ne démarrent que si vous les tapez ; sept (`challenge`,
 `debug`, `test`, `team`, `rag`, `mlops`, `agent-design`) peuvent être lancées
-par le modèle quand le contexte s'y prête. Référence complète : [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md).
+par le modèle quand le contexte s'y prête. Chaque commande a un exemple
+commenté avec sa sortie attendue : [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md).
 
 | Catégorie | Commandes |
 |-----------|-----------|
 | Méthodologie | `design`, `debug`, `plan`, `challenge`, `verify`, `workflow`, `spec`, `refactor`, `legacy`, `test`, `git`, `parallel`, `loop` |
 | Scaffolding | `scaffold entity/usecase/component/hook/api-resource/pack` |
-| Ingénierie AI/ML | `rag`, `mlops`, `agent-design` |
-| Utilitaires | `metrics`, `setup`, `team`, `healthcheck` |
+| Ingénierie IA/ML | `rag`, `mlops`, `agent-design` |
+| Utilitaires | `setup`, `healthcheck`, `metrics`, `team` |
 | CI/CD | `ci` |
 
-Les générateurs (`/craftsman:scaffold`) proposent une variante de gabarit avant de générer le code
-(`bounded-context` ou `event-sourced` pour une entité, par exemple). Les agents
-derrière ces commandes : `team-lead`, `architect` (sans Write/Edit),
-`doc-writer`, `security-pentester`, `legacy-surgeon`, `ui-ux-director`, plus les
-agents relecteurs spécifiques aux packs Symfony, React et AI/ML. Liste complète :
+Agents derrière ces commandes : `team-lead`, `architect` (sans Write/Edit),
+`doc-writer`, `security-pentester`, `legacy-surgeon`, `ui-ux-director`, plus
+des relecteurs propres aux packs Symfony, React et IA/ML. Les 12 missions
+d'agents sont livrées comme des fichiers ordinaires. Liste complète :
 [référence des agents](docs/reference/agents.md).
 
-Le paquet contient les 12 missions d'agents sous forme de fichiers ordinaires
-avant la première session. `scripts/native-manifests.py --check` compare les
-six copies des packs à leurs sources. Claude Code et Grok les chargent
-nativement ; la limite des rôles de plugins dans Codex est décrite dans la
-section d'installation ci-dessus.
+## Face à ce que vous avez déjà
+
+Votre vraie alternative n'est pas un autre plugin. C'est le `CLAUDE.md` ou
+l'`AGENTS.md` que vous avez déjà écrit, et les linters que vous faites déjà
+tourner.
+
+| | Fichier d'instructions seul | Linter et CI | Craftsman |
+|---|---|---|---|
+| Tient encore au fichier 300 d'un refactor | non | oui | oui |
+| Le modèle voit la violation *avant* d'écrire | non | non | oui |
+| Même verdict sur votre machine et dans le pipeline | n/a | partiel | oui |
+| Empêche le modèle de refaire la même erreur | non | non | oui |
+| Avertit quand un modèle de domaine est écrit sans passe de design | non | non | oui |
+
+## Ce qu'il fait vraiment
+
+**Il bloque.** Un seul moteur de règles, appliqué à l'identique en hooks et en
+CI. Aucune dérive entre ce que votre éditeur autorise et ce que votre pipeline
+refuse. GitHub, GitLab, Bitbucket et Jenkins reçoivent tous des annotations
+natives.
+
+**Il apprend.** Chaque violation corrigée est enregistrée localement. Une
+correction qui revient 3 fois sur 3 fichiers devient un instinct candidat que
+vous validez dans `/craftsman:metrics`, puis un skill projet avec provenance.
+La détection est automatique, la codification reste sous contrôle humain.
+
+**Il prouve.** « Terminé » exige des preuves. Une tâche ne peut pas être
+marquée complète sans trace de vérification, et un test qui échoue révoque une
+trace existante.
+
+Et sur Claude Code, chaque travail tourne sur le modèle le moins cher qui en
+est capable : formater un commit sur Haiku en effort faible, une revue
+d'architecture sur Opus en effort élevé.
+
+<details>
+<summary><b>Sept autres mécanismes</b> : le moteur de règles, le cliquet structurel, le panel de design adverse, la détection de biais, et trois autres</summary>
+
+<br>
+
+1. **Moteur de règles à 3 niveaux d'héritage** : Global, Projet, Répertoire. Forme courte (`PHP001: warn`) ou forme longue (règles regex personnalisées). Le code hérité coexiste avec du code strict via une relaxation au niveau répertoire.
+2. **Cliquet structurel** : une baseline committée enregistre le plus haut niveau structurel de chaque fichier (complexité, taille, plus longue fonction, fan-out d'imports, nombre de suppressions). Un fichier que vous touchez peut s'améliorer ou rester égal, jamais régresser : la marque se resserre automatiquement sur un passage vert et ne se desserre que par une suppression documentée et comptée. Le code hérité non touché n'est jamais puni pour une dette qu'il avait déjà.
+3. **Panel de design adverse** : trois contradicteurs (YAGNI, invariants et frontières, faisabilité) attaquent un design pendant `/craftsman:design`, avant qu'une ligne de code existe. Chaque objection atterrit dans un tableau retenue ou écartée : le silence n'est pas une option.
+4. **Détecteur de biais cognitifs** : détection en temps réel du biais d'accélération, du scope creep et de la sur-optimisation dans vos prompts. Les patterns curés en anglais vous avertissent directement ; toutes les autres langues confient la décision au modèle qui lit déjà votre prompt, lequel la remonte ou l'écarte en silence avec toute la session en contexte. Aucun second modèle, aucun appel réseau. Les tags de langue suivent BCP 47. Les lexiques non anglais sont des ébauches orientées rappel qu'aucun locuteur natif n'a encore relues.
+5. **Contrôle qualité en temps réel** : validation progressive sur chaque écriture faite par un outil d'écriture de l'hôte : regex (toujours active, coût mesuré par `tests/perf/test-hook-latency.sh`), puis sémantique LSP (via le plugin LSP officiel de votre langage), puis analyse statique et architecture (PHPStan, ESLint, deptrac : à activer machine par machine parce que lancer les analyseurs d'un projet exécute son code, voir [SECURITY.md](SECURITY.md)). Se dégrade proprement sans aucun outil installé.
+6. **Métriques et tendances** : suivi SQLite des violations, corrections et sessions, avec des vues 7 jours et 30 jours pour identifier vos règles les plus violées.
+7. **Règles de sécurité** : SEC001-003 (secrets en dur, eval dynamique, SQL par concaténation) vérifiées en hooks et en CI, avec leur doctrine routée vers le modèle au blocage.
+
+</details>
 
 ## Moteur de règles
 
-Surchargez n'importe quelle règle par projet ou par répertoire, avec 3 niveaux
-d'héritage :
+Surchargez n'importe quelle règle par projet ou par répertoire, avec un
+héritage de configuration à 3 niveaux :
 
 ```
-~/.claude/.craft-config.yml          ← Défauts globaux
-  └─ {projet}/.craft-config.yml      ← Surcharges projet
+~/.claude/.craft-config.yml          ← Valeurs globales par défaut
+  └─ {project}/.craft-config.yml     ← Surcharges projet
       └─ {dir}/.craft-rules.yml      ← Surcharges répertoire
 ```
 
 Forme courte : `PHP001: warn` / `TS001: ignore`. Forme longue : règles
-personnalisées avec regex, sévérité, langages. Supprimez une occurrence unique
-en ligne avec `// craftsman-ignore: RULE_ID`, sauf les règles de sécurité
-(`SEC*`), qu'aucun marqueur ne réduit au silence, sur aucun front.
+personnalisées avec regex, sévérité, langages. Supprimez une occurrence
+isolée avec `// craftsman-ignore: RULE_ID`, sauf les règles de sécurité
+(`SEC*`), qu'aucun marqueur ne fait taire, sur aucun front.
 
 ## Intégration CI/CD
 
-La CI source les mêmes validateurs de pack et le même moteur de règles que les
-hooks, donc une règle ne peut pas vouloir dire une chose sur votre machine et
-une autre dans le pipeline. Exportez un pipeline avec `/craftsman:ci export`.
+La CI charge les mêmes validateurs de packs et le même moteur de règles que
+les hooks : une règle ne peut pas vouloir dire une chose sur votre machine et
+une autre dans le pipeline. Exportez un pipeline avec `/craftsman:ci export`
+([exemple](examples/ci/01-export-github-gate.md)).
 
-| Fournisseur | Template | Adaptateur |
-|-------------|----------|------------|
-| GitHub Actions | `craftsman-quality-gate.yml` | Natif : annotations inline et commentaire de PR |
+| Fournisseur | Modèle | Adaptateur |
+|-------------|--------|------------|
+| GitHub Actions | `craftsman-quality-gate.yml` | Natif : annotations en ligne et commentaire de PR |
 | GitLab CI | `.gitlab-ci.craftsman.yml` | Natif : rapport code-quality et note de MR |
 | Bitbucket Pipelines | `bitbucket-pipelines.craftsman.yml` | Natif : rapport de build |
 | Jenkins | `Jenkinsfile.craftsman` | Natif : rapport Checkstyle lu par Warnings Next Generation |
 
 ## Coût et confidentialité
 
-Tout ce qui précède fonctionne à **coût API nul** au-delà de votre usage normal
-de Claude Code : validation regex, moteur de règles, détection de biais, export CI et
-métriques sont locaux. Une couche optionnelle ajoute de l'analyse sémantique via
-des agent hooks Haiku, autour de 0,15 à 0,30 dollar par session de 50 opérations
-Write/Edit. Désactivez-la avec `agent_hooks: false`, tout le reste continue.
+Tout ce qui précède fonctionne **sans coût d'API** au-delà de votre usage
+normal du modèle : validation regex, moteur de règles, détection de biais,
+export CI et métriques sont locaux. Une couche optionnelle ajoute une analyse
+sémantique par une revue headless (Haiku sur Claude Code), pour environ
+0,15 à 0,30 $ par session de 50 écritures. Désactivez-la avec
+`agent_hooks: false` et tout le reste continue de fonctionner.
 
-**Aucune télémétrie, aucune analytique, aucun phone-home.** Les métriques ne
-quittent jamais votre machine. Le contenu des fichiers édités n'atteint l'API
-Anthropic que si `agent_hooks: true`. Les command hooks n'écrivent que dans la
-base de métriques locale et l'état de session.
+**Aucune télémétrie, aucune analytique, aucun appel sortant.** Les métriques
+ne quittent jamais votre machine, et chaque hôte et chaque session gardent
+leur propre stockage. Le contenu des fichiers édités n'atteint une API de
+modèle que si `agent_hooks: true`.
 
-Un dépôt cloné est une entrée non fiable, donc les deux capacités qui
-exécuteraient du code fourni par le dépôt (`trust_project_tools` et les chemins
-de packs externes) restent désactivées tant que **vous** ne les activez pas dans
-votre config globale, et un fichier projet ne peut jamais les accorder.
-`tests/core/test-hostile-repo.sh` reproduit chaque attaque couverte par ce modèle
-et vérifie qu'elle échoue. Détail complet : [SECURITY.md](SECURITY.md).
+Un dépôt cloné est une entrée non fiable : les deux capacités qui
+exécuteraient du code fourni par le dépôt (`trust_project_tools` et les
+chemins de packs externes) restent coupées tant que **vous** ne les activez
+pas dans votre propre configuration globale, et un fichier projet ne peut
+jamais les accorder. `tests/core/test-hostile-repo.sh` reproduit chaque
+attaque que ce modèle couvre et vérifie qu'elle échoue. Détail complet :
+[SECURITY.md](SECURITY.md).
 
 ## Limites connues
 
-**Par choix :** les violations de règles bloquent, la détection de biais se
-contente d'avertir ; pas d'auto-commit ; quinze commandes ne démarrent que
-si vous les tapez et sept peuvent être lancées par le modèle ; la méthodologie
-assume ses partis pris (DDD/Clean Architecture).
+**Par conception :** les violations de règles de code bloquent, la détection
+de biais se contente d'avertir ; pas d'auto-commit ; la méthodologie est
+assumée (DDD/Clean Architecture).
 
 **Contraintes actuelles :** PHP, TypeScript, Python, Go, Rust et Bash ont une
-couverture de règles complète, les autres langages un support de base ;
-avertit directement en anglais et laisse le modèle arbitrer toutes les autres
-langues en contexte ; les métriques sont par machine, pas partagées en
-équipe ; l'auto-correction des violations et les plugins IDE ne sont pas
-supportés, par choix.
+couverture de règles complète, les autres langages un support de base ; les
+métriques sont par machine, pas partagées dans une équipe ; les fichiers écrits
+par le shell sont rattrapés par la CI et le garde-fou pre-push, pas avant le
+disque ; les écarts propres à chaque hôte sont listés dans
+[Support des hôtes](#support-des-hôtes).
 
-Plus de détail dans la [FAQ](FAQ.md).
+Plus de détails dans la [FAQ](FAQ.md) et [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ## Pour aller plus loin
 
 | | |
 |---|---|
-| [Nouveautés v4](https://github.com/BULDEE/ai-craftsman-superpowers/releases/latest) | Rupture nette visant Claude Code >= 2.1.218 : boucle d'apprentissage fermée, skills natifs, Level 1.5 sémantique, budgets de contexte. Changements cassants dans [MIGRATION.md](MIGRATION.md). |
-| [Décisions d'architecture](docs/adr/) | 31 ADR couvrant chaque choix majeur. Commencez par [ADR-0016](docs/adr/0016-v4-clean-break-native-first.md) et [ADR-0005](docs/adr/0005-knowledge-first-architecture.md). |
-| [Bundle de connaissance](knowledge/) | La méthodologie est livrée en bundle [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) : du Markdown versionné dans git, lisible par Obsidian ou n'importe quel consommateur OKF. Zéro embedding, zéro index, zéro service externe. |
-| [Guide CLAUDE.md](docs/guides/claude-md-best-practices.md) | Ce qui va dans votre fichier global, dans votre fichier projet, et ce que le plugin doit porter à la place. |
-| [Référence des hooks](docs/reference/hooks.md) | Chaque hook, code de sortie et identifiant de règle, dont le Circuit Breaker et l'Iron Law Pattern. |
-| [Dépannage](TROUBLESHOOTING.md) | Quand un skill n'apparaît pas, qu'un hook ne se déclenche pas, ou qu'une règle se déclenche trop. |
+| [Commandes et exemples](COMMANDS-QUICK-REF.md) | Chaque commande, qui la lance, et un exemple commenté avec sa sortie attendue. |
+| Guides [Codex](docs/guides/codex-quickstart.md), [Grok](docs/guides/grok-quickstart.md), [Hermes](docs/guides/hermes-quickstart.md) | Installation, vérification, limites et désinstallation par hôte. |
+| [Décisions d'architecture](docs/adr/) | Chaque choix de conception majeur. Commencez par [ADR-0016](docs/adr/0016-v4-clean-break-native-first.md) et [ADR-0029](docs/adr/0029-host-adapter-contract.md) (adaptateurs d'hôtes, un seul cœur). |
+| [Bundle de connaissances](knowledge/) | La méthodologie est livrée comme bundle [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog) : du Markdown versionné dans git. Zéro embedding, zéro index, zéro service externe. |
+| [Pour les non-développeurs](docs/guides/for-non-developers.md) | Ce que fait ce plugin, en langage clair, et les trois questions à poser à votre équipe. |
+| [Bonnes pratiques CLAUDE.md](docs/guides/claude-md-best-practices.md) | Ce qui a sa place dans votre fichier global, dans votre fichier projet, et ce que le plugin doit porter à la place. |
+| [Référence des hooks](docs/reference/hooks.md) | Chaque hook, code de sortie et identifiant de règle. |
+| [Migration](MIGRATION.md) | Changements cassants entre versions majeures. |
 
 ## Avec le plugin Superpowers
 
-Craftsman et [Superpowers](https://github.com/obra/superpowers)
-se chargent simultanément sans conflit. Superpowers orchestre l'enchaînement
-(brainstorming, planification, TDD, développement par sous-agents) ; Craftsman
-impose la qualité à l'intérieur.
+Craftsman et [Superpowers](https://github.com/obra/superpowers) se chargent
+ensemble sans conflit. Superpowers orchestre le workflow (brainstorming,
+planification, TDD, développement piloté par sous-agents) ; Craftsman impose
+la qualité à l'intérieur.
 
 <details>
 <summary>La boucle combinée, étape par étape</summary>
@@ -364,11 +390,11 @@ impose la qualité à l'intérieur.
 ```
 1. /superpowers:brainstorming     → Concevoir la solution en collaboration
 2. /superpowers:writing-plans     → Créer le plan d'implémentation
-3. /superpowers:subagent-driven-development → Exécuter avec des sous-agents frais
-   ├── Les hooks Craftsman se déclenchent sur chaque Write/Edit
-   ├── /craftsman:design           → Modélisation DDD quand des entités apparaissent
+3. /superpowers:subagent-driven-development → Exécuter avec des sous-agents neufs
+   ├── Les hooks Craftsman se déclenchent sur chaque écriture (contrôle qualité en temps réel)
+   ├── /craftsman:design           → Modélisation DDD quand des entités de domaine apparaissent
    └── /craftsman:challenge        → Revue d'architecture aux jalons
-4. /craftsman:verify              → Vérification par preuves avant commit
+4. /craftsman:verify              → Vérification fondée sur des preuves avant le commit
 5. /superpowers:finishing-a-development-branch → PR et merge
 ```
 
@@ -382,15 +408,18 @@ Concevoir avant de coder. Tests d'abord. Débogage systématique plutôt que
 correctifs au hasard. YAGNI. Clean Architecture, les dépendances pointent vers
 l'intérieur. Faire marcher, faire bien, faire vite, dans cet ordre.
 
-Pragmatisme plutôt que dogmatisme : 80 % de couverture sur les chemins critiques
-vaut mieux que 100 % partout ; le DDD pour les domaines complexes, pas pour tous ;
-le concret d'abord, l'abstraction quand elle est réellement nécessaire.
+Pragmatisme plutôt que dogmatisme : 80 % de couverture sur les chemins
+critiques vaut mieux que 100 % partout ; le DDD pour les domaines complexes,
+pas pour tous ; le concret d'abord, l'abstraction quand elle est réellement
+nécessaire.
 
 ## Contribution
 
 Les contributions sont bienvenues. Forkez, branchez, suivez la méthodologie
 (`/craftsman:design` d'abord), ajoutez des tests, ouvrez une PR. Détails dans
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md). `bash tests/run-tests.sh` lance toute la
+suite, dont `tests/core/test-command-docs.sh`, qui échoue quand une commande
+perd son exemple.
 
 Vous cherchez par où commencer ? Les [good first issues](https://github.com/BULDEE/ai-craftsman-superpowers/labels/good%20first%20issue)
 sont du vrai travail, pas des tâches d'occupation : nouveaux packs de langage,

@@ -58,7 +58,8 @@
       "trust": "installing and enabling a plugin does not trust its hooks: the 14 handlers loaded from this manifest were reported trustStatus=untrusted until reviewed (/hooks), or bypassed for one invocation with --dangerously-bypass-hook-trust",
       "async_continuation": "a background hook cannot force a continuation: exit 2 and asyncRewake are Claude Code's, and unfinished background hooks are cancelled at shutdown. A verdict that must be acted on belongs in a synchronous gate",
       "native_agents": "0.155.1 plugin manifest loads skills, MCP, apps and hooks; role loader reads config layers and their agents directories, not plugin agent directories. Missions can be read from agents/ without importing roles.",
-      "native_manifest": ".codex-plugin/plugin.json: 22 skills and 14 hooks read on 0.155.1 with no Claude manifest. Portable root plugin.json masks this native entry point and intentionally excludes hooks in this host version."
+      "native_manifest": ".codex-plugin/plugin.json: 22 skills and 14 hooks read on 0.155.1 with no Claude manifest. Portable root plugin.json masks this native entry point and intentionally excludes hooks in this host version.",
+      "gate_note": "No gate file: Codex runs the plugin's hooks/hooks.json natively once trusted, and reads user or project hooks only from hooks.json or config.toml next to a config layer (developers.openai.com/codex/hooks, 2026-09-27), never from .codex/hooks/*.json."
     },
     "grok": {
       "version": "1.0.40",
@@ -88,7 +89,33 @@
       "source": "~/.grok/docs/user-guide/10-hooks.md (1.0.30 event list still holds on 1.0.40) for the event list, the captured events for the payload; TaskCompleted and FileChanged are not events Grok fires. grok --version on 2026-09-21: 1.0.40 (eb1a2256660d)",
       "trust": "a project hooks file runs only once the folder is trusted (--trust, or /hooks-trust): untrusted, it is skipped in silence and every forbidden write lands (measured 2026-09-20)",
       "refusal_rendering": "a hook that exits 2 shows as failed in Grok's hook_execution rows: that is a refusal, not a broken hook",
-      "native_reload": "1.0.34: native plugin enabled/trusted and hookCount=1, but hooks/list initially has no plugin handler. Native hooks/action reload adds the handler; a native PreToolUse control then accepts good-native-control.txt and denies bad-native-control.txt before disk (2026-09-21). Initial SessionStart remains missed; this is not automatic startup parity."
+      "native_reload": "1.0.34: native plugin enabled/trusted and hookCount=1, but hooks/list initially has no plugin handler. Native hooks/action reload adds the handler; a native PreToolUse control then accepts good-native-control.txt and denies bad-native-control.txt before disk (2026-09-21). Initial SessionStart remains missed; this is not automatic startup parity.",
+      "gate_file": ".grok/hooks/craftsman.json",
+      "gate_export": {
+        "timeout": 15,
+        "native_env": {
+          "root": "GROK_PLUGIN_ROOT",
+          "data": "GROK_PLUGIN_DATA"
+        },
+        "matcher_aliases": {
+          "Write": [
+            "write",
+            "search_replace"
+          ],
+          "Edit": [
+            "write",
+            "search_replace"
+          ],
+          "Bash": [
+            "run_terminal_command"
+          ]
+        },
+        "conditional_handlers": "keep_without_if",
+        "data_dir": ".grok/plugins/data/craftsman",
+        "installer": "bin/craftsman-grok-install",
+        "project_note": "Trust the folder before these run: 'grok --trust', or /hooks-trust in the session. Untrusted, project hooks are skipped in silence (measured on 1.0.30). A gate under ~/.grok/hooks is global and needs no trust.",
+        "source": "Grok defaults a hook to 5s and fails open, so the export sets 15. The create tool is `write` and the edit tool `search_replace` (hooks guide 1.0.34: Write -> search_replace), the shell tool `run_terminal_command` in hook payloads. A handler with `if:` is kept without it: pre-push-verify.sh exits 0 unless the command is git push."
+      }
     }
   },
   "event_functions": {

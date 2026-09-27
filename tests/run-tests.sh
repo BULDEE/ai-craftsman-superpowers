@@ -724,6 +724,14 @@ test_invocation_policy() {
     run_subtest "Invocation policy tests pass" "$SCRIPT_DIR/core/test-invocation-policy.sh" || true
 }
 
+# Test: Every command is documented where the README sends readers
+test_command_docs() {
+    echo ""
+    log_info "Testing command documentation (examples, quick reference, host gates)"
+
+    run_subtest "Command documentation tests pass" "$SCRIPT_DIR/core/test-command-docs.sh" || true
+}
+
 # Test: Team templates reference agents that exist
 test_team_templates() {
     echo ""
@@ -870,6 +878,7 @@ main() {
         test_workflow_command
         test_legacy_command
         test_invocation_policy
+        test_command_docs
         test_team_templates
         test_hotspot_analysis
         test_bias_recall
