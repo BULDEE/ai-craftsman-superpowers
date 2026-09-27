@@ -127,6 +127,10 @@ Mapping, applied silently:
 | Prototype | `strictness: moderate` |
 | Going to production, on a NEW project | `strictness: strict` |
 | Going to production, on an EXISTING one | `strictness: moderate` |
+| Alone | no CI proposal |
+| Several | propose `craftsman-ci init` (pipeline template) and `craftsman-ci export` (shareable doctrine) |
+| Explain every blocked change | `guided: true` |
+| Just block, stay short | `guided: false` |
 
 **Question 1 outranks question 2, and this is the single most important line in
 the mapping.** It is enforced by `config_default_strictness` in
@@ -175,21 +179,12 @@ files written since the first mark it absorbed.
 
 Raising an existing project to `strict` is a deliberate later step, taken once
 the debt is under a baseline, and it is one line in `.craft-config.yml`.
-| Alone | no CI proposal |
-| Several | propose `craftsman-ci init` (pipeline template) and `craftsman-ci export` (shareable doctrine) |
-| Explain every blocked change | `guided: true` |
-| Just block, stay short | `guided: false` |
 
 With `guided: true`, every quality gate block gains a plain-language paragraph explaining why the rule exists and where to read more. Turn it off later by flipping the key.
 
 ### Step C: Show the derived config before writing it
 
-Same contract as the rest of this skill: display what was inferred, wait for confirmation, then write. The displayed block must include the two keys the four questions produced:
-
-```yaml
-strictness: "strict"
-guided: true
-```
+Same contract as the rest of this skill: display what was inferred, wait for confirmation, then write. What is displayed and written is the project file of [The configuration file (v4)](#the-configuration-file-v4), with the stack detected as that section says and the `strictness` and `guided` the four questions produced. Then validate it and read it back as that section says.
 
 ### Step D: Take the baseline
 
@@ -225,6 +220,60 @@ above documents what that function returns; it does not compute it.
 
 ---
 
+## The configuration file (v4)
+
+Every mode writes this one format, the one `schemas/craft-config.schema.json`
+describes and `hooks/lib/config.sh` reads. The project file is
+`$PWD/.craft-config.yml`: stack, strictness and guidance describe this
+repository, not the machine.
+
+```yaml
+# .craft-config.yml, format v4 (schemas/craft-config.schema.json)
+v: 4
+stack: {stack}
+strictness: {strictness}
+guided: {guided}
+```
+
+- `{stack}`: `symfony` when only `composer.json` exists, `react` when only
+  `package.json` exists, `fullstack` when both do, `other` when neither does.
+  One word on the same line: the resolver reads a scalar.
+- `{strictness}`: `strict`, `moderate` or `relaxed`, from the Step B mapping.
+  `--quick` omits the line, and the plugin then derives it
+  (`config_default_strictness`).
+- `{guided}`: `true` or `false` (question 4). `--quick` writes `false`.
+
+Never write `version:`, a `stack:` mapping of versions, a `packs:` mapping or
+a `rules:` block of booleans: that is the format before v4. No consumer reads
+the first three (every shipped pack loads on every stack and judges its own
+file types), a `stack:` mapping leaves the resolver with no stack at all, and
+`rules:` is read as rule-id overrides (`PHP001: warn`), never as switches.
+
+The machine-wide keys live in `~/.claude/.craft-config.yml` and only the
+machine owner sets them: `preferred_tools` (`--global`), `trust_project_tools`,
+`hooks`, `packs: external`. A project file cannot grant them.
+
+**Validate, then read it back.** A file that parses is not a file the plugin
+reads as intended. Before saying setup is done, run the validator (schema,
+resolver's own reader) and show the user the values the plugin will use:
+
+```bash
+bash -c 'source "$(craftsman-path hooks/lib/config.sh)"; config_validate .craft-config.yml && echo "stack=$(config_stack) strictness=$(config_strictness)"'
+```
+
+Any line it prints is a problem to fix before finishing; the healthcheck
+reports the same problems as a config error.
+
+**Migrating a pre-v4 file.** A `.craft-config.yml` without `v: 4` was written
+for an older format. Keep what the resolver reads (`strictness`, rule-id
+overrides under `rules:`, `sentry_org`, `sentry_project`, `context_budget`,
+`guided`, and in the global file the machine-owner keys above, `packs:
+external` included), replace a `stack:` mapping with the detected word, drop
+`version:`, the version numbers and the `packs:` switches, add `v: 4`, show
+the result, write it after confirmation, and validate it as above.
+
+---
+
 ## Quick Mode (`--quick`)
 
 When `$ARGUMENTS` contains `--quick`, skip ALL interactive questions and auto-generate configuration:
@@ -234,100 +283,43 @@ When `$ARGUMENTS` contains `--quick`, skip ALL interactive questions and auto-ge
 1. **Detect stack** using Glob tool:
    - `Glob("composer.json")` → PHP detected
    - `Glob("package.json")` → Node detected
-   - Both → fullstack
+   - Map it to `{stack}` as [The configuration file (v4)](#the-configuration-file-v4) says: PHP only → `symfony`, Node only → `react`, both → `fullstack`, neither → `other`
 
-2. **Extract user name** from git:
+2. **Extract user name** from git, for the summary:
    - Run `git config user.name` via Bash tool
    - Fallback: `"Developer"` if not configured
 
-3. **Auto-select packs:**
-   - PHP detected → `symfony: true`
-   - Node detected → `react: true`
-   - Always → `core: true`
-   - If both detected → both enabled
+3. **Write the project file** with the `Write` tool: `$PWD/.craft-config.yml`, the v4 block of [The configuration file (v4)](#the-configuration-file-v4), with the detected stack, `guided: false`, and no `strictness` line (the plugin derives it with `config_default_strictness`).
 
-4. **Generate config** with smart defaults:
+4. **Take the baseline** exactly as [Step D](#step-d-take-the-baseline) says.
 
-Use the `Write` tool to create `~/.claude/.craft-config.yml`:
+5. **Validate and read back** with the command of [The configuration file (v4)](#the-configuration-file-v4). Report its values, not the ones you meant to write.
 
-```yaml
-# AI Craftsman Superpowers Configuration
-# Generated by /craftsman:setup --quick
-# Re-run /craftsman:setup for full customization
-
-version: "1.0"
-
-profile:
-  name: "{git_user_name}"
-  disc_type: ""
-  biases:
-    - acceleration
-    - scope_creep
-    - over_optimization
-    - dispersion
-
-packs:
-  core: true
-  symfony: {auto_detected}
-  react: {auto_detected}
-  ai-ml: false
-
-stack:
-  php_version: "8.4"
-  symfony_version: "7.4"
-  node_version: "22"
-  react_version: "19"
-
-rules:
-  php:
-    final_classes: true
-    private_constructors: true
-    no_setters: true
-    strict_types: true
-    no_datetime_direct: true
-    no_empty_catch: true
-  typescript:
-    no_any: true
-    readonly_default: true
-    branded_types: true
-    named_exports: true
-    no_non_null_assertion: true
-  git:
-    conventional_commits: true
-    no_ai_attribution: true
-
-paths:
-  domain: "src/Domain"
-  application: "src/Application"
-  infrastructure: "src/Infrastructure"
-  presentation: "src/Presentation"
-```
-
-5. **Display summary** (no questions asked):
+6. **Display summary** (no questions asked):
 
 ```
 Quick Setup Complete!
 
   Name: {name} (from git config)
-  Stack: {detected_stack}
-  Strictness: strict (default)
+  Stack: {stack read back by config_stack}
+  Strictness: {strictness read back by config_strictness}
   Biases: all enabled
-  Packs: {auto_selected_packs}
+  Baseline: {what Step D recorded, or "already taken"}
 
-Config saved to ~/.claude/.craft-config.yml
-Run /craftsman:setup for full customization (DISC profile, pack versions, etc.)
+Config saved to .craft-config.yml (this project)
+Run /craftsman:setup for full customization (situational questions, DISC profile)
 ```
 
 ### Guard: Existing Config
 
-If `~/.claude/.craft-config.yml` OR `$PWD/.craft-config.yml` already exists:
+If `$PWD/.craft-config.yml` already exists (the workshop profile in `~/.claude/` is not a project config and does not stop a project setup):
 
 ```
 Config already exists at {path}. Quick setup skipped.
 Use /craftsman:setup --quick --force to overwrite, or /craftsman:setup for interactive reconfiguration.
 ```
 
-Exit without changes unless `--force` is also present in `$ARGUMENTS`.
+Exit without changes unless `--force` is also present in `$ARGUMENTS`. A file without `v: 4` is a pre-v4 config: say so and offer the migration of [The configuration file (v4)](#the-configuration-file-v4) instead of skipping silently.
 
 ---
 
@@ -375,23 +367,23 @@ Based on detection results, suggest any missing quality tools before setup conti
 
 Display detected tools so the user knows what's available.
 
-### Pack Auto-Selection
+### Stack Pre-Selection
 
-Pre-select packs based on detection (user can override in Step 4):
+Pre-select the stack based on detection (user can override in Step 4), with the mapping of [The configuration file (v4)](#the-configuration-file-v4):
 
-- PHP detected → pre-select Symfony Pack
-- Node detected → pre-select React Pack
-- Both detected → pre-select both, display confirmation prompt
-- Neither → Core only, no auto-selection
+- PHP detected → `symfony`
+- Node detected → `react`
+- Both detected → `fullstack`, display confirmation prompt
+- Neither → `other`
 
 ### Existing Config Check
 
 Check if configuration already exists:
 
-Use the **Read** tool to read `~/.claude/.craft-config.yml`. If the file does not exist, treat as CONFIG_NOT_FOUND.
+Use the **Read** tool to read `$PWD/.craft-config.yml` (this project) and `~/.claude/.craft-config.yml` (this machine). A missing file is CONFIG_NOT_FOUND for that scope.
 
-- If file exists: Show current config and ask "Do you want to reconfigure? [y/N]"
-- If file doesn't exist: Proceed with full setup
+- If the project file exists: Show it and ask "Do you want to reconfigure? [y/N]". Without `v: 4` it is a pre-v4 file: propose the migration of [The configuration file (v4)](#the-configuration-file-v4).
+- If it doesn't exist: Proceed with full setup
 
 ## Setup Process
 
@@ -403,7 +395,8 @@ Display:
 Welcome to AI Craftsman Superpowers!
 
 Let's configure your craftsman profile.
-Your config will be saved to ~/.claude/.craft-config.yml
+The project settings go to .craft-config.yml (this project),
+your personal profile to ~/.claude/.craft-config.yml (this machine).
 ```
 
 ### Step 2: Profile Information
@@ -523,112 +516,60 @@ Use `AskUserQuestion` with `multiSelect: true`:
 - **Over-optimization** - Warns when abstracting prematurely
 - **Dispersion** - Warns when jumping between topics
 
-Default recommendation: All enabled.
+Default recommendation: All enabled. Record the answers by id: `acceleration`, `scope_creep`, `over_optimization`, `dispersion`.
 
-### Step 4: Pack Selection
+### Step 4: Stack
 
 Detect available packs and their descriptions:
 
-Use the **Glob** tool: `Glob("packs/*/pack.yml")`. For each found file, use the **Read** tool to read it and extract the `description:` field. Display each pack as `- **<pack-name>**: <description>`. If no packs found, say "No packs found."
+Use the **Glob** tool: `Glob("packs/*/pack.yml")`. For each found file, use the **Read** tool to read it and extract the `description:` field. Display each pack as `- **<pack-name>**: <description>`. If no packs found, say "No packs found." Every shipped pack declares `stack: ["*"]` and judges its own file types, so there is nothing to switch on or off: the question is which stack this project is.
 
-Pre-select packs based on auto-detection from Pre-check (user can adjust):
-- PHP detected → **Symfony Pack** auto-selected
-- Node detected → **React Pack** auto-selected
-- **AI-ML Pack** → Always available (supports all stacks)
+Use `AskUserQuestion` to confirm the stack pre-selected in Pre-check:
 
-Use `AskUserQuestion` with `multiSelect: true` to confirm pack selection.
+**Question 4 - Stack:**
+- **symfony** - PHP/Symfony - _pre-selected if only PHP detected_
+- **react** - React/TypeScript - _pre-selected if only Node detected_
+- **fullstack** - both - _pre-selected if both detected_
+- **other** - anything else
 
-**Question 4 - Technology packs:**
-- **Symfony Pack** - PHP/Symfony/DDD patterns - _auto-selected if PHP detected_
-- **React Pack** - React/TypeScript patterns - _auto-selected if Node detected_
-- **AI-ML Pack** - AI/ML patterns (RAG, MLOps, agent design)
+### Step 5: Generate Configuration
 
-Note: Core pack is always enabled.
+Two files, each with its own scope:
 
-### Step 5: Stack Versions (conditional)
-
-If Symfony Pack selected, ask:
-- PHP version (default: 8.4)
-- Symfony version (default: 7.4)
-
-If React Pack selected, ask:
-- Node version (default: 22)
-- React version (default: 19)
-
-### Step 6: Generate Configuration
-
-Create the configuration file at `~/.claude/.craft-config.yml`:
+1. **This project**: write `$PWD/.craft-config.yml` with the v4 block of [The configuration file (v4)](#the-configuration-file-v4). Without the situational questions of Step B, omit `strictness` (the plugin derives it) and write `guided: false`.
+2. **This machine**: merge the personal profile into `~/.claude/.craft-config.yml`. Add `v: 4` if it is absent, add or replace the `profile:` block, and keep every other key: that file also holds the machine owner's switches (`trust_project_tools`, `hooks`, `packs: external`).
 
 ```yaml
-# AI Craftsman Superpowers Configuration
-# Generated by /craftsman:setup
-# Re-run /craftsman:setup to modify
-
-version: "1.0"
-
+# ~/.claude/.craft-config.yml, merged: every other key is kept
+v: 4
 profile:
   name: "{collected_name}"
   disc_type: "{collected_disc}"
   biases:
     - {bias1}
     - {bias2}
-
-packs:
-  core: true
-  symfony: {true/false}
-  react: {true/false}
-  ai-ml: {true/false}
-
-stack:
-  php_version: "{version}"
-  symfony_version: "{version}"
-  node_version: "{version}"
-  react_version: "{version}"
-
-rules:
-  php:
-    final_classes: true
-    private_constructors: true
-    no_setters: true
-    strict_types: true
-    no_datetime_direct: true
-    no_empty_catch: true
-  typescript:
-    no_any: true
-    readonly_default: true
-    branded_types: true
-    named_exports: true
-    no_non_null_assertion: true
-  git:
-    conventional_commits: true
-    no_ai_attribution: true
-
-paths:
-  domain: "src/Domain"
-  application: "src/Application"
-  infrastructure: "src/Infrastructure"
-  presentation: "src/Presentation"
 ```
 
-Use the `Write` tool to create this file.
+Use the `Write` tool (or `Edit` for the merge), then validate and read back both files with the command of [The configuration file (v4)](#the-configuration-file-v4) (`config_validate ~/.claude/.craft-config.yml` for the second). Take the baseline as [Step D](#step-d-take-the-baseline) says.
 
-### Step 7: Display Summary
+### Step 6: Display Summary
 
-After saving, display:
+After saving, display the values read back, not the ones you meant to write:
 
 ```
-Configuration saved to ~/.claude/.craft-config.yml
+Configuration saved:
+  .craft-config.yml (this project)
+  ~/.claude/.craft-config.yml (your profile)
 
 Your Profile:
   Name: {name}
   DISC Type: {disc_type}
   Bias Protection: {biases}
 
-Enabled Packs:
-  Core: Always enabled
-  Symfony: {Enabled/Disabled}
-  React: {Enabled/Disabled}
-  AI-ML: {Enabled/Disabled}
+This Project:
+  Stack: {stack read back by config_stack}
+  Strictness: {strictness read back by config_strictness}
+  Baseline: {what Step D recorded, or "already taken"}
 
 Available Commands:
 
@@ -649,22 +590,20 @@ Core (20 skills, always available):
   /craftsman:test      - Pragmatic testing
   /craftsman:verify    - Evidence-based verification
 
-{if symfony enabled}
+{if stack is symfony or fullstack}
 Symfony Pack:
   /craftsman:scaffold [entity|usecase]  - Scaffold DDD patterns
 {/if}
 
-{if react enabled}
+{if stack is react or fullstack}
 React Pack:
   /craftsman:scaffold [component|hook]  - Scaffold React patterns
 {/if}
 
-{if ai-ml enabled}
-AI-ML Pack:
+AI-ML Pack (every stack):
   /craftsman:rag          - Design RAG pipeline
   /craftsman:mlops        - MLOps audit
   /craftsman:agent-design - Agent 3P pattern
-{/if}
 
 Happy crafting!
 ```
@@ -673,5 +612,5 @@ Happy crafting!
 
 - Always use `AskUserQuestion` for interactive collection
 - Use `Write` tool to create the config file
-- Validate YAML syntax before writing
-- If reconfiguring, preserve any custom `paths` or `rules` the user may have added manually
+- Validate the written file with `config_validate`, not only its YAML syntax: a pre-v4 file parses and is still read wrongly
+- If reconfiguring, preserve rule-id overrides under `rules:` and every key of the global file the user added manually
