@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Hermes terminal gate: the command is read the way a shell runs it. `echo
+  ok;git push`, `env git push`, `sh -c "git push"`, `eval git push`,
+  `$(git push)` and a git alias for push all went through while `git push`
+  was refused. Operators count even glued to a word, wrappers and assignments
+  are stripped, nested shell text is read, aliases are resolved, and a push
+  or commit the reader cannot place is refused as `unknown`.
+- Hermes terminal gate: a push is judged on what it publishes. After a pass
+  on HEAD, `git push origin unsafe` published another branch's tree. Every
+  refspec source must carry the judged tree; `--all`, `--mirror`, `--tags`,
+  glob refspecs, `push.default=matching` and `remote.<name>.push` rules are
+  refused because their sources cannot be listed. Deleting a remote branch
+  still passes.
+- Hermes conclusion gate: a CI report is a verdict only when it parses,
+  carries its summary, agrees with its exit status and covers the changed
+  source files. An unparsable report or a zero-file report with exit 2 was
+  read as no finding and recorded a pass; it is now an unknown verdict, and
+  the conclusion waits. A turn that changed no file of a known language still
+  passes.
+
 ## [4.12.0] - 2026-09-27
 
 Native install on the three hosts that load plugins (Claude Code, Codex,

@@ -207,6 +207,22 @@ names the repository when the gateway's cwd is not the task's, and a `cd`
 earlier in the same command line is followed. Under `moderate` and `relaxed`
 only the push waits.
 
+The command is read the way a shell runs it (`git_command.py`): operators
+count even glued to a word (`echo ok;git push`), leading assignments and
+wrappers are stripped (`env`, `command`, `nohup`, `time`, `sudo`, `xargs`,
+`timeout`, `nice`), the text a shell runs again is read too (`sh -c`,
+`bash -c`, `eval`, `$(...)`), and a git alias is resolved from the
+repository's config. A push or commit this reader can see but not place
+(`echo git push`, an alias that runs a shell, an inline `-c alias.x=push`) is
+refused as `unknown`. A push is judged on what it publishes: the source of
+every refspec it names must carry the judged tree, `--all`, `--mirror`,
+`--tags` and glob refspecs are refused because their sources cannot be
+listed, and a push with no refspec is refused under `push.default=matching`
+or a `remote.<name>.push` rule. Deleting a remote branch publishes nothing and
+passes. Before this, `echo ok;git push`, `env git push` and, after a pass on
+HEAD, `git push origin unsafe` all went through (review of main eb54d13, B6
+and B7).
+
 Path 1 users declare it as a shell hook instead. The matcher is a regex on
 `tool_name` ([Hermes hooks](https://hermes-agent.nousresearch.com/docs/user-guide/features/hooks)):
 
@@ -306,9 +322,9 @@ no verdict).
 Both reproduced before the in-turn guard existed, and both remain live outside
 it.
 
-**The push gate reads the command line, not the process tree.** `git push`
-inside `sh -c "..."`, a script the agent wrote and then ran, an alias, or a
-push made from outside the `terminal` tool is not seen. And the verdict file
+**The push gate reads the command line, not the process tree.** A script
+the agent wrote and then ran, a shell function defined earlier in the session,
+or a push made from outside the `terminal` tool is not seen. And the verdict file
 lives in the repository's git directory, writable by the agent's uid: an
 agent that forges a pass with the right tree id has evaded the gate on
 purpose, which is the retry budget the design refuses, not a bug it can
