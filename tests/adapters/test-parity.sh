@@ -271,6 +271,69 @@ fi
 rm -rf "$GLOBAL_HOME"
 _clean
 
+# --- a custom rule: one verdict before the write, after it and in CI ------
+#
+# A long-form rule (a pattern in .craft-config.yml) ran in post-write and in
+# the pipeline, never before the write: `severity: block` refused the file
+# once it had landed and let the write itself through (CR-171, measured
+# pre-write 0, post-write 2, CI 2). A post hook can report a file on disk, it
+# cannot take the write back. The three front-ends run the engine's one pass
+# now, and the ignore case doubles as the control: the file is otherwise
+# clean, so a refusal anywhere else is the custom rule's.
+CUSTOM_FILE="$WORK/src/Runner.php"
+CUSTOM_CONTENT='<?php
+
+declare(strict_types=1);
+
+namespace App;
+
+final class Runner
+{
+    public function run(): void
+    {
+        forbidden_call();
+    }
+}'
+_ci_custom_for() {
+    bash "$ROOT_DIR/ci/craftsman-ci.sh" --format json "$1" 2>/dev/null | python3 -c '
+import json, sys
+report = json.load(sys.stdin)
+for v in report.get("violations") or []:
+    if v.get("rule") == "CUSTOM171":
+        print(v.get("severity"), v.get("line"), v.get("message"))'
+}
+for CUSTOM_SEV in block warn ignore; do
+    printf '%s\n' 'rules:' '  CUSTOM171:' '    pattern: "forbidden_call\\("' \
+        '    message: "forbidden_call() is not allowed"' "    severity: ${CUSTOM_SEV}" \
+        '    languages: [php]' > "$WORK/.craft-config.yml"
+    PRE_RC=0
+    PRE_OUT=$(python3 -c '
+import json, sys
+print(json.dumps({"tool_name": "Write", "tool_input": {"file_path": sys.argv[1], "content": sys.argv[2]}}))' \
+        "$CUSTOM_FILE" "$CUSTOM_CONTENT" | bash "$ROOT_DIR/hooks/pre-write-check.sh" 2>&1) || PRE_RC=$?
+    printf '%s\n' "$CUSTOM_CONTENT" > "$CUSTOM_FILE"
+    POST_RC=0
+    POST_OUT=$(printf '{"tool_input":{"file_path":"%s"}}' "$CUSTOM_FILE" \
+        | bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1) || POST_RC=$?
+    CI_OUT=$(_ci_custom_for "src/Runner.php")
+    case "$CUSTOM_SEV" in
+        block)  WANT_RC=2; WANT_CI="critical 11 forbidden_call() is not allowed" ;;
+        warn)   WANT_RC=0; WANT_CI="warning 11 forbidden_call() is not allowed" ;;
+        ignore) WANT_RC=0; WANT_CI="" ;;
+    esac
+    PRE_SAW=no; POST_SAW=no
+    printf '%s' "$PRE_OUT" | grep -q "CUSTOM171" && PRE_SAW=yes
+    printf '%s' "$POST_OUT" | grep -q "CUSTOM171" && POST_SAW=yes
+    WANT_SAW=yes; [[ "$CUSTOM_SEV" == "ignore" ]] && WANT_SAW=no
+    if [[ "$PRE_RC" -eq "$WANT_RC" && "$POST_RC" -eq "$WANT_RC" \
+          && "$PRE_SAW" == "$WANT_SAW" && "$POST_SAW" == "$WANT_SAW" && "$CI_OUT" == "$WANT_CI" ]]; then
+        log_pass "custom rule at ${CUSTOM_SEV}: pre-write, post-write and CI give one verdict (exit ${WANT_RC})"
+    else
+        log_fail "custom rule parity at ${CUSTOM_SEV}" "pre rc=$PRE_RC saw=$PRE_SAW post rc=$POST_RC saw=$POST_SAW ci=[$CI_OUT], want rc=$WANT_RC saw=$WANT_SAW ci=[$WANT_CI]"
+    fi
+    _clean
+done
+
 # --- every adapter directory is covered here ------------------------------
 UNCOVERED=""
 for dir in "$ROOT_DIR"/adapters/*/; do
