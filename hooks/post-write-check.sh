@@ -546,31 +546,10 @@ if sa_language_has_analyser "$_PWC_LANG"; then
 fi
 
 # =============================================================================
-# Custom Rules Validation (from .craft-config.yml rules section)
+# Custom Rules Validation (from .craft-config.yml rules section): the engine's
+# one pass, the same pre-write and CI run (CR-171)
 # =============================================================================
-_validate_custom_rules() {
-    local file="$1"
-    local language
-    language=$(lang_for_file "$file")
-    [[ -z "$language" ]] && return
-
-    local custom_rules
-    custom_rules=$(rules_custom_list "$language")
-    [[ -z "$custom_rules" ]] && return
-
-    while IFS= read -r rule_id; do
-        [[ -z "$rule_id" ]] && continue
-        local pattern msg
-        pattern=$(rules_pattern "$rule_id")
-        msg=$(rules_message "$rule_id")
-        [[ -z "$pattern" ]] && continue
-        # -e: repo-supplied pattern, see rules-engine.sh for the flag-injection note
-        if grep -qE -e "$pattern" "$file" 2>/dev/null; then
-            add_violation "$rule_id" "$msg" "$file"
-        fi
-    done <<< "$custom_rules"
-}
-_validate_custom_rules "$FILE_PATH"
+rules_check_custom "$FILE_PATH" "$_PWC_LANG"
 
 # =============================================================================
 # Structural ratchet (ADR-0025): a touched file may improve or stay equal,

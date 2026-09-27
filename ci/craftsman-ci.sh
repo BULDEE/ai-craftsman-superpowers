@@ -769,26 +769,8 @@ scan_file() {
     # Static analysis Level 2/3 (PHPStan, ESLint, Deptrac, dependency-cruiser)
     _run_static_analysis "$file"
 
-    # Custom rules from the rules engine
-    if [[ -n "$language" ]]; then
-        local custom_rules
-        custom_rules=$(rules_custom_list "$language")
-        while IFS= read -r rule_id; do
-            [[ -z "$rule_id" ]] && continue
-            local pattern msg ln_num=0
-            pattern=$(rules_pattern "$rule_id")
-            msg=$(rules_message "$rule_id")
-            [[ -z "$pattern" ]] && continue
-            while IFS= read -r fline; do
-                ln_num=$((ln_num + 1))
-                # -e: repo-supplied pattern, see rules-engine.sh for the note
-                if echo "$fline" | grep -qE -e "$pattern" 2>/dev/null; then
-                    _add_violation "$file" "$ln_num" "$rule_id" "$msg"
-                    break
-                fi
-            done < "$file"
-        done <<< "$custom_rules"
-    fi
+    # Custom rules: the engine's one pass, the same both hooks run (CR-171).
+    rules_check_custom "$file" "$language"
 
     # Every emitter for this file has run. What no analyser answered for comes
     # back now, with the same severity resolution it would have had first time.
