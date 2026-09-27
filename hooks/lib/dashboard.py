@@ -3,11 +3,16 @@
 
 Usage:
   dashboard.py <db_path> [--out FILE] [--serve [PORT]] [--json]
+  dashboard.py <db_path> --score [DAYS]
 
 Aggregates violations, corrections, sessions, and learned instincts across
 every project recorded in the database, so quality is visible per repository
 and across repositories. The output is a single self-contained HTML file
 served from localhost - nothing leaves the machine.
+
+--score prints the quality score of the last DAYS days (7 by default), of the
+DAYS days before, and the trend between them: the number /craftsman:metrics
+reports, from the same function as the dashboard card.
 """
 import html
 import json
@@ -17,8 +22,12 @@ import webbrowser
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import NamedTuple
 
 DEFAULT_PORT = 8787
+DEFAULT_SCORE_DAYS = 7
+WARNED_WEIGHT = 0.3
+FIXED_CREDIT = 0.6
 
 
 def _query(conn: sqlite3.Connection, sql: str, params: tuple = ()) -> list[tuple]:
@@ -56,7 +65,26 @@ QUERIES = {
                COALESCE(SUM(violations_warned), 0), COALESCE(SUM(writes_count), 0)
         FROM sessions
     """,
+    "fixed": "SELECT COUNT(*) FROM corrections WHERE action = 'fixed'",
 }
+
+WINDOW_SESSIONS = """
+    SELECT COALESCE(SUM(violations_blocked), 0), COALESCE(SUM(violations_warned), 0),
+           COALESCE(SUM(writes_count), 0)
+    FROM sessions WHERE timestamp > datetime('now', ?) AND timestamp <= datetime('now', ?)
+"""
+WINDOW_FIXED = """
+    SELECT COUNT(*) FROM corrections
+    WHERE action = 'fixed' AND timestamp > datetime('now', ?) AND timestamp <= datetime('now', ?)
+"""
+
+
+class Totals(NamedTuple):
+    """What a quality score is computed from, over one window."""
+    blocked: int
+    warned: int
+    fixed: int
+    writes: int
 
 
 def collect(conn: sqlite3.Connection) -> dict:
@@ -65,15 +93,56 @@ def collect(conn: sqlite3.Connection) -> dict:
     return data
 
 
-def _debt_score(data: dict) -> tuple[int, str]:
-    """Blocked-violations per write, mapped to a 0-100 score (higher is better)."""
-    sessions = data["sessions"][0] if data["sessions"] else (0, 0, 0, 0)
-    _count, blocked, warned, writes = sessions
-    if not writes:
+def quality_score(totals: Totals) -> tuple[int, str]:
+    """The one quality score: the dashboard card and /craftsman:metrics.
+
+    Findings per write mapped to 0-100, higher is better. A blocked finding
+    weighs 1 and a warned one 0.3. A correction recorded as `fixed` (the value
+    the corrections table holds, never `fix`) gives back 0.6, the weight the
+    metrics skill always gave a fix against a block (3 to 5): fixing a finding
+    leaves less debt than leaving it, and the debt never goes below zero.
+    """
+    if not totals.writes:
         return 100, "no writes recorded yet"
-    ratio = (blocked + warned * 0.3) / writes
-    score = max(0, min(100, round(100 - ratio * 100)))
-    return score, f"{blocked} blocked + {warned} warned over {writes} writes"
+    debt = max(0.0, totals.blocked + totals.warned * WARNED_WEIGHT - totals.fixed * FIXED_CREDIT)
+    score = max(0, min(100, round(100 - debt / totals.writes * 100)))
+    return score, (f"{totals.blocked} blocked + {totals.warned} warned - "
+                   f"{totals.fixed} fixed over {totals.writes} writes")
+
+
+def _debt_score(data: dict) -> tuple[int, str]:
+    _count, blocked, warned, writes = data["sessions"][0] if data["sessions"] else (0, 0, 0, 0)
+    fixed = data["fixed"][0][0] if data.get("fixed") else 0
+    return quality_score(Totals(blocked, warned, fixed, writes))
+
+
+def window_totals(conn: sqlite3.Connection, days: int, offset: int) -> Totals:
+    """Totals of the `days` days that ended `offset` days ago."""
+    span = (f"-{days + offset} days", f"-{offset} days")
+    blocked, warned, writes = (_query(conn, WINDOW_SESSIONS, span) or [(0, 0, 0)])[0]
+    fixed = (_query(conn, WINDOW_FIXED, span) or [(0,)])[0][0]
+    return Totals(blocked, warned, fixed, writes)
+
+
+def _trend(current: int, previous: int, previous_writes: int) -> str:
+    if not previous_writes:
+        return "no writes in the previous window to compare with"
+    if current > previous:
+        return "improving"
+    if current < previous:
+        return "degrading"
+    return "stable"
+
+
+def score_report(conn: sqlite3.Connection, days: int) -> str:
+    previous_totals = window_totals(conn, days, days)
+    current, current_basis = quality_score(window_totals(conn, days, 0))
+    previous, previous_basis = quality_score(previous_totals)
+    return "\n".join([
+        f"score, last {days} days: {current}/100 ({current_basis})",
+        f"score, the {days} days before: {previous}/100 ({previous_basis})",
+        f"trend: {_trend(current, previous, previous_totals.writes)}",
+    ])
 
 
 def _rows(rows: list[tuple], cols: int) -> str:
@@ -229,6 +298,21 @@ def _parse_port(argv: list[str]) -> int:
     return DEFAULT_PORT
 
 
+def _parse_days(argv: list[str]) -> int:
+    index = argv.index("--score")
+    if len(argv) > index + 1 and argv[index + 1].isdigit() and int(argv[index + 1]) > 0:
+        return int(argv[index + 1])
+    return DEFAULT_SCORE_DAYS
+
+
+def _print_score(db_path: str, days: int) -> None:
+    conn = sqlite3.connect(db_path)
+    try:
+        print(score_report(conn, days))
+    finally:
+        conn.close()
+
+
 def _load(db_path: str) -> dict:
     if not Path(db_path).is_file():
         print(f"error: metrics database not found: {db_path}", file=sys.stderr)
@@ -252,6 +336,17 @@ def _output_path(db_path: str, argv: list[str]) -> Path:
     return Path(db_path).parent / "dashboard.html"
 
 
+def _print_text(db_path: str, data: dict) -> bool:
+    """--score and --json answer on stdout instead of writing the page."""
+    if "--score" in sys.argv:
+        _print_score(db_path, _parse_days(sys.argv))
+        return True
+    if "--json" in sys.argv:
+        _dump_json(data)
+        return True
+    return False
+
+
 def main() -> None:
     if len(sys.argv) < 2:
         print(__doc__, file=sys.stderr)
@@ -259,8 +354,7 @@ def main() -> None:
     db_path = sys.argv[1]
     data = _load(db_path)
 
-    if "--json" in sys.argv:
-        _dump_json(data)
+    if _print_text(db_path, data):
         return
 
     out = _output_path(db_path, sys.argv)

@@ -48,8 +48,13 @@ _final_review_extension_filter() {
 }
 
 REVIEW_FILTER=$(_final_review_extension_filter) || exit 0
-CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null \
-    | grep -E "$REVIEW_FILTER" || true)
+# Tracked changes AND new files. `git diff` never lists an untracked file, so
+# a class the session created and did not stage never reached this review,
+# whose prompt looks for exactly that: new classes without a test (review of
+# main eb54d13, CR-174). Both lists are relative to the repository root, as
+# `git diff` prints them, and .gitignore still applies to the new ones.
+CHANGED_FILES=$( { git diff --name-only HEAD 2>/dev/null; git ls-files --others --exclude-standard --full-name -- ':/' 2>/dev/null; } \
+    | sort -u | grep -E "$REVIEW_FILTER" || true)
 [[ -z "$CHANGED_FILES" ]] && exit 0
 
 # Rewake budget: at most 2 wake-ups per session
