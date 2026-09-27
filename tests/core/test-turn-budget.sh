@@ -206,6 +206,64 @@ else
 fi
 
 echo ""
+echo "=== A review agent never isolates into a worktree, whatever its tools ==="
+
+# The read-only check above let security-pentester through: it holds Write (for
+# its report file), so it counted as a writer, while its mission is to audit
+# the changes of the checkout it is dispatched from, uncommitted ones included
+# (CR-176, M9). What an agent is for is in its description; tools say only
+# what it may touch.
+reviews_or_audits() {
+    frontmatter "$1" | awk '/^description:/{inside=1} inside && /^[a-zA-Z]+:/ && !/^description:/{exit} inside' \
+        | grep -qiE 'review|audit'
+}
+
+REVIEWERS_CHECKED=0
+for agent_file in $AGENT_FILES; do
+    reviews_or_audits "$agent_file" || continue
+    REVIEWERS_CHECKED=$((REVIEWERS_CHECKED + 1))
+    rel="${agent_file#"$ROOT_DIR"/}"
+    if isolates_in_worktree "$agent_file"; then
+        log_fail "$rel reviews or audits and declares isolation: worktree" \
+            "a worktree is a clean checkout: the uncommitted and untracked changes it was asked to audit are absent from it"
+    else
+        log_pass "$rel reviews the checkout it is dispatched from"
+    fi
+done
+
+if [[ $REVIEWERS_CHECKED -eq 0 ]]; then
+    log_fail "no review agent found" "the check above verified nothing"
+fi
+
+cat > "$FIXTURE_DIR/isolated-auditor.md" <<'FIXTURE'
+---
+name: isolated-auditor
+description: |
+  Security specialist. Use when auditing code.
+model: sonnet
+isolation: worktree
+tools:
+  - Read
+  - Write
+---
+
+# Isolated Auditor
+FIXTURE
+
+if reviews_or_audits "$FIXTURE_DIR/isolated-auditor.md" && isolates_in_worktree "$FIXTURE_DIR/isolated-auditor.md" \
+    && ! is_read_only "$FIXTURE_DIR/isolated-auditor.md"; then
+    log_pass "an auditor that holds Write and isolates is detected"
+else
+    log_fail "an isolated auditor with Write went undetected" "the review check cannot fail, so its green means nothing"
+fi
+
+if ! reviews_or_audits "$FIXTURE_DIR/isolated-writer.md"; then
+    log_pass "a writing agent with no review mission keeps its worktree"
+else
+    log_fail "a writing agent was read as a reviewer" "the check would strip isolation from agents that need it"
+fi
+
+echo ""
 echo "=== An agent whose mission runs a shell command is allowed the shell ==="
 
 # `tools:` is an allowlist. doc-writer and ui-ux-director opened on a mandatory
