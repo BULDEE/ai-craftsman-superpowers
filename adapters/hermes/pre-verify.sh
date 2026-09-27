@@ -210,6 +210,12 @@ REPORT=$(portable_timeout "${CRAFTSMAN_GATE_SECONDS:-45}" \
     bash "$CRAFTSMAN_CI" --format json "${SCAN_PATHS[@]}" 2>/dev/null) || GATE_STATUS=$?
 [[ "$GATE_STATUS" -eq 124 ]] && _bail "gate exceeded ${CRAFTSMAN_GATE_SECONDS:-45}s on ${#SCAN_PATHS[@]} file(s), verdict unknown"
 [[ -n "$REPORT" ]] || _bail "gate produced no report (exit ${GATE_STATUS}), verdict unknown"
+# A report that does not parse, carries no summary, disagrees with its exit
+# status or covers none of the changed source files is not a verdict: it was
+# read as "no finding" and recorded a pass (review of main eb54d13, B8).
+REPORT_PROBLEM=$(printf '%s' "$REPORT" | python3 "$ADAPTER_DIR/report_check.py" "$GATE_STATUS" "$PLUGIN_ROOT" "${SCAN_PATHS[@]}" 2>/dev/null) \
+    || REPORT_PROBLEM="the report check could not run"
+[[ -z "$REPORT_PROBLEM" ]] || _bail "${REPORT_PROBLEM}, verdict unknown"
 
 # One verdict, two channels. Criticals block, and carry the advisory findings
 # along so they are read in the same turn. Advisory-only surfaces once, as a
