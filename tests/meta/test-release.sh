@@ -107,6 +107,33 @@ out="$(guard v9.9.9)"; rc=$?
 assert_exit_code "guard refuses a Hermes manifest left on the old version" 1 "$rc"
 assert_contains "guard names plugin.yaml" "$out" "plugin.yaml"
 
+# The Codex and Grok manifests are generated from the Claude one. A hand edit
+# that leaves one behind is drift the guard must name, and the fixture above
+# carried neither the generator nor its outputs, so nothing proved it did.
+build_fixture
+cp "$ROOT_DIR/scripts/native-manifests.py" "$FIXTURE/scripts/"
+printf '{"name": "craftsman", "version": "9.9.9"}\n' > "$FIXTURE/.claude-plugin/plugin.json"
+printf '{"name": "fixture", "version": "9.9.9", "plugins": [{"name": "craftsman", "version": "9.9.9"}]}\n' \
+    > "$FIXTURE/.claude-plugin/marketplace.json"
+python3 "$FIXTURE/scripts/native-manifests.py" --root "$FIXTURE" >/dev/null
+git -C "$FIXTURE" add -A && git -C "$FIXTURE" commit -qm "native manifests at 9.9.9"
+git -C "$FIXTURE" tag v9.9.9
+git -C "$FIXTURE" tag craftsman--v9.9.9
+out="$(guard v9.9.9)"; rc=$?
+assert_exit_code "guard accepts native manifests generated at the release version" 0 "$rc"
+git -C "$FIXTURE" tag -d v9.9.9 craftsman--v9.9.9 >/dev/null
+python3 - "$FIXTURE/.codex-plugin/plugin.json" <<'PYEDIT'
+import json, sys
+data = json.load(open(sys.argv[1])); data["version"] = "9.9.8"
+open(sys.argv[1], "w").write(json.dumps(data, indent=2) + "\n")
+PYEDIT
+git -C "$FIXTURE" commit -qam "hand-edited Codex manifest"
+git -C "$FIXTURE" tag v9.9.9
+git -C "$FIXTURE" tag craftsman--v9.9.9
+out="$(guard v9.9.9)"; rc=$?
+assert_exit_code "guard refuses a native manifest that drifted from the Claude one" 1 "$rc"
+assert_contains "guard names the drifted native manifest" "$out" ".codex-plugin/plugin.json"
+
 build_fixture
 printf '{"version": "9.9.8"}\n' > "$FIXTURE/.claude-plugin/plugin.json"
 git -C "$FIXTURE" commit -qam "manifest disagrees with the tag"
