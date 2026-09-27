@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.12.1] - 2026-09-27
+
+Bugfix release: the Hermes gate findings B6 to B8 of the review of main
+eb54d13 (CR-170) and their Strix follow-up, a Python pack false positive, and
+a repository layout fix. No configuration or rule changes.
+
 ### Security
 
 - Hermes terminal gate: the command is read the way a shell runs it. `echo
@@ -42,6 +48,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parameters: `def resolve(verb, args, where) -> tuple[str, list[str]]` was
   reported as a function with four or more parameters. The pattern now stops
   at the closing parenthesis.
+
+### Removed
+
+- `.codex/config.toml` is no longer in the repository. It was a
+  contributor's own Codex project layer (it set a Claude Code flag in Codex
+  shells) committed by mistake, next to `.codex-plugin/`, the manifest Codex
+  actually installs. `.codex/` is ignored like `.grok/`.
 
 ## [4.12.0] - 2026-09-27
 
