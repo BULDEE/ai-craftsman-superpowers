@@ -153,9 +153,26 @@ def emit_context() -> None:
     sys.stdout.write('\0'.join((session_id(), data, cache)) + '\0')
 
 
+def sweep(days: str = '7') -> None:
+    """Drop bindings of sessions that ended: nothing else removes them."""
+    import time
+
+    limit = time.time() - int(days) * 86400
+    for runtime in ('codex', 'grok', 'claude-code'):
+        for binding in binding_path(runtime, 'x').parent.glob('*.json'):
+            try:
+                if binding.lstat().st_mtime < limit:
+                    binding.unlink()
+            except OSError:
+                continue
+
+
 def main(arguments: list[str]) -> int:
     if arguments[0] == 'context':
         emit_context()
+        return 0
+    if arguments[0] == 'sweep':
+        sweep(*arguments[1:2])
         return 0
     if arguments[0] == 'bind':
         bind(*arguments[1:5])

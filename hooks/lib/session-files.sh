@@ -107,4 +107,5 @@ session_files_sweep() {
         \( -name 'session-state-*.json' -o -name 'session-start-ts-*' \
            -o -name 'session-writes-*' -o -name 'session-violations-*' \) \
         -mtime +"$days" -delete 2>/dev/null || true
+    python3 "${SESSION_FILES_LIB_DIR}/runtime_paths.py" sweep "$days" 2>/dev/null || true
 }

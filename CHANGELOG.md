@@ -166,6 +166,8 @@ Hermes keeps its own plugin manifest (`plugin.yaml`).
 - A skill's `set-verified` is refused after a failing test run, until a
   passing run clears it: the evidence a failure revoked can no longer be
   restored by asking.
+- Session bindings (`~/.<host>/craftsman/sessions/*.json`) are swept after 7
+  days with the other session files; nothing removed them before.
 - A session started from another host's shell carries both hosts' ids;
   skills now resolve the innermost one (the most recent binding) instead of
   whichever host a fixed order named first.

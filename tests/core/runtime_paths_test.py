@@ -77,6 +77,15 @@ class RuntimePathsTest(unittest.TestCase):
         self.assertTrue(after['verified'])
         self.assertFalse(after['last_test_failed'])
 
+    def test_sweep_drops_bindings_of_ended_sessions_only(self) -> None:
+        runtime_paths.bind('grok', 'old', '/plugins/grok', str(self.root / 'grok'))
+        runtime_paths.bind('grok', 'live', '/plugins/grok', str(self.root / 'grok'))
+        old = runtime_paths.binding_path('grok', 'old')
+        os.utime(old, (1_000_000, 1_000_000))
+        runtime_paths.sweep('7')
+        self.assertFalse(old.exists())
+        self.assertTrue(runtime_paths.binding_path('grok', 'live').exists())
+
     def test_unbound_native_session_does_not_read_claude_bridge(self) -> None:
         os.environ['CODEX_SESSION_ID'] = 'missing'
         with self.assertRaises(RuntimeError):
