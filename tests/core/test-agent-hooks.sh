@@ -781,4 +781,50 @@ else
 fi
 rm -rf "$F6_DIR"
 
+echo ""
+echo "=== the final review reads new files too (CR-174) ==="
+# Review of main eb54d13 (2026-09-21, security S4): the scope was
+# `git diff --name-only HEAD`, which never lists an untracked file, so a new
+# class the session created and did not stage never reached the review whose
+# prompt looks for new classes without a test. The witness is the prompt the
+# fake CLI receives; an exit 0 proves nothing.
+FR_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-final-review.XXXXXX")
+mkdir -p "$FR_DIR/bin" "$FR_DIR/proj/src" "$FR_DIR/data" "$FR_DIR/home" "$FR_DIR/global"
+cat > "$FR_DIR/bin/claude" <<FAKE
+#!/bin/sh
+printf '%s\n' "\$*" > "$FR_DIR/prompt"
+echo CLEAN
+FAKE
+chmod +x "$FR_DIR/bin/claude"
+printf '<?php\ndeclare(strict_types=1);\nfinal class Tracked\n{\n}\n' > "$FR_DIR/proj/src/Tracked.php"
+printf 'src/Ignored.php\n' > "$FR_DIR/proj/.gitignore"
+( cd "$FR_DIR/proj" && git init -q . && git add -A && git -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -qm base ) >/dev/null 2>&1
+_fr_run() { # runs the final review; prints the prompt the fake CLI received, or not-called
+    local prompt="$FR_DIR/prompt"
+    rm -f "$prompt"
+    ( cd "$FR_DIR/proj" && printf '{"session_id":"fr","hook_event_name":"Stop","cwd":"%s"}' "$FR_DIR/proj" | env -u CRAFTSMAN_HEADLESS_VERIFY -u CLAUDE_EFFORT -u CLAUDE_PLUGIN_OPTION_strictness \
+        -u CLAUDE_PLUGIN_OPTION_STRICTNESS PATH="$FR_DIR/bin:$PATH" HOME="$FR_DIR/home" CLAUDE_PLUGIN_ROOT="$ROOT_DIR" CLAUDE_PLUGIN_DATA="$FR_DIR/data" CLAUDE_PLUGIN_OPTION_STACK=fullstack \
+        CLAUDE_PLUGIN_OPTION_AGENT_HOOKS=true CRAFTSMAN_GLOBAL_CONFIG_DIR="$FR_DIR/global" bash "$ROOT_DIR/hooks/agent-final-review.sh" >/dev/null 2>&1 )
+    cat "$prompt" 2>/dev/null || echo not-called
+}
+FR_CLEAN=$(_fr_run)
+printf '<?php\ndeclare(strict_types=1);\nfinal class NewOne\n{\n}\n' > "$FR_DIR/proj/src/NewOne.php"
+printf '<?php\nclass Ignored {}\n' > "$FR_DIR/proj/src/Ignored.php"
+FR_UNTRACKED=$(_fr_run)
+if [[ "$FR_CLEAN" == "not-called" && "$FR_UNTRACKED" == *"src/NewOne.php"* && "$FR_UNTRACKED" != *"Ignored.php"* ]]; then
+    log_pass "final review: an untracked new file reaches the review backend, a gitignored one does not (control: nothing changed, no call)"
+else
+    log_fail "final review scope (untracked)" "clean=${FR_CLEAN:0:20} untracked prompt lists: $(printf '%s' "$FR_UNTRACKED" | grep -oE 'src/[A-Za-z]+\.php' | tr '\n' ' ')"
+fi
+printf '<?php\ndeclare(strict_types=1);\nfinal class Staged\n{\n}\n' > "$FR_DIR/proj/src/Staged.php"
+printf '// edited\n' >> "$FR_DIR/proj/src/Tracked.php"
+( cd "$FR_DIR/proj" && git add src/Staged.php ) >/dev/null 2>&1
+FR_ALL=$(_fr_run)
+if [[ "$FR_ALL" == *"src/NewOne.php"* && "$FR_ALL" == *"src/Staged.php"* && "$FR_ALL" == *"src/Tracked.php"* ]]; then
+    log_pass "final review: untracked, staged and modified files are all in scope together"
+else
+    log_fail "final review scope (mixed)" "prompt lists: $(printf '%s' "$FR_ALL" | grep -oE 'src/[A-Za-z]+\.php' | tr '\n' ' ')"
+fi
+rm -rf "$FR_DIR"
+
 test_summary
