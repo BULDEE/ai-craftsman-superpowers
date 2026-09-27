@@ -67,16 +67,30 @@ def _command(payload: dict) -> str:
     return str((arguments or {}).get("command") or "")
 
 
-def _gated_call(payload: dict) -> dict:
-    """The first gated git call of a terminal command, {} when there is none."""
-    found = _git_command().calls(_command(payload), str(payload.get("cwd") or ""))
-    return found[0] if found else {}
+MIXED = ("craftsman refused this terminal command: it commits and pushes in one line, and the push "
+         "would publish a commit that does not exist yet when this gate judges it. Commit in one "
+         "terminal call, then push in the next.")
+
+
+def _gated_calls(payload: dict) -> list[dict]:
+    """Every gated git call of a terminal command, judged one by one.
+
+    Only the first was judged, so `git push origin HEAD; git push origin
+    unsafe` published a tree nobody judged (Strix review of #109). Several
+    pushes are each judged; a commit next to another gated call is refused,
+    since what the push would publish does not exist until the commit runs.
+    """
+    cwd = str(payload.get("cwd") or "")
+    found = _git_command().calls(_command(payload), cwd)
+    if len(found) > 1 and any(call["verb"] != "push" for call in found):
+        return [{"verb": "unknown", "workspace": found[0]["workspace"], "args": [], "reason": MIXED}]
+    return found
 
 
 def inspect(payload: dict) -> str:
     """"<push|commit|unknown|none> <workspace>" for a terminal call."""
-    call = _gated_call(payload)
-    return "%s %s" % (call["verb"], call["workspace"]) if call else "none "
+    found = _gated_calls(payload)
+    return "%s %s" % (found[0]["verb"], found[0]["workspace"]) if found else "none "
 
 
 def worktree_tree(workspace: str) -> str:
@@ -179,15 +193,19 @@ def _published_sources(args: list[str]) -> list[str]:
     return [source for source in sources if source]
 
 
-def _tree_mismatch(request: dict, judged: str) -> str:
-    """The first published source whose tree is not the judged one, "" when all match."""
-    workspace = request["workspace"]
-    if request["verb"] == "commit":
-        return "" if worktree_tree(workspace) == judged else "the working tree"
-    for source in _published_sources(request["args"]):
-        if _git(workspace, "rev-parse", "--verify", "--quiet", source + "^{tree}") != judged:
-            return source
-    return ""
+def _source_refusal(request: dict, source: str, judged: str) -> str:
+    """Why one published source cannot go out, "" when it carries the judged tree."""
+    verb = request["verb"]
+    if verb == "commit":
+        tree = worktree_tree(request["workspace"])
+    else:
+        tree = _git(request["workspace"], "rev-parse", "--verify", "--quiet", source + "^{tree}")
+    if not tree:
+        return "craftsman refused `git push`: it names `%s`, which is not a ref in this repository." % source
+    if tree == judged:
+        return ""
+    return ("craftsman refused `git %s`: the conclusion gate passed a different tree than the one %s "
+            "would publish. Conclude again on that work, then %s." % (verb, source, verb))
 
 
 def _publication_refusal(request: dict, judged: str) -> str:
@@ -195,18 +213,16 @@ def _publication_refusal(request: dict, judged: str) -> str:
     why = _unqualified_push(request["workspace"], request["args"]) if verb == "push" else ""
     if why:
         return "craftsman refused `git push`: %s." % why
-    mismatch = _tree_mismatch(request, judged)
-    if mismatch:
-        return ("craftsman refused `git %s`: the conclusion gate passed a different tree than the one %s "
-                "would publish. Conclude again on that work, then %s." % (verb, mismatch, verb))
-    return ""
+    sources = ["the working tree"] if verb == "commit" else _published_sources(request["args"])
+    refusals = (_source_refusal(request, source, judged) for source in sources)
+    return next((refusal for refusal in refusals if refusal), "")
 
 
 def _refusal(request: dict) -> str:
     """The reason to refuse the call, "" to allow it."""
     verb, workspace = request["verb"], request["workspace"]
     if verb == "unknown":
-        return UNKNOWN_FORM
+        return request.get("reason") or UNKNOWN_FORM
     if not _git(workspace, "rev-parse", "--git-dir"):
         return ("craftsman refused `git %s`: %s is not inside a git repository this gate can read. "
                 "Run it with `git -C <repository> %s` so the conclusion gate's verdict can be found."
@@ -247,8 +263,9 @@ def main(argv: list[str]) -> int:
         return 0
     if len(argv) >= 4 and argv[0] == "judge":
         payload = {} if sys.stdin.isatty() else _read_payload(sys.stdin.read())
-        args = _gated_call(payload).get("args", []) if payload else []
-        return judge({"workspace": argv[1], "verb": argv[2], "strictness": argv[3], "args": args})
+        calls = _gated_calls(payload) or [{"workspace": argv[1], "verb": argv[2], "args": []}]
+        verdicts = (judge(dict(call, strictness=argv[3])) for call in calls)
+        return next((verdict for verdict in verdicts if verdict), 0)
     if len(argv) >= 4 and argv[0] == "record":
         record_verdict(argv[1], argv[2], argv[3])
         return 0

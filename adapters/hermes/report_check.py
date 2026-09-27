@@ -26,6 +26,8 @@ def known_extensions(plugin_root: str) -> set:
                        if os.path.isfile(os.path.join(packs, name, "pack.yml")))
     compiled = subprocess.run([sys.executable, os.path.join(plugin_root, "hooks", "lib", "lang_registry.py"), *manifests],
                               capture_output=True, text=True, check=False, timeout=30)
+    if compiled.returncode != 0:
+        return set()
     rows = (line.split("\t") for line in compiled.stdout.splitlines())
     return {row[2] for row in rows if len(row) >= 3 and row[1] == "extensions"}
 
@@ -65,6 +67,12 @@ def main(argv: list[str]) -> int:
         sys.stderr.write(__doc__ or "")
         return 2
     extensions = known_extensions(argv[1])
+    if not extensions:
+        # No known extension means no changed file counts as source, and
+        # every check below is skipped: a registry that cannot be read is not
+        # a turn with nothing to judge (Strix review of #109).
+        print("the gate could not read its language registry")
+        return 0
     judgeable = sum(1 for path in argv[2:] if os.path.splitext(path)[1].lstrip(".") in extensions)
     reason = problem(sys.stdin.read(), int(argv[0]), judgeable)
     if reason:

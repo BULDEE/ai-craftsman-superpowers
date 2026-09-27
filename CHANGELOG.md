@@ -21,12 +21,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   glob refspecs, `push.default=matching` and `remote.<name>.push` rules are
   refused because their sources cannot be listed. Deleting a remote branch
   still passes.
+- Hermes terminal gate: every gated git call of a compound command is judged
+  (Strix review). Only the first was, so `git push origin HEAD; git push
+  origin unsafe` published a tree nobody judged. Several pushes are each
+  judged; a commit next to a push in one command is refused, since the
+  commit the push would publish does not exist yet; a push naming a ref that
+  does not exist says so.
 - Hermes conclusion gate: a CI report is a verdict only when it parses,
   carries its summary, agrees with its exit status and covers the changed
   source files. An unparsable report or a zero-file report with exit 2 was
   read as no finding and recorded a pass; it is now an unknown verdict, and
   the conclusion waits. A turn that changed no file of a known language still
   passes.
+  A language registry that cannot be read is an unknown verdict too, never a
+  turn with nothing to judge.
 
 ## [4.12.0] - 2026-09-27
 

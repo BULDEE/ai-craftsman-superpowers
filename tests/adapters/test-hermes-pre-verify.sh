@@ -363,6 +363,17 @@ out=$(b8_case '{"summary":{"files_scanned":1,"violations":1,"warnings":0},"viola
 [[ "${out##*|}" == "fail" && "$out" == *PHP001* ]] || B8_OK+=" [critical blocks: $out]"
 out=$(b8_case '{"summary":{"files_scanned":1,"violations":0,"warnings":0},"violations":[]}' 0 src/New.php)
 [[ "${out##*|}" == "pass" && "$out" != *'"block"'* ]] || B8_OK+=" [clean report passes: $out]"
+# Strix review of #109 (LOW): a registry that cannot be read named no known
+# extension, so no changed file counted as source and every check was skipped.
+cp "$B8_ROOT/hooks/lib/lang_registry.py" "$WORK/lang_registry.py.keep"
+printf 'import sys\nsys.exit(1)\n' > "$B8_ROOT/hooks/lib/lang_registry.py"
+out=$(b8_case '{"summary":{"files_scanned":0,"violations":0,"warnings":0},"violations":[]}' 0 src/New.php)
+cp "$WORK/lang_registry.py.keep" "$B8_ROOT/hooks/lib/lang_registry.py"
+if [[ "${out##*|}" == "fail" && "$out" == *registry* ]]; then
+    log_pass "a language registry that cannot be read makes the report an unknown verdict, not a pass"
+else
+    log_fail "an unreadable registry fails closed" "$out"
+fi
 rm -f "$B8_REPO/src/New.php"
 out=$(b8_case "$ZERO" 2 NOTES.md)
 [[ "${out##*|}" == "pass" && "$out" != *'"block"'* ]] || B8_OK+=" [a docs-only turn passes: $out]"

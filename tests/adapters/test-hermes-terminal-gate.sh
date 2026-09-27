@@ -42,6 +42,9 @@ cd "$REPO" && git init -q . 2>/dev/null
 printf '<?php\ndeclare(strict_types=1);\nfinal class Ok { private function __construct() {} }\n' > src/Ok.php
 git add -A >/dev/null 2>&1
 git -c user.email=t@t -c user.name=t commit -qm fixtures >/dev/null 2>&1
+# git init names the first branch main or master depending on the machine's
+# git: a push that names "main" on a runner where it is "master" names nothing.
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
 # The shell wire, as Hermes serialises it.
 terminal() {
@@ -161,7 +164,7 @@ else
 fi
 git add -A >/dev/null 2>&1
 git -c user.email=t@t -c user.name=t commit -qm "judged" >/dev/null 2>&1
-out=$(gate "git push origin main")
+out=$(gate "git push origin $BRANCH")
 if [[ "${out%%$'\n'*}" == "0" ]]; then
     log_pass "git push of the judged tree is allowed"
 else
@@ -198,13 +201,34 @@ if [[ -z "$B7_OK" ]]; then
 else
     log_fail "B7 control: the judged tree is still pushable" "refused:$B7_OK"
 fi
+# Strix review of #109 (HIGH): only the first gated call was judged, so a
+# judged push followed by another published a tree nobody judged.
+COMPOUND_MISS=""
+for compound in "git push origin HEAD; git push origin unsafe" "git push origin HEAD && git push origin unsafe" \
+                "git push origin HEAD | git push origin unsafe" "git commit -m x && git push origin unsafe" \
+                "git commit -m x && git push"; do
+    out=$(gate "$compound")
+    refused "$out" || COMPOUND_MISS+=" [$compound]"
+done
+out=$(gate "git push origin HEAD; git push backup HEAD")
+if [[ -z "$COMPOUND_MISS" && "${out%%$'\n'*}" == "0" ]]; then
+    log_pass "every gated call of a compound command is judged: a second push of another tree, or a commit then a push, is refused; two pushes of the judged tree pass"
+else
+    log_fail "every gated call of a compound command is judged" "allowed:${COMPOUND_MISS} two-judged-pushes=${out%%$'\n'*}"
+fi
+out=$(gate "git push origin no-such-branch")
+if refused "$out" && printf '%s' "$out" | grep -q "not a ref"; then
+    log_pass "a push naming a ref that does not exist is refused and says so"
+else
+    log_fail "a push naming a missing ref says so" "got: $out"
+fi
 git branch -q -D unsafe >/dev/null 2>&1
 
 # --- A pass on one tree does not authorise another ----------------------------
 printf 'const later: any = 1;\n' > src/Later.ts
 git add -A >/dev/null 2>&1
 git -c user.email=t@t -c user.name=t commit -qm "after the pass" >/dev/null 2>&1
-out=$(gate "git push origin main")
+out=$(gate "git push origin $BRANCH")
 if refused "$out" && printf '%s' "$out" | grep -q "different tree"; then
     log_pass "git push of a tree the conclusion never judged is refused, pass or no pass, and says so"
 else
