@@ -13,7 +13,7 @@ The plugin uses Claude Code hooks to automatically enforce code quality rules. H
 | SessionStart | `session-start.sh` | Initialization, config loading, first-run detection |
 | PreToolUse | `config-protection.sh` | Refuse writes that would tamper with plugin configuration; reads a Write/Edit `file_path` or every file a Codex `apply_patch` names. The matchers stay Claude's names (`Write|Edit`, `Bash`): every host measured maps them to its own tools (Codex `apply_patch`, Grok `write`/`search_replace`/`run_terminal_command`), and the hook receives the host's name, which `hooks/lib/write_mirror.py` reads through one table (`WRITE_TOOL_KINDS`) |
 | PreToolUse | `pre-write-check.sh` | Judge the would-be file **before** it lands, through the same pack validators post-write runs, on a mirror of the workspace; a multi-file patch is judged file by file and refused as a whole |
-| PreToolUse | `pre-push-verify.sh` | Validate git push commands for safety |
+| PreToolUse | `pre-push-verify.sh` | Warn on `git push` from a session with no verification evidence; reads no file, always exits 0, the push is allowed ([ADR-0023](../adr/0023-deterministic-verification-loop.md), Amendment) |
 | PostToolUse | `post-write-check.sh` | Validate file **after** write (all rules); one run per file for a Codex `apply_patch` |
 | PostToolUse | `post-bash-test-verify.sh` | A passing test run (Bash, or the TaskOutput that ends a background run) grants verification evidence; the result is decoded per host by `lib/tool_result.py`, and a host whose event carries no exit code (Codex) grants and revokes nothing. A background run the model never polls with TaskOutput fires no hook event and stays pending |
 | PostToolUseFailure | `tool-failure-tracker.sh` | Record failed tool calls for correction learning |
@@ -42,8 +42,9 @@ lands with every hook enabled and trusted (measured on Codex 0.154.0,
 command line, not a file, and refusing on a regex over command lines would
 block `sed` in a Makefile and miss `python3 write.py`. What catches those
 writes is the layer that reads the tree rather than the call: the post-write
-validation of files the session touched, `ci/craftsman-ci.sh` on the diff,
-and `pre-push-verify.sh` before the push.
+validation of files the session touched, and `ci/craftsman-ci.sh` on the diff.
+`pre-push-verify.sh` is not that layer: it reads no file and only warns when
+the session holds no verification evidence.
 
 Delivery of a background verdict is the host's, and not every host has one.
 Claude Code wakes the session on exit 2 (`asyncRewake`). Codex cancels
@@ -56,7 +57,6 @@ Agent hooks run a model for semantic analysis beyond regex patterns. The backend
 | Event | Agent | Model | Purpose | Timeout |
 |-------|-------|-------|---------|---------|
 | PostToolUse | DDD Verifier | Haiku | Layer violations, aggregate boundaries, value objects, naming | 30s |
-| InstructionsLoaded | Project Analyzer | Haiku | Architectural context map + correction trends + channel status | 20s |
 | Stop | Sentry Context | none (no model call) | Asks for Sentry error context on the files this session wrote (the write log post-write-check.sh keeps; a Stop payload names no file). The request is shown to the user at Stop and handed to the model as `additionalContext` on the next UserPromptSubmit, once: a Stop hook has no model-visible channel on either host short of forcing a continuation | 30s |
 | Stop | Final Reviewer | Haiku | Architecture validation before session end (strict mode only) | 30s |
 
@@ -66,12 +66,11 @@ Agent hooks run a model for semantic analysis beyond regex patterns. The backend
 3. Missing Value Objects (primitive obsession)
 4. Non-domain naming in Domain layer
 
-**Project Analyzer** builds at session start:
-1. Bounded contexts map (from namespaces/directories)
-2. Available Value Objects inventory
-3. Aggregate roots identified
-4. Correction trends (30-day window)
-5. Active channels status
+There is no Project Analyzer hook any more: `hooks/hooks.json` wires no
+`InstructionsLoaded` handler. Agents get the resolved doctrine, the codemap,
+the hotspots and the correction trends from `hooks/lib/dispatch-context.sh`,
+which they run as their first action, or from their caller when they have no
+shell (doc-writer, ui-ux-director).
 
 **Final Reviewer** (strict mode only):
 1. Layer violations in changed files
@@ -342,9 +341,7 @@ Three-level inheritance: Global → Project → Directory. See CLAUDE.md for det
 
 ## Schema Validation (v2.2.0+)
 
-At session start, `session-start.sh` validates all hook event names in `hooks.json` against the supported set:
-
-`SessionStart`, `PreToolUse`, `PostToolUse`, `UserPromptSubmit`, `FileChanged`, `InstructionsLoaded`, `Stop`, `SessionEnd`
+At session start, `session-start.sh` validates all hook event names in `hooks.json` against the host event names listed once in `hooks/lib/hook-events.sh` (`VALID_HOOK_EVENTS`). Being on that list means the name is valid, not that this plugin wires a handler on it: the handlers are the ones in the tables above.
 
 Unsupported events trigger a `SCHEMA WARNING` in the session startup message.
 
@@ -356,10 +353,7 @@ The Stop hook's Final Reviewer agent monitors file changes per session:
 
 ## Monorepo Safety (v2.2.0+)
 
-The InstructionsLoaded agent applies sampling for large codebases:
-- If any `src/` Glob returns >100 results: switches to directory-level analysis (file counts per subdirectory)
-- Caps file Read to 3 representative files maximum
-- Limits Value Object and Aggregate root listings to 10 each
+The sampling this section described belonged to the analyzer once wired on `InstructionsLoaded`, which is gone (see Agent Hooks above). The codemap an agent now reads comes from `hooks/lib/codemap.py` through `dispatch-context.sh`, cached until HEAD moves.
 
 ## Bias Detection
 

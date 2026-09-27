@@ -15,8 +15,11 @@ disable-model-invocation: true
 > inside this installation. The plugin's `bin/` is on PATH in the Claude Code
 > Bash tool; on a host where it is not, call it by its full path
 > (`<plugin root>/bin/craftsman-path`). Do not use `${CLAUDE_PLUGIN_ROOT}` in a
-> skill body: a skill is text handed to a model, the host expands nothing there,
-> and Claude Code does not export that variable to the Bash tool.
+> skill body: Claude Code documents substituting it inline in skill text
+> (plugins-reference, read 2026-09-27), yet on Claude Code 2.1.278 a skill that
+> relied on it ran `source "/hooks/lib/config.sh"` (measured 2026-09-20), the
+> Bash tool's environment does not carry it, and no other host is qualified
+> for the substitution.
 
 ## Outcome Contract
 

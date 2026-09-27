@@ -84,7 +84,7 @@ Run /craftsman:ci export to generate the workflow if missing.
 
 ## Cross-Harness Doctrine Export
 
-Teammates using Copilot, Cursor, Codex, Gemini, or Antigravity cannot run craftsman hooks, but they can read instruction files. Export the active rules as those files so the doctrine travels with the repository:
+Teammates whose agent does not run this plugin's hooks can still read instruction files: Cursor, Gemini and Antigravity, which the plugin does not ship to; Copilot, whose adapter has no qualified surface yet; and a Codex or Grok session where the plugin's gate is not installed, wired and trusted as their quickstarts describe (both are qualified hosts in `hooks/host-capabilities.json` once it is). Export the active rules as those files so the doctrine travels with the repository:
 
 ```bash
 craftsman-ci export --target agents-md   # AGENTS.md (read by most agents)

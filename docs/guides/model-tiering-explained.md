@@ -367,9 +367,11 @@ wins:
 
 ```bash
 mkdir -p .claude/agents
-cp "$CLAUDE_PLUGIN_ROOT/agents/architect.md" .claude/agents/architect.md
+cp "$(craftsman-path agents/architect.md)" .claude/agents/architect.md
 # edit the model: line - your definition now takes precedence
 ```
+
+If `craftsman-path` is not on PATH, copy from `<installed plugin root>/agents/architect.md`: `$CLAUDE_PLUGIN_ROOT` is not set in a terminal, nor in Claude Code's Bash tool.
 
 ### 3. Shadow a skill
 

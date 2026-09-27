@@ -11,7 +11,8 @@
 - Project has `composer.json` (Symfony 7.4)
 - No `package.json`
 - Git user: `Alexandre Mallet`
-- No existing `.craft-config.yml`
+- No existing `.craft-config.yml` in the project
+- An existing repository: 412 commits, no `.craftsman-baseline.json` yet
 
 ## Expected Behavior
 
@@ -21,35 +22,41 @@
 Detecting project stack...
   composer.json found → PHP/Symfony detected
   package.json not found → No Node/React
+  stack → symfony
   git config user.name → Alexandre Mallet
 ```
 
 ### Config Generation
 
-Creates `~/.claude/.craft-config.yml`:
+Creates `.craft-config.yml` in the project, format v4, with no `strictness`
+line: the plugin derives it (`config_default_strictness`).
 
 ```yaml
-version: "1.0"
-
-profile:
-  name: "Alexandre Mallet"
-  disc_type: ""
-  biases:
-    - acceleration
-    - scope_creep
-    - over_optimization
-    - dispersion
-
-packs:
-  core: true
-  symfony: true
-  react: false
-  ai-ml: false
-
-stack:
-  php_version: "8.4"
-  symfony_version: "7.4"
+# .craft-config.yml, format v4 (schemas/craft-config.schema.json)
+v: 4
+stack: symfony
+guided: false
 ```
+
+### Baseline
+
+```
+$ bash "$(craftsman-path bin/craftsman-ci)" baseline src
+Scanning to record what is already there...
+...
+Done. A violation already recorded here is reported but no longer blocks.
+A new one, or one more of the same rule in the same file, still does.
+```
+
+### Validation and Read-Back
+
+```
+$ bash -c 'source "$(craftsman-path hooks/lib/config.sh)"; config_validate .craft-config.yml && echo "stack=$(config_stack) strictness=$(config_strictness)"'
+stack=symfony strictness=strict
+```
+
+`strict` because the mark now exists: an existing repository without one would
+read back `moderate`, and the summary says whichever the resolver answered.
 
 ### Summary Output
 
@@ -58,12 +65,12 @@ Quick Setup Complete!
 
   Name: Alexandre Mallet (from git config)
   Stack: symfony
-  Strictness: strict (default)
+  Strictness: strict
   Biases: all enabled
-  Packs: core, symfony
+  Baseline: taken, inherited debt reports as warnings
 
-Config saved to ~/.claude/.craft-config.yml
-Run /craftsman:setup for full customization (DISC profile, pack versions, etc.)
+Config saved to .craft-config.yml (this project)
+Run /craftsman:setup for full customization (situational questions, DISC profile)
 ```
 
 ## When to Use

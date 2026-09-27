@@ -67,8 +67,8 @@ Coordinate, delegate, challenge, and consolidate. You never implement directly -
 | Task touches React/TypeScript | Delegate to frontend-craftsman |
 | Task requires architecture validation | Delegate to architect |
 | Task requires AI/RAG/LLM work | Delegate to ai-engineer |
-| Task requires UX/design decisions | Delegate to ui-ux-director |
-| Task requires documentation | Delegate to doc-writer |
+| Task requires UX/design decisions | Delegate to ui-ux-director, with the part of your dispatch context it needs in the prompt (it has no shell) |
+| Task requires documentation | Delegate to doc-writer, with the part of your dispatch context it needs in the prompt (it has no shell); run the examples it lists as unverified |
 | Task requires security audit | Delegate to security-pentester |
 | Task touches untested or tangled legacy code | Delegate to legacy-surgeon (or the legacy-takeover team template) |
 | Task requires code review | Delegate to architect + stack reviewer |

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted (amended 2026-09-28: push warning, single monitor and evidence source, see Amendment)
 
 ## Date
 
@@ -53,6 +53,45 @@ Rejected: blocks every Bash call on test-suite latency; the previous version mov
 ### Alternative 2: Stop-hook-only verification
 
 Rejected: `Stop` fires at turn end, after the model has already claimed completion; `TaskCompleted` intercepts the claim itself.
+
+## Amendment (2026-09-28): what was delivered
+
+The decision above is kept as it was accepted. Three of its four points did
+not ship as written, and a reader following it would believe in protections
+this plugin does not have (review of main eb54d13, CR-178 M17). What the
+consumers actually do:
+
+1. **Test failures wake the model: delivered.** `post-bash-test-verify.sh` is
+   wired `async` with `asyncRewake` in `hooks/hooks.json` (PostToolUse and
+   PostToolUseFailure). A passing run grants the session's `verified` flag. A
+   failing one appends to `test-failures.log` and revokes the flag, and exits 2
+   to wake the session only on a regression (the suite was green earlier in
+   the session) whose command is the test runner alone.
+2. **Task completion requires evidence: delivered, with different evidence.**
+   `task-completed-verify.sh` reads the `verified` flag of the session's
+   `session-state-<id>.json` (written by `craftsman-helper set-verified` from
+   `/craftsman:verify`, or by a passing test run) and counts the lines of the
+   session's `session-writes` file. No writes, or a task whose subject starts
+   with docs, documentation, readme, changelog or adr, needs no evidence.
+   Without it: exit 2 under `strict`, a `systemMessage` warning under
+   `moderate`, nothing under `relaxed`. The exemption is that subject pattern,
+   not a path rule of the rules engine, and there is no `verifications` table:
+   the SQLite schema in `hooks/lib/metrics-db.sh` has none.
+3. **Continuous feedback via monitors: not delivered as watchers.**
+   `monitors/monitors.json` declares one monitor, `craftsman-test-failures`,
+   which tails `test-failures.log`. It starts no analyser: there is no
+   `phpstan --watch`, no `vitest --watch`, and no pack-defined watcher.
+   Claude Code runs plugin monitors in interactive sessions only.
+4. **Push gate: not a gate on Claude Code, Codex or Grok.**
+   `pre-push-verify.sh` (PreToolUse, `Bash(git push*)`) prints a warning when
+   the session has no `verified` flag and always exits 0: the push is allowed,
+   and no file is read. A file written by a shell command is judged by
+   `ci/craftsman-ci.sh`, not by this hook. On Hermes the terminal gate
+   (`adapters/hermes/pre-tool-call.sh`, `terminal_gate.py`) does refuse a
+   `git push` until the last conclusion passed on the tree being published.
+
+Making the push hook block, or shipping analyser watchers, would each be a new
+decision with its own ADR; this amendment only aligns the record with the code.
 
 ## References
 

@@ -81,8 +81,10 @@ Complexity
 Rank your codebase without any external tool:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/hooks/lib/hotspot_analysis.py" --since 12.month --top 15
+python3 "$(craftsman-path hooks/lib/hotspot_analysis.py)" --since 12.month --top 15
 ```
+
+If `craftsman-path` is not on PATH, use `<installed plugin root>/hooks/lib/hotspot_analysis.py` directly. Not `${CLAUDE_PLUGIN_ROOT}`: no shell you type into has it, and Claude Code does not put it in the Bash tool's environment either.
 
 Already running SonarQube, CodeScene, or PHPStan? Feed their report in instead of recomputing a weaker signal:
 

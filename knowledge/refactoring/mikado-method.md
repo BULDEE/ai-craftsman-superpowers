@@ -29,7 +29,7 @@ The two phases at a glance:
 | | Discovery | Delivery |
 |---|-----------|----------|
 | You are | Learning the shape of the change | Executing known, small steps |
-| On timer end | Note prerequisites, `git reset --hard` | Commit, tick off, ship |
+| On timer end | Note prerequisites, throw the attempt away | Commit, tick off, ship |
 | Output | A growing graph of subgoals | A shrinking graph and shipped PRs |
 | Direction | Top-down (attack the goal) | Bottom-up (work the leaves) |
 | Mindset | Curiosity, willingness to revert | Discipline, ship often |
@@ -52,7 +52,7 @@ Write the goal down
   List blocking subgoals     Commit
    (unrelated? -> Parking)    Tick off the goal
         |                     (optionally open an intermediate PR)
-   git reset --hard           |
+  Throw the attempt away      |
         |                     Pick the next subgoal
    Pick a subgoal  <----------+
 ```
@@ -62,7 +62,7 @@ Write the goal down
 Attempt the goal directly. When the timer rings and it is not done:
 
 1. Write down every prerequisite you just discovered as a **subgoal** node, drawing the dependency graph of what must happen first.
-2. `git reset --hard` - **throw the attempt away.** You keep the *knowledge* (the graph), not the broken code.
+2. **Throw the attempt away** (see [Reverting Only the Attempt](#reverting-only-the-attempt)). You keep the *knowledge* (the graph), not the broken code.
 3. Pick one subgoal and start a new timer against it.
 
 Reverting is not failure; it is the mechanism. You attacked the problem to *learn its shape*, and now you know one more prerequisite. Repeating this turns an unknowable change into an explicit graph of small, known tasks.
@@ -75,9 +75,47 @@ After discovering subgoals over and over, you reach leaves that take under ten m
 - Each completed leaf makes its parents easier, like dominoes.
 - The codebase stays working the whole time, so you can **ship multiple times**: open intermediate PRs for the preparatory work. Deliver often to avoid the merge conflicts of a long-running branch. Delivering often is what makes you go faster.
 
+## Reverting Only the Attempt
+
+Throwing the attempt away must take back what the attempt changed and nothing else. That is why not `git reset --hard`: it resets the whole working tree to the last commit, so it also destroys whatever was uncommitted before the attempt started (your work in progress, or the user's when an assistant runs the loop in their checkout), and it leaves behind the files the attempt created. Mark the starting point once, then return to it exactly after every failed timebox.
+
+### Mark the starting point
+
+Before the first attempt, and again after each delivered commit:
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+MIKADO_INDEX="$(git rev-parse --git-path mikado.index)"
+cp "$(git rev-parse --git-path index)" "$MIKADO_INDEX" 2>/dev/null || rm -f "$MIKADO_INDEX"
+GIT_INDEX_FILE="$MIKADO_INDEX" git add -A
+git update-ref refs/mikado/start "$(GIT_INDEX_FILE="$MIKADO_INDEX" git write-tree)"
+```
+
+This records the whole working tree, tracked and untracked files alike, as a tree under `refs/mikado/start`, through a separate index: your index, your staged changes and your files are not touched, and the mark survives across shells and sessions.
+
+### Throw the attempt away
+
+When the timer rings and the goal is not done:
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+MIKADO_INDEX="$(git rev-parse --git-path mikado.index)"
+GIT_INDEX_FILE="$MIKADO_INDEX" git add -A
+MIKADO_NOW="$(GIT_INDEX_FILE="$MIKADO_INDEX" git write-tree)"
+git diff --quiet refs/mikado/start "$MIKADO_NOW" || git diff --binary refs/mikado/start "$MIKADO_NOW" | git apply -R
+```
+
+It reverses exactly the difference between the mark and now: files the attempt edited get their marked content back (your earlier uncommitted changes included), files it created are removed, files it deleted come back. `git apply` refuses the whole patch rather than half-applying it, so a failure leaves the tree as it was and says so.
+
+Three rules keep it exact:
+
+- An attempt stages nothing and commits nothing. Delivery commits; Discovery only edits files.
+- Ignored files (build output, caches) are outside the mark; clean them with your build tool if the attempt produced any.
+- When the goal is reached, drop the mark: `git update-ref -d refs/mikado/start` and remove the `mikado.index` file it names.
+
 ## A Worked Example
 
-Goal: **replace scattered `console.log()` calls with a proper injectable logger** in a legacy service. You try it directly and immediately hit a wall: the `Transaction` class logs inline, `Ticket` logs inline, there is no logger abstraction, and there are no tests. `git reset --hard`, and note what blocked you. After a few Discovery timeboxes the graph looks like this:
+Goal: **replace scattered `console.log()` calls with a proper injectable logger** in a legacy service. You try it directly and immediately hit a wall: the `Transaction` class logs inline, `Ticket` logs inline, there is no logger abstraction, and there are no tests. Throw the attempt away, and note what blocked you. After a few Discovery timeboxes the graph looks like this:
 
 ```
 Replace console.log() with a logger   <- the goal (last thing to do)
@@ -142,7 +180,8 @@ Mikado composes with the other legacy disciplines:
 
 | Mistake | Consequence | Correction |
 |---------|-------------|------------|
-| Pushing through instead of reverting | You accumulate broken, intertwined changes with no way back | Timebox and `git reset --hard`; keep the graph, drop the code |
+| Pushing through instead of reverting | You accumulate broken, intertwined changes with no way back | Timebox and throw the attempt away; keep the graph, drop the code |
+| Reverting with a global reset | The work that was uncommitted before the attempt is destroyed with it | Mark the starting point, then revert only the attempt |
 | No timer | Discovery drifts into an hours-long tunnel | Start a ~10 minute timer every attempt |
 | Working from the root | You try the goal before its prerequisites exist; nothing completes | Always deliver from the leaves inward |
 | Chasing unrelated messes | You lose the goal in a swamp of side-quests | Put them in the Parking, decide later |
@@ -156,7 +195,7 @@ Plain refactoring assumes you can see the target and the path. Mikado is for whe
 
 **"I could just crack this in an hour without the ceremony."** Maybe. But the honest test: start a timer for 30-60 minutes and try. When it rings, ask yourself truthfully whether you are done and whether more surprises are coming. If it is not crystal clear, revert and switch to Mikado. It exists precisely for the *unknown unknowns* you cannot estimate; if there were none, you would already be finished.
 
-**"Reverting ten minutes of work feels wasteful."** The value you produced was the knowledge now captured in the graph, not the diff. Worst case you redo ten minutes, and next time you take smaller steps. `git stash` a fragment if you genuinely need it for reference.
+**"Reverting ten minutes of work feels wasteful."** The value you produced was the knowledge now captured in the graph, not the diff. Worst case you redo ten minutes, and next time you take smaller steps. Save a fragment as a patch before throwing the attempt away if you genuinely need it for reference.
 
 **"Won't a graph slow me down?"** Only until the change is trivial; then you skip it. For a change whose depth you cannot see, the graph is faster than thrashing, because you never end up lost in a broken state wondering whether to push on or start over.
 
@@ -172,11 +211,11 @@ The method is named after the pick-up-sticks game where you remove one stick wit
 
 ## Cheat Sheet
 
-1. Write the goal at the top of a graph.
+1. Write the goal at the top of a graph, and mark the starting point.
 2. Start a ~10 minute timer and attempt the goal (or current subgoal) directly.
-3. Timer rings, goal done? **Yes** -> commit, tick it off, optionally ship a PR, pick the next subgoal.
+3. Timer rings, goal done? **Yes** -> commit, tick it off, mark the new starting point, optionally ship a PR, pick the next subgoal.
 4. **No** -> write down the blocking prerequisites as child nodes; drop anything unrelated into the Parking.
-5. `git reset --hard` to return to a working state; keep only the graph.
+5. Throw the attempt away to return to the marked starting point; keep only the graph.
 6. Pick a subgoal (prefer a leaf) and go to step 2.
 7. Repeat until the goal at the top falls out for free.
 
@@ -194,7 +233,7 @@ This plugin's `/refactor` Mikado mode reads and writes that file, so you can sto
 
 The hardest part is step 5: throwing away code that "almost worked". It feels wasteful, but it is the whole point. The value you produced in a Discovery timebox is *knowledge*, captured in the graph, not the diff. If reverting feels painful, that is a signal you need to practice it more, not that the method is wrong: worst case you redo ten minutes of work, and next time you will take smaller, safer steps by reflex. Being able to let go of code you wrote is a craft skill in its own right, and it is what lets you move fast on code that would otherwise trap you.
 
-If you genuinely need a fragment of the reverted attempt, `git stash` it before resetting so it stays available for reference while your working tree returns to green.
+If you genuinely need a fragment of the reverted attempt, write the attempt's diff to a patch file before throwing it away (the same `git diff --binary refs/mikado/start "$MIKADO_NOW"`, redirected to a file outside the tree), so it stays available for reference while your working tree returns to green. Not `git stash`: it would shelve the work that preceded the attempt along with it.
 
 ## What Mikado Is Not
 

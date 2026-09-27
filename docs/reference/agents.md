@@ -1,6 +1,6 @@
 # Agents Reference
 
-The plugin provides **12 agents** (6 core, 6 symlinked from the packs) organized in two categories:
+The plugin provides **12 agents** (6 core, 6 shipped as ordinary copies of the packs' agents, which `scripts/native-manifests.py` checks byte for byte) organized in two categories:
 - **4 Reviewers** - read-only analysis and code review
 - **7 Craftsmen** - implementation specialists with domain expertise
 
@@ -34,7 +34,7 @@ The plugin provides **12 agents** (6 core, 6 symlinked from the packs) organized
 
 **Mission**: Orchestrator that delegates, challenges decisions, and validates deliverables. **Never codes directly.**
 
-**Skills**: plan, challenge, verify
+**Skills**: challenge
 
 **Behavior**:
 - Decomposes complex tasks into subtasks for specialists
@@ -46,11 +46,11 @@ The plugin provides **12 agents** (6 core, 6 symlinked from the packs) organized
 
 ### backend-craftsman
 
-**Model**: Sonnet | **Effort**: high | **Memory**: project | **Max Turns**: 30
+**Model**: Sonnet | **Effort**: medium | **Memory**: project | **Max Turns**: 30
 
 **Mission**: PHP/Symfony implementation expert.
 
-**Skills**: entity, usecase, spec, test
+**Skills**: test
 
 **Expertise**:
 - Symfony 7.4/8, API Platform 4, Doctrine ORM
@@ -64,11 +64,11 @@ The plugin provides **12 agents** (6 core, 6 symlinked from the packs) organized
 
 ### frontend-craftsman
 
-**Model**: Sonnet | **Effort**: high | **Memory**: project | **Max Turns**: 30
+**Model**: Sonnet | **Effort**: medium | **Memory**: project | **Max Turns**: 30
 
 **Mission**: React/TypeScript implementation expert.
 
-**Skills**: component, hook, spec, test
+**Skills**: test
 
 **Expertise**:
 - React 19, TypeScript 5, Tailwind, shadcn/ui, TanStack Query
@@ -81,11 +81,9 @@ The plugin provides **12 agents** (6 core, 6 symlinked from the packs) organized
 
 ### architect
 
-**Model**: Opus | **Effort**: high | **Memory**: project | **Max Turns**: 20
+**Model**: Opus | **Effort**: high | **Memory**: project | **Max Turns**: 60
 
 **Mission**: DDD/Clean Architecture validation. **Read-only - cannot edit or write files.**
-
-**Skills**: design, challenge
 
 **Disallowed Tools**: Edit, Write
 
@@ -99,7 +97,7 @@ The plugin provides **12 agents** (6 core, 6 symlinked from the packs) organized
 
 ### ai-engineer
 
-**Model**: Sonnet | **Effort**: high | **Memory**: project | **Max Turns**: 30
+**Model**: Sonnet | **Effort**: medium | **Memory**: project | **Max Turns**: 30
 
 **Mission**: AI/ML implementation specialist.
 
@@ -115,7 +113,7 @@ The plugin provides **12 agents** (6 core, 6 symlinked from the packs) organized
 
 ### api-craftsman
 
-**Model**: Sonnet | **Effort**: high | **Memory**: project | **Max Turns**: 30
+**Model**: Sonnet | **Effort**: medium | **Memory**: project | **Max Turns**: 30
 
 **Mission**: Senior API architect.
 
@@ -129,7 +127,7 @@ The plugin provides **12 agents** (6 core, 6 symlinked from the packs) organized
 
 ### ui-ux-director
 
-**Model**: Sonnet | **Effort**: high | **Memory**: project | **Max Turns**: 20
+**Model**: Sonnet | **Effort**: medium | **Memory**: project | **Max Turns**: 20
 
 **Mission**: UX quality and accessibility guardian.
 
@@ -143,7 +141,7 @@ The plugin provides **12 agents** (6 core, 6 symlinked from the packs) organized
 
 ### doc-writer
 
-**Model**: Haiku (cost-optimized) | **Effort**: medium | **Memory**: project | **Max Turns**: 20
+**Model**: Haiku (cost-optimized) | **Effort**: low | **Memory**: project | **Max Turns**: 20
 
 **Mission**: Technical documentation specialist.
 
@@ -359,6 +357,12 @@ maxTurns: 20
 ---
 
 # Agent: [Name]
+
+## Turn Budget
+
+You run under `maxTurns`. Emit your deliverable as soon as the evidence
+justifies it, keep the last third of the budget for writing it, and never let
+your final action be a tool call.
 
 ## Mission
 [One sentence purpose]

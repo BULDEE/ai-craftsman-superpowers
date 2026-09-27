@@ -65,11 +65,26 @@ hc_check_node() {
     fi
 }
 
+# Present is not valid: a pre-v4 file with a `stack:` mapping was reported ok
+# while the resolver ignored the stack it set. Each file is judged by
+# config_validate, the schema read with the resolver's own reader.
 hc_check_config() {
-    if [[ -f "${HOME}/.claude/.craft-config.yml" ]] || [[ -f "${PWD}/.craft-config.yml" ]]; then
-        _hc_record "config" "ok" ".craft-config.yml"
-    else
+    type config_validate >/dev/null 2>&1 || source "${_HC_LIB_DIR}/config.sh"
+    local file found="" problems="" problem
+    for file in "${PWD}/.craft-config.yml" "$(config_global_file)"; do
+        [[ -n "$file" && -f "$file" ]] || continue
+        [[ " $found " == *" ${file} "* ]] && continue
+        found="${found:+$found }${file}"
+        while IFS= read -r problem; do
+            problems+="${file}: ${problem};"
+        done < <(config_validate "$file")
+    done
+    if [[ -z "$found" ]]; then
         _hc_record "config" "warn" "missing - run /craftsman:setup"
+    elif [[ -n "$problems" ]]; then
+        _hc_record "config" "error" "${problems%;} - run /craftsman:setup"
+    else
+        _hc_record "config" "ok" "v4: ${found}"
     fi
 }
 

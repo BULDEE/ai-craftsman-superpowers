@@ -117,10 +117,150 @@ else
         "the table carries ${DOC_RULES} rules, the registry compiles ${REGISTRY_COUNT}"
 fi
 
+# -----------------------------------------------------------------------------
+# 7. An example never declares Level 2 active without consent and a run.
+# -----------------------------------------------------------------------------
+# examples/healthcheck/01-plugin-diagnostic.md went from "vendor/bin/phpstan
+# found" to "Level 2: active, fully operational". sa_analyze_file returns
+# before any analyser runs unless the machine owner set trust_project_tools in
+# the global file, so on a fresh install that verdict was false (CR-178, M18).
+# The example's own commands are run: the consent check against both answers,
+# the probe through the gate's dispatcher with a stand-in phpstan.
+DIAG="$ROOT_DIR/examples/healthcheck/01-plugin-diagnostic.md"
+example_block() {
+    awk -v label="$2" '!found && /^#/ && index($0, label){found=1; next}
+        found && /^```bash/{code=1; next}
+        code && /^```/{exit}
+        code' "$1"
+}
+unconsented=$(grep -rlE 'Level 2[^|]*\*\*active\*\*' "$ROOT_DIR/examples" 2>/dev/null \
+    | while IFS= read -r f; do grep -q 'trust_project_tools' "$f" || echo "${f#"$ROOT_DIR"/}"; done)
+CONSENT_CMD=$(example_block "$DIAG" "Check the consent")
+PROBE_CMD=$(example_block "$DIAG" "Observe a run")
+L2_DIR=$(mktemp -d "${TMPDIR:-/tmp}/doc-claims-l2.XXXXXX")
+mkdir -p "$L2_DIR/home/.claude" "$L2_DIR/project/vendor/bin" "$L2_DIR/tmp"
+printf '#!/bin/sh\necho "$2:4:Undefined variable: \\$total"\n' > "$L2_DIR/project/vendor/bin/phpstan"
+chmod +x "$L2_DIR/project/vendor/bin/phpstan"
+l2_run() {
+    (cd "$L2_DIR/project" && HOME="$L2_DIR/home" TMPDIR="$L2_DIR/tmp" PATH="$ROOT_DIR/bin:$PATH" \
+        bash -c "$1" 2>/dev/null | tr '\n' ' ')
+}
+CONSENT_OFF=$(l2_run "$CONSENT_CMD"); PROBE_OFF=$(l2_run "$PROBE_CMD")
+printf 'v: 4\ntrust_project_tools: true\n' > "$L2_DIR/home/.claude/.craft-config.yml"
+CONSENT_ON=$(l2_run "$CONSENT_CMD"); PROBE_ON=$(l2_run "$PROBE_CMD")
+rm -rf "$L2_DIR"
+if [[ -z "$unconsented" && -n "$CONSENT_CMD" && -n "$PROBE_CMD" \
+      && "$CONSENT_OFF" == *"not trusted"* && "$CONSENT_ON" != *"not trusted"* && "$CONSENT_ON" == *trusted* \
+      && "$PROBE_OFF" != *PHPSTAN* && "$PROBE_ON" == *PHPSTAN002* ]]; then
+    log_pass "the diagnostic example checks consent and observes Level 2 run before calling it active"
+else
+    log_fail "Level 2 declared active without consent and an observed run" \
+        "unconsented examples: '${unconsented}'; consent off/on: '${CONSENT_OFF}'/'${CONSENT_ON}'; probe off/on: '${PROBE_OFF}'/'${PROBE_ON}'"
+fi
 
-# A skill body is text handed to a model: the host expands nothing in it, and
-# Claude Code 2.1.278 exports no CLAUDE_PLUGIN_ROOT to the Bash tool at all
-# (measured: the tool sees CLAUDECODE and the session id). Five skills sourced
+# -----------------------------------------------------------------------------
+# 8. The pre-push hook is documented as the warning it is, the monitor as the
+#    log tail it is, and ADR-0023 says so in an amendment.
+# -----------------------------------------------------------------------------
+# README, SECURITY.md and three guides said "CI and the pre-push gate catch"
+# shell-written files, and ADR-0023 calls pre-push-verify.sh "the last
+# deterministic gate" and announces phpstan/vitest watchers. The hook reads no
+# file and always allows the push; monitors.json tails one log (CR-178, M17).
+# The Hermes terminal gate, which does refuse a push, is described as such.
+PUSH_HOOK="$ROOT_DIR/hooks/pre-push-verify.sh"
+if grep -q 'Warning only - do not block the push' "$PUSH_HOOK" && ! grep -qE '^[^#]*exit 2' "$PUSH_HOOK"; then
+    push_claims=$(grep -rniE 'pre-push gate|garde-fou pre-push|pre-push-verify\.sh` before the push|^# Blocks git push|Validate git push commands' \
+        "$ROOT_DIR/README.md" "$ROOT_DIR/README.fr.md" "$ROOT_DIR/SECURITY.md" "$ROOT_DIR/docs/guides" \
+        "$ROOT_DIR/docs/reference" "$PUSH_HOOK" 2>/dev/null | sed "s|$ROOT_DIR/||" || true)
+    if [[ -z "$push_claims" ]]; then
+        log_pass "no document calls the pre-push warning a gate that catches files"
+    else
+        log_fail "the pre-push hook warns and reads no file, documents call it a gate" "$(printf '%s' "$push_claims" | tr '\n' ' ' | cut -c1-600)"
+    fi
+else
+    log_pass "pre-push-verify.sh blocks, and a gate is what the documents may call it"
+fi
+
+ADR23="$ROOT_DIR/docs/adr/0023-deterministic-verification-loop.md"
+AMENDMENT=$(awk '/^## Amendment/{inside=1} inside' "$ADR23")
+watchers_shipped=$(jq -r '.[].command' "$ROOT_DIR/monitors/monitors.json" 2>/dev/null | grep -ciE 'phpstan|vitest|--watch' || true)
+if [[ "$watchers_shipped" -gt 0 ]] \
+    || { [[ "$AMENDMENT" == *pre-push-verify.sh* && "$AMENDMENT" == *monitors.json* && "$AMENDMENT" == *session-writes* ]]; }; then
+    log_pass "ADR-0023 carries an amendment for the push warning, the single monitor and the evidence it reads"
+else
+    log_fail "ADR-0023 amendment" "no '## Amendment' naming pre-push-verify.sh, monitors.json and the session-writes evidence"
+fi
+
+# -----------------------------------------------------------------------------
+# 9. A command a guide hands to a terminal runs, and a reference page says what
+#    the manifests say (CR-178, M17).
+# -----------------------------------------------------------------------------
+# Each check reads the consumer first: the Bash tool's environment (Claude Code
+# documents that CLAUDE_PLUGIN_ROOT is not in it), the absent package.json of
+# the retired RAG index, hooks.json, plugin.json, host-capabilities.json and
+# the agents' own frontmatter.
+root_in_shell=$(for f in "$ROOT_DIR"/README*.md "$ROOT_DIR"/docs/*.md "$ROOT_DIR"/docs/guides/*.md "$ROOT_DIR"/docs/reference/*.md; do
+    awk -v f="${f#"$ROOT_DIR"/}" '/^```(bash|sh|shell|console)/{c=1;next} c&&/^```/{c=0} c&&/CLAUDE_PLUGIN_ROOT/{print f":"NR}' "$f"
+done)
+[[ -z "$root_in_shell" ]] \
+    && log_pass "no guide hands a terminal a command that needs CLAUDE_PLUGIN_ROOT" \
+    || log_fail "guide commands need CLAUDE_PLUGIN_ROOT, which no shell has" "$(printf '%s' "$root_in_shell" | tr '\n' ' ')"
+
+if [[ ! -f "$ROOT_DIR/package.json" ]]; then
+    rag_index=$(grep -rln 'npm run index' "$ROOT_DIR/README.md" "$ROOT_DIR/README.fr.md" "$ROOT_DIR/docs/guides" "$ROOT_DIR/docs/reference" 2>/dev/null || true)
+    [[ -z "$rag_index" ]] \
+        && log_pass "no document prescribes the retired RAG index command" \
+        || log_fail "npm run index prescribed with no package.json to run it" "$(printf '%s' "$rag_index" | sed "s|$ROOT_DIR/||" | tr '\n' ' ')"
+fi
+
+if ! jq -e '.. | objects | select(has("InstructionsLoaded"))' "$ROOT_DIR/hooks/hooks.json" >/dev/null 2>&1; then
+    grep -qE '^\| *InstructionsLoaded *\||InstructionsLoaded agent' "$ROOT_DIR/docs/reference/hooks.md" \
+        && log_fail "hooks reference documents an InstructionsLoaded hook" "hooks.json wires none" \
+        || log_pass "the hooks reference documents no InstructionsLoaded hook, and hooks.json wires none"
+fi
+
+if ! jq -e 'has("packs")' "$ROOT_DIR/.claude-plugin/plugin.json" >/dev/null 2>&1; then
+    grep -rq '"packs": {' "$ROOT_DIR/docs/guides" 2>/dev/null \
+        && log_fail "a guide registers packs in plugin.json" "plugin.json has no packs key; packs/<name>/pack.yml is what the loader reads" \
+        || log_pass "no guide registers packs in plugin.json, which has no packs key"
+fi
+
+if jq -e '.hosts.codex' "$ROOT_DIR/hooks/host-capabilities.json" >/dev/null 2>&1; then
+    grep -qiE 'Codex[^.]*cannot run craftsman hooks' "$ROOT_DIR/skills/ci/SKILL.md" \
+        && log_fail "the ci skill says Codex cannot run craftsman hooks" "Codex is a qualified host in hooks/host-capabilities.json" \
+        || log_pass "no skill denies Codex the hooks the capability matrix qualifies"
+fi
+
+if grep -rq 'expands nothing' "$ROOT_DIR"/skills/*/SKILL.md 2>/dev/null; then
+    log_fail "skills say the host expands nothing in a skill body" \
+        "Claude Code documents substituting \${CLAUDE_PLUGIN_ROOT} inline in skill and agent content (plugins-reference, Where each variable resolves)"
+else
+    log_pass "no skill claims the host substitutes nothing in a skill body"
+fi
+
+agent_meta_drift=""
+while IFS= read -r agent_md; do
+    name=$(basename "$agent_md" .md)
+    front_matter=$(awk 'NR==1&&$0=="---"{i=1;next} i&&$0=="---"{exit} i' "$agent_md")
+    want="$(echo "$front_matter" | sed -n 's/^model: *//p')|$(echo "$front_matter" | sed -n 's/^effort: *//p')|$(echo "$front_matter" | sed -n 's/^memory: *//p')|$(echo "$front_matter" | sed -n 's/^maxTurns: *//p')"
+    want_skills=$(echo "$front_matter" | awk '/^skills:/{s=1;next} s&&/^  - /{sub(/^  - (craftsman:)?/,""); printf "%s,",$0; next} s{s=0}')
+    got=$(awk -v n="$name" '/^### /{here=($2==n)} here && /^\*\*Model\*\*/{print; exit}' "$ROOT_DIR/docs/reference/agents.md" \
+        | sed -E 's/\*\*Model\*\*: *([A-Za-z]+)[^|]*\| *\*\*Effort\*\*: *([a-z]+) *\| *\*\*Memory\*\*: *([a-z]+) *\| *\*\*Max Turns\*\*: *([0-9]+).*/\1|\2|\3|\4/' \
+        | tr '[:upper:]' '[:lower:]')
+    got_skills=$(awk -v n="$name" '/^### /{here=($2==n)} here && /^\*\*Skills\*\*/{sub(/^\*\*Skills\*\*: */,""); gsub(/ /,""); print $0 ","; exit}' "$ROOT_DIR/docs/reference/agents.md")
+    [[ -z "$got" || "$got" == "$want" ]] || agent_meta_drift+="${name}: doc ${got} vs frontmatter ${want}; "
+    [[ -z "$got_skills" || "$got_skills" == "$want_skills" ]] \
+        || agent_meta_drift+="${name}: skills doc '${got_skills}' vs frontmatter '${want_skills:-none}'; "
+done < <(find "$ROOT_DIR/agents" -maxdepth 1 -name '*.md' | sort)
+grep -q 'symlinked from the packs' "$ROOT_DIR/docs/reference/agents.md" && agent_meta_drift+="pack agents are shipped as copies, not symlinks; "
+[[ -z "$agent_meta_drift" ]] \
+    && log_pass "the agents reference states each agent's model, effort, memory, turns and skills as its frontmatter does" \
+    || log_fail "agents reference drifted from the frontmatter" "$agent_meta_drift"
+
+# Claude Code documents substituting CLAUDE_PLUGIN_ROOT inline in skill text
+# (plugins-reference, read 2026-09-27), but 2.1.278 did not do it for these
+# skills and exports no CLAUDE_PLUGIN_ROOT to the Bash tool at all (measured
+# 2026-09-20: the tool sees CLAUDECODE and the session id). Five skills sourced
 # their libraries through that variable, so /craftsman:healthcheck ran
 # `source "/hooks/lib/config.sh"` and the model improvised a diagnosis.
 ENV_IN_SKILLS=$(grep -ln 'CLAUDE_PLUGIN_ROOT}' "$ROOT_DIR"/skills/*/SKILL.md 2>/dev/null \
