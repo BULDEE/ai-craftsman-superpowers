@@ -463,6 +463,53 @@ else
 fi
 rm -rf "$HH"
 
+# The root is whatever path the plugin was installed under, and a host runs the
+# exported command through a shell. The environment prefix is quoted, but the
+# command body spliced the raw root between the manifest's double quotes: a `$`,
+# a `"` or a backtick in the root was expanded or split, and the hook exited
+# 127 without running (review of eb54d13, R5; CR-177). Each gate is exported
+# from a real copy of the plugin and its PreToolUse command run by `sh -c` on a
+# write to the gate itself: config-protection.sh denying it (exit 2) proves the
+# hook ran, where a hook with nothing to do would exit 0 too.
+ODD=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-oddroot.XXXXXX")
+mkdir -p "$ODD/home" "$ODD/project"
+copy_plugin() {
+    mkdir -p "$1"
+    cp -R "$ROOT_DIR/.claude-plugin" "$ROOT_DIR/ci" "$ROOT_DIR/hooks" "$ROOT_DIR/packs" "$ROOT_DIR/rules" "$1/"
+}
+export_gate() {
+    (cd "$ODD/project" && HOME="$ODD/home" bash "$1/ci/craftsman-ci.sh" export --target grok-hooks --into "$ODD/gate" 2>&1)
+}
+ODD_PAYLOAD=$(jq -n --arg f "$ODD/project/.grok/hooks/craftsman.json" --arg c "$ODD/project" \
+    '{hook_event_name:"PreToolUse",tool_name:"write",tool_input:{file_path:$f,content:"{}"},cwd:$c}')
+for odd_name in 'with space' 'odd $HOME "dq" `id` it'"'"'s'; do
+    rm -rf "$ODD/gate"
+    copy_plugin "$ODD/$odd_name/plugin"
+    export_gate "$ODD/$odd_name/plugin" >/dev/null
+    odd_cmd=$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$ODD/gate/craftsman.json" 2>/dev/null)
+    odd_exit=0
+    odd_out=$(printf '%s' "$ODD_PAYLOAD" | HOME="$ODD/home" sh -c "$odd_cmd" 2>&1) || odd_exit=$?
+    if [[ "$odd_exit" -eq 2 && "$odd_out" == *'"permissionDecision": "deny"'* && "$odd_cmd" == *config-protection.sh* ]]; then
+        log_pass "a gate exported from a root named '$odd_name' launches its hook (deny, exit 2)"
+    else
+        log_fail "gate from a root named '$odd_name'" "exit $odd_exit: $(printf '%s' "$odd_out" | tr '\n' ' ' | cut -c1-160)"
+    fi
+done
+# Quoting every word would also neutralise an operator or an expansion, so a
+# manifest command that is more than plain words is refused, not exported with
+# another meaning.
+copy_plugin "$ODD/guard/plugin"
+jq '.hooks.SessionStart[0].hooks[0].command += " || true"' "$ROOT_DIR/hooks/hooks.json" > "$ODD/guard/plugin/hooks/hooks.json"
+rm -rf "$ODD/gate"
+guard_exit=0
+guard_out=$(export_gate "$ODD/guard/plugin") || guard_exit=$?
+if [[ "$guard_exit" -ne 0 && ! -e "$ODD/gate/craftsman.json" && "$guard_out" == *"|| true"* ]]; then
+    log_pass "a manifest command that is more than plain words is refused, not exported with another meaning"
+else
+    log_fail "non-plain manifest command" "exit $guard_exit: $(printf '%s' "$guard_out" | tr '\n' ' ' | cut -c1-160)"
+fi
+rm -rf "$ODD"
+
 GROK_MKT="$ROOT_DIR/.grok-plugin/marketplace.json"
 CLAUDE_MKT="$ROOT_DIR/.claude-plugin/marketplace.json"
 if [[ "$(jq -r '.plugins[0].name,.plugins[0].version' "$GROK_MKT")" == "$(jq -r '.plugins[0].name,.plugins[0].version' "$CLAUDE_MKT")" \
