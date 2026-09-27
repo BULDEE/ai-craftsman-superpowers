@@ -581,6 +581,41 @@ else
     log_fail "CR-168 quoted shell text" "verified=$(_flag)"
 fi
 
+# Release review of 4.12.0: a redirection is part of the command, not a
+# separator. The shlex lexer split `2>&1` into `2>`, `&`, `1`, so the last
+# segment was `1`: a failing `pytest -q 2>&1` kept the evidence green, and
+# `|&` read as one word hid a pipe whose status is the reader's.
+REDIRECT_MISS=""
+for redirected in "pytest -q 2>&1" "pytest -q >/dev/null 2>&1" "pytest -q &> test.log" "pytest -q 2>&1 >out.log"; do
+    echo '{"verified": true}' > "$STATE"
+    _verify "$(_as_test claude-code 2.1.272 post-tool-use-failure.bash.exit1-tests-failed "; d['tool_input']['command'] = \"$redirected\"")"
+    [[ "$(_flag)" == "false" ]] || REDIRECT_MISS="${REDIRECT_MISS} [revoke: $redirected]"
+    echo '{"verified": false}' > "$STATE"
+    _verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.python-tests-passed "; d['tool_input']['command'] = \"$redirected\"")"
+    [[ "$(_flag)" == "true" ]] || REDIRECT_MISS="${REDIRECT_MISS} [grant: $redirected]"
+done
+if [[ -z "$REDIRECT_MISS" ]]; then
+    log_pass "a runner with its output redirected is still the runner: a failure revokes, a pass grants"
+else
+    log_fail "redirected runner" "missed:${REDIRECT_MISS}"
+fi
+echo '{"verified": false}' > "$STATE"
+for not_runner in "pytest -q |& cat" "pytest -q &" "echo n | ./run-tests.sh" "yes | pytest -q"; do
+    _verify "$(_as_test claude-code 2.1.272 post-tool-use.bash.python-tests-passed "; d['tool_input']['command'] = \"$not_runner\"")"
+done
+if [[ "$(_flag)" == "false" ]]; then
+    log_pass "a runner in a pipeline or sent to the background grants nothing"
+else
+    log_fail "piped or background runner" "verified=$(_flag)"
+fi
+echo '{"verified": true}' > "$STATE"
+_verify "$(_as_test claude-code 2.1.272 post-tool-use-failure.bash.exit1-tests-failed "; d['tool_input']['command'] = 'yes | pytest -q'")"
+if [[ "$(_flag)" == "false" ]]; then
+    log_pass "a failing runner at the end of a pipeline still revokes the evidence"
+else
+    log_fail "piped runner failure revokes" "verified=$(_flag)"
+fi
+
 # an interruption is neither a pass nor a failure
 echo '{"verified": true}' > "$STATE"
 _verify "$(_as_test claude-code 2.1.272 post-tool-use-failure.bash.exit1-tests-failed "; d['is_interrupt'] = True")"; RC=$?

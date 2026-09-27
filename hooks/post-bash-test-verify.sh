@@ -123,6 +123,11 @@ fi
 GRAMMAR=$(printf '%s' "$COMMAND" | python3 "$LIB_DIR/command_grammar.py" 2>/dev/null) || exit 0
 LAST=$(printf '%s' "$GRAMMAR" | jq -r '.last // empty')
 HAS_OR=$(printf '%s' "$GRAMMAR" | jq -r '.has_or // false')
+BACKGROUND=$(printf '%s' "$GRAMMAR" | jq -r '.background // false')
+if [[ "$BACKGROUND" == true ]]; then
+    echo "craftsman: '${COMMAND}' runs in the background; its exit status is the shell's, not the test runner's, so verification evidence is unchanged." >&2
+    exit 0
+fi
 RUNNER_LAST=false; RUNNER_ALONE=false
 if [[ "$HAS_OR" != true ]] && printf '%s' "$LAST" | grep -qE "$(_test_command_pattern)"; then
     RUNNER_LAST=true
@@ -131,6 +136,13 @@ if [[ "$HAS_OR" != true ]] && printf '%s' "$LAST" | grep -qE "$(_test_command_pa
 fi
 if [[ "$RUNNER_LAST" != true ]]; then
     echo "craftsman: '${COMMAND}' is a compound command; its result is not the test runner's, so verification evidence is unchanged (run the runner as the last or only command)." >&2
+    exit 0
+fi
+# A runner fed by a pipe ran on input the model chose: a pass there is not
+# evidence, a failure still revokes.
+HAS_PIPE=$(printf '%s' "$GRAMMAR" | jq -r '.has_pipe // false')
+if [[ "$HAS_PIPE" == true && "$STATE" == "succeeded" ]]; then
+    echo "craftsman: '${COMMAND}' feeds the test runner through a pipe; a pass there grants no verification evidence (run the runner alone)." >&2
     exit 0
 fi
 
