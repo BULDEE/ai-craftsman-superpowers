@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.12.0] - 2026-09-27
+
+Native install on the three hosts that load plugins (Claude Code, Codex,
+Grok), a Grok write gate that actually runs, and per-host session isolation.
+Hermes keeps its own plugin manifest (`plugin.yaml`).
+
+### Upgrading
+
+- **Grok**: run `bin/craftsman-grok-install` again (or
+  `craftsman-ci export --target grok-hooks --into ~/.grok/hooks`). The gate
+  that runs is now the global `~/.grok/hooks/craftsman.json`; a project
+  `.grok/hooks` file from 4.11.0 still needs `grok --trust` to run.
+- **Codex**: install from the native entry point
+  (`codex plugin marketplace add BULDEE/ai-craftsman-superpowers`, then
+  `codex plugin add craftsman@ai-craftsman-superpowers`) and trust the
+  handlers in `/hooks`. Installing never grants trust.
+- **Skills and scripts that read the metrics database** from a shell: resolve
+  it with `bash "$(craftsman-path bin/craftsman-runtime)" metrics`. The
+  `~/.claude/craftsman-metrics-db-path` bridge is a Claude Code fallback only;
+  native Codex and Grok sessions never read it.
+- `/craftsman:healthcheck` names the export command when a gate is missing,
+  behind this install, or written by another install.
+
+### Added
+
+- Grok native install (`.grok-plugin/plugin.json`,
+  `.grok-plugin/marketplace.json`) and `bin/craftsman-grok-install`, which
+  installs the plugin and writes the global gate. Grok lists a plugin's
+  `hooks/hooks.json` as `hookType: file` and runs none of it on a fresh
+  process (measured on 1.0.34 and 1.0.40), so the gate is exported from the
+  same manifest instead of typed twice. It judges `write` and
+  `search_replace` before disk and keeps `pre-push-verify.sh`. When no other
+  review CLI is installed, the semantic review falls back to `grok -p`.
+- Codex native entry point (`.codex-plugin/plugin.json`, catalogue in
+  `.agents/plugins/marketplace.json`). The native loader reads the 22 skills
+  and 14 handlers without the Claude manifest. Codex 0.155.1 omits hooks from
+  the portable root `plugin.json` format, so the package ships no competing
+  root manifest.
+- All 12 agent missions ship as ordinary files before the first session.
+  `scripts/native-manifests.py` generates the Codex and Grok manifests and
+  `--check` fails on drift between the six pack agent copies and their
+  sources; `scripts/bump-version.sh` runs it.
+- `bin/craftsman-runtime`: one resolver for the current host and session
+  store (`metrics`), used by skills and one-off queries.
+- Grok slash names: `/name`, except `/plan`, `/loop` and `/workflow`, which
+  Grok already owns and which stay `/craftsman:name`.
+- The shared `hooks/hooks.json` matchers also name Grok's write tools, and
+  the healthcheck gained a `write-gate` row: ok when the gate's owner marker
+  matches this install, the export command otherwise.
+
+### Changed
+
+- Every session store is bound to its host and session. A validated binding
+  from the hook payload wins over inherited environment variables, Grok
+  bindings are recovered from all supported aliases after a hook reload, and
+  an unbound native session reports missing state instead of reading another
+  host's data. Metrics and correction persistence never bypass validation
+  when the store is unavailable: the write gate still judges the code.
+- The session context is resolved in one Python process instead of several
+  helper processes per hook.
+
 ### Fixed
 
 - Grok's default hook timeout is 5 seconds and fail-open. The Grok export
@@ -27,6 +88,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.<host>/hooks/craftsman.json`. `craftsman-grok-install` still exports
   the gate when the plugin is already installed, and prints the installer's
   own output on success.
+- Session lifecycle stores are isolated per native session: start, write,
+  verify, failure, compact and end read and write the same store, and a
+  parent session's sentinel is left intact (#103).
+- Pre-write caches are scoped to the bound session. A cache filled for one
+  store could answer for another after the store changed between two
+  `pack_loader_init` calls.
+- Grok config protection covers the host's own hook configuration, so the
+  model cannot relax the gate through an edit.
+- Hermes exported skills expand the native helper paths.
+- Hook libraries import their siblings under the Python 3.9 floor.
+- The Linux latency ceilings in `tests/perf/test-hook-latency.sh` were inside
+  the spread of one commit on `ubuntu-latest`. They are now 1.35x the quiet
+  reading and at least 1.15x the fast one, still under twice the quiet
+  reading, so a 50 percent regression still fails.
+
+- `/craftsman:healthcheck` no longer warns about the write gate on every
+  Claude Code session. The row warns only where the host's capability row
+  records a trust step (Codex: review the handlers in `/hooks`), and is ok
+  where plugin hooks run on install.
+
+### Security
+
+- Test evidence is granted from shell grammar, not from text separators.
+  `hooks/lib/command_grammar.py` lexes the command with `shlex`, so a quoted
+  or escaped runner (`printf '%s\n' 'hello; ./run-tests.sh --quick'`) no
+  longer sets `verified`, which gates a push. Runners after `&&`, by path,
+  and through `python -m` or `npx` stay qualified.
+- Redirections are part of the command, not separators. Before this release,
+  `pytest -q 2>&1` lexed as `2>`, `&`, `1`, so a failing run kept the
+  evidence green; `&>`, `>/dev/null 2>&1` had the same hole, and `|&` read as
+  one word hid a pipe. `<` and `>` are now lexer punctuation, `|&` is a pipe,
+  and a command sent to the background (`pytest -q &`) grants and revokes
+  nothing, since its status is the shell's.
+- A runner fed by a pipe (`echo n | ./run-tests.sh`) no longer grants the
+  evidence: it ran on input the model chose. A failure there still revokes.
+- The Grok semantic review runs with the read-only allowlist of Grok's
+  headless guide (`--tools read_file,grep,list_dir`). The previous denylist
+  named the shell tool `run_terminal_cmd` while hook payloads name it
+  `run_terminal_command`; an allowlist with a wrong name fails closed.
+- `SECURITY.md` gains "Host limits that weaken the gate": Grok's fail-open
+  hook timeout, Codex's trust step, and shell-written files.
+
+### Documentation
+
+- README and README.fr rewritten for adoption: one install block per host
+  (Claude Code, Codex, Grok, Hermes), a "first ten minutes" path that
+  provokes a refusal on purpose, and a host support table read from
+  `hooks/host-capabilities.json`. The Codex and Grok badges read their
+  qualified version from that matrix, so they cannot drift from it.
+- New `docs/guides/codex-quickstart.md` and `docs/guides/grok-quickstart.md`
+  (install, verify, limits, uninstall), on the model of the Hermes one.
+- Every command now has a worked example: `agent-design`, `ci`, `loop`,
+  `mlops`, `rag`, `scaffold` and `spec` had none. `COMMANDS-QUICK-REF.md`
+  says who starts each command and links its example.
+- `tests/core/test-command-docs.sh` fails when a skill has no example, when a
+  document names a command that does not exist, when the quick reference
+  misses a command or its example, when the README's invocation split
+  disagrees with the skills' frontmatter, and when a host that runs no plugin
+  hook lacks its gate command in either README.
 
 ## [4.11.0] - 2026-09-20
 
