@@ -164,10 +164,12 @@ A characterization test is only worth the disk it sits on if it fails when behav
 ```bash
 # 1. Suite is green. 2. Introduce an obvious mistake in the code under test.
 # 3. Run again: at least one approved test MUST go red.
-sed -i 's/return total/return 0/' src/checkout.js
+sed -i.orig 's/return total/return 0/' src/checkout.js   # keeps the exact bytes in src/checkout.js.orig
 npm test   # expect a failing approval; if it stays green, your net has a hole
-git checkout src/checkout.js   # revert the deliberate break
+mv src/checkout.js.orig src/checkout.js   # undo the deliberate break, and only it
 ```
+
+Undo the break from the copy `sed` kept, not from git: the file may carry uncommitted work that the last commit does not have, and restoring it from the commit would discard that work with the mutation. `-i.orig` also works with both GNU and BSD `sed`.
 
 If nothing goes red, you have not actually pinned the behavior you are about to change; add inputs until you do.
 

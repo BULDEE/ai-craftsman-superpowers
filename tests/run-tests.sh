@@ -747,6 +747,7 @@ test_legacy_command() {
 
     run_subtest "Legacy command tests pass" "$SCRIPT_DIR/core/test-legacy-command.sh" || true
     run_subtest "Legacy worked example still runs" "$SCRIPT_DIR/core/test-legacy-example.sh" || true
+    run_subtest "Throwing an attempt away keeps the user's work" "$SCRIPT_DIR/core/test-attempt-revert.sh" || true
 }
 
 # Test: Hotspot analysis tool (functional)
