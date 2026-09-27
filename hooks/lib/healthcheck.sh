@@ -304,6 +304,19 @@ hc_check_hooks_declared() {
     fi
 }
 
+# A host whose matrix row records a trust step runs installed hooks only after
+# that step, which this process cannot observe: warn and name /hooks. A host
+# with no trust step runs them on install, so the row is ok.
+_hc_record_plugin_gate() {
+    local trust
+    trust=$(jq -r --arg h "$1" '.hosts[$h].trust // empty' "$2" 2>/dev/null)
+    if [[ -z "$trust" ]]; then
+        _hc_record "write-gate" "ok" "${1}: plugin hooks run on install"
+        return
+    fi
+    _hc_record "write-gate" "warn" "${1}: installing does not trust plugin hooks; trust is not measured here. Check the native /hooks view"
+}
+
 # Plugin hooks listed is not plugin hooks executed. Grok 1.0.30 and 1.0.34
 # list hooks/hooks.json and run none of it; the write gate is live only
 # through a project or global craftsman.json that calls pre-write-check.sh.
@@ -319,7 +332,7 @@ hc_check_write_gate() {
     fi
     plugin_run=$(_hc_plugin_hooks_run "$host" "$capabilities")
     if [[ "$plugin_run" != "false" && "$plugin_run" != "not observed"* ]]; then
-        _hc_record "write-gate" "warn" "${host}: plugin hooks supported; current trust and execution are not measured here. Check the native /hooks view"
+        _hc_record_plugin_gate "$host" "$capabilities"
         return
     fi
     gate=$(_hc_host_gate_file "$host" "$capabilities") || gate=""

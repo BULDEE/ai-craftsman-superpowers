@@ -183,6 +183,20 @@ if [[ "$CODEX_MSG" == *"NOT observable"* && "$CODEX_MSG" == *"ask unsupported"* 
 else
     log_fail "hc_check_host" "codex=[$CODEX_MSG] claude=[$CLAUDE_MSG] unknown=$UNKNOWN_STATUS"
 fi
+
+# The write-gate row warns only where the host puts a step between install and
+# execution. A warn on every Claude Code session teaches people to skip the row.
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CRAFTSMAN_SESSION_HOST=claude-code CLAUDE_PLUGIN_ROOT="$ROOT_DIR" hc_check_write_gate
+WG_CLAUDE="${_HC_STATUSES[0]}"
+_HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+CRAFTSMAN_SESSION_HOST=codex CLAUDE_PLUGIN_ROOT="$ROOT_DIR" hc_check_write_gate
+WG_CODEX="${_HC_STATUSES[0]}|${_HC_MESSAGES[0]}"
+if [[ "$WG_CLAUDE" == "ok" && "$WG_CODEX" == warn\|*"/hooks"* ]]; then
+    log_pass "write-gate is ok where plugin hooks run on install and warns, naming /hooks, where the host requires trust"
+else
+    log_fail "write-gate row per host" "claude-code=$WG_CLAUDE codex=$WG_CODEX"
+fi
 # The real consumer is skills/healthcheck/SKILL.md, which sources config.sh,
 # pack-loader.sh and healthcheck.sh and nothing else. Every case above hands
 # the host in by hand, so none of them noticed that `host_detect` is not
