@@ -13,7 +13,7 @@ The plugin uses Claude Code hooks to automatically enforce code quality rules. H
 | SessionStart | `session-start.sh` | Initialization, config loading, first-run detection |
 | PreToolUse | `config-protection.sh` | Refuse writes that would tamper with plugin configuration; reads a Write/Edit `file_path` or every file a Codex `apply_patch` names. The matchers stay Claude's names (`Write|Edit`, `Bash`): every host measured maps them to its own tools (Codex `apply_patch`, Grok `write`/`search_replace`/`run_terminal_command`), and the hook receives the host's name, which `hooks/lib/write_mirror.py` reads through one table (`WRITE_TOOL_KINDS`) |
 | PreToolUse | `pre-write-check.sh` | Judge the would-be file **before** it lands, through the same pack validators post-write runs, on a mirror of the workspace; a multi-file patch is judged file by file and refused as a whole |
-| PreToolUse | `pre-push-verify.sh` | Validate git push commands for safety |
+| PreToolUse | `pre-push-verify.sh` | Warn on `git push` from a session with no verification evidence; reads no file, always exits 0, the push is allowed ([ADR-0023](../adr/0023-deterministic-verification-loop.md), Amendment) |
 | PostToolUse | `post-write-check.sh` | Validate file **after** write (all rules); one run per file for a Codex `apply_patch` |
 | PostToolUse | `post-bash-test-verify.sh` | A passing test run (Bash, or the TaskOutput that ends a background run) grants verification evidence; the result is decoded per host by `lib/tool_result.py`, and a host whose event carries no exit code (Codex) grants and revokes nothing. A background run the model never polls with TaskOutput fires no hook event and stays pending |
 | PostToolUseFailure | `tool-failure-tracker.sh` | Record failed tool calls for correction learning |
@@ -42,8 +42,9 @@ lands with every hook enabled and trusted (measured on Codex 0.154.0,
 command line, not a file, and refusing on a regex over command lines would
 block `sed` in a Makefile and miss `python3 write.py`. What catches those
 writes is the layer that reads the tree rather than the call: the post-write
-validation of files the session touched, `ci/craftsman-ci.sh` on the diff,
-and `pre-push-verify.sh` before the push.
+validation of files the session touched, and `ci/craftsman-ci.sh` on the diff.
+`pre-push-verify.sh` is not that layer: it reads no file and only warns when
+the session holds no verification evidence.
 
 Delivery of a background verdict is the host's, and not every host has one.
 Claude Code wakes the session on exit 2 (`asyncRewake`). Codex cancels

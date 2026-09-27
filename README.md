@@ -213,7 +213,9 @@ real CLI and recorded in [`hooks/host-capabilities.json`](hooks/host-capabilitie
 
 On every host, the gate judges the host's write tools. A file written by a
 shell command the model runs (`printf > file`, `sed -i`, a script) is not
-gated before disk: CI (`ci/craftsman-ci.sh`) and the pre-push gate catch it.
+gated before disk: CI (`ci/craftsman-ci.sh`) catches it. The pre-push hook
+reads no file and only warns when the session was never verified; Hermes alone
+refuses a push until a passing conclusion on the tree it publishes.
 GitHub Copilot has an adapter for its documented hook contract; no Copilot
 surface is qualified yet, so it has no badge.
 
@@ -339,8 +341,8 @@ auto-commit; methodology is opinionated (DDD/Clean Architecture).
 
 **Current constraints:** PHP, TypeScript, Python, Go, Rust and Bash get full
 rule coverage, other languages basic support only; metrics are per-machine,
-not shared across a team; shell-written files are caught by CI and the
-pre-push gate, not before disk; per-host gaps are listed in
+not shared across a team; shell-written files are caught by CI, not before
+disk (the pre-push hook only warns); per-host gaps are listed in
 [Host support](#host-support).
 
 More detail in the [FAQ](FAQ.md) and [TROUBLESHOOTING.md](TROUBLESHOOTING.md).

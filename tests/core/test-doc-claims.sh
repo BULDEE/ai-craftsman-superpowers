@@ -158,6 +158,39 @@ else
         "unconsented examples: '${unconsented}'; consent off/on: '${CONSENT_OFF}'/'${CONSENT_ON}'; probe off/on: '${PROBE_OFF}'/'${PROBE_ON}'"
 fi
 
+# -----------------------------------------------------------------------------
+# 8. The pre-push hook is documented as the warning it is, the monitor as the
+#    log tail it is, and ADR-0023 says so in an amendment.
+# -----------------------------------------------------------------------------
+# README, SECURITY.md and three guides said "CI and the pre-push gate catch"
+# shell-written files, and ADR-0023 calls pre-push-verify.sh "the last
+# deterministic gate" and announces phpstan/vitest watchers. The hook reads no
+# file and always allows the push; monitors.json tails one log (CR-178, M17).
+# The Hermes terminal gate, which does refuse a push, is described as such.
+PUSH_HOOK="$ROOT_DIR/hooks/pre-push-verify.sh"
+if grep -q 'Warning only - do not block the push' "$PUSH_HOOK" && ! grep -qE '^[^#]*exit 2' "$PUSH_HOOK"; then
+    push_claims=$(grep -rniE 'pre-push gate|garde-fou pre-push|pre-push-verify\.sh` before the push|^# Blocks git push|Validate git push commands' \
+        "$ROOT_DIR/README.md" "$ROOT_DIR/README.fr.md" "$ROOT_DIR/SECURITY.md" "$ROOT_DIR/docs/guides" \
+        "$ROOT_DIR/docs/reference" "$PUSH_HOOK" 2>/dev/null | sed "s|$ROOT_DIR/||" || true)
+    if [[ -z "$push_claims" ]]; then
+        log_pass "no document calls the pre-push warning a gate that catches files"
+    else
+        log_fail "the pre-push hook warns and reads no file, documents call it a gate" "$(printf '%s' "$push_claims" | tr '\n' ' ' | cut -c1-600)"
+    fi
+else
+    log_pass "pre-push-verify.sh blocks, and a gate is what the documents may call it"
+fi
+
+ADR23="$ROOT_DIR/docs/adr/0023-deterministic-verification-loop.md"
+AMENDMENT=$(awk '/^## Amendment/{inside=1} inside' "$ADR23")
+watchers_shipped=$(jq -r '.[].command' "$ROOT_DIR/monitors/monitors.json" 2>/dev/null | grep -ciE 'phpstan|vitest|--watch' || true)
+if [[ "$watchers_shipped" -gt 0 ]] \
+    || { [[ "$AMENDMENT" == *pre-push-verify.sh* && "$AMENDMENT" == *monitors.json* && "$AMENDMENT" == *session-writes* ]]; }; then
+    log_pass "ADR-0023 carries an amendment for the push warning, the single monitor and the evidence it reads"
+else
+    log_fail "ADR-0023 amendment" "no '## Amendment' naming pre-push-verify.sh, monitors.json and the session-writes evidence"
+fi
+
 # A skill body is text handed to a model: the host expands nothing in it, and
 # Claude Code 2.1.278 exports no CLAUDE_PLUGIN_ROOT to the Bash tool at all
 # (measured: the tool sees CLAUDECODE and the session id). Five skills sourced

@@ -62,7 +62,8 @@ bash /path/to/ai-craftsman-superpowers/ci/craftsman-ci.sh export \
 
 - The gate judges `apply_patch`. A file written by a shell command
   (`printf > file`, `sed -i`, a script) is not gated before disk: CI
-  (`ci/craftsman-ci.sh`) and the pre-push gate catch it.
+  (`ci/craftsman-ci.sh`) catches it. The pre-push hook reads no file and only
+  warns.
 - `FileChanged`, `PostToolUseFailure` and `TaskCompleted` are not fired by
   this host, so external-edit tracking, failed-tool tracking and the
   evidence gate before a task completes do not run there.
