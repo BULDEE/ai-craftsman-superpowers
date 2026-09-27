@@ -133,12 +133,16 @@ _semantic_codex_cli() {
 # grok -p, read-only tools, one reply on stdout. The Claude model id above is
 # not a Grok model. The child inherits CRAFTSMAN_HEADLESS_VERIFY so this
 # plugin's hooks in that process do not record the review as a session.
+# An allowlist, the read-only set of Grok's headless guide: a denylist removed
+# nothing when a tool name was wrong (the shell tool is `run_terminal_command`
+# in hook payloads and `run_terminal_cmd` in the headless guide), while an
+# allowlist with a wrong name fails closed.
 _semantic_grok_cli() {
     command -v grok >/dev/null 2>&1 || return 1
     CRAFTSMAN_HEADLESS_VERIFY=1 grok -p "$1" \
         --max-turns 4 \
         --output-format plain \
-        --disallowed-tools "search_replace,write,run_terminal_cmd" 2>/dev/null || return 1
+        --tools "read_file,grep,list_dir" 2>/dev/null || return 1
 }
 
 # haiku_findings <verdict-body>
