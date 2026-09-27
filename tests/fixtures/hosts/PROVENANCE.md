@@ -172,6 +172,15 @@ Nothing else is edited. `hook-env.*.json` lists variable NAMES only.
     aliases. `GROK_HOOK_EVENT` was read by the capture script; the rest is
     documented, not captured.
 
+### grok/1.0.41 plugin install, second call (2026-09-23)
+
+- `grok --version`: `grok 1.0.41 (4220f3b224a6) [stable]`.
+- Command, twice, on this checkout: `grok plugin install <root> --trust`.
+- First call exited 0: `Installed 1 plugin(s) from <root>: craftsman`.
+- Second call exited 1. The stderr is `plugin-install-second.txt`, unmodified.
+  The distinctive phrase is `already installed`. `bin/craftsman-grok-install`
+  treats that phrase as "the plugin is present" and still exports the gate.
+
 ### codex/0.154.0-app-server (2026-09-20)
 
 - Same `codex --version` (`codex-cli 0.154.0`), different path in: the plugin

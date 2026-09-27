@@ -170,8 +170,9 @@ _doctrine_write_host_hooks() {
     local host="$1" here root into="${EXPORT_INTO:-}" out
     here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     root="$(cd "$here/.." && pwd)"
-    [[ -z "$into" ]] && into=".${host}/hooks"
-    out="${into%/}/craftsman.json"
+    rel=$(python3 "${CI_LIB_DIR:-$here}/host_hooks.py" --gate-rel "$root" "$host")
+    [[ -z "$into" ]] && into=$(dirname "$rel")
+    out="${into%/}/$(basename "$rel")"
     python3 "${CI_LIB_DIR:-$here}/host_hooks.py" "$host" "$root" "$out" || return 1
     if [[ "$host" == "grok" ]]; then
         echo "Trust the folder before these run: 'grok --trust', or /hooks-trust in the session. Untrusted, project hooks are skipped in silence (measured on 1.0.30)."

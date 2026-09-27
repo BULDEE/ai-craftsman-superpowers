@@ -291,6 +291,11 @@ elif [[ ! -f "${PWD}/.craft-config.yml" ]]; then
     WARNINGS="${WARNINGS} | No project .craft-config.yml found. Run /craftsman:setup to configure this project."
 fi
 
+# The global gate is refreshed only when its marker names this install.
+# A missing gate is not created, and a gate that names another checkout
+# is not adopted: that file is trusted by the host as soon as it exists.
+hc_refresh_owned_gate 2>/dev/null || true
+
 # Healthcheck summary
 HC_SUMMARY=$(hc_summary 2>/dev/null || echo "Healthcheck: unavailable")
 MSG="${MSG} | ${HC_SUMMARY}"
