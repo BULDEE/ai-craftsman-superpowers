@@ -79,8 +79,13 @@ hc_check_config() {
             problems+="${file}: ${problem};"
         done < <(config_validate "$file")
     done
+    # A file without the v4 marker is every config written before 4.12.2:
+    # warned with what the resolver ignores and how to migrate. An error is
+    # for a v4 file whose values are wrong, which no upgrade explains.
     if [[ -z "$found" ]]; then
         _hc_record "config" "warn" "missing - run /craftsman:setup"
+    elif [[ "$problems" == *"a format before v4"* ]]; then
+        _hc_record "config" "warn" "${problems%;} - run /craftsman:setup"
     elif [[ -n "$problems" ]]; then
         _hc_record "config" "error" "${problems%;} - run /craftsman:setup"
     else

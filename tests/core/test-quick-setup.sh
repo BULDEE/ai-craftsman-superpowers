@@ -186,11 +186,17 @@ V1_VERDICT=$(cd "$V1_DIR" && HOME="$V1_DIR/home" bash -c \
 printf 'v: 4\nstack: react\n' > "$V1_DIR/.craft-config.yml"
 V4_VERDICT=$(cd "$V1_DIR" && HOME="$V1_DIR/home" bash -c \
     'source "$1/hooks/lib/config.sh"; source "$1/hooks/lib/healthcheck.sh"; hc_check_config; printf "%s" "${_HC_STATUSES[0]}"' _ "$ROOT_DIR" 2>/dev/null)
+printf 'v: 4\nstack: angular\n' > "$V1_DIR/.craft-config.yml"
+V4_BAD_VERDICT=$(cd "$V1_DIR" && HOME="$V1_DIR/home" bash -c \
+    'source "$1/hooks/lib/config.sh"; source "$1/hooks/lib/healthcheck.sh"; hc_check_config; printf "%s" "${_HC_STATUSES[0]}"' _ "$ROOT_DIR" 2>/dev/null)
 rm -rf "$V1_DIR"
-if [[ "$V1_VERDICT" == 1\|error\|*stack* && "$V1_VERDICT" == *"v: 4"* && "$V4_VERDICT" == ok ]]; then
-    log_pass "a pre-v4 config is refused by the validator and the healthcheck, a v4 one is ok"
+# A pre-v4 file is every user's config before they rerun setup: the row says
+# which keys the resolver ignores and how to migrate, as a warning. An error
+# is for a v4 file whose values are wrong, which no upgrade explains.
+if [[ "$V1_VERDICT" == 1\|warn\|*stack* && "$V1_VERDICT" == *"v: 4"* && "$V4_VERDICT" == ok && "$V4_BAD_VERDICT" == error ]]; then
+    log_pass "a pre-v4 config is refused by the validator and warned by the healthcheck, an invalid v4 one is an error, a valid v4 one is ok"
 else
-    log_fail "config validation" "pre-v4: '${V1_VERDICT}', v4: '${V4_VERDICT}'"
+    log_fail "config validation" "pre-v4: '${V1_VERDICT}', v4: '${V4_VERDICT}', invalid v4: '${V4_BAD_VERDICT}'"
 fi
 
 grep -q "committed" "$SETUP_CMD" \
