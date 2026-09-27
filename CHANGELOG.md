@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A language registry that cannot be read is an unknown verdict too, never a
   turn with nothing to judge.
 
+### Fixed
+
+- The Python pack's WARN-PY001 counted the commas of a return annotation as
+  parameters: `def resolve(verb, args, where) -> tuple[str, list[str]]` was
+  reported as a function with four or more parameters. The pattern now stops
+  at the closing parenthesis.
+
 ## [4.12.0] - 2026-09-27
 
 Native install on the three hosts that load plugins (Claude Code, Codex,
