@@ -109,6 +109,13 @@ import { a } from "./a";
 export const b = (): string => a();
 TS
 
+# Level 1 clean too, and named for what the stubs do with them: ESLint crashes
+# on crash.ts and never answers on slow.ts, dependency-cruiser fails on
+# depcrash.ts.
+cp "$SRC_DIR/clean.ts" "$SRC_DIR/crash.ts"
+cp "$SRC_DIR/clean.ts" "$SRC_DIR/slow.ts"
+cp "$SRC_DIR/clean.ts" "$SRC_DIR/depcrash.ts"
+
 BAD_FILE="$SRC_DIR/bad.ts"
 UNUSED_FILE="$SRC_DIR/unused.ts"
 CLEAN_FILE="$SRC_DIR/clean.ts"
@@ -164,6 +171,11 @@ case "$(basename "$TARGET")" in
     ignored.ts)
         printf '[{"filePath":"%s","messages":[{"ruleId":null,"fatal":false,"severity":1,"message":"File ignored because outside of base path.","nodeType":null}],"suppressedMessages":[],"errorCount":0,"fatalErrorCount":0,"warningCount":1}]\n' "$TARGET"
         exit 0 ;;
+    crash.ts)
+        printf 'Oops! Something went wrong! :(\n\nESLint: 9.39.5\n\nTypeError: Cannot read properties of undefined\n' >&2
+        exit 2 ;;
+    slow.ts)
+        exec sleep 30 ;;
     *)
         printf '[{"filePath":"%s","messages":[],"suppressedMessages":[],"errorCount":0,"fatalErrorCount":0,"warningCount":0}]\n' "$TARGET"
         exit 0 ;;
@@ -206,6 +218,10 @@ STUB
 
 _depcruise_stub_payloads() {
     cat <<'STUB'
+if [[ "$(basename "$TARGET")" == "depcrash.ts" ]]; then
+    echo "ERROR: Extracting dependencies ran afoul of a module it could not resolve" >&2
+    exit 1
+fi
 if [[ "$OUTPUT_TYPE" == "json" ]]; then
     printf '{"modules":[],"summary":{"violations":%s,"error":0,"warn":0,"info":0,"totalCruised":2}}\n' "$VIOLATIONS"
     [[ "$VIOLATIONS" == "[]" ]] && exit 0
@@ -394,7 +410,97 @@ else
 fi
 
 # =============================================================================
-# Group E - the recordings above are what the real tools actually print
+# Group E - no verdict is not a clean verdict
+#
+# A crash and a timeout used to leave the gate exactly as silent as a clean
+# file: stderr and the status were thrown away twice, by the adapter and by the
+# dispatcher, so the hook exited 0 with nothing to say and the pipeline passed
+# (review of main eb54d13, CR-174, M4). ESLint's own exit codes separate the
+# two: 0 and 1 are verdicts, 2 is a configuration problem or an internal error.
+# =============================================================================
+echo ""
+echo "--- E. A crash or a timeout is reported, never passed as clean ---"
+
+budget_hook() {
+    printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$1" \
+        | CRAFTSMAN_SA_BUDGET_FILE=1 CRAFTSMAN_SA_BUDGET_PROJECT=1 \
+            bash "$ROOT_DIR/hooks/post-write-check.sh" 2>/dev/null
+}
+
+ci_rules_and_exit() {
+    local report status=0
+    report=$(bash "$ROOT_DIR/ci/craftsman-ci.sh" --format json "$1" 2>/dev/null) || status=$?
+    printf '%s exit=%s' "$(printf '%s' "$report" | grep -oE '"rule":"[A-Z0-9-]+"' | cut -d'"' -f4 | sort -u | tr '\n' ' ')" "$status"
+}
+
+CRASH_HOOK=$(budget_hook "$SRC_DIR/crash.ts")
+if echo "$CRASH_HOOK" | grep -q 'ANALYSER001' && echo "$CRASH_HOOK" | grep -q 'eslint'; then
+    log_pass "an ESLint crash reaches the hook output as ANALYSER001, naming the tool"
+else
+    log_fail "an ESLint crash reaches the hook output as ANALYSER001, naming the tool" \
+        "got '$(echo "$CRASH_HOOK" | tr '\n' ' ' | cut -c1-200)' - exit 2 was flattened into a clean pass"
+fi
+if echo "$CRASH_HOOK" | grep -q 'Something went wrong'; then
+    log_fail "the tool's own stderr stays out of the hook output" \
+        "the crash text reached the model's context verbatim - it is the repository's text, not a diagnostic this gate controls"
+else
+    log_pass "the tool's own stderr stays out of the hook output"
+fi
+
+CRASH_CI=$(ci_rules_and_exit "src/crash.ts")
+if [[ "$CRASH_CI" == *ANALYSER001* && "$CRASH_CI" != *"exit=0" ]]; then
+    log_pass "an ESLint crash is not a green pipeline ($CRASH_CI)"
+else
+    log_fail "an ESLint crash is not a green pipeline" "got '$CRASH_CI'"
+fi
+
+started=$SECONDS
+SLOW_HOOK=$(budget_hook "$SRC_DIR/slow.ts")
+elapsed=$(( SECONDS - started ))
+if echo "$SLOW_HOOK" | grep -q 'ANALYSER001' && [[ $elapsed -lt 15 ]]; then
+    log_pass "an ESLint run stopped by the budget is reported (${elapsed}s against 1s)"
+else
+    log_fail "an ESLint run stopped by the budget is reported" \
+        "${elapsed}s, got '$(echo "$SLOW_HOOK" | tr '\n' ' ' | cut -c1-200)'"
+fi
+
+DEPCRASH_HOOK=$(budget_hook "$SRC_DIR/depcrash.ts")
+if echo "$DEPCRASH_HOOK" | grep -q 'ANALYSER001' && echo "$DEPCRASH_HOOK" | grep -q 'dependency-cruiser'; then
+    log_pass "a dependency-cruiser failure is reported the same way"
+else
+    log_fail "a dependency-cruiser failure is reported the same way" \
+        "got '$(echo "$DEPCRASH_HOOK" | tr '\n' ' ' | cut -c1-200)'"
+fi
+
+# The other direction, on the same harness: exit 1 is ESLint's verdict with
+# findings, and a clean run is a verdict too. Neither is a failure to analyse.
+if echo "$(budget_hook "$BAD_FILE")" | grep -q 'ANALYSER001'; then
+    log_fail "a finding's exit 1 is a verdict, not a crash" \
+        "ANALYSER001 came out beside ESLINT001 - every file with a finding would also read as unanalysed"
+else
+    log_pass "a finding's exit 1 is a verdict, not a crash"
+fi
+if [[ -z "$(budget_hook "$CLEAN_FILE")" ]]; then
+    log_pass "a clean run stays silent"
+else
+    log_fail "a clean run stays silent" "got '$(budget_hook "$CLEAN_FILE" | tr '\n' ' ' | cut -c1-200)'"
+fi
+
+# Consent still comes first: without trust_project_tools nothing of the
+# project's runs, so nothing crashed and there is nothing to report.
+printf 'stack: fullstack\n' > "$HOME/.claude/.craft-config.yml"
+: > "$ARGV_LOG"
+UNTRUSTED_HOOK=$(budget_hook "$SRC_DIR/crash.ts")
+if [[ ! -s "$ARGV_LOG" ]] && ! echo "$UNTRUSTED_HOOK" | grep -q 'ANALYSER001'; then
+    log_pass "untrusted, the project's ESLint never runs and nothing is reported for it"
+else
+    log_fail "untrusted, the project's ESLint never runs and nothing is reported for it" \
+        "argv log: '$(tr '\n' ' ' < "$ARGV_LOG")', output: '$(echo "$UNTRUSTED_HOOK" | tr '\n' ' ' | cut -c1-160)'"
+fi
+printf 'stack: fullstack\ntrust_project_tools: true\n' > "$HOME/.claude/.craft-config.yml"
+
+# =============================================================================
+# Group F - the recordings above are what the real tools actually print
 # =============================================================================
 # Opt-in because it installs from the network. Everything above replays these
 # payloads; this is the leg that catches the next major changing the contract,
@@ -402,7 +508,7 @@ fi
 #
 #   CRAFTSMAN_TEST_REAL_TOOLS=1 bash tests/packs/test-eslint-verdict.sh
 echo ""
-echo "--- E. Against the real ESLint and the real dependency-cruiser ---"
+echo "--- F. Against the real ESLint and the real dependency-cruiser ---"
 
 if [[ "${CRAFTSMAN_TEST_REAL_TOOLS:-0}" != "1" ]]; then
     echo "  - skipped (network): CRAFTSMAN_TEST_REAL_TOOLS=1 to install and run them"

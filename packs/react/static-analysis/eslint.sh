@@ -60,6 +60,16 @@ _pack_sa_eslint_binary() {
     return 0
 }
 
+# Whether the run produced a verdict. ESLint documents three exits: 0 (no
+# error), 1 (at least one error) and 2 (a configuration problem or an internal
+# error). Only the first two are verdicts, and exit 1 must stay one: it is how
+# every file with a finding comes back. A verdict is also a JSON array; a 124
+# from the budget, a 2, or a report cut short is no verdict at all.
+_pack_sa_eslint_answered() {
+    [[ "$1" == "0" || "$1" == "1" ]] || return 1
+    printf '%s' "$2" | jq -e 'type == "array"' >/dev/null 2>&1
+}
+
 # Severity 2 is ESLint's error. A severity 1 message is the project's own
 # warning, and a fatal parse error also arrives here with a null ruleId, which
 # the code mapping turns into ESLINT001 rather than dropping: a file ESLint
@@ -106,14 +116,20 @@ _pack_sa_eslint_findings() {
 # ESLint 9 also prints an ESLintRCWarning on stderr in the compat case. It does
 # not reach stdout, so the json stays parseable - which a prose reporter could
 # not have promised.
+#
+# The status is kept, not flattened with `|| true`: a crash and a stopped run
+# printed nothing, and nothing read exactly like a clean file (CR-174).
 _pack_sa_eslint_run() {
-    local file="$1" eslint output errors="" rule lineno msg code
+    local file="$1" eslint output status=0 errors="" rule lineno msg code
     command -v jq >/dev/null 2>&1 || return 0
     eslint=$(_pack_sa_eslint_binary)
     [[ -n "$eslint" ]] || return 0
 
-    output=$(sa_timeout "$SA_BUDGET_FILE_SECONDS" $eslint "$file" --format=json 2>/dev/null) || true
-    [[ -n "$output" ]] || return 0
+    output=$(sa_timeout "$SA_BUDGET_FILE_SECONDS" $eslint "$file" --format=json 2>/dev/null) || status=$?
+    if ! _pack_sa_eslint_answered "$status" "$output"; then
+        sa_declare_incomplete "eslint" "$status"
+        return 0
+    fi
 
     while IFS=$'\t' read -r rule lineno msg; do
         [[ -n "$msg" ]] || continue
@@ -152,6 +168,16 @@ _pack_sa_depcruise_findings() {
     ' 2>/dev/null
 }
 
+# Whether the cruise produced a verdict. Its exit code cannot say: the
+# documentation ties a non-zero exit to the violation count for the err
+# reporters, not for json. The report can: a cruise that printed no parseable
+# summary, or that the budget stopped, gave no verdict, and says so rather than
+# passing for a clean graph (CR-174).
+_pack_sa_depcruise_answered() {
+    [[ "$1" != "124" ]] || return 1
+    printf '%s' "$2" | jq -e '.summary | type == "object"' >/dev/null 2>&1
+}
+
 # --output-type json, and never `err`. The `err` reporter is prose: on a clean
 # cruise it prints "no dependency violations found" to stdout, which the line
 # loop this replaces turned into a blocking ESLINT003 - the gate refused a
@@ -161,13 +187,16 @@ _pack_sa_depcruise_findings() {
 # cruise is not what doc/cli.md still describes ("print nothing"), which is why
 # the machine-readable reporter is the only one this adapter will read.
 _pack_sa_depcruise_run() {
-    local file="$1" depcruise output errors="" rule from to
+    local file="$1" depcruise output status=0 errors="" rule from to
     command -v jq >/dev/null 2>&1 || return 0
     depcruise=$(_pack_sa_depcruise_binary)
     [[ -n "$depcruise" ]] || return 0
 
-    output=$(sa_timeout "$SA_BUDGET_PROJECT_SECONDS" $depcruise "$file" --output-type json 2>/dev/null) || true
-    [[ -n "$output" ]] || return 0
+    output=$(sa_timeout "$SA_BUDGET_PROJECT_SECONDS" $depcruise "$file" --output-type json 2>/dev/null) || status=$?
+    if ! _pack_sa_depcruise_answered "$status" "$output"; then
+        sa_declare_incomplete "dependency-cruiser" "$status"
+        return 0
+    fi
 
     while IFS=$'\t' read -r rule from to; do
         [[ -n "$rule" ]] || continue

@@ -505,21 +505,33 @@ _run_static_analysis() {
     # manifest that names the analyser as owner of the analyser's own codes.
     precedence_higher_level_begin
     while IFS= read -r err_line; do
-        [[ -z "$err_line" ]] && continue
-        local sa_code sa_lineno sa_msg
-        sa_code=$(echo "$err_line" | cut -d: -f1)
-        sa_lineno=$(echo "$err_line" | cut -d: -f2)
-        sa_msg=$(echo "$err_line" | cut -d: -f3-)
-        sa_msg="${sa_msg#"${sa_msg%%[![:space:]]*}"}"
-        # A verdict on a code is the higher level answering for that code.
-        precedence_declare_covered "$sa_code"
-        if [[ -n "$sa_lineno" && "$sa_lineno" -gt 0 ]] 2>/dev/null; then
-            add_warning "${sa_code}" "line ${sa_lineno}: ${sa_msg}"
-        else
-            add_warning "${sa_code}" "${sa_msg}"
-        fi
+        _apply_static_analysis_line "$err_line"
     done <<< "$errors"
     precedence_higher_level_end
+}
+
+# One line of an analyser's result: a coverage record or a finding. A clean
+# run answers too, and its coverage arrives as a record because nothing the
+# adapter declared inside its own subshell survives it.
+_apply_static_analysis_line() {
+    local err_line="$1" sa_code sa_lineno sa_msg
+    [[ -z "$err_line" ]] && return
+    case "$err_line" in
+        "$SA_COVERED_RECORD"*)
+            precedence_declare_covered "${err_line#"$SA_COVERED_RECORD"}"
+            return ;;
+    esac
+    sa_code=$(echo "$err_line" | cut -d: -f1)
+    sa_lineno=$(echo "$err_line" | cut -d: -f2)
+    sa_msg=$(echo "$err_line" | cut -d: -f3-)
+    sa_msg="${sa_msg#"${sa_msg%%[![:space:]]*}"}"
+    # A verdict on a code is the higher level answering for that code.
+    precedence_declare_covered "$sa_code"
+    if [[ -n "$sa_lineno" && "$sa_lineno" -gt 0 ]] 2>/dev/null; then
+        add_warning "${sa_code}" "line ${sa_lineno}: ${sa_msg}"
+    else
+        add_warning "${sa_code}" "${sa_msg}"
+    fi
 }
 
 # =============================================================================

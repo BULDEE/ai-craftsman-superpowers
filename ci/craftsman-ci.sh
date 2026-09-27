@@ -699,6 +699,13 @@ _run_static_analysis() {
     precedence_higher_level_begin
     while IFS= read -r err_line; do
         [[ -z "$err_line" ]] && continue
+        # A clean run's coverage arrives as a record, the same way the hook
+        # reads it: the adapter's own subshell keeps nothing it declared.
+        case "$err_line" in
+            "$SA_COVERED_RECORD"*)
+                precedence_declare_covered "${err_line#"$SA_COVERED_RECORD"}"
+                continue ;;
+        esac
         local sa_code sa_lineno sa_msg
         sa_code=$(echo "$err_line" | cut -d: -f1)
         sa_lineno=$(echo "$err_line" | cut -d: -f2)

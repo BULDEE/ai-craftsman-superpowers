@@ -437,6 +437,30 @@ def _matching_close(source: str, open_index: int) -> int:
     return len(source) - 1
 
 
+_BRACKET_STEP = {"(": 1, "[": 1, ")": -1, "]": -1}
+
+
+def _item_end(source: str, start: int) -> int:
+    """Index where the item whose attribute starts at `start` ends.
+
+    The item ends on its own `;` or on the `}` closing its body, whichever
+    comes first outside brackets and parentheses. The attribute is balanced,
+    so walking from its `#` crosses it at depth zero. `mod tests;` ends on its
+    `;`, and searching for the next `{` instead ran the range into the first
+    production function below the declaration. A `;` inside `[u32; 2]`
+    belongs to the signature and is not the end.
+    """
+    depth = 0
+    for index in range(start, len(source)):
+        char = source[index]
+        depth += _BRACKET_STEP.get(char, 0)
+        if depth == 0 and char == ";":
+            return index
+        if depth == 0 and char == "{":
+            return _matching_close(source, index)
+    return len(source) - 1
+
+
 def _line_offsets(source: str) -> list:
     """The character offset where each line starts."""
     offsets, position = [], 0
@@ -453,7 +477,8 @@ def test_line_range(source: str, raw: str) -> set:
     flips back stops validating the file from there on. `#[cfg(test)] mod
     tests` conventionally sits at the bottom, so the damage is usually
     invisible; put anything after it, or a single `#[test]` in the middle, and
-    every rule below goes quiet. The block's own braces are what bounds it.
+    every rule below goes quiet. The item the attribute is attached to is what
+    bounds it: its body's braces, or its `;` when it has no body here.
     """
     inside: set = set()
     raw_lines = raw.split("\n")
@@ -463,10 +488,10 @@ def test_line_range(source: str, raw: str) -> set:
             continue
         if index >= len(offsets):
             continue
-        opening = source.find("{", offsets[index])
-        if opening == -1:
+        attribute = source.find("#", offsets[index])
+        if attribute == -1:
             continue
-        closing = _matching_close(source, opening)
+        closing = _item_end(source, attribute)
         first = source.count("\n", 0, offsets[index]) + 1
         last = source.count("\n", 0, closing) + 1
         inside.update(range(first, last + 1))

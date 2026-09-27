@@ -6,6 +6,10 @@
 # Usage:
 #   source "${CLAUDE_PLUGIN_ROOT}/hooks/lib/static-analysis.sh"
 #   errors=$(sa_analyze_file "/path/to/file.php")
+#
+# The result is one line per item: a `CODE:LINE:MESSAGE` finding, or a
+# `@covered <RULE>` record (SA_COVERED_RECORD) the front-end hands to
+# precedence_declare_covered. A run with no verdict reports ANALYSER001.
 # =============================================================================
 
 # One implementation, sourced rather than copied: three copies of a timeout
@@ -34,6 +38,45 @@ sa_timeout() {
         echo "craftsman: static analysis stopped after ${budget}s, this file was not fully analysed" >&2
     fi
     return $status
+}
+
+# An adapter's result reaches the front-end on stdout and nowhere else. The
+# adapter runs inside at least one command substitution, the front-end's own
+# `$(sa_analyze_file ...)`, so anything it does to shell state dies with that
+# subshell: errcheck and clippy declared their coverage straight into
+# precedence.sh from there, the declaration never reached the shell that
+# flushes, and a clean run left the regex finding standing while a run with a
+# finding produced it twice (CR-172). A record on stdout survives every level
+# of substitution between the adapter and the front-end, which applies it.
+#
+# The prefix cannot open a finding: every finding line starts with the rule
+# code the adapter wrote, and no rule code starts with `@`.
+SA_COVERED_RECORD="@covered "
+
+# sa_declare_covered <rule>... - the run that just ended gave a verdict on these
+# rules, clean or not. Called only after a run that produced one: no verdict is
+# not a clean verdict, and an undeclared rule is left to Level 1.
+sa_declare_covered() {
+    local rule
+    for rule in "$@"; do
+        printf '%s%s\n' "$SA_COVERED_RECORD" "$rule"
+    done
+}
+
+# sa_declare_incomplete <tool> <status> - the run ended without a verdict: it
+# crashed, or the budget stopped it (124). Both used to leave the gate exactly
+# as silent as a clean file, because the adapters and this dispatcher each
+# threw the status and stderr away (CR-174). It is reported as ANALYSER001, an
+# ordinary finding whose severity the rules engine resolves (advisory in
+# rules/core.yml), so both front-ends show it and neither reads the file as
+# clean. The message is built from the tool's name and its exit status only:
+# the tool's stderr is the repository's text, and it does not travel into the
+# model's context.
+sa_declare_incomplete() {
+    local tool="$1" status="$2" reason
+    reason="it exited with status ${status}"
+    [[ "$status" == "124" ]] && reason="its time budget ran out"
+    printf 'ANALYSER001:0:%s gave no verdict (%s): this file was not fully analysed\n' "$tool" "$reason"
 }
 
 # Running the project's analysers means running the project's code (its
