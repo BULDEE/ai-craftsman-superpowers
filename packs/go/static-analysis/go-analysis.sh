@@ -57,8 +57,11 @@ pack_sa_go() {
     # errcheck exits 0 when every error is checked and 1 when it found one:
     # both are verdicts. 2 is its fatal exit (a package that does not load)
     # and 124 is the budget; neither says anything about GO004 or GO006, so
-    # the regex keeps them.
-    [[ $status -le 1 ]] || return 0
+    # the regex keeps them, and the missing verdict is reported, not swallowed.
+    if [[ $status -gt 1 ]]; then
+        sa_declare_incomplete "errcheck" "$status"
+        return 0
+    fi
 
     # Declared here rather than left to the orchestrator: errcheck answers for
     # GO004 and GO006 whether or not it found anything, and a clean run is a

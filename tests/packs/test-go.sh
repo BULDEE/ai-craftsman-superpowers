@@ -754,7 +754,7 @@ fi
 
 sa_errcheck "exit 0"
 out="$(sa_hook)"
-if [[ -f "$SA_MARKER" ]] && ! echo "$out" | grep -qE 'GO006|ERRCHECK001'; then
+if [[ -f "$SA_MARKER" ]] && ! echo "$out" | grep -qE 'GO006|ERRCHECK001|ANALYSER001'; then
     log_pass "a clean errcheck run answers for GO006 in the hook"
 else
     log_fail "a clean errcheck run answers for GO006 in the hook" \
@@ -779,6 +779,14 @@ if sa_rules "$(sa_ci)" | grep -q 'GO006'; then
 else
     log_fail "a crashed errcheck leaves GO006 to the regex in the pipeline" "rules: $(sa_rules "$(sa_ci)")"
 fi
+# And the crash itself is said, not swallowed: exit 2 is errcheck's fatal
+# exit, which analysed nothing (CR-174).
+if echo "$out" | grep -q 'ANALYSER001' && sa_rules "$(sa_ci)" | grep -q 'ANALYSER001'; then
+    log_pass "a crashed errcheck is reported as ANALYSER001 in the hook and the pipeline"
+else
+    log_fail "a crashed errcheck is reported as ANALYSER001 in the hook and the pipeline" \
+        "hook: $(echo "$out" | grep -oE 'ANALYSER001[^\\]*' | head -1); pipeline: $(sa_rules "$(sa_ci)")"
+fi
 
 # `exec`, so the process the budget kills is the one holding the pipe open: a
 # stub that forked its sleep would measure the timeout fallback's reach into
@@ -792,6 +800,12 @@ if [[ -f "$SA_MARKER" && $elapsed -lt 15 ]] && echo "$out" | grep -q 'GO006'; th
 else
     log_fail "the budget stops a slow errcheck, and GO006 comes back" \
         "ran=$([[ -f "$SA_MARKER" ]] && echo yes || echo no), ${elapsed}s against a 1s budget: $(echo "$out" | tr '\n' ' ' | cut -c1-160)"
+fi
+if echo "$out" | grep -q 'ANALYSER001'; then
+    log_pass "an errcheck stopped by the budget is reported as ANALYSER001"
+else
+    log_fail "an errcheck stopped by the budget is reported as ANALYSER001" \
+        "the stop was silent: $(echo "$out" | tr '\n' ' ' | cut -c1-160)"
 fi
 
 # The same bound, seen from inside: the adapter must hand errcheck to the

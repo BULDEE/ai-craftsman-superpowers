@@ -853,6 +853,7 @@ cat > "$CLIPPY_WORK/bin/cargo" <<STUB
 #!/usr/bin/env bash
 [[ "\$*" == "clippy --version" ]] && { echo "clippy 0.1.80"; exit 0; }
 touch "$CLIPPY_MARKER"
+[[ -n "\${CLIPPY_STUB_SLOW:-}" ]] && exec sleep 30
 exit 0
 STUB
 chmod +x "$CLIPPY_WORK/bin/cargo"
@@ -865,6 +866,25 @@ if [[ -f "$CLIPPY_MARKER" ]] && ! echo "$clippy_out" | grep -q 'RUST001'; then
 else
     log_fail "a clean clippy run answers for RUST001 in the hook" \
         "ran=$([[ -f "$CLIPPY_MARKER" ]] && echo yes || echo no): $(echo "$clippy_out" | grep -oE 'RUST001[^\\]*' | head -1)"
+fi
+
+# A clippy the budget stopped gave no verdict, and says so (CR-174). The file
+# is Level 1 clean, so the notice is all there is to read: a silent exit 0
+# here is the stop passing for a clean crate.
+cat > "$CLIPPY_WORK/project/src/settled.rs" <<'RS'
+/// Reads the configured value.
+pub fn settled(value: Option<u32>) -> u32 {
+    value.unwrap_or(0)
+}
+RS
+slow_clippy_out="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$CLIPPY_WORK/project/src/settled.rs" \
+    | ( cd "$CLIPPY_WORK/project" && env "${CLIPPY_ENV[@]}" CLIPPY_STUB_SLOW=1 CRAFTSMAN_SA_BUDGET_PROJECT=1 \
+        bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1 ))"
+if echo "$slow_clippy_out" | grep -q 'ANALYSER001'; then
+    log_pass "a clippy run stopped by the budget is reported as ANALYSER001"
+else
+    log_fail "a clippy run stopped by the budget is reported as ANALYSER001" \
+        "got '$(echo "$slow_clippy_out" | tr '\n' ' ' | cut -c1-200)'"
 fi
 
 # --- The canonical example must survive its own pack -------------------------

@@ -108,7 +108,10 @@ pack_sa_rust() {
         cargo clippy --manifest-path "$manifest" --message-format=json --quiet \
         -- -W clippy::unwrap_used -W clippy::expect_used 2>/dev/null) || status=$?
 
-    [[ $status -eq 124 ]] && return 0
+    if [[ $status -eq 124 ]]; then
+        sa_declare_incomplete "clippy" "$status"
+        return 0
+    fi
 
     # A record in the result, not a call into precedence: this runs inside the
     # dispatcher's command substitution, where such a call dies unread.

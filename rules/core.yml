@@ -99,3 +99,13 @@ rules:
     group: Structure
     text: "structural metrics may improve, never regress"
     default_severity: warn
+
+  # Emitted by hooks/lib/static-analysis.sh for every language: a Level 2/3
+  # analyser that crashed or ran out of its budget gave no verdict, and saying
+  # nothing let the gate read exactly like a clean pass (CR-174). Advisory
+  # because the regex still answered for every rule it owns; the notice is
+  # that the file was not fully analysed, not that it is wrong.
+  - id: ANALYSER001
+    group: Advisory
+    text: "a Level 2/3 analyser that crashed or ran out of its budget gave no verdict - the file was not fully analysed"
+    default_severity: warn
