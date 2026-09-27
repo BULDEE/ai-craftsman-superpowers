@@ -107,6 +107,78 @@ else
     log_pass "the block message does not name the switch that disarms it"
 fi
 
+# CR-204 (review of 4.12.0): the path the write REACHES decides, whatever its
+# spelling. Relative paths, `//`, `/./`, an inner `..`, a symlinked parent and
+# a case change all reached a protected file with exit 0 (F1, F2).
+ALIAS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-alias.XXXXXX") || exit 1
+ALIAS_DIR=$(cd "$ALIAS_DIR" && pwd -P)
+mkdir -p "$ALIAS_DIR/proj/.claude" "$ALIAS_DIR/proj/src"
+ln -s "$ALIAS_DIR/proj/.claude" "$ALIAS_DIR/proj/src/cfg"
+run_in() {
+    local cwd="$1" file_path="$2" mode="${3:-default}"
+    (cd "$cwd" && jq -n --arg fp "$file_path" --arg cwd "$cwd" --arg m "$mode" \
+        '{"prompt_id":"p1","cwd":$cwd,"permission_mode":$m,"tool_name":"Write","tool_input":{"file_path":$fp}}' \
+        | bash "$ROOT_DIR/hooks/config-protection.sh" 2>/dev/null; echo "|$?")
+}
+ALIAS_MISS=""
+for alias in ".claude/settings.json" "$ALIAS_DIR/proj//.claude/settings.json" "$ALIAS_DIR/proj/./.claude/settings.json" \
+             ".claude/sub/../settings.json" "src/cfg/settings.json" ".Claude/Settings.json" "PHPStan.neon" \
+             "$(printf '%s' "$ROOT_DIR" | tr '[:lower:]' '[:upper:]')/hooks/lib/rules-engine.sh"; do
+    out=$(run_in "$ALIAS_DIR/proj" "$alias")
+    [[ "${out##*|}" == "2" ]] || ALIAS_MISS+=" [$alias]"
+done
+if [[ -z "$ALIAS_MISS" ]]; then
+    log_pass "relative, doubled, dotted, dot-dot, symlinked-parent and case-changed aliases of protected files are denied"
+else
+    log_fail "aliases of protected files are denied" "allowed:$ALIAS_MISS"
+fi
+# F4: `ask` is a decision only where a human is asked. In bypassPermissions
+# the host proceeds on `ask`, so the gate's own configuration is denied there.
+out=$(run_in "$ALIAS_DIR/proj" ".craft-config.yml" "bypassPermissions")
+if [[ "${out##*|}" == "2" && "$out" == *'"deny"'* ]]; then
+    log_pass "the gate's own config is denied, not asked, under bypassPermissions"
+else
+    log_fail "own config under bypassPermissions" "$out"
+fi
+out=$(run_in "$ALIAS_DIR/proj" ".craft-config.yml" "default")
+if [[ "${out##*|}" == "0" && "$out" == *'"ask"'* ]]; then
+    log_pass "the gate's own config is still asked in the default permission mode"
+else
+    log_fail "own config in default mode" "$out"
+fi
+# F3: the plugin's own data (registries, session state, bindings, bridges) is
+# the gate's machinery: a forged registry cache disarmed the config gate.
+DATA_MISS=""
+for data in "$ALIAS_DIR/home/.claude/plugins/data/craftsman-x/lang-registry-abc.tsv" \
+            "$ALIAS_DIR/home/.grok/craftsman/sessions/s1.json" \
+            "$ALIAS_DIR/home/.claude/craftsman-set-verified.sh" \
+            "$ALIAS_DIR/home/.codex/craftsman/cache/rule-registry-1.tsv"; do
+    out=$(run_in "$ALIAS_DIR/proj" "$data")
+    [[ "${out##*|}" == "2" ]] || DATA_MISS+=" [$data]"
+done
+if [[ -z "$DATA_MISS" ]]; then
+    log_pass "the plugin's data, caches, session bindings and bridges are denied"
+else
+    log_fail "plugin data is denied" "allowed:$DATA_MISS"
+fi
+# F5: a registry that cannot be built is not an empty list of protected
+# configs. A copy of the plugin whose registry compiler fails, with no earlier
+# cache, let phpstan.neon through with exit 0.
+BROKEN="$ALIAS_DIR/broken-plugin"
+mkdir -p "$BROKEN"
+(cd "$ROOT_DIR" && tar cf - hooks packs rules config .claude-plugin 2>/dev/null) | (cd "$BROKEN" && tar xf -)
+printf 'import sys\nsys.exit(1)\n' > "$BROKEN/hooks/lib/lang_registry.py"
+out=$(cd "$ALIAS_DIR/proj" && jq -n --arg cwd "$ALIAS_DIR/proj" \
+    '{"prompt_id":"p1","cwd":$cwd,"tool_name":"Write","tool_input":{"file_path":"phpstan.neon"}}' \
+    | CLAUDE_PLUGIN_ROOT="$BROKEN" CLAUDE_PLUGIN_DATA="$ALIAS_DIR/fresh-data" HOME="$ALIAS_DIR/home" \
+      bash "$BROKEN/hooks/config-protection.sh" 2>/dev/null; echo "|$?")
+if [[ "${out##*|}" == "2" && "$out" == *"registry"* ]]; then
+    log_pass "a registry that cannot be built refuses the write instead of judging it against no list"
+else
+    log_fail "registry failure fails closed" "$out"
+fi
+rm -rf "$ALIAS_DIR"
+
 # CRAFTSMAN_DISABLED_HOOKS opt-out still works for this hook
 export CRAFTSMAN_DISABLED_HOOKS="config-protection"
 result=$(run_hook "/tmp/project/phpstan.neon")

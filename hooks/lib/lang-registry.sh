@@ -64,10 +64,23 @@ _lang_registry_is_stale() {
     return 1
 }
 
+# An unwritable cache directory with no earlier cache: this process compiles
+# its own copy rather than judging against none (CR-204 F5).
+_lang_registry_private_copy() {
+    local private
+    private=$(mktemp "${TMPDIR:-/tmp}/craftsman-registry.XXXXXX" 2>/dev/null) || return 1
+    if python3 "$(_lang_registry_builder)" "$@" > "$private" 2>/dev/null && [[ -s "$private" ]]; then
+        printf '%s' "$private"
+        return 0
+    fi
+    rm -f "$private"
+    return 1
+}
+
 _lang_registry_build_cache() {
     local label="$1"
     shift
-    local cache_dir key cache
+    local cache_dir key cache private
     cache_dir=$(_lang_registry_cache_dir)
     [[ -n "$cache_dir" ]] || return 0
     key=$(_lang_registry_cache_key "$@")
@@ -79,6 +92,10 @@ _lang_registry_build_cache() {
             # cache; a failure is said once and leaves the previous cache.
             if python3 "$(_lang_registry_builder)" "$@" > "${cache}.tmp" 2>/dev/null && [[ -s "${cache}.tmp" ]]; then
                 mv -f "${cache}.tmp" "$cache" 2>/dev/null || rm -f "${cache}.tmp"
+            elif [[ ! -s "$cache" ]] && private=$(_lang_registry_private_copy "$@"); then
+                rm -f "${cache}.tmp"
+                printf '%s' "$private"
+                return 0
             else
                 rm -f "${cache}.tmp"
                 echo "craftsman: the language registry could not be compiled from the pack manifests; the previous registry stays in use" >&2
@@ -142,8 +159,10 @@ lang_extension_is_known() {
         "$_LANG_REGISTRY_KNOWN_FILE" 2>/dev/null
 }
 
+# Ready means rows: an empty file is the no-python3 marker, and a registry
+# with no rows names no protected config (CR-204 F5).
 _lang_registry_ready() {
-    [[ -n "$_LANG_REGISTRY_FILE" && -f "$_LANG_REGISTRY_FILE" ]]
+    [[ -n "$_LANG_REGISTRY_FILE" && -s "$_LANG_REGISTRY_FILE" ]]
 }
 
 # lang_for_file <path> → language id, empty when no loaded pack claims it.

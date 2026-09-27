@@ -8,18 +8,53 @@ import re
 import sys
 
 
-def session_id() -> str:
-    raw = next((os.environ[key] for key in (
-        'CRAFTSMAN_SESSION_ID', 'GROK_SESSION_ID', 'CODEX_SESSION_ID',
-        'CODEX_THREAD_ID', 'CLAUDE_CODE_SESSION_ID',
-    ) if os.environ.get(key)), '')
+_INHERITED_IDS = (
+    ('grok', 'GROK_SESSION_ID'), ('codex', 'CODEX_SESSION_ID'),
+    ('codex', 'CODEX_THREAD_ID'), ('claude-code', 'CLAUDE_CODE_SESSION_ID'),
+)
+
+
+def _clean(raw: str) -> str:
     return re.sub(r'[^A-Za-z0-9_-]', '', raw)[:64]
+
+
+def _nested() -> tuple[str, str] | None:
+    """The innermost session when several hosts' ids are inherited.
+
+    A session started from another host's shell carries both ids, and a fixed
+    order named the parent whenever the parent's host came first (review of
+    4.12.0, CR-204 F6). A child binds after its parent, so when two or more
+    inherited ids have a binding, the most recent binding is this session.
+    """
+    bound = []
+    for runtime, key in _INHERITED_IDS:
+        identity = _clean(os.environ.get(key, ''))
+        if identity and binding_path(runtime, identity).is_file():
+            bound.append((binding_path(runtime, identity).stat().st_mtime, runtime, identity))
+    if len(bound) < 2:
+        return None
+    _, runtime, identity = max(bound)
+    return runtime, identity
+
+
+def session_id() -> str:
+    if os.environ.get('CRAFTSMAN_SESSION_ID'):
+        return _clean(os.environ['CRAFTSMAN_SESSION_ID'])
+    nested = _nested()
+    if nested:
+        return nested[1]
+    raw = next((os.environ[key] for _, key in _INHERITED_IDS if os.environ.get(key)), '')
+    return _clean(raw)
 
 
 def host() -> str:
     bound = os.environ.get('CRAFTSMAN_SESSION_HOST')
     if bound in ('codex', 'grok', 'claude-code'):
         return bound
+    if not os.environ.get('CRAFTSMAN_SESSION_ID'):
+        nested = _nested()
+        if nested:
+            return nested[0]
     if os.environ.get('GROK_SESSION_ID') or os.environ.get('GROK_HOOK_EVENT'):
         return 'grok'
     if os.environ.get('CODEX_SESSION_ID') or os.environ.get('CODEX_THREAD_ID'):

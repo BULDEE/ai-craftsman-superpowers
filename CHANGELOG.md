@@ -143,11 +143,45 @@ Hermes keeps its own plugin manifest (`plugin.yaml`).
   headless guide (`--tools read_file,grep,list_dir`). The previous denylist
   named the shell tool `run_terminal_cmd` while hook payloads name it
   `run_terminal_command`; an allowlist with a wrong name fails closed.
+- Config protection judges the file a write REACHES, whatever its spelling.
+  A bare relative path, `//`, `/./`, an inner `..`, a symlinked parent
+  directory and a case change (`.Claude/Settings.json`, `PHPStan.neon`, an
+  upper-cased plugin path) all reached a protected file with exit 0 on
+  Claude Code and Grok. Each path is now joined to the payload's `cwd`,
+  resolved physically, and classified case-insensitively.
+- Under `bypassPermissions` the gate's own configuration (`.craft-config.yml`,
+  `.craft-rules.yml`, `.craftsman-baseline.json`) is denied instead of
+  asked: in that mode an ask proceeds without the user seeing it, and one
+  write of the global config could set `hooks.disabled` for every later
+  session. In the default mode it is still put to the user. If you run
+  `/craftsman:setup` in bypass mode, edit the file yourself or approve it
+  outside bypass mode.
+- The plugin's own data is protected like its code: registry caches, session
+  state, session bindings and the `~/.claude/craftsman-*` bridges. A forged
+  registry cache had turned a denied `phpstan.neon` into an allowed one. A
+  shell command can still write there (see SECURITY.md).
+- A registry that cannot be built refuses the write instead of judging it
+  against an empty list of protected configs; an unwritable cache directory
+  with no earlier cache compiles a private copy first.
+- A skill's `set-verified` is refused after a failing test run, until a
+  passing run clears it: the evidence a failure revoked can no longer be
+  restored by asking.
+- A session started from another host's shell carries both hosts' ids;
+  skills now resolve the innermost one (the most recent binding) instead of
+  whichever host a fixed order named first.
 - A gate is never written through a symlink: a symlinked gate file or gate
   directory is refused and its target left untouched. A first write honours
   the umask (0644 under 022) instead of the 0600 of a temporary file.
 - `SECURITY.md` gains "Host limits that weaken the gate": Grok's fail-open
   hook timeout, Codex's trust step, and shell-written files.
+
+### Fixed (test suite)
+
+- A test whose `cd` fails inside the plugin repository now stops, and no test
+  may run a git write there (`tests/lib/test-helpers.sh`). With `/tmp`
+  unwritable, `tests/core/test-hostile-repo.sh` fell back to the repository
+  and committed its fixtures on the current branch. Its work directory now
+  comes from `mktemp` under `$TMPDIR`.
 
 ### Documentation
 

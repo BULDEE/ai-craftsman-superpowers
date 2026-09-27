@@ -229,11 +229,19 @@ if [[ "${R%%|*}" == "2" ]] && [[ "${R#*|}" == *'"deny"'* && "${R#*|}" != *'"ask"
 else
     log_fail "gate config via apply_patch denied" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-200)"
 fi
-R=$(_run config-protection.sh "$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$WORK" "d['tool_input']['file_path']='$WORK/src/Domain/.craft-rules.yml'")")
+R=$(_run config-protection.sh "$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$WORK" "d['tool_input']['file_path']='$WORK/src/Domain/.craft-rules.yml'; d['permission_mode']='default'")")
 if [[ "${R%%|*}" == "0" ]] && [[ "${R#*|}" == *'"ask"'* ]]; then
-    log_pass "the same file through Claude Code Write still asks (the host supports it)"
+    log_pass "the same file through Claude Code Write still asks in the default permission mode (the host supports it)"
 else
     log_fail "Claude Code .craft-rules.yml still asks" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
+fi
+# The captured Claude Code payload runs under bypassPermissions, where an ask
+# proceeds unseen: the gate's own configuration is denied there (CR-204 F4).
+R=$(_run config-protection.sh "$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$WORK" "d['tool_input']['file_path']='$WORK/src/Domain/.craft-rules.yml'")")
+if [[ "${R%%|*}" == "2" ]] && [[ "${R#*|}" == *'"deny"'* && "${R#*|}" == *bypassPermissions* ]]; then
+    log_pass "under the captured bypassPermissions mode the same file is denied, since an ask would proceed unseen"
+else
+    log_fail "Claude Code .craft-rules.yml under bypassPermissions" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
 fi
 
 # --- post-write on apply_patch: every touched file is validated -----------
@@ -858,7 +866,7 @@ echo "--- challenge review: symlink alias, patched root, anchor scope ---"
 # F1: a symlink named like a source file pointing at the gate's own config
 ln -sf "$WORK/src/Domain/.craft-rules.yml" "$WORK/alias.ts" 2>/dev/null; mkdir -p "$WORK/src/Domain"; printf 'rules:\n  LAYER001: block\n' > "$WORK/src/Domain/.craft-rules.yml"; ln -sf "$WORK/src/Domain/.craft-rules.yml" "$WORK/alias.ts"
 R=$(_run config-protection.sh "$(host_fixture_with codex 0.154.0 pre-tool-use.apply_patch.multifile-move "$WORK" "d['tool_name']='Write'; d['tool_input']=dict(file_path='$WORK/alias.ts', content='rules: ignore')")")
-R2=$(_run config-protection.sh "$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$WORK" "d['tool_input']['file_path'] = '$WORK/alias.ts'; d['tool_input']['content'] = 'rules:\\n  LAYER001: ignore\\n'")")
+R2=$(_run config-protection.sh "$(host_fixture_with claude-code 2.1.272 pre-tool-use.write "$WORK" "d['tool_input']['file_path'] = '$WORK/alias.ts'; d['tool_input']['content'] = 'rules:\\n  LAYER001: ignore\\n'; d['permission_mode'] = 'default'")")
 if [[ "${R%%|*}" == "2" && "${R#*|}" == *'"deny"'* && "${R2#*|}" == *'"ask"'* ]]; then
     log_pass "F1: a write through a symlink named alias.ts that points at .craft-rules.yml is judged by the file it reaches (deny on Codex, ask on Claude Code)"
 else
@@ -960,7 +968,7 @@ R=$(cd "$WORK" && _run post-write-check.sh "$(host_fixture_with grok 1.0.30 post
 
 # config-protection reads the same envelope
 G_CFG=$(host_fixture_with grok 1.0.30 pre-tool-use.write "$WORK" \
-    "d['tool_input'].update(file_path='$WORK/.craft-rules.yml', content='rules:\n  LAYER001: ignore\n'); d['toolInput'] = dict(d['tool_input'])")
+    "d['tool_input'].update(file_path='$WORK/.craft-rules.yml', content='rules:\n  LAYER001: ignore\n'); d['toolInput'] = dict(d['tool_input']); d['permission_mode'] = 'default'")
 R=$(_run config-protection.sh "$G_CFG")
 # Grok's hooks guide: allow, deny, ask, defer are all honoured from
 # hookSpecificOutput.permissionDecision, so the gate asks there as it does on

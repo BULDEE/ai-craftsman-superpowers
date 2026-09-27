@@ -338,6 +338,15 @@ reads the absence of a warning as a guarantee:
 - **Codex runs no hook until you trust it.** Installing and enabling the
   plugin loads the handlers as untrusted; they refuse nothing until reviewed in
   `/hooks`.
+- **`ask` is only as strong as the permission mode.** Under
+  `bypassPermissions` an ask proceeds unseen, so there the gate's own
+  configuration is denied, not asked. Other modes that auto-approve are the
+  host's to document; the gate reads `permission_mode` from the payload.
+- **The plugin's data is protected from write tools, not from the shell.**
+  Registry caches, session state, bindings and bridges are refused to
+  Write, Edit and apply_patch; a shell command can still write them, like any
+  shell-written file, and a forged registry cache is trusted until a pack
+  manifest changes.
 - **Shell-written files are not gated before disk on any host.** The gate
   judges the host's write tools; `printf > file` or `sed -i` is caught by CI
   and the pre-push gate.

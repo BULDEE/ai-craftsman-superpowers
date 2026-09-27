@@ -155,6 +155,11 @@ On hosts where `craftsman-path` is not on PATH, run
 skill's path. Never use another host's wrapper or write a shared state file.
 If this fails, report "Session state update skipped" with the error.
 
+If it answers `refused: a test run failed in this session after the last pass`,
+the verdict is not a pass: a failing test run is the most recent evidence.
+Re-run the test suite until it is green (the hook restores the evidence on its
+own), then report. Never work around the refusal.
+
 This records evidence for the session. The pre-push hook warns when it is absent.
 
 ## Common Verification Commands

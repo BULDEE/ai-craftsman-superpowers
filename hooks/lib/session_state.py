@@ -340,6 +340,14 @@ def handle_set_verified(arguments: list[str]) -> None:
 
     state_path = arguments[0] if arguments else _resolve_session_state_path()
     state = read_state(state_path)
+    # Only a passing test run (the hook, which names the path it resolved from
+    # the payload) clears a failure. A skill asking without a path cannot
+    # restore evidence a failing run revoked (review of 4.12.0, CR-204 F7).
+    if not arguments and state.get('last_test_failed'):
+        print('refused: a test run failed in this session after the last pass; '
+              're-run the suite green to restore the verification evidence', file=sys.stderr)
+        sys.exit(1)
+    state['last_test_failed'] = False
     state['verified'] = True
     state['verified_at'] = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     write_state_atomically(state_path, state)

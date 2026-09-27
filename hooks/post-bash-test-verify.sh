@@ -180,6 +180,9 @@ if [[ "$STATE" == "failed" ]]; then
     mkdir -p "$DATA_DIR" 2>/dev/null || true
     printf '%s test failure: %s (exit %s)\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$COMMAND" "${EXIT_CODE:-?}" \
         >> "${DATA_DIR}/test-failures.log" 2>/dev/null || true
+    # Remembered even when nothing was verified yet: a skill's set-verified is
+    # refused until a passing run clears it (CR-204 F7).
+    python3 "$LIB_DIR/session_state.py" merge "$SESSION_STATE" last_test_failed true 2>/dev/null || true
     if [[ "$CURRENT" == "true" ]]; then
         python3 "$LIB_DIR/session_state.py" merge "$SESSION_STATE" verified false 2>/dev/null || true
         # The wake is for a failure this layer can attribute to the runner.
