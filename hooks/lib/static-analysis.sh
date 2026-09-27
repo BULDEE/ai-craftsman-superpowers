@@ -36,6 +36,29 @@ sa_timeout() {
     return $status
 }
 
+# An adapter's result reaches the front-end on stdout and nowhere else. The
+# adapter runs inside at least one command substitution, the front-end's own
+# `$(sa_analyze_file ...)`, so anything it does to shell state dies with that
+# subshell: errcheck and clippy declared their coverage straight into
+# precedence.sh from there, the declaration never reached the shell that
+# flushes, and a clean run left the regex finding standing while a run with a
+# finding produced it twice (CR-172). A record on stdout survives every level
+# of substitution between the adapter and the front-end, which applies it.
+#
+# The prefix cannot open a finding: every finding line starts with the rule
+# code the adapter wrote, and no rule code starts with `@`.
+SA_COVERED_RECORD="@covered "
+
+# sa_declare_covered <rule>... - the run that just ended gave a verdict on these
+# rules, clean or not. Called only after a run that produced one: no verdict is
+# not a clean verdict, and an undeclared rule is left to Level 1.
+sa_declare_covered() {
+    local rule
+    for rule in "$@"; do
+        printf '%s%s\n' "$SA_COVERED_RECORD" "$rule"
+    done
+}
+
 # Running the project's analysers means running the project's code (its
 # binaries under vendor/bin or node_modules/.bin, and the config files they
 # auto-discover). Refuse unless the machine owner allowed it globally.

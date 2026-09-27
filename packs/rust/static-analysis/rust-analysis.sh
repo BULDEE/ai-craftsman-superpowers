@@ -110,10 +110,9 @@ pack_sa_rust() {
 
     [[ $status -eq 124 ]] && return 0
 
-    if type precedence_declare_covered >/dev/null 2>&1; then
-        precedence_declare_covered "RUST001"
-        precedence_declare_covered "RUST005"
-    fi
+    # A record in the result, not a call into precedence: this runs inside the
+    # dispatcher's command substitution, where such a call dies unread.
+    sa_declare_covered "RUST001" "RUST005"
 
     printf '%s' "$output" | _pack_sa_rust_filter "$absolute" "$manifest"
 }

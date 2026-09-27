@@ -831,6 +831,42 @@ else
         "$(echo "$external_out" | tr '\n' ' ' | cut -c1-300)"
 fi
 
+# --- A clean clippy run answers for RUST001 --------------------------------------
+#
+# pack.yml hands RUST001 and RUST005 to clippy, and the adapter declared that
+# coverage inside the dispatcher's command substitution, where it died: a clean
+# clippy run left the regex's blocking RUST001 standing beside it (review of
+# main eb54d13, CR-172). A stub cargo on PATH plays the clean run; the hook is
+# the consumer.
+CLIPPY_WORK="$WORK/clippy"
+CLIPPY_MARKER="$CLIPPY_WORK/clippy-ran"
+mkdir -p "$CLIPPY_WORK/project/src" "$CLIPPY_WORK/bin" "$CLIPPY_WORK/home/.claude" "$CLIPPY_WORK/data"
+printf '[package]\nname = "probe"\nversion = "0.1.0"\nedition = "2021"\n' > "$CLIPPY_WORK/project/Cargo.toml"
+printf 'trust_project_tools: true\n' > "$CLIPPY_WORK/home/.claude/.craft-config.yml"
+cat > "$CLIPPY_WORK/project/src/lib.rs" <<'RS'
+/// Reads the configured value.
+pub fn configured(value: Option<u32>) -> u32 {
+    value.unwrap()
+}
+RS
+cat > "$CLIPPY_WORK/bin/cargo" <<STUB
+#!/usr/bin/env bash
+[[ "\$*" == "clippy --version" ]] && { echo "clippy 0.1.80"; exit 0; }
+touch "$CLIPPY_MARKER"
+exit 0
+STUB
+chmod +x "$CLIPPY_WORK/bin/cargo"
+CLIPPY_ENV=("HOME=$CLIPPY_WORK/home" "PATH=$CLIPPY_WORK/bin:$PATH" "CLAUDE_PLUGIN_ROOT=$ROOT_DIR"
+    "CLAUDE_PLUGIN_DATA=$CLIPPY_WORK/data")
+clippy_out="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$CLIPPY_WORK/project/src/lib.rs" \
+    | ( cd "$CLIPPY_WORK/project" && env "${CLIPPY_ENV[@]}" bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1 ))"
+if [[ -f "$CLIPPY_MARKER" ]] && ! echo "$clippy_out" | grep -q 'RUST001'; then
+    log_pass "a clean clippy run answers for RUST001 in the hook"
+else
+    log_fail "a clean clippy run answers for RUST001 in the hook" \
+        "ran=$([[ -f "$CLIPPY_MARKER" ]] && echo yes || echo no): $(echo "$clippy_out" | grep -oE 'RUST001[^\\]*' | head -1)"
+fi
+
 # --- The canonical example must survive its own pack -------------------------
 #
 # The Iron Law loads this file before scaffolding. A canonical example that its

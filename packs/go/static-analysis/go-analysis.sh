@@ -22,10 +22,12 @@
 # types, so it sees the ignored error on a call into the project's own code,
 # which is where the interesting ones are. pack.yml declares
 # `errcheck=GO004,GO006`, so when errcheck runs it owns those codes and the
-# regex defers; when it is absent, times out, or is configured to skip a
-# package, precedence_flush re-emits the Level 1 finding with full severity
+# regex defers; when it is absent, times out, crashes, or is configured to skip
+# a package, precedence_flush re-emits the Level 1 finding with full severity
 # resolution. No verdict is not a clean verdict, which is why the coverage is
-# declared only on a run that actually happened.
+# declared only on a run that actually produced one, and declared as a record
+# in the result (sa_declare_covered) rather than into the caller's shell state,
+# which this function never reaches.
 # =============================================================================
 
 _pack_sa_go_bin() {
@@ -42,23 +44,27 @@ _pack_sa_go_bin() {
 
 pack_sa_go() {
     local file="$1"
-    local binary
+    local binary output status=0
     binary="$(_pack_sa_go_bin)" || return 0
     [[ -f "$file" ]] || return 0
 
-    # Declared here rather than left to the orchestrator: errcheck answers for
-    # GO004 and GO006 whether or not it found anything, and a clean run is a
-    # verdict. It is declared only past the binary probe, so an absent errcheck
-    # never silences the Level 1 rules.
-    if type precedence_declare_covered >/dev/null 2>&1; then
-        precedence_declare_covered "GO004"
-        precedence_declare_covered "GO006"
-    fi
-
     # It is asked for one package rather than ./... because this runs per
     # file on a write, and a repository-wide pass is a CI concern, not a
-    # keystroke concern.
-    "$binary" "$(dirname "$file")" 2>/dev/null | _pack_sa_go_findings "$file"
+    # keystroke concern. Under the central budget like every other analyser:
+    # called directly, no CRAFTSMAN_SA_BUDGET_* could stop it.
+    output=$(sa_timeout "$SA_BUDGET_FILE_SECONDS" "$binary" "$(dirname "$file")" 2>/dev/null) || status=$?
+
+    # errcheck exits 0 when every error is checked and 1 when it found one:
+    # both are verdicts. 2 is its fatal exit (a package that does not load)
+    # and 124 is the budget; neither says anything about GO004 or GO006, so
+    # the regex keeps them.
+    [[ $status -le 1 ]] || return 0
+
+    # Declared here rather than left to the orchestrator: errcheck answers for
+    # GO004 and GO006 whether or not it found anything, and a clean run is a
+    # verdict.
+    sa_declare_covered "GO004" "GO006"
+    printf '%s\n' "$output" | _pack_sa_go_findings "$file"
 }
 
 # errcheck reports `path:line:col\ttext`, one line per finding; only the lines
