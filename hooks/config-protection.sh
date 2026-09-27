@@ -55,20 +55,29 @@ fi
 CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null || true)
 [[ -n "$CWD" ]] || CWD="$PWD"
 _canonical() {
-    local p="$1" dir
-    case "$p" in "~/"*) p="${HOME}/${p#\~/}" ;; /*) ;; *) p="${CWD%/}/$p" ;; esac
-    if dir=$(cd "${p%/*}/" 2>/dev/null && pwd -P); then
-        p="${dir%/}/${p##*/}"
-        [[ -L "$p" ]] || { printf '%s\n' "$p"; return; }
+    local target="$1" dir
+    case "$target" in
+        "~/"*) target="${HOME}/${target#\~/}" ;;
+        /*) ;;
+        *) target="${CWD%/}/$target" ;;
+    esac
+    if dir=$(cd "${target%/*}/" 2>/dev/null && pwd -P); then
+        target="${dir%/}/${target##*/}"
+        if [[ ! -L "$target" ]]; then
+            printf '%s\n' "$target"
+            return
+        fi
     fi
-    python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$p" 2>/dev/null || printf '%s\n' "$p"
+    python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$target" 2>/dev/null || printf '%s\n' "$target"
 }
 CANONICAL=""
 while IFS= read -r FILE_PATH; do
     [[ -n "$FILE_PATH" ]] && CANONICAL+="$(_canonical "$FILE_PATH")"$'\n'
 done <<< "$FILE_PATHS"
 FILE_PATHS="${CANONICAL%$'\n'}"
-_lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+_lower() {
+    printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
 PLUGIN_ROOT_LOWER=""
 [[ -n "${CLAUDE_PLUGIN_ROOT:-}" ]] && PLUGIN_ROOT_LOWER=$(_lower "$(cd "$CLAUDE_PLUGIN_ROOT" 2>/dev/null && pwd -P || printf '%s' "$CLAUDE_PLUGIN_ROOT")")
 
@@ -90,7 +99,9 @@ PLUGIN_ROOT_LOWER=""
 #          own files: no project session has a legitimate reason to write
 #          either, and a hook is a script re-read on every call.
 _gate_own_config() {
-    case "$(_lower "${1##*/}")" in
+    local name
+    name=$(_lower "${1##*/}")
+    case "$name" in
         .craft-rules.yml|.craft-config.yml|.craftsman-baseline.json) return 0 ;;
     esac
     return 1

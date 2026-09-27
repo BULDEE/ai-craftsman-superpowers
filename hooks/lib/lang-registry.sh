@@ -80,34 +80,44 @@ _lang_registry_private_copy() {
 _lang_registry_build_cache() {
     local label="$1"
     shift
-    local cache_dir key cache private
+    local cache_dir key cache
     cache_dir=$(_lang_registry_cache_dir)
     [[ -n "$cache_dir" ]] || return 0
     key=$(_lang_registry_cache_key "$@")
     cache="${cache_dir}/lang-${label}-${key}.tsv"
-
     if _lang_registry_is_stale "$cache" "$@"; then
-        if command -v python3 >/dev/null 2>&1; then
-            # Only a compile that succeeded AND produced rows replaces the
-            # cache; a failure is said once and leaves the previous cache.
-            if python3 "$(_lang_registry_builder)" "$@" > "${cache}.tmp" 2>/dev/null && [[ -s "${cache}.tmp" ]]; then
-                mv -f "${cache}.tmp" "$cache" 2>/dev/null || rm -f "${cache}.tmp"
-            elif [[ ! -s "$cache" ]] && private=$(_lang_registry_private_copy "$@"); then
-                rm -f "${cache}.tmp"
-                printf '%s' "$private"
-                return 0
-            else
-                rm -f "${cache}.tmp"
-                echo "craftsman: the language registry could not be compiled from the pack manifests; the previous registry stays in use" >&2
-            fi
-        else
-            # No python3: an empty registry disables every pack validator, and
-            # a silent pass is exactly the failure mode this file exists to
-            # remove. Say so once, on stderr, and keep the hook alive.
-            echo "craftsman: python3 not found, no language was registered and no pack validator will run" >&2
-            : > "$cache"
-        fi
+        _lang_registry_rebuild "$cache" "$@"
+        return 0
     fi
+    printf '%s' "$cache"
+}
+
+# _lang_registry_rebuild <cache> <pack.yml>... prints the registry to read.
+_lang_registry_rebuild() {
+    local cache="$1" private
+    shift
+    if ! command -v python3 >/dev/null 2>&1; then
+        # No python3: an empty registry disables every pack validator, and
+        # a silent pass is exactly the failure mode this file exists to
+        # remove. Say so once, on stderr, and keep the hook alive.
+        echo "craftsman: python3 not found, no language was registered and no pack validator will run" >&2
+        : > "$cache"
+        printf '%s' "$cache"
+        return 0
+    fi
+    # Only a compile that succeeded AND produced rows replaces the cache; a
+    # failure is said once and leaves the previous cache.
+    if python3 "$(_lang_registry_builder)" "$@" > "${cache}.tmp" 2>/dev/null && [[ -s "${cache}.tmp" ]]; then
+        mv -f "${cache}.tmp" "$cache" 2>/dev/null || rm -f "${cache}.tmp"
+        printf '%s' "$cache"
+        return 0
+    fi
+    rm -f "${cache}.tmp"
+    if [[ ! -s "$cache" ]] && private=$(_lang_registry_private_copy "$@"); then
+        printf '%s' "$private"
+        return 0
+    fi
+    echo "craftsman: the language registry could not be compiled from the pack manifests; the previous registry stays in use" >&2
     printf '%s' "$cache"
 }
 
