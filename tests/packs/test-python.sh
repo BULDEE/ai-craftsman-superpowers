@@ -200,6 +200,22 @@ else
     log_fail "WARN-PY001: detects 4+ parameters" "not detected"
 fi
 
+# Test: WARN-PY001 counts parameters, not the commas of a return annotation.
+# `def resolve(verb, args, where) -> tuple[str, list[str]]` has three
+# parameters and was reported as 4+: the pattern ran past the closing
+# parenthesis into the annotation.
+cat > "$tmpfile" << 'PYTHON'
+def resolve(verb: str, args: list[str], where: str) -> tuple[str, list[str]]:
+    return verb, args
+PYTHON
+VIOLATIONS=""
+pack_validate_python "$tmpfile"
+if echo -e "$VIOLATIONS" | grep -q "WARN-PY001"; then
+    log_fail "WARN-PY001: a return annotation's commas are not parameters" "reported on a three-parameter function"
+else
+    log_pass "WARN-PY001: a return annotation's commas are not parameters"
+fi
+
 # Test: Clean Python file passes without violations
 cat > "$tmpfile" << 'PYTHON'
 """Clean module."""
