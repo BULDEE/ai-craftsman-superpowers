@@ -79,6 +79,6 @@ plugin root (`bash <plugin root>/bin/<name>`).
 | Helper | What it does |
 |--------|--------------|
 | `craftsman-healthcheck --report` | The same diagnostic as `/craftsman:healthcheck`, from a shell |
-| `craftsman-ci export --target <t>` | Export doctrine (`agents-md`, `cursor`, `copilot`; `all` writes these three), Codex roles (`codex-agents`) or a host gate (`grok-hooks`, `codex-hooks`) |
+| `craftsman-ci export --target <t>` | Export doctrine (`agents-md`, `cursor`, `copilot`; `all` writes these three), Codex roles (`codex-agents`) or the Grok gate (`grok-hooks`) |
 | `craftsman-grok-install` | Install on Grok and write the global gate `~/.grok/hooks/craftsman.json` |
 | `craftsman-runtime metrics` | Print the metrics database of the current host and session |

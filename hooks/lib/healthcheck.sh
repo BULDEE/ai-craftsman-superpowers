@@ -247,7 +247,7 @@ hc_check_host() {
 # Grok (and any host whose matrix sets plugin_hooks_executed to false) lists
 # a plugin's hooks/hooks.json and runs none of it. The write gate is live
 # there only when a project or global hooks file actually calls
-# pre-write-check.sh. skills_dir `.grok/skills` -> `.grok/hooks/craftsman.json`.
+# pre-write-check.sh. The gate path is the row's gate_file.
 _hc_gate_relpath() {
     local root="$1" host="$2"
     python3 "$root/ci/host_hooks.py" --gate-rel "$root" "$host" 2>/dev/null
@@ -340,7 +340,10 @@ hc_check_write_gate() {
         _hc_record_gate_owner "$host" "$root" "$gate"
         return
     fi
-    _hc_record "write-gate" "warn" "${host}: native plugin handlers are absent from the initial registry. The write gate is inert at startup on 1.0.40 until craftsman-ci export --target grok-hooks writes ~/.grok/hooks/craftsman.json (bin/craftsman-grok-install does this). A fresh process runs neither a hooks.json path nor inline plugin hooks."
+    local rel installer
+    rel=$(_hc_gate_relpath "$root" "$host")
+    installer=$(jq -r --arg h "$host" '.hosts[$h].gate_export.installer // empty' "$capabilities" 2>/dev/null)
+    _hc_record "write-gate" "warn" "${host}: this host runs none of the plugin's own hooks, so the write gate is inert until craftsman-ci export --target ${host}-hooks writes ~/${rel}${installer:+ (${installer} does this)}"
 }
 
 # A generated gate names the install that wrote it. Same root and same

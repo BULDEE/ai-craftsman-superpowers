@@ -67,6 +67,22 @@ Hermes keeps its own plugin manifest (`plugin.yaml`).
   when the store is unavailable: the write gate still judges the code.
 - The session context is resolved in one Python process instead of several
   helper processes per hook.
+- Host facts live in `hooks/host-capabilities.json` only. The gate exporter
+  (`ci/host_hooks.py`) reads each host's `gate_file` and `gate_export` row
+  (timeout, native environment names, tool aliases, conditional handlers,
+  data directory) and derives the events a host does not fire from its
+  `events_loaded`. A test fails when a host name, host environment name or
+  host tool name is typed in the exporter again.
+- `craftsman-ci export --target codex-hooks` is refused and writes nothing.
+  Codex runs the plugin's `hooks/hooks.json` natively once trusted and reads
+  user or project hooks only from `hooks.json` or `config.toml` next to a
+  config layer ([Codex hooks](https://developers.openai.com/codex/hooks)),
+  never from `.codex/hooks/*.json`: the file this target wrote was read by
+  nothing.
+- `bin/craftsman-grok-install` reads `grok plugin list --json` to know
+  whether this checkout is already installed, instead of matching the
+  wording of an install error, and prints the checkout's origin and commit
+  before trusting it.
 
 ### Fixed
 
@@ -127,6 +143,9 @@ Hermes keeps its own plugin manifest (`plugin.yaml`).
   headless guide (`--tools read_file,grep,list_dir`). The previous denylist
   named the shell tool `run_terminal_cmd` while hook payloads name it
   `run_terminal_command`; an allowlist with a wrong name fails closed.
+- A gate is never written through a symlink: a symlinked gate file or gate
+  directory is refused and its target left untouched. A first write honours
+  the umask (0644 under 022) instead of the 0600 of a temporary file.
 - `SECURITY.md` gains "Host limits that weaken the gate": Grok's fail-open
   hook timeout, Codex's trust step, and shell-written files.
 

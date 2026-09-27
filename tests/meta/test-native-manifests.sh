@@ -43,14 +43,42 @@ PATH="$FIXTURE/tools:$PATH" bash "$FIXTURE/bin/craftsman-grok-install" --compat-
 assert_contains 'explicit compatibility retains the hook export' "$(cat "$CALL_LOG")" 'ci export --target grok-hooks'
 PATH="$FIXTURE/tools:$PATH" bash "$FIXTURE/bin/craftsman-grok-install" --invalid >/dev/null 2>&1
 assert_exit_code 'unknown install modes are rejected' 2 "$?"
+# Already installed is read from `grok plugin list --json`, not from the
+# wording of an install error: the install is skipped, the gate still written.
+FIXTURE_REAL=$(cd "$FIXTURE" && pwd -P)
 cat > "$FIXTURE/tools/grok" << EOF
 #!/bin/sh
-cat "$ROOT/tests/fixtures/hosts/grok/1.0.41/plugin-install-second.txt" >&2
-exit 1
+printf "grok %s\\n" "\$*" >> "\$CALL_LOG"
+case "\$*" in
+    "plugin list --json") printf '[{"status":"installed","name":"craftsman","source":"%s"}]' "$FIXTURE_REAL" ;;
+    "plugin install"*) exit 1 ;;
+esac
 EOF
 chmod +x "$FIXTURE/tools/grok" "$FIXTURE/ci/craftsman-ci.sh"
 : > "$CALL_LOG"
-HOME="$FIXTURE/home" PATH="$FIXTURE/tools:$PATH" bash "$FIXTURE/bin/craftsman-grok-install" >/dev/null 2>&1 || true
+HOME="$FIXTURE/home" PATH="$FIXTURE/tools:$PATH" bash "$FIXTURE/bin/craftsman-grok-install" >/dev/null 2>&1; RC=$?
 assert_contains 'already installed still exports the gate' "$(cat "$CALL_LOG")" 'ci export --target grok-hooks'
+assert_exit_code 'already installed from this checkout is not an error' 0 "$RC"
+if grep -q 'grok plugin install' "$CALL_LOG"; then
+    log_fail 'already installed skips the install' "$(cat "$CALL_LOG")"
+else
+    log_pass 'already installed skips the install'
+fi
+# Not installed and the install fails: nothing is exported.
+cat > "$FIXTURE/tools/grok" << 'EOF'
+#!/bin/sh
+printf "grok %s\n" "$*" >> "$CALL_LOG"
+case "$*" in
+    "plugin list --json") printf '[]' ;;
+    "plugin install"*) echo "install failed" >&2; exit 3 ;;
+esac
+EOF
+: > "$CALL_LOG"
+HOME="$FIXTURE/home" PATH="$FIXTURE/tools:$PATH" bash "$FIXTURE/bin/craftsman-grok-install" >/dev/null 2>&1; RC=$?
+if [[ "$RC" -ne 0 ]] && ! grep -q 'ci export' "$CALL_LOG"; then
+    log_pass 'a failed install exports no gate and fails'
+else
+    log_fail 'a failed install exports no gate and fails' "rc=$RC calls=$(tr '\n' '|' < "$CALL_LOG")"
+fi
 rm -rf "$FIXTURE"
 test_summary
