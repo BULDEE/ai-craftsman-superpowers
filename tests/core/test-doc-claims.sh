@@ -117,6 +117,46 @@ else
         "the table carries ${DOC_RULES} rules, the registry compiles ${REGISTRY_COUNT}"
 fi
 
+# -----------------------------------------------------------------------------
+# 7. An example never declares Level 2 active without consent and a run.
+# -----------------------------------------------------------------------------
+# examples/healthcheck/01-plugin-diagnostic.md went from "vendor/bin/phpstan
+# found" to "Level 2: active, fully operational". sa_analyze_file returns
+# before any analyser runs unless the machine owner set trust_project_tools in
+# the global file, so on a fresh install that verdict was false (CR-178, M18).
+# The example's own commands are run: the consent check against both answers,
+# the probe through the gate's dispatcher with a stand-in phpstan.
+DIAG="$ROOT_DIR/examples/healthcheck/01-plugin-diagnostic.md"
+example_block() {
+    awk -v label="$2" '!found && /^#/ && index($0, label){found=1; next}
+        found && /^```bash/{code=1; next}
+        code && /^```/{exit}
+        code' "$1"
+}
+unconsented=$(grep -rlE 'Level 2[^|]*\*\*active\*\*' "$ROOT_DIR/examples" 2>/dev/null \
+    | while IFS= read -r f; do grep -q 'trust_project_tools' "$f" || echo "${f#"$ROOT_DIR"/}"; done)
+CONSENT_CMD=$(example_block "$DIAG" "Check the consent")
+PROBE_CMD=$(example_block "$DIAG" "Observe a run")
+L2_DIR=$(mktemp -d "${TMPDIR:-/tmp}/doc-claims-l2.XXXXXX")
+mkdir -p "$L2_DIR/home/.claude" "$L2_DIR/project/vendor/bin" "$L2_DIR/tmp"
+printf '#!/bin/sh\necho "$2:4:Undefined variable: \\$total"\n' > "$L2_DIR/project/vendor/bin/phpstan"
+chmod +x "$L2_DIR/project/vendor/bin/phpstan"
+l2_run() {
+    (cd "$L2_DIR/project" && HOME="$L2_DIR/home" TMPDIR="$L2_DIR/tmp" PATH="$ROOT_DIR/bin:$PATH" \
+        bash -c "$1" 2>/dev/null | tr '\n' ' ')
+}
+CONSENT_OFF=$(l2_run "$CONSENT_CMD"); PROBE_OFF=$(l2_run "$PROBE_CMD")
+printf 'v: 4\ntrust_project_tools: true\n' > "$L2_DIR/home/.claude/.craft-config.yml"
+CONSENT_ON=$(l2_run "$CONSENT_CMD"); PROBE_ON=$(l2_run "$PROBE_CMD")
+rm -rf "$L2_DIR"
+if [[ -z "$unconsented" && -n "$CONSENT_CMD" && -n "$PROBE_CMD" \
+      && "$CONSENT_OFF" == *"not trusted"* && "$CONSENT_ON" != *"not trusted"* && "$CONSENT_ON" == *trusted* \
+      && "$PROBE_OFF" != *PHPSTAN* && "$PROBE_ON" == *PHPSTAN002* ]]; then
+    log_pass "the diagnostic example checks consent and observes Level 2 run before calling it active"
+else
+    log_fail "Level 2 declared active without consent and an observed run" \
+        "unconsented examples: '${unconsented}'; consent off/on: '${CONSENT_OFF}'/'${CONSENT_ON}'; probe off/on: '${PROBE_OFF}'/'${PROBE_ON}'"
+fi
 
 # A skill body is text handed to a model: the host expands nothing in it, and
 # Claude Code 2.1.278 exports no CLAUDE_PLUGIN_ROOT to the Bash tool at all
