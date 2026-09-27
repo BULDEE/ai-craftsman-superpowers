@@ -532,6 +532,48 @@ mod tests {
 }
 RS
 
+# An attribute belongs to the item right after it. `#[cfg(test)] mod tests;`
+# declares a module whose body lives in tests.rs, and the test range used to
+# run to the next `{` in the file: the body of the first production function
+# after the declaration, whose unwrap was then read as test code (review of
+# main eb54d13, CR-172). rustc accepts this file as written.
+run_rs RUST001 raises "an external #[cfg(test)] module declaration does not exempt the next function" <<'RS'
+#[cfg(test)]
+mod tests;
+
+/// Reads the configured value.
+pub fn configured(value: Option<u32>) -> u32 {
+    value.unwrap()
+}
+RS
+
+run_rs RUST001 raises "a #[path] between the attribute and the declaration changes nothing" <<'RS'
+#[cfg(test)]
+#[path = "configured_tests.rs"]
+mod tests;
+
+/// Reads the configured value.
+pub fn configured(value: Option<u32>) -> u32 {
+    value.unwrap()
+}
+RS
+
+# The item ends on its own `;` at depth zero, not on the first `;` met: the
+# one inside `[u32; 2]` belongs to the signature, and stopping there would
+# take the exemption away from a test helper's body.
+run_rs RUST001 clean "a #[cfg(test)] helper whose signature holds a ; stays exempt" <<'RS'
+/// Adds the numbers.
+pub fn add(left: u32, right: u32) -> u32 {
+    left + right
+}
+
+#[cfg(test)]
+fn fixture() -> [u32; 2] {
+    let parsed: u32 = "12".parse().unwrap();
+    [parsed; 2]
+}
+RS
+
 # The standard library writes SAFETY notes over two or three lines, and so does
 # clippy's own documentation for undocumented_unsafe_blocks.
 run_rs RUST003 clean "a multi-line SAFETY comment counts" <<'RS'
@@ -766,6 +808,27 @@ if echo "$e2e_out" | grep -q "LAYER001"; then
 else
     log_fail "LAYER001 reaches the pipeline as well as the hook" \
         "$(echo "$e2e_out" | tr '\n' ' ')"
+fi
+
+# The external test module again, through the pipeline this time: the scanner
+# is shared, and a fix proven on the validator alone says nothing about the
+# consumer that fails a build.
+mkdir -p "$E2E/src/config"
+cat > "$E2E/src/config/mod.rs" <<'RS'
+#[cfg(test)]
+mod tests;
+
+/// Reads the configured value.
+pub fn configured(value: Option<u32>) -> u32 {
+    value.unwrap()
+}
+RS
+external_out="$(cd "$E2E" && CLAUDE_PLUGIN_ROOT="$ROOT_DIR" bash "$ROOT_DIR/ci/craftsman-ci.sh" --format json src/config/mod.rs 2>&1)"
+if echo "$external_out" | grep -q '"rule":"RUST001".*"line":6'; then
+    log_pass "the pipeline refuses the unwrap after an external #[cfg(test)] module"
+else
+    log_fail "the pipeline refuses the unwrap after an external #[cfg(test)] module" \
+        "$(echo "$external_out" | tr '\n' ' ' | cut -c1-300)"
 fi
 
 # --- The canonical example must survive its own pack -------------------------
