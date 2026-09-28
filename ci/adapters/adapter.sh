@@ -122,11 +122,32 @@ _adapter_comment_footer() {
     echo "*craftsman${1:+ v$1} -- [docs](https://github.com/BULDEE/ai-craftsman-superpowers)*"
 }
 
-_adapter_comment_header() {
-    local status="Passed"
-    [[ "$ADAPTER_C_WARNINGS" -gt 0 ]] && status="Passed with warnings"
-    [[ "$ADAPTER_C_VIOLATIONS" -gt 0 ]] && status="Failed"
+# The heading says what the exit decides, asked of the exit's own function. It
+# was recomputed from the two counters, so a report that scanned no file read
+# "Passed" above a job adapter_compute_exit failed with 2 (CR-211).
+_adapter_comment_status() {
+    local exit_code=0
+    adapter_compute_exit "$1" 2>/dev/null || exit_code=$?
+    case "$exit_code" in
+        0) printf 'Passed' ;;
+        1) printf 'Passed with warnings' ;;
+        *) printf 'Failed' ;;
+    esac
+}
 
+# A zero-file run passes only under --changed-only, on a diff with no source
+# file; any other one has not run, and the reader needs to know which.
+_adapter_comment_scope_note() {
+    [[ "$ADAPTER_C_FILES" -eq 0 ]] || return 0
+    if [[ "$1" == "Passed" ]]; then
+        printf 'The diff holds no source file a pack recognises, so there was nothing to validate.\n\n'
+        return 0
+    fi
+    printf 'No source file was scanned, so this run is not a pass. Check the paths the job passes to craftsman-ci.\n\n'
+}
+
+_adapter_comment_header() {
+    local status="$1"
     cat <<EOF
 ## Craftsman Quality Gate -- ${status}
 
@@ -193,7 +214,10 @@ adapter_format_comment() {
         _adapter_comment_footer ""
         return 0
     fi
-    _adapter_comment_header
+    local status
+    status=$(_adapter_comment_status "$report_file")
+    _adapter_comment_header "$status"
+    _adapter_comment_scope_note "$status"
     [[ "$ADAPTER_C_ISSUES" -gt 0 ]] && _adapter_comment_issue_table "$report_file"
 
     _adapter_comment_footer "$ADAPTER_C_VERSION"

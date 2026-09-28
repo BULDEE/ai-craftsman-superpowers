@@ -614,6 +614,39 @@ for bad in unreadable empty nosummary; do
     fi
 done
 
+# The heading says what the exit decides. It was recomputed from the two
+# counters, so a report that scanned no file read "Passed" above a job the exit
+# failed with 2 (CR-211). Each shape is checked against adapter_compute_exit
+# itself; the --changed-only empty diff is the one zero-file run that passes.
+cat > "$TEMP_DIR/zero-report.json" <<'JSON'
+{"version": "4.12.2", "config": {}, "summary": {"files_scanned": 0, "violations": 0, "warnings": 0}, "violations": []}
+JSON
+cat > "$TEMP_DIR/zero-changed-report.json" <<'JSON'
+{"version": "4.12.2", "config": {}, "scope": {"changed_only": true}, "summary": {"files_scanned": 0, "violations": 0, "warnings": 0}, "violations": []}
+JSON
+for shape in clean violations warnings zero zero-changed; do
+    comment=$(adapter_format_comment "$TEMP_DIR/${shape}-report.json" 2>/dev/null)
+    heading=$(printf '%s\n' "$comment" | grep -m1 '^## Craftsman Quality Gate -- ')
+    shape_exit=0
+    adapter_compute_exit "$TEMP_DIR/${shape}-report.json" 2>/dev/null || shape_exit=$?
+    case "$shape_exit" in
+        0) expected="## Craftsman Quality Gate -- Passed" ;;
+        1) expected="## Craftsman Quality Gate -- Passed with warnings" ;;
+        *) expected="## Craftsman Quality Gate -- Failed" ;;
+    esac
+    if [[ "$heading" == "$expected" ]]; then
+        log_pass "$shape report: the heading agrees with exit $shape_exit"
+    else
+        log_fail "$shape report heading" "exit $shape_exit, heading '$heading', expected '$expected'"
+    fi
+done
+zero_comment=$(adapter_format_comment "$TEMP_DIR/zero-report.json" 2>/dev/null)
+if [[ "$zero_comment" == *"No source file was scanned"* ]]; then
+    log_pass "a zero-file report says no file was scanned"
+else
+    log_fail "zero-file report" "the comment does not say why the run failed"
+fi
+
 # Every provider builds its comment from that helper. Each is asked, through
 # its own adapter_comment, for the body it would deliver: github through a gh
 # stand-in that records the POST, gitlab and bitbucket on their no-token path,

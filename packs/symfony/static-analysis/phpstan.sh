@@ -47,28 +47,45 @@ _pack_sa_phpstan_binary() {
 # Without an explicit --configuration, PHPStan auto-discovers phpstan.neon from
 # the working directory, and its bootstrapFiles key require()s arbitrary PHP
 # before analysis. A trusted phpstan binary is not enough: pin the config so a
-# repository cannot supply one.
+# repository cannot supply one. Without a pinned config it does not run at all:
+# the fallback that ran it bare when mktemp failed handed the repository's
+# phpstan.neon back its bootstrapFiles.
+#
+# The status is returned, not flattened with `|| true`: a fatal error and a
+# stopped run printed nothing, and nothing read exactly like a clean file
+# (CR-212).
 _pack_sa_phpstan_run() {
-    local phpstan="$1" file="$2" safe_conf output
-    safe_conf=$(mktemp -t craftsman-phpstan.XXXXXX) || safe_conf=""
-    if [[ -z "$safe_conf" ]]; then
-        sa_timeout "$SA_BUDGET_FILE_SECONDS" $phpstan analyse "$file" --level=max --no-progress --error-format=raw 2>/dev/null || true
-        return 0
-    fi
+    local phpstan="$1" file="$2" safe_conf status=0
+    safe_conf=$(mktemp -t craftsman-phpstan.XXXXXX) || return 1
     printf 'parameters:\n    level: max\n' > "$safe_conf"
-    output=$(sa_timeout "$SA_BUDGET_FILE_SECONDS" $phpstan analyse "$file" --configuration="$safe_conf" --no-progress --error-format=raw 2>/dev/null) || true
+    sa_timeout "$SA_BUDGET_FILE_SECONDS" $phpstan analyse "$file" --configuration="$safe_conf" --no-progress --error-format=raw 2>/dev/null || status=$?
     rm -f "$safe_conf"
-    printf '%s' "$output"
+    return "$status"
+}
+
+# PHPStan exits 0 with no error and 1 with errors, which the raw format prints
+# one per line. A fatal error exits 255 with nothing on stdout, and an exit 1
+# that printed nothing is no verdict either.
+_pack_sa_phpstan_answered() {
+    [[ "$1" == "0" ]] && return 0
+    [[ "$1" == "1" && -n "$2" ]]
 }
 
 _pack_sa_phpstan() {
-    local file="$1" phpstan output line lineno msg code errors=""
+    local file="$1" phpstan output status=0
     phpstan=$(_pack_sa_phpstan_binary)
     [[ -z "$phpstan" ]] && return 0
 
-    output=$(_pack_sa_phpstan_run "$phpstan" "$file")
-    [[ -z "$output" ]] && return 0
+    output=$(_pack_sa_phpstan_run "$phpstan" "$file") || status=$?
+    if ! _pack_sa_phpstan_answered "$status" "$output"; then
+        sa_declare_incomplete "phpstan" "$status"
+        return 0
+    fi
+    _pack_sa_phpstan_findings "$output"
+}
 
+_pack_sa_phpstan_findings() {
+    local output="$1" line lineno msg code errors=""
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         # PHPStan raw format: "path/file.php:LINE MESSAGE"
@@ -112,8 +129,21 @@ _pack_sa_deptrac_binary() {
 _pack_sa_deptrac_run() {
     local deptrac="$1"
     sa_timeout "$SA_BUDGET_PROJECT_SECONDS" $deptrac analyse \
-        --no-progress --no-ansi --formatter=github-actions 2>/dev/null || true
-    return 0
+        --no-progress --no-ansi --formatter=github-actions 2>/dev/null
+}
+
+# deptrac exits 0 on a clean analysis and 1 when it reports a violation, but 1
+# as well when it fails before analysing (a missing depfile, an unknown
+# formatter, an exception). Only the finding lines tell those apart, so an
+# exit 1 without one `::error file=` line is no verdict (CR-212).
+#
+# A clean run declares no coverage. Exit 0 with nothing printed is also what a
+# depfile that does not cover the boundary produces, and an analyser configured
+# to ignore a rule leaves the regex reporting.
+_pack_sa_deptrac_answered() {
+    [[ "$1" == "0" ]] && return 0
+    [[ "$1" == "1" ]] || return 1
+    printf '%s\n' "$2" | grep -q '^::error file='
 }
 
 # The physical path of a file. deptrac reports absolute, symlink-resolved paths,
@@ -190,13 +220,20 @@ _pack_sa_deptrac_line() {
 }
 
 _pack_sa_deptrac() {
-    local file="$1" deptrac output line entry target base errors=""
+    local file="$1" deptrac output status=0
     deptrac=$(_pack_sa_deptrac_binary)
     [[ -z "$deptrac" ]] && return 0
 
-    output=$(_pack_sa_deptrac_run "$deptrac")
-    [[ -z "$output" ]] && return 0
+    output=$(_pack_sa_deptrac_run "$deptrac") || status=$?
+    if ! _pack_sa_deptrac_answered "$status" "$output"; then
+        sa_declare_incomplete "deptrac" "$status"
+        return 0
+    fi
+    _pack_sa_deptrac_findings "$file" "$output"
+}
 
+_pack_sa_deptrac_findings() {
+    local file="$1" output="$2" line entry target base errors=""
     target=$(_pack_sa_deptrac_realpath "$file") || return 0
     base=$(basename "$file")
     while IFS= read -r line; do
