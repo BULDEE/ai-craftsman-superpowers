@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- PHPStan no longer runs when its pinned configuration cannot be written.
+  The fallback ran it bare, and a bare PHPStan auto-discovers the
+  repository's `phpstan.neon`, whose `bootstrapFiles` run PHP (CR-212).
+
+### Fixed
+
+- PHPStan and deptrac report a run that gave no verdict as ANALYSER001, like
+  the ESLint, dependency-cruiser, errcheck and clippy adapters. A fatal
+  PHPStan error, a deptrac run that failed before analysing (a missing
+  depfile) and a run the budget stopped all left the gate as silent as a
+  clean file. deptrac's exit 1 counts as a verdict only when it printed a
+  finding line. A clean deptrac run still declares no coverage of LAYER001 to
+  LAYER004: exit 0 with nothing printed is also what a depfile that does not
+  cover the boundary produces, and the regex keeps reporting then (CR-212).
+- The CI comment heading agrees with the job's exit. A report that scanned
+  no file outside `--changed-only` read "Passed" while the job failed with
+  exit 2; the heading now comes from `adapter_compute_exit`, and a zero-file
+  comment says whether the diff held nothing to validate or the run did not
+  happen (CR-211).
+
 ## [4.12.2] - 2026-09-28
 
 Bugfix release: the P2 findings M1 to M18 and I1 of the review of main
