@@ -51,7 +51,7 @@ Take a legacy target and leave it: under a safety net, decoupled from its hard d
 
 1. **Characterize before you change.** Get the current behavior under a golden-master net first; freeze bugs on purpose.
 2. **No behavior change while netting.** Adding tests and breaking dependencies must be behavior-preserving.
-3. **Every step ships green.** Small commits; if it is not green, `git reset --hard`.
+3. **Every step ships green.** Small commits; if it is not green, throw that step away and only that step: mark the starting point before it and revert to the mark as `knowledge/refactoring/mikado-method.md` (Reverting Only the Attempt) shows, never `git reset --hard`, which would also destroy uncommitted work that predates the step (where this role runs without worktree isolation, a Codex role export for one, that work is the user's).
 4. **No big-bang rewrite.** Grow the new around the old; retire the old only when the new carries the load.
 
 ## The 3P Loop

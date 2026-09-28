@@ -532,6 +532,48 @@ mod tests {
 }
 RS
 
+# An attribute belongs to the item right after it. `#[cfg(test)] mod tests;`
+# declares a module whose body lives in tests.rs, and the test range used to
+# run to the next `{` in the file: the body of the first production function
+# after the declaration, whose unwrap was then read as test code (review of
+# main eb54d13, CR-172). rustc accepts this file as written.
+run_rs RUST001 raises "an external #[cfg(test)] module declaration does not exempt the next function" <<'RS'
+#[cfg(test)]
+mod tests;
+
+/// Reads the configured value.
+pub fn configured(value: Option<u32>) -> u32 {
+    value.unwrap()
+}
+RS
+
+run_rs RUST001 raises "a #[path] between the attribute and the declaration changes nothing" <<'RS'
+#[cfg(test)]
+#[path = "configured_tests.rs"]
+mod tests;
+
+/// Reads the configured value.
+pub fn configured(value: Option<u32>) -> u32 {
+    value.unwrap()
+}
+RS
+
+# The item ends on its own `;` at depth zero, not on the first `;` met: the
+# one inside `[u32; 2]` belongs to the signature, and stopping there would
+# take the exemption away from a test helper's body.
+run_rs RUST001 clean "a #[cfg(test)] helper whose signature holds a ; stays exempt" <<'RS'
+/// Adds the numbers.
+pub fn add(left: u32, right: u32) -> u32 {
+    left + right
+}
+
+#[cfg(test)]
+fn fixture() -> [u32; 2] {
+    let parsed: u32 = "12".parse().unwrap();
+    [parsed; 2]
+}
+RS
+
 # The standard library writes SAFETY notes over two or three lines, and so does
 # clippy's own documentation for undocumented_unsafe_blocks.
 run_rs RUST003 clean "a multi-line SAFETY comment counts" <<'RS'
@@ -766,6 +808,83 @@ if echo "$e2e_out" | grep -q "LAYER001"; then
 else
     log_fail "LAYER001 reaches the pipeline as well as the hook" \
         "$(echo "$e2e_out" | tr '\n' ' ')"
+fi
+
+# The external test module again, through the pipeline this time: the scanner
+# is shared, and a fix proven on the validator alone says nothing about the
+# consumer that fails a build.
+mkdir -p "$E2E/src/config"
+cat > "$E2E/src/config/mod.rs" <<'RS'
+#[cfg(test)]
+mod tests;
+
+/// Reads the configured value.
+pub fn configured(value: Option<u32>) -> u32 {
+    value.unwrap()
+}
+RS
+external_out="$(cd "$E2E" && CLAUDE_PLUGIN_ROOT="$ROOT_DIR" bash "$ROOT_DIR/ci/craftsman-ci.sh" --format json src/config/mod.rs 2>&1)"
+if echo "$external_out" | grep -q '"rule":"RUST001".*"line":6'; then
+    log_pass "the pipeline refuses the unwrap after an external #[cfg(test)] module"
+else
+    log_fail "the pipeline refuses the unwrap after an external #[cfg(test)] module" \
+        "$(echo "$external_out" | tr '\n' ' ' | cut -c1-300)"
+fi
+
+# --- A clean clippy run answers for RUST001 --------------------------------------
+#
+# pack.yml hands RUST001 and RUST005 to clippy, and the adapter declared that
+# coverage inside the dispatcher's command substitution, where it died: a clean
+# clippy run left the regex's blocking RUST001 standing beside it (review of
+# main eb54d13, CR-172). A stub cargo on PATH plays the clean run; the hook is
+# the consumer.
+CLIPPY_WORK="$WORK/clippy"
+CLIPPY_MARKER="$CLIPPY_WORK/clippy-ran"
+mkdir -p "$CLIPPY_WORK/project/src" "$CLIPPY_WORK/bin" "$CLIPPY_WORK/home/.claude" "$CLIPPY_WORK/data"
+printf '[package]\nname = "probe"\nversion = "0.1.0"\nedition = "2021"\n' > "$CLIPPY_WORK/project/Cargo.toml"
+printf 'trust_project_tools: true\n' > "$CLIPPY_WORK/home/.claude/.craft-config.yml"
+cat > "$CLIPPY_WORK/project/src/lib.rs" <<'RS'
+/// Reads the configured value.
+pub fn configured(value: Option<u32>) -> u32 {
+    value.unwrap()
+}
+RS
+cat > "$CLIPPY_WORK/bin/cargo" <<STUB
+#!/usr/bin/env bash
+[[ "\$*" == "clippy --version" ]] && { echo "clippy 0.1.80"; exit 0; }
+touch "$CLIPPY_MARKER"
+[[ -n "\${CLIPPY_STUB_SLOW:-}" ]] && exec sleep 30
+exit 0
+STUB
+chmod +x "$CLIPPY_WORK/bin/cargo"
+CLIPPY_ENV=("HOME=$CLIPPY_WORK/home" "PATH=$CLIPPY_WORK/bin:$PATH" "CLAUDE_PLUGIN_ROOT=$ROOT_DIR"
+    "CLAUDE_PLUGIN_DATA=$CLIPPY_WORK/data")
+clippy_out="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$CLIPPY_WORK/project/src/lib.rs" \
+    | ( cd "$CLIPPY_WORK/project" && env "${CLIPPY_ENV[@]}" bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1 ))"
+if [[ -f "$CLIPPY_MARKER" ]] && ! echo "$clippy_out" | grep -q 'RUST001'; then
+    log_pass "a clean clippy run answers for RUST001 in the hook"
+else
+    log_fail "a clean clippy run answers for RUST001 in the hook" \
+        "ran=$([[ -f "$CLIPPY_MARKER" ]] && echo yes || echo no): $(echo "$clippy_out" | grep -oE 'RUST001[^\\]*' | head -1)"
+fi
+
+# A clippy the budget stopped gave no verdict, and says so (CR-174). The file
+# is Level 1 clean, so the notice is all there is to read: a silent exit 0
+# here is the stop passing for a clean crate.
+cat > "$CLIPPY_WORK/project/src/settled.rs" <<'RS'
+/// Reads the configured value.
+pub fn settled(value: Option<u32>) -> u32 {
+    value.unwrap_or(0)
+}
+RS
+slow_clippy_out="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$CLIPPY_WORK/project/src/settled.rs" \
+    | ( cd "$CLIPPY_WORK/project" && env "${CLIPPY_ENV[@]}" CLIPPY_STUB_SLOW=1 CRAFTSMAN_SA_BUDGET_PROJECT=1 \
+        bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1 ))"
+if echo "$slow_clippy_out" | grep -q 'ANALYSER001'; then
+    log_pass "a clippy run stopped by the budget is reported as ANALYSER001"
+else
+    log_fail "a clippy run stopped by the budget is reported as ANALYSER001" \
+        "got '$(echo "$slow_clippy_out" | tr '\n' ' ' | cut -c1-200)'"
 fi
 
 # --- The canonical example must survive its own pack -------------------------

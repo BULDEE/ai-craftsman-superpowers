@@ -69,29 +69,32 @@ adapter_load() {
 # =============================================================================
 # Unified comment formatter: JSON report -> Markdown
 # =============================================================================
-# One parse, not seven. Every field used to spawn its own python3 with its own
-# `|| default`, so an unreadable report rendered a comment full of defaults that
-# reads exactly like a clean run.
+# One parse, not seven, and no default counter. A parse failure used to print
+# zeros, so an unreadable report rendered "Passed, 0 files, 0 violations" while
+# adapter_compute_exit failed the job on the same file (CR-177). The summary is
+# read as strictly as the exit reads it, and a failure is reported as one.
 _adapter_comment_fields() {
     python3 -c "
 import json, sys
 d = json.load(sys.stdin)
 c = d.get('config', {})
-s = d.get('summary', {})
+s = d['summary']
 print(d.get('version', 'unknown'))
 print(c.get('strictness', 'strict'))
 print(c.get('stack', 'fullstack'))
-print(s.get('files_scanned', 0))
-print(s.get('violations', 0))
-print(s.get('warnings', 0))
+print(int(s['files_scanned']))
+print(int(s['violations']))
+print(int(s['warnings']))
 print(len(d.get('violations', [])))
-" < "$1" 2>/dev/null || printf 'unknown\nstrict\nfullstack\n0\n0\n0\n0\n'
+" < "$1" 2>/dev/null
 }
 
 ADAPTER_C_VERSION=""; ADAPTER_C_STRICTNESS=""; ADAPTER_C_STACK=""
 ADAPTER_C_FILES=0; ADAPTER_C_VIOLATIONS=0; ADAPTER_C_WARNINGS=0; ADAPTER_C_ISSUES=0
 
 _adapter_comment_read() {
+    local fields
+    fields=$(_adapter_comment_fields "$1") || return 1
     {
         read -r ADAPTER_C_VERSION
         read -r ADAPTER_C_STRICTNESS
@@ -100,7 +103,23 @@ _adapter_comment_read() {
         read -r ADAPTER_C_VIOLATIONS
         read -r ADAPTER_C_WARNINGS
         read -r ADAPTER_C_ISSUES
-    } < <(_adapter_comment_fields "$1")
+    } <<< "$fields"
+}
+
+# Same heading prefix as a verdict, so a forge adapter that updates its earlier
+# comment replaces a stale "Passed" instead of leaving it next to this one.
+_adapter_comment_unreadable() {
+    cat <<'EOF'
+## Craftsman Quality Gate -- Error
+
+The report could not be read, so this run has no verdict and no counter to show. The job fails closed; its log names the report.
+
+EOF
+}
+
+_adapter_comment_footer() {
+    echo "---"
+    echo "*craftsman${1:+ v$1} -- [docs](https://github.com/BULDEE/ai-craftsman-superpowers)*"
 }
 
 _adapter_comment_header() {
@@ -169,12 +188,15 @@ adapter_format_comment() {
         return 1
     fi
 
-    _adapter_comment_read "$report_file"
+    if ! _adapter_comment_read "$report_file"; then
+        _adapter_comment_unreadable
+        _adapter_comment_footer ""
+        return 0
+    fi
     _adapter_comment_header
     [[ "$ADAPTER_C_ISSUES" -gt 0 ]] && _adapter_comment_issue_table "$report_file"
 
-    echo "---"
-    echo "*craftsman v${ADAPTER_C_VERSION} -- [docs](https://github.com/BULDEE/ai-craftsman-superpowers)*"
+    _adapter_comment_footer "$ADAPTER_C_VERSION"
     return 0
 }
 

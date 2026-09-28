@@ -673,6 +673,171 @@ else
     log_fail "the errcheck claim compiles" "no supersedes row: $(echo "$registry_out" | tr '\n' ' ')"
 fi
 
+# --- The claim holds in the consumers, one verdict per case --------------------
+#
+# The claim compiling proves nothing about the run. The adapter declared its
+# coverage inside the dispatcher's command substitution, so the declaration
+# died with the subshell: a finding came out twice (ERRCHECK001 and GO006), a
+# clean errcheck left GO006 standing, and errcheck ran outside sa_timeout, so
+# no budget could stop it (review of main eb54d13, CR-172, M15 and M16).
+# A stub errcheck on PATH plays each case through the real hook and the real
+# pipeline; the tool itself is not what is under test, the transport is.
+SA_WORK="$WORK/errcheck"
+SA_PROJECT="$SA_WORK/project"
+SA_BIN="$SA_WORK/bin"
+SA_HOME="$SA_WORK/home"
+SA_MARKER="$SA_WORK/errcheck-ran"
+mkdir -p "$SA_PROJECT" "$SA_BIN" "$SA_HOME/.claude" "$SA_WORK/data"
+printf 'module probe\n\ngo 1.22\n' > "$SA_PROJECT/go.mod"
+SA_FILE="$SA_PROJECT/cleanup.go"
+cat > "$SA_FILE" <<'GO'
+package cleanup
+
+import "os"
+
+// Cleanup removes a path.
+func Cleanup() {
+	os.Remove("target")
+}
+GO
+
+sa_trust() {
+    if [[ "$1" == "trusted" ]]; then
+        printf 'trust_project_tools: true\n' > "$SA_HOME/.claude/.craft-config.yml"
+    else
+        : > "$SA_HOME/.claude/.craft-config.yml"
+    fi
+}
+
+# sa_errcheck <body>: the stub records that it ran, then plays the case.
+sa_errcheck() {
+    printf '#!/usr/bin/env bash\ntouch "%s"\n%s\n' "$SA_MARKER" "$1" > "$SA_BIN/errcheck"
+    chmod +x "$SA_BIN/errcheck"
+    rm -f "$SA_MARKER"
+}
+
+SA_ENV=("HOME=$SA_HOME" "PATH=$SA_BIN:$PATH" "CLAUDE_PLUGIN_ROOT=$ROOT_DIR"
+    "CLAUDE_PLUGIN_DATA=$SA_WORK/data" "CRAFTSMAN_SA_BUDGET_FILE=1"
+    "CRAFTSMAN_SA_BUDGET_PROJECT=1")
+
+sa_env() {
+    env "${SA_ENV[@]}" "$@"
+}
+
+sa_hook() {
+    printf '{"tool_name":"Write","tool_input":{"file_path":"%s"}}' "$SA_FILE" \
+        | ( cd "$SA_PROJECT" && sa_env bash "$ROOT_DIR/hooks/post-write-check.sh" 2>&1 )
+}
+
+sa_ci() {
+    ( cd "$SA_PROJECT" && sa_env bash "$ROOT_DIR/ci/craftsman-ci.sh" --format json cleanup.go 2>&1 )
+}
+
+sa_rules() {
+    printf '%s' "$1" | grep -oE '"rule":"[A-Z0-9-]+"' | cut -d'"' -f4 | sort | tr '\n' ' '
+}
+
+sa_trust trusted
+sa_errcheck "printf '%s:7:2\\tignored error\\n' \"$SA_FILE\"; exit 1"
+out="$(sa_hook)"
+if echo "$out" | grep -q 'ERRCHECK001' && ! echo "$out" | grep -q 'GO006'; then
+    log_pass "an errcheck finding is one verdict in the hook, not two"
+else
+    log_fail "an errcheck finding is one verdict in the hook, not two" \
+        "$(echo "$out" | grep -oE '(ERRCHECK001|GO006)[^\\]*' | tr '\n' ' ')"
+fi
+if [[ "$(sa_rules "$(sa_ci)")" == "ERRCHECK001 " ]]; then
+    log_pass "an errcheck finding is one verdict in the pipeline, not two"
+else
+    log_fail "an errcheck finding is one verdict in the pipeline, not two" "rules: $(sa_rules "$(sa_ci)")"
+fi
+
+sa_errcheck "exit 0"
+out="$(sa_hook)"
+if [[ -f "$SA_MARKER" ]] && ! echo "$out" | grep -qE 'GO006|ERRCHECK001|ANALYSER001'; then
+    log_pass "a clean errcheck run answers for GO006 in the hook"
+else
+    log_fail "a clean errcheck run answers for GO006 in the hook" \
+        "ran=$([[ -f "$SA_MARKER" ]] && echo yes || echo no): $(echo "$out" | grep -oE 'GO006[^\\]*' | head -1)"
+fi
+if [[ -z "$(sa_rules "$(sa_ci)")" ]]; then
+    log_pass "a clean errcheck run answers for GO006 in the pipeline"
+else
+    log_fail "a clean errcheck run answers for GO006 in the pipeline" "rules: $(sa_rules "$(sa_ci)")"
+fi
+
+sa_errcheck "echo 'errcheck: failed to load package' >&2; exit 2"
+out="$(sa_hook)"
+if [[ -f "$SA_MARKER" ]] && echo "$out" | grep -q 'GO006' && ! echo "$out" | grep -q 'ERRCHECK001'; then
+    log_pass "a crashed errcheck leaves GO006 to the regex in the hook"
+else
+    log_fail "a crashed errcheck leaves GO006 to the regex in the hook" \
+        "ran=$([[ -f "$SA_MARKER" ]] && echo yes || echo no): $(echo "$out" | tr '\n' ' ' | cut -c1-200)"
+fi
+if sa_rules "$(sa_ci)" | grep -q 'GO006'; then
+    log_pass "a crashed errcheck leaves GO006 to the regex in the pipeline"
+else
+    log_fail "a crashed errcheck leaves GO006 to the regex in the pipeline" "rules: $(sa_rules "$(sa_ci)")"
+fi
+# And the crash itself is said, not swallowed: exit 2 is errcheck's fatal
+# exit, which analysed nothing (CR-174).
+if echo "$out" | grep -q 'ANALYSER001' && sa_rules "$(sa_ci)" | grep -q 'ANALYSER001'; then
+    log_pass "a crashed errcheck is reported as ANALYSER001 in the hook and the pipeline"
+else
+    log_fail "a crashed errcheck is reported as ANALYSER001 in the hook and the pipeline" \
+        "hook: $(echo "$out" | grep -oE 'ANALYSER001[^\\]*' | head -1); pipeline: $(sa_rules "$(sa_ci)")"
+fi
+
+# `exec`, so the process the budget kills is the one holding the pipe open: a
+# stub that forked its sleep would measure the timeout fallback's reach into
+# grandchildren, which is not what is under test here.
+sa_errcheck "exec sleep 30"
+started=$SECONDS
+out="$(sa_hook)"
+elapsed=$(( SECONDS - started ))
+if [[ -f "$SA_MARKER" && $elapsed -lt 15 ]] && echo "$out" | grep -q 'GO006'; then
+    log_pass "the budget stops a slow errcheck, and GO006 comes back (${elapsed}s)"
+else
+    log_fail "the budget stops a slow errcheck, and GO006 comes back" \
+        "ran=$([[ -f "$SA_MARKER" ]] && echo yes || echo no), ${elapsed}s against a 1s budget: $(echo "$out" | tr '\n' ' ' | cut -c1-160)"
+fi
+if echo "$out" | grep -q 'ANALYSER001'; then
+    log_pass "an errcheck stopped by the budget is reported as ANALYSER001"
+else
+    log_fail "an errcheck stopped by the budget is reported as ANALYSER001" \
+        "the stop was silent: $(echo "$out" | tr '\n' ' ' | cut -c1-160)"
+fi
+
+# The same bound, seen from inside: the adapter must hand errcheck to the
+# central helper, and a 124 from it is no verdict at all.
+SA_HELPER_LOG="$SA_WORK/helper-called"
+sa_errcheck "printf '%s:7:2\\tignored error\\n' \"$SA_FILE\"; exit 1"
+helper_out="$(cd "$SA_PROJECT" && sa_env bash -c '
+    helper_log="$2"
+    source "$1/hooks/lib/static-analysis.sh"
+    source "$1/packs/go/static-analysis/go-analysis.sh"
+    sa_timeout() { touch "$helper_log"; return 124; }
+    pack_sa_go "$3"
+' probe "$ROOT_DIR" "$SA_HELPER_LOG" "$SA_FILE" 2>&1)"
+if [[ -f "$SA_HELPER_LOG" ]] && ! echo "$helper_out" | grep -q 'ERRCHECK001'; then
+    log_pass "errcheck runs under sa_timeout, and a stopped run reports no finding"
+else
+    log_fail "errcheck runs under sa_timeout, and a stopped run reports no finding" \
+        "helper called: $([[ -f "$SA_HELPER_LOG" ]] && echo yes || echo no); output: $(echo "$helper_out" | tr '\n' ' ')"
+fi
+
+# Consent first: without trust_project_tools the project's errcheck never runs,
+# and the regex answers.
+sa_trust untrusted
+sa_errcheck "exit 0"
+out="$(sa_hook)"
+if [[ ! -f "$SA_MARKER" ]] && echo "$out" | grep -q 'GO006'; then
+    log_pass "untrusted, errcheck does not run and GO006 reports"
+else
+    log_fail "untrusted, errcheck does not run and GO006 reports" \
+        "ran=$([[ -f "$SA_MARKER" ]] && echo yes || echo no): $(echo "$out" | tr '\n' ' ' | cut -c1-160)"
+fi
+
 # --- The gate that decides whether the validator runs at all ------------------
 #
 # Every assertion above sources the validator directly, so `_pack_stack_compatible`

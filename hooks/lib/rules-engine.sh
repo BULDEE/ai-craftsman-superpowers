@@ -794,6 +794,35 @@ rules_message() {
 }
 
 # ---------------------------------------------------------------------------
+# rules_check_custom "$file" "$language"
+# Matches the language's custom rules against the file and reports each one
+# once, at its first matching line, through the caller's add_violation, with
+# the `line N: message` form the pack validators use (the pipeline reads the
+# line from it). Severity stays the caller's add_violation's to resolve.
+#
+# One pass for every front-end. Post-write and the pipeline each kept a loop
+# of their own and pre-write had none, so a `severity: block` rule refused a
+# file once it had landed and never before the write (CR-171). Returns before
+# starting any process when no custom rule is declared, since pre-write runs
+# on every write; and always returns 0, since the hooks trap a failing
+# command (post-write fails open on it, pre-write refuses the write).
+# ---------------------------------------------------------------------------
+rules_check_custom() {
+    local file="$1" language="$2"
+    [[ -n "$language" && -d "$_RULES_STORE/languages" ]] || return 0
+    local rule_id pattern first
+    while IFS= read -r rule_id; do
+        [[ -z "$rule_id" ]] && continue
+        pattern=$(rules_pattern "$rule_id")
+        [[ -z "$pattern" ]] && continue
+        # -e: repo-supplied pattern, see _rules_validate_pattern for the note
+        first=$(grep -nE -m 1 -e "$pattern" "$file" 2>/dev/null) || continue
+        add_violation "$rule_id" "line ${first%%:*}: $(rules_message "$rule_id")" "$file"
+    done <<< "$(rules_custom_list "$language")"
+    return 0
+}
+
+# ---------------------------------------------------------------------------
 # rules_explain "$rule_id" ["$file_path"]
 # Shows where the rule's current severity comes from (traceability).
 # Output: "RULE_ID: severity (source: description)"

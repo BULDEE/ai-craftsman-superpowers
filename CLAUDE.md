@@ -4,7 +4,7 @@
 
 Claude Code plugin that transforms Claude into a disciplined Senior Software Craftsman. DDD, Clean Architecture, TDD methodology enforced through hooks, commands, agents, and a rules engine.
 
-**Current version:** 4.12.1
+**Current version:** 4.12.2
 **Stack:** Bash (hooks/CI), Markdown (skills/agents/templates), Python (metrics helpers), YAML (config)
 
 ## Development Rules
@@ -67,7 +67,10 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
   absent from it. `context: fork` is refused into any agent without the delivery
   contract, and never belongs on a skill that delivers a verdict to the user
   (ADR-0028): a fork carries neither the conversation nor the user's attachments.
-  `tests/core/test-turn-budget.sh` enforces all three, with fixtures that prove
+  An agent that reviews or audits never declares `isolation: worktree` either,
+  whatever its tools, and a mission that tells an agent to run a shell command
+  requires `Bash` in its `tools:` (a mission fed by its caller needs none).
+  `tests/core/test-turn-budget.sh` enforces all five, with fixtures that prove
   each check can fail.
 - A skill with `disable-model-invocation: true` starts ONLY when the user types `/craftsman:<name>` first in a prompt; the Skill tool refuses it. So: an agent's `skills:` frontmatter may list only model-invocable skills and never one whose `agent:` binding points back at that agent; a skill body may write `**Invokes:** /craftsman:x` only when `x` is model-invocable, otherwise `**Hands off to:**` plus the command to paste. `tests/core/test-invocation-policy.sh` enforces both.
 

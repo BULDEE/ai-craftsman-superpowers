@@ -123,6 +123,10 @@ cat > "$PACK_DIR/static-analysis/toy-analyse.sh" <<BASH
 pack_sa_toy() {
     local file="\$1"
     [[ "\${CRAFTSMAN_TOY_VERDICT:-emit}" == "silent" ]] && return 0
+    if [[ "\${CRAFTSMAN_TOY_VERDICT:-emit}" == "clean" ]]; then
+        sa_declare_covered "TOY001"
+        return 0
+    fi
     grep -q 'forbidden' "\$file" 2>/dev/null \\
         && echo "TOY001:1:${L23_MESSAGE}"
     return 0
@@ -341,6 +345,49 @@ if echo "$OTHER_PATH" | grep -q "$L23_MESSAGE"; then
 else
     log_fail "control: the fixture analyser did not report" \
         "the assertion above is undetermined, not green"
+fi
+
+# =============================================================================
+# Group K - a clean run answers for its rules, through both front-ends
+#
+# A clean run emits no finding, so the only thing that can carry its verdict
+# back is the coverage it declares. The adapter runs inside the front-end's
+# command substitution, and a declaration made into precedence.sh from there
+# died with the subshell: the regex finding stood beside a clean analyser, and
+# errcheck and clippy lived with it (review of main eb54d13, CR-172).
+# =============================================================================
+echo ""
+echo "--- K. A clean run's declared coverage reaches the flush ---"
+
+write_home_config trusted
+install_tool
+export CRAFTSMAN_TOY_VERDICT=clean
+CLEAN_RUN=$(hook_output)
+CI_CLEAN_RUN=$(ci_output)
+unset CRAFTSMAN_TOY_VERDICT
+
+if echo "$CLEAN_RUN" | grep -q 'TOY002'; then
+    log_pass "control: the clean run still reports TOY002, which it does not claim"
+
+    if echo "$CLEAN_RUN" | grep -q "$L1_MESSAGE"; then
+        log_fail "a clean run answers for its rule in the hook" \
+            "the analyser declared TOY001 covered and emitted nothing, and the regex finding came back anyway - its declaration never left the subshell"
+    else
+        log_pass "a clean run answers for its rule in the hook"
+    fi
+else
+    log_fail "control: the clean run reported nothing at all" \
+        "got '$(echo "$CLEAN_RUN" | tr '\n' ' ' | cut -c1-160)' - the coverage assertion is undetermined"
+fi
+
+if echo "$CI_CLEAN_RUN" | grep -q "$L1_MESSAGE"; then
+    log_fail "a clean run answers for its rule in the pipeline" \
+        "CI flushed TOY001 after a clean run that declared it covered"
+elif echo "$CI_CLEAN_RUN" | grep -q 'TOY002'; then
+    log_pass "a clean run answers for its rule in the pipeline"
+else
+    log_fail "control: CI reported nothing for the clean run" \
+        "got '$(echo "$CI_CLEAN_RUN" | tr '\n' ' ' | cut -c1-160)'"
 fi
 
 # =============================================================================

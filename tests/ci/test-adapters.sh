@@ -595,6 +595,58 @@ else
     log_fail "Missing file should error" "got exit $ec"
 fi
 
+# An unreadable report has no verdict, and its comment must not invent one. It
+# fell back to zero counters and printed "Passed", 0 files, 0 violations, while
+# adapter_compute_exit failed the job on the same file (review of eb54d13, R6;
+# CR-177): the pull request showed a pass on a red pipeline.
+printf '{broken' > "$TEMP_DIR/unreadable-report.json"
+: > "$TEMP_DIR/empty-report.json"
+printf '{}' > "$TEMP_DIR/nosummary-report.json"
+for bad in unreadable empty nosummary; do
+    comment=$(adapter_format_comment "$TEMP_DIR/${bad}-report.json" 2>/dev/null)
+    bad_exit=0
+    adapter_compute_exit "$TEMP_DIR/${bad}-report.json" 2>/dev/null || bad_exit=$?
+    if [[ "$comment" == *"Craftsman Quality Gate -- Error"* && "$comment" != *Passed* \
+        && "$comment" != *"| Violations |"* && "$bad_exit" -eq 2 ]]; then
+        log_pass "$bad report: the comment states an error with no counters, and the exit is 2"
+    else
+        log_fail "$bad report comment" "exit $bad_exit, comment: $(printf '%s' "$comment" | head -1)"
+    fi
+done
+
+# Every provider builds its comment from that helper. Each is asked, through
+# its own adapter_comment, for the body it would deliver: github through a gh
+# stand-in that records the POST, gitlab and bitbucket on their no-token path,
+# jenkins and generic into their comment file.
+# The stand-in names its file through delivered_file: bash scopes dynamically,
+# and _gh_post_comment declares a local `body` that would shadow a shorter name.
+provider_comment_body() {
+    local provider="$1" report="$2" delivered_file="$TEMP_DIR/delivered-$1.md"
+    rm -f "$delivered_file"
+    (
+        unset GITLAB_TOKEN CI_PROJECT_ID CI_MERGE_REQUEST_IID BITBUCKET_TOKEN BITBUCKET_PR_ID
+        source "$ADAPTER_BASE"
+        adapter_load "$provider" >/dev/null
+        gh() { [[ "$*" == *"--method POST"* ]] && printf '%s\n' "$@" > "$delivered_file"; return 0; }
+        export GITHUB_PR_NUMBER=7 GITHUB_REPOSITORY=owner/repo
+        case "$provider" in
+            gitlab|bitbucket) adapter_comment "$report" > "$delivered_file" 2>/dev/null ;;
+            *) adapter_comment "$report" "$delivered_file" >/dev/null 2>&1 ;;
+        esac
+    )
+    cat "$delivered_file" 2>/dev/null
+}
+for provider in github gitlab bitbucket jenkins generic; do
+    clean_body=$(provider_comment_body "$provider" "$TEMP_DIR/clean-report.json")
+    broken_body=$(provider_comment_body "$provider" "$TEMP_DIR/unreadable-report.json")
+    if [[ "$clean_body" == *"Craftsman Quality Gate -- Passed"* \
+        && "$broken_body" == *"Craftsman Quality Gate -- Error"* && "$broken_body" != *Passed* ]]; then
+        log_pass "$provider: an unreadable report delivers an error comment, never a Passed one (control: a clean report still reads Passed)"
+    else
+        log_fail "$provider comment on an unreadable report" "clean: $(printf '%s' "$clean_body" | grep -m1 'Quality Gate') / unreadable: $(printf '%s' "$broken_body" | grep -m1 'Quality Gate')"
+    fi
+done
+
 # =============================================================================
 # 10. Contract parity (static, auto-discovered)
 # -----------------------------------------------------------------------------

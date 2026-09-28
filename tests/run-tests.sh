@@ -679,6 +679,7 @@ test_session_metrics() {
     run_subtest "CI adapter tests pass" "$SCRIPT_DIR/ci/test-adapters.sh" || true
     run_subtest "CI adapter delivery tests pass" "$SCRIPT_DIR/ci/test-adapter-delivery.sh" || true
     run_subtest "Jenkins adapter tests pass" "$SCRIPT_DIR/ci/test-jenkins-adapter.sh" || true
+    run_subtest "Secrets scan reads its target, whatever the CWD" "$SCRIPT_DIR/ci/test-secrets-scan.sh" || true
     run_subtest "Hermes pre_verify adapter tests pass" "$SCRIPT_DIR/adapters/test-hermes-pre-verify.sh" || true
     run_subtest "Host adapter parity tests pass" "$SCRIPT_DIR/adapters/test-parity.sh" || true
     run_subtest "Hermes native plugin tests pass" "$SCRIPT_DIR/adapters/test-hermes-plugin.sh" || true
@@ -747,6 +748,7 @@ test_legacy_command() {
 
     run_subtest "Legacy command tests pass" "$SCRIPT_DIR/core/test-legacy-command.sh" || true
     run_subtest "Legacy worked example still runs" "$SCRIPT_DIR/core/test-legacy-example.sh" || true
+    run_subtest "Throwing an attempt away keeps the user's work" "$SCRIPT_DIR/core/test-attempt-revert.sh" || true
 }
 
 # Test: Hotspot analysis tool (functional)

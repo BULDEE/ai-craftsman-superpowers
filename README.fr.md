@@ -223,7 +223,9 @@ sur la vraie CLI et consigné dans
 Sur tous les hôtes, le garde-fou juge les outils d'écriture de l'hôte. Un
 fichier écrit par une commande shell que lance le modèle (`printf > file`,
 `sed -i`, un script) n'est pas contrôlé avant le disque : la CI
-(`ci/craftsman-ci.sh`) et le garde-fou pre-push le rattrapent. GitHub Copilot
+(`ci/craftsman-ci.sh`) le rattrape. Le hook pre-push ne lit aucun fichier et
+se contente d'avertir quand la session n'a jamais été vérifiée ; seul Hermes
+refuse un push tant qu'une conclusion n'est pas passée sur l'arbre publié. GitHub Copilot
 a un adaptateur pour son contrat de hooks documenté ; aucune surface Copilot
 n'est encore qualifiée, donc pas de badge.
 
@@ -358,8 +360,8 @@ assumée (DDD/Clean Architecture).
 **Contraintes actuelles :** PHP, TypeScript, Python, Go, Rust et Bash ont une
 couverture de règles complète, les autres langages un support de base ; les
 métriques sont par machine, pas partagées dans une équipe ; les fichiers écrits
-par le shell sont rattrapés par la CI et le garde-fou pre-push, pas avant le
-disque ; les écarts propres à chaque hôte sont listés dans
+par le shell sont rattrapés par la CI, pas avant le disque (le hook pre-push
+se contente d'avertir) ; les écarts propres à chaque hôte sont listés dans
 [Support des hôtes](#support-des-hôtes).
 
 Plus de détails dans la [FAQ](FAQ.md) et [TROUBLESHOOTING.md](TROUBLESHOOTING.md).

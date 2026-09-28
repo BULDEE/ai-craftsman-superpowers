@@ -11,7 +11,6 @@ Priority (highest to lowest):
 3. Global ~/.claude/CLAUDE.md
 4. Pack knowledge
 5. Core knowledge
-6. RAG search results
 ```
 
 ---
@@ -184,31 +183,39 @@ Ask Claude to use knowledge:
 > Apply the 3P pattern to design this agent
 ```
 
-### Via RAG Search
+### Via the Lookup
 
-Query indexed content:
+Find the concepts that answer a rule or a tag, instead of searching an index:
 
-```
-> Search my knowledge for "event sourcing vs event notification"
-
-> What does my knowledge base say about chunking strategies?
+```bash
+bash "$(craftsman-path bin/craftsman-helper)" knowledge by-rule LAYER004
+bash "$(craftsman-path bin/craftsman-helper)" knowledge by-tag persistence
 ```
 
 ---
 
 ## Adding Knowledge
 
+### To the Core Bundle
+
+1. Create a markdown file under `knowledge/` with frontmatter: `type` is the one required key, and `tags` and `rules` are what the lookups match on
+2. Check that the lookup finds it:
+
+```bash
+bash "$(craftsman-path bin/craftsman-helper)" knowledge list
+bash "$(craftsman-path bin/craftsman-helper)" knowledge by-rule LAYER001
+```
+
+If `craftsman-path` is not on PATH, use `<installed plugin root>/bin/craftsman-helper` directly.
+
 ### To a Pack
 
-1. Create markdown file in `pack-name/knowledge/`
-2. Update `plugin.json` to include the file
-3. Reference in skills as needed
+1. Create a markdown file in `packs/<pack>/knowledge/` (the pack's `pack.yml` declares `knowledge: ["knowledge/"]`); nothing is registered in `plugin.json`
+2. Reference it from the pack's skills or agents: the lookup above reads the core `knowledge/` bundle only
 
-### To RAG Index
+### No RAG Index
 
-1. Add PDF to source directory
-2. Run `npm run index`
-3. Verify with `List my knowledge sources`
+There is no index to rebuild. The `knowledge-rag` server and its index-build step were removed in v4.0.0 ([ADR-0024](../adr/0024-okf-knowledge-bundle.md), [MCP servers](mcp-servers.md)): the bundle is plain markdown read by a deterministic rule-to-concept lookup.
 
 ---
 

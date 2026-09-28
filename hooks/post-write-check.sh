@@ -505,21 +505,33 @@ _run_static_analysis() {
     # manifest that names the analyser as owner of the analyser's own codes.
     precedence_higher_level_begin
     while IFS= read -r err_line; do
-        [[ -z "$err_line" ]] && continue
-        local sa_code sa_lineno sa_msg
-        sa_code=$(echo "$err_line" | cut -d: -f1)
-        sa_lineno=$(echo "$err_line" | cut -d: -f2)
-        sa_msg=$(echo "$err_line" | cut -d: -f3-)
-        sa_msg="${sa_msg#"${sa_msg%%[![:space:]]*}"}"
-        # A verdict on a code is the higher level answering for that code.
-        precedence_declare_covered "$sa_code"
-        if [[ -n "$sa_lineno" && "$sa_lineno" -gt 0 ]] 2>/dev/null; then
-            add_warning "${sa_code}" "line ${sa_lineno}: ${sa_msg}"
-        else
-            add_warning "${sa_code}" "${sa_msg}"
-        fi
+        _apply_static_analysis_line "$err_line"
     done <<< "$errors"
     precedence_higher_level_end
+}
+
+# One line of an analyser's result: a coverage record or a finding. A clean
+# run answers too, and its coverage arrives as a record because nothing the
+# adapter declared inside its own subshell survives it.
+_apply_static_analysis_line() {
+    local err_line="$1" sa_code sa_lineno sa_msg
+    [[ -z "$err_line" ]] && return
+    case "$err_line" in
+        "$SA_COVERED_RECORD"*)
+            precedence_declare_covered "${err_line#"$SA_COVERED_RECORD"}"
+            return ;;
+    esac
+    sa_code=$(echo "$err_line" | cut -d: -f1)
+    sa_lineno=$(echo "$err_line" | cut -d: -f2)
+    sa_msg=$(echo "$err_line" | cut -d: -f3-)
+    sa_msg="${sa_msg#"${sa_msg%%[![:space:]]*}"}"
+    # A verdict on a code is the higher level answering for that code.
+    precedence_declare_covered "$sa_code"
+    if [[ -n "$sa_lineno" && "$sa_lineno" -gt 0 ]] 2>/dev/null; then
+        add_warning "${sa_code}" "line ${sa_lineno}: ${sa_msg}"
+    else
+        add_warning "${sa_code}" "${sa_msg}"
+    fi
 }
 
 # =============================================================================
@@ -546,31 +558,10 @@ if sa_language_has_analyser "$_PWC_LANG"; then
 fi
 
 # =============================================================================
-# Custom Rules Validation (from .craft-config.yml rules section)
+# Custom Rules Validation (from .craft-config.yml rules section): the engine's
+# one pass, the same pre-write and CI run (CR-171)
 # =============================================================================
-_validate_custom_rules() {
-    local file="$1"
-    local language
-    language=$(lang_for_file "$file")
-    [[ -z "$language" ]] && return
-
-    local custom_rules
-    custom_rules=$(rules_custom_list "$language")
-    [[ -z "$custom_rules" ]] && return
-
-    while IFS= read -r rule_id; do
-        [[ -z "$rule_id" ]] && continue
-        local pattern msg
-        pattern=$(rules_pattern "$rule_id")
-        msg=$(rules_message "$rule_id")
-        [[ -z "$pattern" ]] && continue
-        # -e: repo-supplied pattern, see rules-engine.sh for the flag-injection note
-        if grep -qE -e "$pattern" "$file" 2>/dev/null; then
-            add_violation "$rule_id" "$msg" "$file"
-        fi
-    done <<< "$custom_rules"
-}
-_validate_custom_rules "$FILE_PATH"
+rules_check_custom "$FILE_PATH" "$_PWC_LANG"
 
 # =============================================================================
 # Structural ratchet (ADR-0025): a touched file may improve or stay equal,

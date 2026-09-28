@@ -281,18 +281,18 @@ haiku_verdict_is_clean() {
 # that is exactly why it may only do so when the FILE changed in between: the
 # same content judged twice with two answers is the model's variance, and a
 # fixed rate fed by variance measures nothing. The content hash recorded with
-# the last run that found something is the witness.
+# the last run that found something on THIS file is the witness, and no
+# witness is not a change: a finding raised while another file was judged, or
+# recorded before runs carried their exact path, stays open (CR-173).
 haiku_close_resolved() {
     local file="$1" current="$2"
-    local rule
+    local rule then_hash now_hash
     type metrics_haiku_previous_rules >/dev/null 2>&1 || return 0
+    type metrics_haiku_last_finding_hash >/dev/null 2>&1 || return 0
     [[ -z "$file" || ! -e "$file" ]] && return 0
-    if type metrics_haiku_last_finding_hash >/dev/null 2>&1; then
-        local then_hash now_hash
-        then_hash=$(metrics_haiku_last_finding_hash "$file")
-        now_hash=$(metrics_content_hash "$file")
-        [[ -n "$then_hash" && "$then_hash" == "$now_hash" ]] && return 0
-    fi
+    then_hash=$(metrics_haiku_last_finding_hash "$file")
+    now_hash=$(metrics_content_hash "$file")
+    [[ -z "$then_hash" || "$then_hash" == "$now_hash" ]] && return 0
     while IFS= read -r rule; do
         [[ -z "$rule" ]] && continue
         printf '%s' "$current" | grep -q "$rule" && continue

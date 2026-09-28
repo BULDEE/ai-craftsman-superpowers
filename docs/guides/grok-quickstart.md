@@ -71,7 +71,8 @@ plugin already owns is also shown as `/craftsman:name`.
 
 - The gate judges the host's write tools. A file written by a shell command
   (`printf > file`, `sed -i`, a script) is not gated before disk: CI
-  (`ci/craftsman-ci.sh`) and the pre-push gate catch it.
+  (`ci/craftsman-ci.sh`) catches it. The pre-push hook reads no file and only
+  warns.
 - Grok's default hook timeout is 5 seconds and fail-open. The exported gate
   sets `timeout: 15` on every handler.
 - A reload in `/hooks` activates the plugin handlers but does not replay the

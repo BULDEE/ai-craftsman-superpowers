@@ -122,6 +122,19 @@ if [[ -z "$sql_errors" ]]; then
 else
     log_fail "Skill queries must match the schema" "$sql_errors"
 fi
+
+# Test: a correction outcome a skill names is one the table can hold. A value
+# outside the CHECK constraint is not an SQL error, it is a count of zero: the
+# score step counted action='fix' and its bonus never moved (review of main
+# eb54d13, delivery D3). The persisted value is `fixed`.
+allowed_actions=$(sqlite3 "$SCHEMA_DB" "SELECT sql FROM sqlite_master WHERE name='corrections';" 2>/dev/null | grep -oE "action IN \([^)]*\)" | grep -oE "'[a-z_]+'")
+unknown_actions=$(grep -rhoE "action ?= ?'[A-Za-z_]+'" "$ROOT_DIR/skills" --include=SKILL.md 2>/dev/null | grep -oE "'[A-Za-z_]+'" \
+    | grep -vxF -e "${allowed_actions:-none}" | tr '\n' ' ')
+if [[ -n "$allowed_actions" && -z "$unknown_actions" ]]; then
+    log_pass "Skills name only correction outcomes the schema accepts"
+else
+    log_fail "Skills name a correction outcome the table refuses" "unknown: ${unknown_actions:-none}; schema: ${allowed_actions:-unreadable}"
+fi
 rm -f "$SCHEMA_DB"
 
 # Test: Auto-setup gate warns when no config

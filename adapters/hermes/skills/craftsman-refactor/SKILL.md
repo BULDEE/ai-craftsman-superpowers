@@ -190,9 +190,33 @@ vendor/bin/phpstan analyse
 
 When a refactoring ripples across many files and each attempt uncovers new prerequisites, switch to the **Mikado Method** (see `references/refactoring-mikado-method.md`):
 
-1. Write the goal; start a ~10 minute timer; attempt it directly.
-2. Not done when the timer rings? Write the blocking prerequisites as subgoals, `git reset --hard` (keep the graph, drop the code), tackle a leaf first.
-3. Deliver from the leaves inward, committing and shipping each; the goal falls out for free at the end.
+1. Write the goal; mark the starting point (below); start a ~10 minute timer; attempt it directly.
+2. Not done when the timer rings? Write the blocking prerequisites as subgoals, throw the attempt away (below: keep the graph, drop the code), tackle a leaf first.
+3. Deliver from the leaves inward, committing and shipping each, and mark the new starting point after each commit; the goal falls out for free at the end.
+
+You run in the user's checkout, where uncommitted work may predate the attempt. Revert only what the attempt changed, never `git reset --hard`: it would destroy that work too. An attempt stages nothing and commits nothing.
+
+**Mark the starting point** (before the first attempt, and after each delivered commit):
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+MIKADO_INDEX="$(git rev-parse --git-path mikado.index)"
+cp "$(git rev-parse --git-path index)" "$MIKADO_INDEX" 2>/dev/null || rm -f "$MIKADO_INDEX"
+GIT_INDEX_FILE="$MIKADO_INDEX" git add -A
+git update-ref refs/mikado/start "$(GIT_INDEX_FILE="$MIKADO_INDEX" git write-tree)"
+```
+
+**Throw the attempt away** (the tree returns to the mark exactly: edits reversed, created files removed, deleted files restored, earlier uncommitted work kept):
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+MIKADO_INDEX="$(git rev-parse --git-path mikado.index)"
+GIT_INDEX_FILE="$MIKADO_INDEX" git add -A
+MIKADO_NOW="$(GIT_INDEX_FILE="$MIKADO_INDEX" git write-tree)"
+git diff --quiet refs/mikado/start "$MIKADO_NOW" || git diff --binary refs/mikado/start "$MIKADO_NOW" | git apply -R
+```
+
+When the goal is reached, drop the mark (`git update-ref -d refs/mikado/start`). The why and the edge cases are in `references/refactoring-mikado-method.md` (Reverting Only the Attempt).
 
 Persist the graph across sessions in `.craftsman/mikado.json` (atomic write: `tempfile.mkstemp()` + `os.rename()`), so an interruption never loses the map. Discipline: **revert, do not fix** a failing attempt. Render the final graph as Mermaid in the session summary.
 

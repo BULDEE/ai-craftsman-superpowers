@@ -174,6 +174,65 @@ config_stack() {
     _config_resolve "stack" "fullstack"
 }
 
+# config_validate <file>: one line per problem, silent and 0 when the file is a
+# v4 config the resolver reads as written.
+#
+# The contract is schemas/craft-config.schema.json, read here rather than
+# restated, and each value is read by _config_parse_yml_value, the reader the
+# resolver uses. Valid YAML is not enough: /craftsman:setup wrote
+# `version: "1.0"` and a `stack:` mapping of versions, the resolver read that
+# `stack` as nothing and answered `fullstack`, and the healthcheck said ok
+# because it only tested that the file existed.
+config_validate() {
+    local file="$1" schema properties key type const enum value
+    local problems=0
+    schema="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/schemas/craft-config.schema.json"
+    [[ -f "$file" ]] || { echo "$file: no such file"; return 1; }
+    properties=$(jq -r '.properties | to_entries[]
+        | select(.value.type == "string" or .value.type == "integer" or .value.type == "boolean")
+        | [.key, .value.type, (.value.const // "" | tostring), ((.value.enum // []) | join(","))]
+        | join("|")' "$schema" 2>/dev/null) || { echo "$schema: unreadable"; return 1; }
+    while IFS='|' read -r key type const enum; do
+        [[ -n "$key" ]] || continue
+        if ! _config_has_top_level_key "$key" "$file"; then
+            [[ -n "$const" ]] && { echo "no \`${key}: ${const}\` marker: a format before v4, /craftsman:setup rewrites it"; problems=1; }
+            continue
+        fi
+        value=$(_config_parse_yml_value "$key" "$file")
+        _config_value_matches "$value" "$type" "$const" "$enum" && continue
+        echo "\`${key}\` reads as '${value}': expected $(_config_expected "$type" "$const" "$enum")"
+        problems=1
+    done <<< "$properties"
+    return "$problems"
+}
+
+_config_has_top_level_key() {
+    local key="$1" file="$2" line
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ "$line" == "${key}:"* ]] && return 0
+    done < "$file"
+    return 1
+}
+
+_config_value_matches() {
+    local value="$1" type="$2" const="$3" enum="$4"
+    [[ -n "$value" ]] || return 1
+    [[ -z "$const" || "$value" == "$const" ]] || return 1
+    [[ -z "$enum" || ",${enum}," == *",${value},"* ]] || return 1
+    case "$type" in
+        integer) [[ "$value" =~ ^-?[0-9]+$ ]] ;;
+        boolean) [[ "$value" == true || "$value" == false ]] ;;
+        *) return 0 ;;
+    esac
+}
+
+_config_expected() {
+    local type="$1" const="$2" enum="$3"
+    [[ -n "$const" ]] && { printf '%s' "$const"; return 0; }
+    [[ -n "$enum" ]] && { printf 'one of %s' "${enum//,/ | }"; return 0; }
+    printf 'a %s on the same line' "$type"
+}
+
 config_guided() {
     local value
     value=$(_config_resolve "guided" "false")

@@ -7,6 +7,135 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.12.2] - 2026-09-28
+
+Bugfix release: the P2 findings M1 to M18 and I1 of the review of main
+eb54d13 (CR-171 to CR-178), and macOS latency ceilings set from measured
+spread (CR-179). One new advisory rule, ANALYSER001; no rule becomes
+stricter.
+
+### Upgrading
+
+- **Configuration**: `/craftsman:setup` now writes a v4 file (`v: 4`, a
+  scalar `stack`, `strictness`, `guided`). A pre-v4 file (`version: "1.0"`
+  with a `stack:` mapping) was silently read as `fullstack`; the healthcheck
+  now names it as a warning with the keys the resolver ignores. Rerun
+  `/craftsman:setup` to migrate. A v4 file with an invalid value is an error.
+- **Custom rules** declared in `.craft-config.yml` now run before the write
+  as well as after it. A `severity: block` rule refuses the write instead of
+  refusing the file once it has landed. An edit to a file that already
+  violates such a rule is refused before the write, as pack rules already
+  are; the rule baseline mark still demotes inherited occurrences. The hook
+  message gains a `line N: ` prefix.
+- **Rust with clippy trusted**: a clean clippy run now supersedes RUST001
+  and RUST005 as `packs/rust/pack.yml` declares, so an unwrap is reported as
+  the advisory CLIPPY001 instead of the blocking RUST001.
+
+### Security
+
+- The secrets scan reads the repository it is given.
+  `.github/scripts/secrets-scan.sh` listed tracked files relative to the
+  target but let grep open them relative to the caller's working directory,
+  so a key in the target could come back SUCCESS. The target is now
+  canonicalised and entered before any read (CR-177).
+- Exported host gates run whatever the plugin root is called. The
+  `grok-hooks` export spliced the raw root into the command body, so a root
+  containing `$`, `"` or a backtick was expanded or split and the gate exited
+  127 without running. Each manifest command is rebuilt word by word with
+  the root quoted; a manifest command that is more than plain words is
+  refused at export instead of being written with another meaning (CR-177).
+
+### Added
+
+- ANALYSER001 (advisory, `rules/core.yml`): an analyser that gave no verdict
+  is reported. A crashed or stopped ESLint, dependency-cruiser, errcheck or
+  clippy left the gate as silent as a clean file. The message names the tool
+  and its exit status, never its stderr (CR-174).
+- `dashboard.py <db> --score [DAYS]` (through `craftsman-helper dashboard
+  --score 7`): the quality score over the last DAYS days, the DAYS before,
+  and the trend.
+
+### Fixed
+
+- Custom rules: one pass, `rules_check_custom`, shared by pre-write (on the
+  would-be file), post-write and `ci/craftsman-ci.sh`. Each rule is reported
+  once, at its first matching line, with severity resolved per file.
+  `tests/adapters/test-parity.sh` checks the three front-ends at block, warn
+  and ignore (CR-171).
+- Rust: an external `#[cfg(test)] mod tests;` opened a test range that ran
+  into the body of the next production function, whose `.unwrap()` lost
+  RUST001 in the scanner, the hooks and the pipeline. The range ends on the
+  item's own `;` or closing `}` (CR-172).
+- Analyser coverage reaches the flush. errcheck and clippy declared the rules
+  they answer for from inside a command substitution, and the declaration
+  died with the subshell: an errcheck finding came out twice, a clean
+  errcheck left GO006 standing, a clean clippy left RUST001 in place.
+  Adapters now return an `@covered <RULE>` record that the hook and the
+  pipeline apply before the flush (CR-172).
+- errcheck runs under `sa_timeout` with the per-file budget. Only its two
+  verdicts (exit 0 and 1) answer for GO004 and GO006; a fatal exit or a
+  stopped run leaves them to the regex (CR-172).
+- Semantic fix witness: the content hash that proves a file changed between
+  two verdicts was looked up by directory, so a run on `src/Domain/B.php`
+  became the witness for an unchanged `src/Domain/A.php`, and a CLEAN on A
+  recorded a fix. `haiku_runs` records each run's exact path (additive
+  `file_path` column), and a finding with no recorded content for its own
+  file stays open (CR-173).
+- Quality score: one formula, `quality_score` in `hooks/lib/dashboard.py`
+  (findings per write: blocked 1, warned 0.3, each `fixed` correction gives
+  back 0.6). `/craftsman:metrics` computed its own score from
+  `action='fix'`, a value the corrections table never holds, so the fix
+  bonus was always zero (CR-173).
+- SubagentStop gate: rule severities are honoured. It never initialised the
+  rules engine and `add_warning` bypassed `rules_severity_for_file`, so a
+  rule set to `ignore` still reached the main loop and a `block` rule was
+  filed as a warning (CR-174).
+- Final review scope includes untracked files that `.gitignore` does not
+  exclude. A class created during the session and never staged was absent
+  from the review that looks for new classes without tests (CR-174).
+- `/craftsman:setup` Step D takes the canonical baseline with
+  `craftsman-ci baseline`, which records rule violations as well as
+  structure, so inherited debt reports as warnings instead of blocking the
+  first edit (CR-175).
+- `config_validate` in `hooks/lib/config.sh` checks a config against the
+  schema with the resolver's own reader; the healthcheck config row uses it
+  (CR-175).
+- doc-writer and ui-ux-director no longer open on a shell command their tools
+  allowlist refuses; they start from the context their caller provides. The
+  turn-budget suite fails when an agent body prescribes a shell command
+  without Bash in its tools (CR-176).
+- security-pentester no longer isolates into a worktree, where the
+  uncommitted changes it audits are absent. The turn-budget suite refuses
+  worktree isolation on any agent that reviews or audits (CR-176).
+- The Mikado method, the refactor and legacy skills, the legacy-surgeon agent
+  and the characterization example no longer prescribe `git reset --hard` or
+  a path checkout to undo an attempt. A mark taken before the attempt
+  reverses exactly what the attempt changed, and the user's uncommitted and
+  untracked work survives. `tests/core/test-attempt-revert.sh` runs every
+  documented sequence on a throwaway repository (CR-176). The skills exported
+  to Hermes carry the same correction: the committed export was regenerated
+  without a drift check, so it still prescribed `git reset --hard`, and
+  `tests/adapters/test-hermes-plugin.sh` now fails when regenerating it
+  changes a file.
+- An unreadable CI report is never commented as Passed. The shared comment
+  formatter fell back to zero counters while the job failed with exit 2; it
+  now renders `Craftsman Quality Gate -- Error`, checked for github, gitlab,
+  bitbucket, jenkins and generic (CR-177).
+- The PHPStan diagnostic example checks the `trust_project_tools` consent and
+  calls Level 2 active only after a probe shows a finding (CR-178).
+
+### Changed
+
+- ADR-0023 gains an amendment recording what shipped: the test-failure
+  wake-up, the evidence gate and its exemptions, a single monitor, and a
+  pre-push hook that only warns (Hermes is the one host that refuses a push).
+  README (both mirrors), SECURITY.md, references and guides are aligned
+  (CR-178).
+- macOS latency ceilings are set from 30 measured runs of the runner's own
+  spread instead of a guess, and `tests/perf/test-hook-latency.sh` fails when
+  a ceiling exceeds 1.5 times its quiet reading, so a ceiling cannot drift
+  into meaninglessness (CR-179).
+
 ## [4.12.1] - 2026-09-27
 
 Bugfix release: the Hermes gate findings B6 to B8 of the review of main

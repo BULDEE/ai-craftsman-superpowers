@@ -88,8 +88,10 @@ precedence_higher_level_end() {
 }
 
 # precedence_declare_covered <rule> - a higher level answered for this rule.
-# Called with the code of every Level 2/3 verdict, and callable by an adapter
-# that ran clean and knows which rules its run actually covered.
+# The front-end calls it with the code of every Level 2/3 verdict and with
+# every rule an adapter's result declared covered (sa_declare_covered in
+# static-analysis.sh). An adapter never calls it: it runs inside a command
+# substitution, and state set there is gone before the flush reads it.
 precedence_declare_covered() {
     local rule="$1"
     [[ -z "$rule" ]] && return 0

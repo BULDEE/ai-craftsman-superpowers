@@ -205,7 +205,7 @@ Break a hard dependency (DB, HTTP, clock, third-party, global) so the code becom
 
 3. Apply it with **automated refactorings** where possible (no tests yet = rely on the IDE's safe transformations).
 4. Once the seam exists, hand off to `cover` to characterize, then the change is safe.
-5. For a change with unknown prerequisites, drive it with the **Mikado Method**: attempt, note blockers, `git reset --hard`, tackle a prerequisite first.
+5. For a change with unknown prerequisites, drive it with the **Mikado Method**: mark the starting point, attempt, note blockers, throw the attempt away, tackle a prerequisite first. Mark and throw away with the two commands of `the craftsman-refactor skill`'s Mikado Mode (`references/refactoring-mikado-method.md`, Reverting Only the Attempt): they revert only what the attempt changed, so uncommitted work that predates it survives. Never `git reset --hard` in the user's checkout.
 
 Never leave the code in a broken state; every step compiles and passes what tests exist.
 

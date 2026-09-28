@@ -149,6 +149,8 @@ while IFS= read -r MIRROR_REL; do
     [[ -z "$LANG_ID" ]] && continue
     FILE_PATH="$MIRROR_FILE"
     pack_dispatch_file "$MIRROR_FILE"
+    # The project's own rules too, the pass post-write and CI run (CR-171).
+    rules_check_custom "$MIRROR_FILE" "$LANG_ID"
 done <<< "$MIRROR_FILES"
 FILE_PATH="$FILE_PATH_REAL"
 

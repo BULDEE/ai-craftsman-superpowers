@@ -130,18 +130,27 @@ VERDICT: [PASS | CONDITIONAL PASS | FAIL]
 
 ### Registering Skills
 
-Add to `plugin.json`:
+Nothing is registered in `plugin.json`, which has no `packs` key. A pack is a
+directory `packs/<name>/` with a `pack.yml`; the loader
+(`hooks/lib/pack-loader.sh`) reads every manifest whose
+`compatibility.stack` admits the project's stack, and at session start copies
+each flat skill file `packs/<name>/commands/<skill>.md` to
+`skills/<skill>/SKILL.md`. So the skill above lives at
+`packs/security/commands/security-review.md`, next to:
 
-```json
-{
-  "packs": {
-    "security": {
-      "description": "Security-focused skills",
-      "skills": ["security-pack/skills/security-review"]
-    }
-  }
-}
+```yaml
+# packs/security/pack.yml
+name: security
+version: "1.0.0"
+description: "Security-focused skills"
+compatibility:
+  core: ">=4.0.0"
+  stack: ["*"]
 ```
+
+A pack outside the plugin directory is declared in your own
+`~/.claude/.craft-config.yml` under `packs: external:`, never in a project
+file: loading a pack runs its code.
 
 ---
 
@@ -334,6 +343,12 @@ knowledge/
 
 ### RAG Knowledge Strategy
 
+A design to implement in your own stack, not an interface this plugin ships:
+`search_knowledge` below names the retrieval tool you would build. The plugin's
+`knowledge-rag` server was removed in v4.0.0; what it ships is the markdown
+bundle and its rule and tag lookup (`craftsman-helper knowledge`, see
+[Knowledge Reference](../reference/knowledge.md)).
+
 For large knowledge bases:
 
 ```
@@ -365,10 +380,10 @@ For large knowledge bases:
 
 ```bash
 # Structure
-my-pack/
-├── skills/
-│   └── my-skill/
-│       └── SKILL.md
+packs/my-pack/
+├── pack.yml
+├── commands/
+│   └── my-skill.md
 ├── agents/
 │   └── my-agent.md
 ├── knowledge/
@@ -378,21 +393,22 @@ my-pack/
     └── bounded-context.template.md
 ```
 
-Update `plugin.json`:
+Declare it in `packs/my-pack/pack.yml` (not in `plugin.json`, which has no
+`packs` key; see Registering Skills above):
 
-```json
-{
-  "packs": {
-    "my-pack": {
-      "description": "My custom pack",
-      "required": false,
-      "skills": ["my-pack/skills/my-skill"],
-      "agents": ["my-pack/agents/my-agent.md"],
-      "knowledge": ["my-pack/knowledge/*"]
-    }
-  }
-}
+```yaml
+name: my-pack
+version: "1.0.0"
+description: "My custom pack"
+compatibility:
+  core: ">=4.0.0"
+  stack: ["*"]
+agents: ["agents/my-agent.md"]
+knowledge: ["knowledge/"]
 ```
+
+The shipped manifests under `packs/*/pack.yml` show the other keys
+(`languages`, `rules`, `hooks`, `routes`).
 
 ### Publishing
 

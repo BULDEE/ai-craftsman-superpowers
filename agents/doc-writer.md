@@ -30,15 +30,13 @@ instead of leaving it silent, and never let your final action be a tool call.
 
 ## First Action
 
-Before anything else, run this once and treat its output as ground truth:
-
-```bash
-bash "${CLAUDE_PLUGIN_ROOT}/hooks/lib/dispatch-context.sh"
-```
-
-It returns the resolved doctrine (this project's rule severities, which
-override any rule you remember), the codemap, the current hotspots, and the
-correction trends. Do not re-scan the repository for what it already answers.
+You have no shell: your tools are Read, Glob, Grep, Edit and Write, on
+purpose. Start from the context your caller put in your prompt. When it
+includes the dispatch context (resolved doctrine, codemap, hotspots,
+correction trends), treat it as ground truth: this project's rule severities
+override any rule you remember. When a question needs it and it is not there,
+say so in your report instead of guessing, and answer the rest from the files
+you can read.
 
 ## Documentation Types
 
@@ -106,7 +104,7 @@ Status: [Proposed | Accepted | Deprecated | Superseded]
 Before submitting any documentation:
 
 1. **Code check** - Does the code actually do what the doc says?
-2. **Example check** - Do the code examples compile/run?
+2. **Example check** - Does each example match the code it calls? You cannot run it: list every example you did not see run as unverified in your report, so the caller runs it
 3. **Link check** - Are all links valid?
 4. **Freshness check** - Is this based on the current version?
 

@@ -12,8 +12,11 @@ disable-model-invocation: true
 > inside this installation. The plugin's `bin/` is on PATH in the Claude Code
 > Bash tool; on a host where it is not, call it by its full path
 > (`<plugin root>/bin/craftsman-path`). Do not use `${CLAUDE_PLUGIN_ROOT}` in a
-> skill body: a skill is text handed to a model, the host expands nothing there,
-> and Claude Code does not export that variable to the Bash tool.
+> skill body: Claude Code documents substituting it inline in skill text
+> (plugins-reference, read 2026-09-27), yet on Claude Code 2.1.278 a skill that
+> relied on it ran `source "/hooks/lib/config.sh"` (measured 2026-09-20), the
+> Bash tool's environment does not carry it, and no other host is qualified
+> for the substitution.
 
 ## Outcome Contract
 
@@ -202,7 +205,7 @@ Break a hard dependency (DB, HTTP, clock, third-party, global) so the code becom
 
 3. Apply it with **automated refactorings** where possible (no tests yet = rely on the IDE's safe transformations).
 4. Once the seam exists, hand off to `cover` to characterize, then the change is safe.
-5. For a change with unknown prerequisites, drive it with the **Mikado Method**: attempt, note blockers, `git reset --hard`, tackle a prerequisite first.
+5. For a change with unknown prerequisites, drive it with the **Mikado Method**: mark the starting point, attempt, note blockers, throw the attempt away, tackle a prerequisite first. Mark and throw away with the two commands of `/craftsman:refactor`'s Mikado Mode (`knowledge/refactoring/mikado-method.md`, Reverting Only the Attempt): they revert only what the attempt changed, so uncommitted work that predates it survives. Never `git reset --hard` in the user's checkout.
 
 Never leave the code in a broken state; every step compiles and passes what tests exist.
 

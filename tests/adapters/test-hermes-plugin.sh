@@ -404,12 +404,24 @@ else
 fi
 
 # The curated export is committed output: regenerating it must be clean and
-# self-contained (no reference reaching back into knowledge/).
+# self-contained (no reference reaching back into knowledge/), and must change
+# nothing. The regeneration used to overwrite a stale export silently, so the
+# skills Hermes installs kept prescribing `git reset --hard` after the source
+# skills stopped (CR-176).
+export_digest() {
+    (cd "$ROOT_DIR/adapters/hermes/skills" && find . -type f | LC_ALL=C sort | xargs shasum | shasum)
+}
+EXPORT_BEFORE=$(export_digest)
 if bash "$ROOT_DIR/scripts/export-hermes-skills.sh" >/dev/null 2>&1 \
     && ! grep -rn "knowledge/" "$ROOT_DIR/adapters/hermes/skills" --include=SKILL.md >/dev/null 2>&1; then
     log_pass "skill export regenerates clean with no dead knowledge link"
 else
     log_fail "skill export" "generator failed or left a knowledge/ link"
+fi
+if [[ "$(export_digest)" == "$EXPORT_BEFORE" ]]; then
+    log_pass "the committed skill export matches its sources"
+else
+    log_fail "skill export drift" "regenerating changed adapters/hermes/skills; commit the regenerated export"
 fi
 
 RUNTIME_COMMAND=$(sed -n 's/.*$(bash "\([^"]*craftsman-runtime\)" metrics).*/\1/p' "$ROOT_DIR/adapters/hermes/skills/craftsman-debug/SKILL.md")

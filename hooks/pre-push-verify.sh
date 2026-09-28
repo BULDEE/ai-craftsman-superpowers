@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Pre-Push Verify Hook for Claude Code
-# Blocks git push if /craftsman:verify has not been run in the current session.
+# Warns on git push when the session holds no verification evidence
+# (/craftsman:verify or a passing test run). It reads no file and never blocks:
+# the push is allowed either way (ADR-0023, Amendment).
 #
 # TRIGGERS: PreToolUse for Bash (git push)
-# EXIT CODES: 0 = allow, 2 = block with reason
+# EXIT CODES: 0 always (a warning is additionalContext plus stderr)
 # =============================================================================
 set -uo pipefail
 

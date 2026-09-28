@@ -289,6 +289,47 @@ fi
 
 rm -rf "$SQG_DIR"
 
+# Severity is the rules engine's decision, for a subagent's file as for the
+# main loop's (review of main eb54d13, security S3, CR-174). add_warning wrote
+# straight to the findings with "warn": PY003 set to ignore still reached the
+# main loop as a violation to fix, and PY003 set to block went into the
+# metrics as a warning. The gate stays observational: exit 0 in every case.
+SEV_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-sqg-severity.XXXXXX")
+mkdir -p "$SEV_DIR/proj" "$SEV_DIR/home"
+printf 'def answer():\n    return 42\n' > "$SEV_DIR/proj/answer.py"
+( cd "$SEV_DIR/proj" && git init -q . ) >/dev/null 2>&1
+printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Write","input":{"file_path":"%s"}}]}}\n' \
+    "$SEV_DIR/proj/answer.py" > "$SEV_DIR/transcript.jsonl"
+_sev_gate() { # $1 = case name; prints "<exit>|<lines naming PY003 in the output>|<metric severity>"
+    local data="$SEV_DIR/data-$1" out rc=0
+    mkdir -p "$data"
+    out=$( cd "$SEV_DIR/proj" && jq -n --arg t "$SEV_DIR/transcript.jsonl" --arg c "$SEV_DIR/proj" '{agent_type:"architect", agent_transcript_path:$t, cwd:$c}' \
+        | env -u CRAFTSMAN_PLUGIN_DATA HOME="$SEV_DIR/home" CLAUDE_PLUGIN_DATA="$data" bash "$ROOT_DIR/hooks/subagent-quality-gate.sh" 2>/dev/null ) || rc=$?
+    out=$(printf '%s' "$out" | grep -c PY003)
+    printf '%s|%s|%s' "$rc" "$out" "$(sqlite3 "$data/metrics.db" "SELECT COALESCE((SELECT severity FROM violations WHERE rule='PY003' ORDER BY id DESC LIMIT 1), 'none')" 2>/dev/null)"
+}
+SEV_RESULTS=""
+for sev in ignore warn block; do
+    printf 'rules:\n  PY003: %s\n' "$sev" > "$SEV_DIR/proj/.craft-rules.yml"
+    SEV_RESULTS="${SEV_RESULTS}${sev}=$(_sev_gate "dir-$sev") "
+done
+rm -f "$SEV_DIR/proj/.craft-rules.yml"
+if [[ "$SEV_RESULTS" == "ignore=0|0|none warn=0|1|warning block=0|1|critical " ]]; then
+    log_pass "subagent gate: PY003 in .craft-rules.yml is honoured as ignore, warn and block, and the gate still exits 0"
+else
+    log_fail "subagent gate severity parity (.craft-rules.yml)" \
+        "got '$SEV_RESULTS', expected ignore=0|0|none warn=0|1|warning block=0|1|critical"
+fi
+printf 'rules:\n  PY003: ignore\n' > "$SEV_DIR/proj/.craft-config.yml"
+SEV_PROJECT=$(_sev_gate project-ignore)
+rm -f "$SEV_DIR/proj/.craft-config.yml"
+if [[ "$SEV_PROJECT" == "0|0|none" ]]; then
+    log_pass "subagent gate: PY003: ignore in the project .craft-config.yml silences it too"
+else
+    log_fail "subagent gate severity parity (.craft-config.yml)" "got '$SEV_PROJECT', expected 0|0|none"
+fi
+rm -rf "$SEV_DIR"
+
 echo ""
 echo "=== Semantic layer telemetry ==="
 
@@ -665,6 +706,62 @@ CLOSED=$(sqlite3 "$C6_DIR/data/metrics.db" "select count(*) from corrections whe
 rm -rf "$C6_DIR"
 
 echo ""
+echo "=== a finding on B is not the witness for an unchanged A (CR-173) ==="
+# Review of main eb54d13 (2026-09-21, state S4): the content hash proving that
+# a file changed between two verdicts was looked up by file_pattern, the
+# DIRECTORY bucket. A finding on B, next door, made B's hash the witness for A,
+# and a CLEAN on A, never edited, closed A's finding as fixed. Real libraries
+# and a real SQLite database, no model.
+HH_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-haiku-hash.XXXXXX")
+mkdir -p "$HH_DIR/home" "$HH_DIR/data" "$HH_DIR/proj/src/Domain"
+( cd "$HH_DIR/proj" && git init -q . ) >/dev/null 2>&1
+printf '<?php class A {}\n' > "$HH_DIR/proj/src/Domain/A.php"
+printf '<?php class B {}\n' > "$HH_DIR/proj/src/Domain/B.php"
+printf '<?php class C {}\n' > "$HH_DIR/proj/src/Domain/C.php"
+_hh() { # one snippet against the real libraries, from inside the fixture project
+    ( cd -P "$HH_DIR/proj" && env -u CRAFTSMAN_SESSION_ID -u CRAFTSMAN_SESSION_HOST -u CLAUDE_CODE_SESSION_ID \
+          -u CODEX_SESSION_ID -u CODEX_THREAD_ID -u GROK_SESSION_ID -u GROK_PLUGIN_DATA -u PLUGIN_DATA \
+          -u CRAFTSMAN_PLUGIN_DATA HOME="$HH_DIR/home" CLAUDE_PLUGIN_DATA="$HH_DIR/data" \
+          bash -c "source '$ROOT_DIR/hooks/lib/metrics-db.sh'; source '$ROOT_DIR/hooks/lib/haiku-verify.sh'; metrics_init; $1" ) 2>/dev/null
+}
+_hh_fixed() { # corrections recorded as fixed on one file
+    sqlite3 "$HH_DIR/data/metrics.db" "SELECT COUNT(*) FROM corrections WHERE source='haiku' AND action='fixed' AND file_path='$1'"
+}
+_hh 'CRAFTSMAN_METRICS_SOURCE=haiku metrics_record_violation HAIKU_LAYER001 "src/Domain/**/*.php" warning 0 0 "$PWD/src/Domain/A.php"
+     metrics_record_haiku_run agent-ddd-verifier findings 1 20 "$PWD/src/Domain/A.php"
+     haiku_close_resolved "$PWD/src/Domain/A.php" ""'
+HH_CONTROL=$(_hh_fixed src/Domain/A.php)
+_hh 'metrics_record_haiku_run agent-ddd-verifier findings 1 20 "$PWD/src/Domain/B.php"
+     haiku_close_resolved "$PWD/src/Domain/A.php" ""'
+HH_AFTER_B=$(_hh_fixed src/Domain/A.php)
+if [[ "$HH_CONTROL" == "0" && "$HH_AFTER_B" == "0" ]]; then
+    log_pass "a finding run on B, same directory, does not make an unchanged A count as fixed"
+else
+    log_fail "B's hash became A's witness" "control=$HH_CONTROL after_B=$HH_AFTER_B (expected 0 and 0)"
+fi
+# A finding the verifier raised on C while it was judging B: no run ever
+# recorded C's content, so there is no witness that C changed, and an absent
+# witness is not a change.
+_hh 'CRAFTSMAN_METRICS_SOURCE=haiku metrics_record_violation HAIKU_LAYER001 "src/Domain/**/*.php" warning 0 0 "$PWD/src/Domain/C.php"
+     metrics_record_haiku_run agent-ddd-verifier findings 1 20 "$PWD/src/Domain/B.php"
+     haiku_close_resolved "$PWD/src/Domain/C.php" ""'
+HH_NO_WITNESS=$(_hh_fixed src/Domain/C.php)
+if [[ "$HH_NO_WITNESS" == "0" ]]; then
+    log_pass "a finding with no recorded content for its own file closes nothing: no witness is not a change"
+else
+    log_fail "an absent witness closed a finding" "fixed on C=$HH_NO_WITNESS (expected 0)"
+fi
+printf '<?php final class A {}\n' > "$HH_DIR/proj/src/Domain/A.php"
+_hh 'haiku_close_resolved "$PWD/src/Domain/A.php" ""'
+HH_EDITED=$(_hh_fixed src/Domain/A.php)
+if [[ "$HH_EDITED" == "1" ]]; then
+    log_pass "control: A really edited, then CLEAN, closes A's finding once"
+else
+    log_fail "control: edited A" "fixed on A=$HH_EDITED (expected 1)"
+fi
+rm -rf "$HH_DIR"
+
+echo ""
 echo "=== the DDD verifier reviews a Codex apply_patch too ==="
 # F6 (challenge review): the callback exited on a missing file_path, so no
 # Codex write was ever reviewed. Same fake CLI witness as above.
@@ -683,5 +780,51 @@ else
     log_fail "F6 apply_patch review" "no model call made"
 fi
 rm -rf "$F6_DIR"
+
+echo ""
+echo "=== the final review reads new files too (CR-174) ==="
+# Review of main eb54d13 (2026-09-21, security S4): the scope was
+# `git diff --name-only HEAD`, which never lists an untracked file, so a new
+# class the session created and did not stage never reached the review whose
+# prompt looks for new classes without a test. The witness is the prompt the
+# fake CLI receives; an exit 0 proves nothing.
+FR_DIR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-final-review.XXXXXX")
+mkdir -p "$FR_DIR/bin" "$FR_DIR/proj/src" "$FR_DIR/data" "$FR_DIR/home" "$FR_DIR/global"
+cat > "$FR_DIR/bin/claude" <<FAKE
+#!/bin/sh
+printf '%s\n' "\$*" > "$FR_DIR/prompt"
+echo CLEAN
+FAKE
+chmod +x "$FR_DIR/bin/claude"
+printf '<?php\ndeclare(strict_types=1);\nfinal class Tracked\n{\n}\n' > "$FR_DIR/proj/src/Tracked.php"
+printf 'src/Ignored.php\n' > "$FR_DIR/proj/.gitignore"
+( cd "$FR_DIR/proj" && git init -q . && git add -A && git -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -qm base ) >/dev/null 2>&1
+_fr_run() { # runs the final review; prints the prompt the fake CLI received, or not-called
+    local prompt="$FR_DIR/prompt"
+    rm -f "$prompt"
+    ( cd "$FR_DIR/proj" && printf '{"session_id":"fr","hook_event_name":"Stop","cwd":"%s"}' "$FR_DIR/proj" | env -u CRAFTSMAN_HEADLESS_VERIFY -u CLAUDE_EFFORT -u CLAUDE_PLUGIN_OPTION_strictness \
+        -u CLAUDE_PLUGIN_OPTION_STRICTNESS PATH="$FR_DIR/bin:$PATH" HOME="$FR_DIR/home" CLAUDE_PLUGIN_ROOT="$ROOT_DIR" CLAUDE_PLUGIN_DATA="$FR_DIR/data" CLAUDE_PLUGIN_OPTION_STACK=fullstack \
+        CLAUDE_PLUGIN_OPTION_AGENT_HOOKS=true CRAFTSMAN_GLOBAL_CONFIG_DIR="$FR_DIR/global" bash "$ROOT_DIR/hooks/agent-final-review.sh" >/dev/null 2>&1 )
+    cat "$prompt" 2>/dev/null || echo not-called
+}
+FR_CLEAN=$(_fr_run)
+printf '<?php\ndeclare(strict_types=1);\nfinal class NewOne\n{\n}\n' > "$FR_DIR/proj/src/NewOne.php"
+printf '<?php\nclass Ignored {}\n' > "$FR_DIR/proj/src/Ignored.php"
+FR_UNTRACKED=$(_fr_run)
+if [[ "$FR_CLEAN" == "not-called" && "$FR_UNTRACKED" == *"src/NewOne.php"* && "$FR_UNTRACKED" != *"Ignored.php"* ]]; then
+    log_pass "final review: an untracked new file reaches the review backend, a gitignored one does not (control: nothing changed, no call)"
+else
+    log_fail "final review scope (untracked)" "clean=${FR_CLEAN:0:20} untracked prompt lists: $(printf '%s' "$FR_UNTRACKED" | grep -oE 'src/[A-Za-z]+\.php' | tr '\n' ' ')"
+fi
+printf '<?php\ndeclare(strict_types=1);\nfinal class Staged\n{\n}\n' > "$FR_DIR/proj/src/Staged.php"
+printf '// edited\n' >> "$FR_DIR/proj/src/Tracked.php"
+( cd "$FR_DIR/proj" && git add src/Staged.php ) >/dev/null 2>&1
+FR_ALL=$(_fr_run)
+if [[ "$FR_ALL" == *"src/NewOne.php"* && "$FR_ALL" == *"src/Staged.php"* && "$FR_ALL" == *"src/Tracked.php"* ]]; then
+    log_pass "final review: untracked, staged and modified files are all in scope together"
+else
+    log_fail "final review scope (mixed)" "prompt lists: $(printf '%s' "$FR_ALL" | grep -oE 'src/[A-Za-z]+\.php' | tr '\n' ' ')"
+fi
+rm -rf "$FR_DIR"
 
 test_summary
