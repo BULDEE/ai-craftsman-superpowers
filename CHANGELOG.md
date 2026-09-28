@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.12.3] - 2026-09-28
+
+Bugfix release: the PHP analysers report a run that gave no verdict, PHPStan
+never runs without its pinned configuration, and the CI comment heading
+agrees with the job's exit (CR-211, CR-212). No rule changes.
+
 ### Security
 
 - PHPStan no longer runs when its pinned configuration cannot be written.
