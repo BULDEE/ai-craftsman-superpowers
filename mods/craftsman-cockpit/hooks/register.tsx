@@ -9,6 +9,8 @@ import type { CockpitCandidate, CockpitQueue, CockpitView } from '../types'
 
 const PANE = 'instincts'
 const view = atom({ plugin: 'craftsman-cockpit', key: 'view' } as const, { kind: 'loading' } as CockpitView)
+// The id of the candidate whose skill preview is open; 0 for none.
+const preview = atom({ plugin: 'craftsman-cockpit', key: 'preview' } as const, 0)
 
 type Helper = { argv0: string; env: Record<string, string> }
 type Located = { helper: Helper } | { tried: string[] }
@@ -122,6 +124,37 @@ async function decide($: EngineInterface, { options, verb: decision, candidate }
   await refresh($, options, notice)
 }
 
+// What a severity does to a write, in the words a reviewer decides on.
+const SEVERITY_EFFECT: Record<string, string> = {
+  block: 'blocks the write',
+  warn: 'advisory: reported, never blocks',
+  ignore: 'switched off',
+}
+
+function origin(candidate: CockpitCandidate): string {
+  const owner = candidate.rule_owner === '' ? 'unknown pack' : candidate.rule_owner === 'core' ? 'core rules' : `${candidate.rule_owner} pack`
+  const effect = SEVERITY_EFFECT[candidate.default_severity] ?? 'severity unknown'
+  return `${owner} · ${candidate.rule_group || 'no group'} · default ${candidate.default_severity || '?'} (${effect})`
+}
+
+function acceptance(candidate: CockpitCandidate): string {
+  const total = candidate.fixed + candidate.rejected
+  const rate = total === 0 ? 0 : Math.round((100 * candidate.fixed) / total)
+  return `Accepted ${candidate.fixed} of ${total} times (${rate}%). Refused ${candidate.rejected}: ` +
+    `${candidate.ignored} craftsman-ignore, ${candidate.scoped} relaxed by config.`
+}
+
+// Below four fixes in five, the refusals are part of the decision.
+function isContested(candidate: CockpitCandidate): boolean {
+  return candidate.rejected * 5 > candidate.fixed + candidate.rejected
+}
+
+function standing(candidate: CockpitCandidate): string {
+  const last = candidate.last_fixed === '' ? 'never recorded' : candidate.last_fixed.slice(0, 10)
+  return `Last fixed ${last} · ${candidate.files} files · confidence ${candidate.confidence.toFixed(2)} ` +
+    '(lower bound of the acceptance rate: an order, not a bar)'
+}
+
 export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
@@ -157,7 +190,8 @@ export const register: Register = (on, options) => {
     }
 
     const { candidates, approved } = current.queue
-    const room = Math.max(1, Math.floor(((e.viewport?.rows ?? 30) - 8) / 6))
+    const opened = await read($, preview)
+    const room = Math.max(1, Math.floor(((e.viewport?.rows ?? 30) - 8) / 14))
     const shown = candidates.slice(0, room)
 
     return (
@@ -168,12 +202,19 @@ export const register: Register = (on, options) => {
         {shown.map(candidate => (
           <Box key={`candidate-${candidate.id}`} flexDirection="column" marginTop={1}>
             <Text>
-              <Text bold>{candidate.rule}</Text> confidence {candidate.confidence.toFixed(2)} · fixed {candidate.fixed} · rejected {candidate.rejected} · {candidate.files} files
+              <Text bold>{candidate.rule}</Text>{candidate.rule_text !== '' ? ` · ${candidate.rule_text}` : ''}
             </Text>
-            {candidate.summary !== '' && <Text dimColor>{candidate.summary}</Text>}
+            <Text dimColor>{origin(candidate)}</Text>
+            <Text>{acceptance(candidate)}</Text>
+            <Text dimColor>{standing(candidate)}</Text>
+            {candidate.summary !== '' && <Text dimColor>Recorded fix: {candidate.summary}</Text>}
+            <Text dimColor>Fixed in:</Text>
             {candidate.evidence.map(item => (
               <Text dimColor>  {item.file}{item.context !== '' ? `: ${item.context}` : ''}</Text>
             ))}
+            <Text>Approve: writes {candidate.skill_path}; Claude then loads it as background knowledge and applies the fix before the gate flags it.</Text>
+            <Text>Reject: no skill; the candidate stays hidden until new fixes build up. The rule itself keeps running either way.</Text>
+            {isContested(candidate) && <Text color="yellow">About one refusal in {Math.round((candidate.fixed + candidate.rejected) / Math.max(1, candidate.rejected))}: if those were legitimate exceptions, Approve; if the rule misfits this codebase, Reject and relax it in .craft-rules.yml.</Text>}
             <Box flexDirection="row" gap={1}>
               <Button key={`approve-${candidate.id}`} variant="primary" onPress={() => decide($, { options, verb: 'approve', candidate })}>
                 Approve
@@ -181,7 +222,15 @@ export const register: Register = (on, options) => {
               <Button key={`reject-${candidate.id}`} onPress={() => decide($, { options, verb: 'reject', candidate })}>
                 Reject
               </Button>
+              <Button key={`skill-${candidate.id}`} onPress={() => update($, preview, open => (open === candidate.id ? 0 : candidate.id))}>
+                {opened === candidate.id ? 'Hide skill' : 'Show skill'}
+              </Button>
             </Box>
+            {opened === candidate.id && (
+              <Box flexDirection="column" borderStyle="single" paddingX={1}>
+                {candidate.skill_preview.split('\n').map(line => <Text dimColor>{line === '' ? ' ' : line}</Text>)}
+              </Box>
+            )}
           </Box>
         ))}
         {candidates.length > shown.length && <Text dimColor>{candidates.length - shown.length} more below the fold; decide these first.</Text>}

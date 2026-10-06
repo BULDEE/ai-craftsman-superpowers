@@ -662,7 +662,7 @@ rules = [c["rule"] for c in data["candidates"]]
 php = next(c for c in data["candidates"] if c["rule"] == "PHP001")
 problems = []
 if sorted(rules) != ["PHP001", "TS001"]: problems.append("rules=%s" % rules)
-if set(php) != {"id", "rule", "confidence", "fixed", "rejected", "files", "summary", "evidence"}:
+if not {"id", "rule", "confidence", "fixed", "rejected", "files", "summary", "evidence"} <= set(php):
     problems.append("keys=%s" % sorted(php))
 if (php["fixed"], php["rejected"], php["files"]) != (3, 0, 3): problems.append("counts")
 if not isinstance(php["id"], int): problems.append("id")
@@ -687,6 +687,59 @@ if [[ "$AFTER_CHECK" == "PHP001|TS001" ]]; then
     log_pass "an approved instinct leaves the queue and is listed as approved"
 else
     log_fail "an approved instinct leaves the queue" "$AFTER_CHECK"
+fi
+
+# A reviewer decides on what the rule says, how often it was refused and how,
+# and what Approve will write; a rule id and a Wilson bound are not enough
+# (feedback on the first pane, 2026-10-06). The rule's wording comes from the
+# compiled registry the hooks read, never from a copy kept here.
+echo ""
+echo "=== The review queue says what a decision means ==="
+sqlite3 "$REVIEW_DB" "
+INSERT INTO corrections (project_hash, rule, file_pattern, file_path, action, context) VALUES
+  ('p3','TS003','src/a/**/*.ts','src/a/a.ts','fixed',''),
+  ('p3','TS003','src/b/**/*.ts','src/b/b.ts','fixed',''),
+  ('p3','TS003','src/c/**/*.ts','src/c/c.ts','fixed',''),
+  ('p3','TS003','src/d/**/*.ts','src/d/d.ts','fixed',''),
+  ('p3','TS003','src/a/**/*.ts','src/a/a.ts','ignored','craftsman-ignore added'),
+  ('p3','TS003','src/b/**/*.ts','src/b/b.ts','scoped','');"
+printf 'TS003\tTypeScript\twarn\treact\tno non-null assertion (!) - handle null explicitly\tno\tno\n' > "$REVIEW/registry.tsv"
+EXPLAINED=$(CRAFTSMAN_RULE_REGISTRY="$REVIEW/registry.tsv" python3 "$INSTINCTS" review "$REVIEW_DB" p3 2>&1)
+EXPLAINED_CHECK=$(printf '%s' "$EXPLAINED" | python3 -c '
+import json, sys
+c = json.load(sys.stdin)["candidates"][0]
+problems = []
+if c.get("rule_text") != "no non-null assertion (!) - handle null explicitly": problems.append("rule_text=%r" % c.get("rule_text"))
+if (c.get("rule_owner"), c.get("default_severity")) != ("react", "warn"): problems.append("owner/severity")
+if (c.get("ignored"), c.get("scoped"), c.get("rejected")) != (1, 1, 2): problems.append("breakdown")
+if not c.get("last_fixed"): problems.append("last_fixed")
+if c.get("skill_path") != ".claude/skills/learned-ts003/SKILL.md": problems.append("skill_path=%r" % c.get("skill_path"))
+preview = c.get("skill_preview", "")
+if "name: learned-ts003" not in preview: problems.append("preview frontmatter")
+if "handle null explicitly" not in preview: problems.append("preview carries no fix when no context was recorded")
+print("ok" if not problems else "; ".join(problems))' 2>&1)
+if [[ "$EXPLAINED_CHECK" == "ok" ]]; then
+    log_pass "review carries the rule wording, the refusal breakdown and the skill Approve writes"
+else
+    log_fail "review explains the decision" "$EXPLAINED_CHECK :: $EXPLAINED"
+fi
+
+# The preview is a promise: Approve writes exactly what the pane showed.
+P3_ID=$(printf '%s' "$EXPLAINED" | python3 -c 'import json,sys; print(json.load(sys.stdin)["candidates"][0]["id"])')
+printf '%s' "$EXPLAINED" | python3 -c 'import json,sys; sys.stdout.write(json.load(sys.stdin)["candidates"][0]["skill_preview"])' > "$REVIEW/preview.md"
+(cd "$REVIEW" && CRAFTSMAN_RULE_REGISTRY="$REVIEW/registry.tsv" python3 "$INSTINCTS" approve "$REVIEW_DB" "$P3_ID" "$REVIEW/.claude/skills" >/dev/null 2>&1)
+if cmp -s "$REVIEW/preview.md" "$REVIEW/.claude/skills/learned-ts003/SKILL.md"; then
+    log_pass "approve writes byte for byte the skill the review previewed"
+else
+    log_fail "approve writes the previewed skill" "$(diff "$REVIEW/preview.md" "$REVIEW/.claude/skills/learned-ts003/SKILL.md" 2>&1 | head -10)"
+fi
+
+# Without a registry the queue still answers, with the wording left empty.
+BARE=$(python3 "$INSTINCTS" review "$REVIEW_DB" p1 2>&1)
+if printf '%s' "$BARE" | python3 -c 'import json,sys; c=json.load(sys.stdin)["candidates"][0]; sys.exit(0 if c["rule_text"]=="" else 1)' 2>/dev/null; then
+    log_pass "with no registry the queue answers and leaves the wording empty"
+else
+    log_fail "with no registry the queue answers" "$BARE"
 fi
 rm -rf "$REVIEW"
 

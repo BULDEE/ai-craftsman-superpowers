@@ -9,6 +9,15 @@ export type CockpitCandidate = {
   files: number
   summary: string
   evidence: CockpitEvidence[]
+  rule_text: string
+  rule_group: string
+  rule_owner: string
+  default_severity: string
+  ignored: number
+  scoped: number
+  last_fixed: string
+  skill_path: string
+  skill_preview: string
 }
 
 export type CockpitApproved = {
@@ -29,6 +38,6 @@ export type CockpitView =
 
 declare module 'claude-code' {
   interface PluginState {
-    'craftsman-cockpit': { view: CockpitView }
+    'craftsman-cockpit': { view: CockpitView; preview: number }
   }
 }

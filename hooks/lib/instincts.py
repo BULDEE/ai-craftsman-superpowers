@@ -22,6 +22,7 @@ can edit or delete.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 import sys
@@ -375,9 +376,8 @@ def approve(conn: sqlite3.Connection, instinct_id: int, skills_dir: str) -> None
     project_hash, rule, summary, occurrences, distinct_files, confidence = _load_candidate(
         conn, instinct_id
     )
-    contexts = _evidence_contexts(conn, project_hash, rule)
     skill_dir = _own_skill_dir(_resolve_skills_dir(skills_dir), f"learned-{_slugify(rule)}")
-    content = _render_skill(rule, summary, occurrences, distinct_files, confidence, contexts)
+    content = _skill_for(conn, project_hash, (rule, summary, occurrences, distinct_files, confidence))
     (skill_dir / "SKILL.md").write_text(content)
     conn.execute(
         "UPDATE instincts SET status = 'approved', reviewed_at = datetime('now') WHERE id = ?",
@@ -476,6 +476,65 @@ def _cmd_pending_count(conn: sqlite3.Connection, args: list[str]) -> None:
     print(count)
 
 
+# The rule's wording, owner and default severity, from the registry the hooks
+# compile out of the pack manifests (CRAFTSMAN_RULE_REGISTRY, exported by
+# rule_registry_init). Absent, the fields are empty: the queue still answers.
+# An external pack writes these columns, so they are filtered like any text
+# out of a repository.
+_NO_RULE_INFO = {"rule_text": "", "rule_group": "", "rule_owner": "", "default_severity": ""}
+
+
+def _rule_info(rule: str) -> dict:
+    registry = os.environ.get("CRAFTSMAN_RULE_REGISTRY", "")
+    try:
+        rows = Path(registry).read_text().splitlines() if registry else []
+    except OSError:
+        rows = []
+    for row in rows:
+        columns = row.split("\t")
+        if len(columns) >= 5 and columns[0] == rule:
+            return {"rule_text": _untrusted(columns[4]), "rule_group": _untrusted(columns[1], 40),
+                    "rule_owner": _untrusted(columns[3], 40), "default_severity": _untrusted(columns[2], 10)}
+    return dict(_NO_RULE_INFO)
+
+
+# One builder for the skill Approve writes and the preview the review shows,
+# so the pane can promise what lands on disk. With no correction context
+# recorded, the rule's own wording is the pattern: "see the rule definition"
+# taught the model nothing.
+def _skill_for(conn: sqlite3.Connection, project_hash: str, candidate: tuple) -> str:
+    rule, summary, occurrences, distinct_files, confidence = candidate
+    wording = _rule_info(rule)["rule_text"]
+    pattern = summary or (f"{rule}: {wording}." if wording else "")
+    contexts = _evidence_contexts(conn, project_hash, rule)
+    return _render_skill(rule, pattern, occurrences, distinct_files, confidence, contexts)
+
+
+def _refusals(conn: sqlite3.Connection, project_hash: str, rule: str) -> dict:
+    ignored, scoped, last_fixed = conn.execute(
+        "SELECT COALESCE(SUM(action = 'ignored'), 0), COALESCE(SUM(action = 'scoped'), 0),"
+        " MAX(CASE WHEN action = 'fixed' THEN timestamp END)"
+        " FROM corrections WHERE project_hash = ? AND rule = ?",
+        (project_hash, rule),
+    ).fetchone()
+    return {"ignored": ignored, "scoped": scoped, "last_fixed": last_fixed or ""}
+
+
+def _candidate_entry(conn: sqlite3.Connection, project_hash: str, row: tuple) -> dict:
+    iid, rule, confidence, fixed, rejected, files, summary, _status = row
+    entry = {"id": iid, "rule": _untrusted(rule, 40), "confidence": confidence, "fixed": fixed,
+             "files": files, "rejected": rejected, "summary": _untrusted(summary)}
+    entry.update(_rule_info(rule))
+    entry.update(_refusals(conn, project_hash, rule))
+    entry["evidence"] = [
+        {"file": _untrusted(file_pattern, 120), "context": _untrusted(context, 120)}
+        for context, file_pattern in _evidence_contexts(conn, project_hash, rule)
+    ]
+    entry["skill_path"] = f".claude/skills/learned-{_slugify(rule)}/SKILL.md"
+    entry["skill_preview"] = _skill_for(conn, project_hash, (rule, summary, fixed, files, confidence))
+    return entry
+
+
 # The review queue for a program, not a person (ADR-0031): the cockpit mod
 # draws its pane from this and never from the prose `list` prints, so a
 # reworded line cannot silently empty the pane. Every text that came out of
@@ -489,17 +548,13 @@ def review_queue(conn: sqlite3.Connection, project_hash: str) -> dict:
         (project_hash,),
     ).fetchall()
     queue: dict = {"candidates": [], "approved": []}
-    for iid, rule, confidence, fixed, rejected, files, summary, status in rows:
-        entry = {"id": iid, "rule": _untrusted(rule, 40), "confidence": confidence,
-                 "fixed": fixed, "files": files}
+    for row in rows:
+        iid, rule, confidence, fixed, _rejected, files, _summary, status = row
         if status == "approved":
-            queue["approved"].append(entry)
+            queue["approved"].append({"id": iid, "rule": _untrusted(rule, 40), "confidence": confidence,
+                                      "fixed": fixed, "files": files})
             continue
-        entry.update(rejected=rejected, summary=_untrusted(summary), evidence=[
-            {"file": _untrusted(file_pattern, 120), "context": _untrusted(context, 120)}
-            for context, file_pattern in _evidence_contexts(conn, project_hash, rule)
-        ])
-        queue["candidates"].append(entry)
+        queue["candidates"].append(_candidate_entry(conn, project_hash, row))
     return queue
 
 

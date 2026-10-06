@@ -10,8 +10,12 @@ const HELPER = `${ROOT}/bin/craftsman-helper`
 
 const QUEUE = {
   candidates: [{
-    id: 7, rule: 'PHP001', confidence: 0.82, fixed: 18, rejected: 1, files: 9,
+    id: 7, rule: 'PHP001', confidence: 0.82, fixed: 18, rejected: 2, files: 9,
     summary: 'added strict_types', evidence: [{ file: 'src/A/**/*.php', context: 'added strict_types' }],
+    rule_text: 'declare(strict_types=1) at the top of every PHP file', rule_group: 'PHP',
+    rule_owner: 'symfony', default_severity: 'block', ignored: 1, scoped: 1, last_fixed: '2026-09-30 10:00:00',
+    skill_path: '.claude/skills/learned-php001/SKILL.md',
+    skill_preview: '---\nname: learned-php001\n---\n\n## Pattern\n\nadded strict_types\n',
   }],
   approved: [{ id: 3, rule: 'TS001', confidence: 0.96, fixed: 101, files: 40 }],
 }
@@ -57,13 +61,31 @@ test('the pane lists the queue the core answers, on every surface that has butto
   // craftsman-ignore: DB003 (wrong: one mount per surface, no query in the loop)
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...PANE, surface })
-    expect((await ui.find({ type: 'Text', text: /PHP001/ }))?.text).toContain('fixed 18')
+    expect((await ui.find({ type: 'Text', text: /PHP001/ }))?.text).toContain('strict_types=1')
     expect(await ui.find({ type: 'Text', text: /src\/A/ })).toBeDefined()
     expect(await ui.find({ key: 'approve-7' })).toBeDefined()
     expect(await ui.find({ key: 'reject-7' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /TS001/ })).toBeDefined()
     await ui.unmount()
   }
+})
+
+test('a candidate says what the rule is, how it was refused and what each button does', async ($, on) => {
+  host(on, BOUND)
+  await $.command.run(OPEN)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: /declare\(strict_types=1\)/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /symfony pack.*blocks the write/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Accepted 18 of 20 times \(90%\)/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /1 craftsman-ignore, 1 relaxed by config/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Last fixed 2026-09-30/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /\.claude\/skills\/learned-php001\/SKILL\.md/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /name: learned-php001/ })).toBeUndefined()
+  await ui.press({ key: 'skill-7' })
+  expect(await ui.find({ type: 'Text', text: /name: learned-php001/ })).toBeDefined()
+  await ui.press({ key: 'skill-7' })
+  expect(await ui.find({ type: 'Text', text: /name: learned-php001/ })).toBeUndefined()
+  await ui.unmount()
 })
 
 test('approve hands the core the id and the project skills directory, under the bound data', async ($, on) => {
