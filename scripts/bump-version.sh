@@ -7,7 +7,8 @@
 #
 # Updates:
 #   - .claude-plugin/plugin.json
-#   - .claude-plugin/marketplace.json (2 occurrences)
+#   - .claude-plugin/marketplace.json (root + one per plugin)
+#   - mods/*/.claude-plugin/plugin.json (companion mods, ADR-0031)
 #   - ci/craftsman-ci.sh (VERSION=)
 #   - CLAUDE.md (Current version)
 #   - plugin.yaml (version:, the Hermes manifest `hermes plugins` reports)
@@ -140,11 +141,20 @@ bump_file "${ROOT_DIR}/.claude-plugin/plugin.json" \
     "\"version\": \"${NEW_VERSION}\"" \
     ".claude-plugin/plugin.json"
 
-# 2. marketplace.json (2 occurrences)
+# 2. marketplace.json (root + one per plugin)
 bump_file "${ROOT_DIR}/.claude-plugin/marketplace.json" \
     "\"version\": \"${CURRENT_VERSION}\"" \
     "\"version\": \"${NEW_VERSION}\"" \
     ".claude-plugin/marketplace.json"
+
+# 2b. Companion mods (ADR-0031): each carries the repository's version.
+for mod_manifest in "${ROOT_DIR}"/mods/*/.claude-plugin/plugin.json; do
+    [[ -f "$mod_manifest" ]] || continue
+    bump_file "$mod_manifest" \
+        "\"version\": \"${CURRENT_VERSION}\"" \
+        "\"version\": \"${NEW_VERSION}\"" \
+        "${mod_manifest#"${ROOT_DIR}"/}"
+done
 
 # 3. craftsman-ci.sh
 bump_file "${ROOT_DIR}/ci/craftsman-ci.sh" \

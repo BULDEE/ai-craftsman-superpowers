@@ -1,0 +1,20 @@
+{
+  "name": "craftsman-cockpit",
+  "version": "4.12.3",
+  "description": "Companion panes for the craftsman plugin (ADR-0031): review learned-instinct candidates with their evidence and approve or reject them by hand.",
+  "author": {
+    "name": "Alexandre Mallet",
+    "email": "contact@buldee.com",
+    "url": "https://github.com/BULDEE"
+  },
+  "license": "Apache-2.0",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "helper": {
+      "type": "string",
+      "title": "craftsman-helper path",
+      "description": "Absolute path to the craftsman plugin's bin/craftsman-helper. Empty: the session binding, the repository layout, then PATH (ADR-0031).",
+      "default": ""
+    }
+  }
+}

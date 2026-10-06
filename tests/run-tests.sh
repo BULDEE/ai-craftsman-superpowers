@@ -554,6 +554,13 @@ test_instincts() {
     run_subtest "Instinct pipeline tests pass" "$SCRIPT_DIR/core/test-instincts.sh" || true
 }
 
+test_mods() {
+    echo ""
+    log_info "Testing companion mods (ADR-0031)"
+
+    run_subtest "Companion mod tests pass" "$SCRIPT_DIR/mods/test-mods.sh" || true
+}
+
 test_config_protection() {
     echo ""
     log_info "Testing config-protection hook (functional)"
@@ -864,6 +871,7 @@ main() {
         test_verify_loop
         test_observation
         test_instincts
+        test_mods
         test_config_protection
         test_host_payloads
         test_review_backend

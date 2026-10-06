@@ -280,6 +280,8 @@ The correction learning loop promotes recurring corrections into learned skills,
 bash "$(craftsman-path bin/craftsman-helper)" instincts candidates
 ```
 
+On Claude Code with the `craftsman-cockpit` mod installed, the user can review in a pane instead: tell them to type `/instincts` (ADR-0031). The pane runs the same `approve` and `reject` below, on their keypress only.
+
 For each candidate, show the user the rule, confidence, occurrence count, ignored count, and evidence, then ask what to do. A rule is a candidate only when it was fixed MORE often than it was rejected (ignored or scoped), and a candidate whose rejections catch up is withdrawn from the list on the next refresh (#45). The confidence is a different statistic, the lower bound of the acceptance rate given the evidence (Wilson, 95%): it orders the list, more corrections rank higher, nothing saturates, so the first candidate listed is the one best supported by the data. Read it as an order, never as a bar.
 
 - **Approve** (generates `<skills dir>/learned-<rule>/SKILL.md` with provenance, loaded automatically as background knowledge; the directory is the host's: `$PWD/.claude/skills` on Claude Code, `$PWD/.agents/skills` on Codex, and the helper refuses any other depth):

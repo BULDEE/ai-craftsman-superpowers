@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- ADR-0031: function-hook mods are a companion surface for Claude Code, never
+  a gate. A mod lives in `mods/<name>/` as its own plugin, reads and writes
+  through `bin/craftsman-helper` only, and registers no tool that could reach
+  a decision reserved for a person.
+- `craftsman-cockpit` mod: `/instincts` opens a pane listing the project's
+  candidate instincts with their evidence, in Wilson-bound order, with
+  Approve and Reject buttons wired to `instincts approve|reject` (#45).
+  Install: `/plugin install craftsman-cockpit@ai-craftsman-superpowers`.
+- `instincts review`: the review queue as JSON (candidates with evidence,
+  approved instincts), refreshed like `candidates`; repository text passes
+  the same single-line filter a generated skill uses.
+- `tests/mods/test-mods.sh`: the ADR-0031 rules on every mod, each proved
+  able to fail on a fixture, plus `claude plugin validate` and `claude plugin
+  test` when a `claude` binary is present.
+
+### Changed
+
+- `scripts/native-manifests.py` keeps only the root plugin in the Grok
+  catalogue: no other host loads a mod.
+- `scripts/bump-version.sh` carries `mods/*/.claude-plugin/plugin.json`.
+
 ## [4.12.3] - 2026-09-28
 
 Bugfix release: the PHP analysers report a run that gave no verdict, PHPStan

@@ -5,6 +5,7 @@ Subcommands:
   candidates <db> <project_hash>            refresh + list candidate instincts
   list <db> <project_hash> [status]         list instincts (default: all)
   pending-count <db> <project_hash>         print number of candidates awaiting review
+  review <db> <project_hash>                refresh + the review queue as JSON (ADR-0031)
   approve <db> <id> <skills_dir>            generate learned skill, mark approved
   reject <db> <id>                          mark rejected (re-proposed only on new evidence)
   global-candidates <db>                    rules approved in 2+ projects (promotion candidates)
@@ -20,6 +21,7 @@ can edit or delete.
 # annotation evaluation keeps the modern syntax and runs on 3.9.
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 import sys
@@ -474,6 +476,37 @@ def _cmd_pending_count(conn: sqlite3.Connection, args: list[str]) -> None:
     print(count)
 
 
+# The review queue for a program, not a person (ADR-0031): the cockpit mod
+# draws its pane from this and never from the prose `list` prints, so a
+# reworded line cannot silently empty the pane. Every text that came out of
+# the audited repository goes through `_untrusted`, as it does into a skill.
+def review_queue(conn: sqlite3.Connection, project_hash: str) -> dict:
+    refresh_candidates(conn, project_hash)
+    rows = conn.execute(
+        "SELECT id, rule, confidence, occurrences, ignored, distinct_files, pattern_summary, status"
+        " FROM instincts WHERE project_hash = ? AND status IN ('candidate', 'approved')"
+        " ORDER BY confidence DESC, occurrences DESC",
+        (project_hash,),
+    ).fetchall()
+    queue: dict = {"candidates": [], "approved": []}
+    for iid, rule, confidence, fixed, rejected, files, summary, status in rows:
+        entry = {"id": iid, "rule": _untrusted(rule, 40), "confidence": confidence,
+                 "fixed": fixed, "files": files}
+        if status == "approved":
+            queue["approved"].append(entry)
+            continue
+        entry.update(rejected=rejected, summary=_untrusted(summary), evidence=[
+            {"file": _untrusted(file_pattern, 120), "context": _untrusted(context, 120)}
+            for context, file_pattern in _evidence_contexts(conn, project_hash, rule)
+        ])
+        queue["candidates"].append(entry)
+    return queue
+
+
+def _cmd_review(conn: sqlite3.Connection, args: list[str]) -> None:
+    print(json.dumps(review_queue(conn, args[0])))
+
+
 def _cmd_list(conn: sqlite3.Connection, args: list[str]) -> None:
     list_instincts(conn, args[0], args[1] if len(args) > 1 else None)
 
@@ -490,6 +523,7 @@ COMMANDS = {
     "candidates": (_cmd_candidates, 1),
     "pending-count": (_cmd_pending_count, 1),
     "list": (_cmd_list, 1),
+    "review": (_cmd_review, 1),
     "approve": (_cmd_approve, 2),
     "reject": (_cmd_reject, 1),
     "global-candidates": (_cmd_global_candidates, 0),
