@@ -13,11 +13,13 @@ owns extraction and codification; this module only presents.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import sys
 
-from instinct_skills import _evidence_contexts, _rule_info, _skill_for, _slugify, _untrusted
-from instincts import _connect, refresh_candidates
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from instinct_skills import _evidence_contexts, _rule_info, _skill_for, _slugify, _untrusted  # noqa: E402
+from instincts import _connect, refresh_candidates  # noqa: E402
 
 
 def _refusals(conn: sqlite3.Connection, project_hash: str, rule: str) -> dict:

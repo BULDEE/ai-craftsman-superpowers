@@ -20,10 +20,14 @@ can edit or delete.
 # annotation evaluation keeps the modern syntax and runs on 3.9.
 from __future__ import annotations
 
+import os
 import sqlite3
 import sys
 
-from instinct_skills import approve, global_candidates, promote
+# Loaded by path as well as run as a script (the 3.9 floor job imports every
+# hook library by file): the sibling module is found from here, not from cwd.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from instinct_skills import approve, global_candidates, promote  # noqa: E402
 
 MIN_OCCURRENCES = 3
 MIN_DISTINCT_FILES = 3
