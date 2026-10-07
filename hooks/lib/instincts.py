@@ -5,10 +5,12 @@ Subcommands:
   candidates <db> <project_hash>            refresh + list candidate instincts
   list <db> <project_hash> [status]         list instincts (default: all)
   pending-count <db> <project_hash>         print number of candidates awaiting review
-  approve <db> <id> <skills_dir>            generate learned skill, mark approved
+  approve <db> <id> [skills_dir]            generate learned skill, mark approved
   reject <db> <id>                          mark rejected (re-proposed only on new evidence)
   global-candidates <db>                    rules approved in 2+ projects (promotion candidates)
-  promote <db> <rule> <skills_dir>          generate a global learned skill for a rule
+  promote <db> <rule> [skills_dir]          generate a global learned skill for a rule
+
+A skills_dir left out is the current host's, from hooks/host-capabilities.json.
 
 Promotion is never automatic: `candidates` only records what a human may
 approve. Generated skills carry provenance and are plain files the user
@@ -243,7 +245,7 @@ def _cmd_global_candidates(conn: sqlite3.Connection, _args: list[str]) -> None:
 
 
 def _cmd_promote(conn: sqlite3.Connection, args: list[str]) -> None:
-    promote(conn, args[0], args[1])
+    promote(conn, args[0], args[1] if len(args) > 1 else None)
 
 
 def _cmd_candidates(conn: sqlite3.Connection, args: list[str]) -> None:
@@ -265,7 +267,7 @@ def _cmd_list(conn: sqlite3.Connection, args: list[str]) -> None:
 
 
 def _cmd_approve(conn: sqlite3.Connection, args: list[str]) -> None:
-    approve(conn, int(args[0]), args[1])
+    approve(conn, int(args[0]), args[1] if len(args) > 1 else None)
 
 
 def _cmd_reject(conn: sqlite3.Connection, args: list[str]) -> None:
@@ -276,10 +278,10 @@ COMMANDS = {
     "candidates": (_cmd_candidates, 1),
     "pending-count": (_cmd_pending_count, 1),
     "list": (_cmd_list, 1),
-    "approve": (_cmd_approve, 2),
+    "approve": (_cmd_approve, 1),
     "reject": (_cmd_reject, 1),
     "global-candidates": (_cmd_global_candidates, 0),
-    "promote": (_cmd_promote, 2),
+    "promote": (_cmd_promote, 1),
 }
 
 

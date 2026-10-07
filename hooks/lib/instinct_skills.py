@@ -7,12 +7,16 @@ preview share one builder (ADR-0031).
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import runtime_paths  # noqa: E402
 
 
 def _slugify(rule: str) -> str:
@@ -58,29 +62,56 @@ def _safe_rule(rule: str) -> str:
 # A generated skill only means something inside the project or the user's own
 # Claude configuration; anywhere else is a write primitive, not a feature.
 # The directories a host reads project and user skills from, and from nowhere
-# deeper. Claude Code: .claude/skills/<name>/SKILL.md and ~/.claude/skills/,
-# measured with `claude -p --debug` (two project skills on disk, one at that
-# depth and one under .claude/skills/craftsman-learned/, loaded as
-# `project: 1`; four releases of approvals went to the second place). Codex:
-# .agents/skills/<name>/SKILL.md and ~/.agents/skills/, documented at
+# deeper, as hooks/host-capabilities.json declares them (`skills_dir` under the
+# project, `user_skills_dir` under $HOME). Claude Code: .claude/skills, measured
+# with `claude -p --debug` (a skill one level deeper was never loaded; four
+# releases of approvals went there). Codex: .agents/skills, documented at
 # learn.chatgpt.com/docs/build-skills and listed by `codex debug prompt-input`
-# on 0.154.0; an approval into .claude/skills on a Codex machine was a file
-# Codex never loaded (audit CR-117, C5). A destination the consumer will never
-# read is refused, not written.
-HOST_SKILL_PARENTS = (".claude", ".agents")
+# on 0.154.0 (audit CR-117, C5). This module kept its own list of the first two,
+# so on Grok `approve` refused .grok/skills, the one directory the matrix says
+# Grok reads. A destination the consumer will never read is refused, not
+# written; one the matrix does not declare is not guessed.
+_MATRIX = Path(__file__).resolve().parents[1] / "host-capabilities.json"
 
 
-def _resolve_skills_dir(skills_dir: str) -> Path:
-    target = Path(skills_dir).expanduser().resolve()
-    roots = (Path.cwd().resolve(), Path.home().resolve())
-    allowed = [root / parent / "skills" for root in roots for parent in HOST_SKILL_PARENTS]
-    # Exactly these four directories, not "anything named .claude/skills": a
+def _host_dirs() -> dict:
+    hosts = json.loads(_MATRIX.read_text()).get("hosts", {})
+    return {name: (caps["skills_dir"], caps.get("user_skills_dir"))
+            for name, caps in hosts.items() if caps.get("skills_dir")}
+
+
+def _allowed_dirs() -> list[Path]:
+    project = Path.cwd().resolve()
+    allowed = []
+    for skills_dir, user_dir in _host_dirs().values():
+        allowed.append(project / skills_dir)
+        if user_dir:
+            allowed.append(Path(user_dir).expanduser().resolve())
+    return allowed
+
+
+def default_skills_dir(scope: str) -> str:
+    """The current host's skills directory: the project's, or the user's for
+    `global`. A host whose user directory is not measured gets none."""
+    host = runtime_paths.host()
+    skills_dir, user_dir = _host_dirs().get(host, (None, None))
+    chosen = user_dir if scope == "global" else skills_dir and str(Path.cwd() / skills_dir)
+    if not chosen:
+        print(f"error: hooks/host-capabilities.json declares no {scope} skills directory for "
+              f"{host}; pass the directory explicitly once it is measured", file=sys.stderr)
+        sys.exit(1)
+    return chosen
+
+
+def _resolve_skills_dir(skills_dir: str | None, scope: str = "project") -> Path:
+    target = Path(skills_dir or default_skills_dir(scope)).expanduser().resolve()
+    # Exactly the declared directories, not "anything named .claude/skills": a
     # nested project/x/.agents/skills passed the name test and is a place no
     # host reads (review of ff99dd5, F4).
+    allowed = _allowed_dirs()
     if target not in allowed:
-        print("error: a host loads a skill from .claude/skills/<name>/SKILL.md (Claude Code) "
-              "or .agents/skills/<name>/SKILL.md (Codex), at the project root or under $HOME, "
-              f"never from {target}: approve into \"$PWD/.claude/skills\" or \"$PWD/.agents/skills\"",
+        listed = ", ".join(f"{path}/<name>/SKILL.md" for path in allowed)
+        print(f"error: no host loads a skill from {target}; a host loads one of {listed}",
               file=sys.stderr)
         sys.exit(1)
     return target
@@ -167,7 +198,7 @@ def _evidence_contexts(conn: sqlite3.Connection, project_hash: str, rule: str) -
     ).fetchall()
 
 
-def approve(conn: sqlite3.Connection, instinct_id: int, skills_dir: str) -> None:
+def approve(conn: sqlite3.Connection, instinct_id: int, skills_dir: str | None = None) -> None:
     project_hash, rule, summary, occurrences, distinct_files, confidence = _load_candidate(
         conn, instinct_id
     )
@@ -214,7 +245,7 @@ def global_candidates(conn: sqlite3.Connection) -> list[tuple]:
     ).fetchall()
 
 
-def promote(conn: sqlite3.Connection, rule: str, skills_dir: str) -> None:
+def promote(conn: sqlite3.Connection, rule: str, skills_dir: str | None = None) -> None:
     """Promote a rule to global scope. Human-invoked only, never automatic."""
     match = [row for row in global_candidates(conn) if row[0] == rule]
     if not match:
@@ -222,7 +253,7 @@ def promote(conn: sqlite3.Connection, rule: str, skills_dir: str) -> None:
         sys.exit(1)
     _rule, projects, occurrences, summary = match[0]
     rule = _safe_rule(rule)
-    skill_dir = _own_skill_dir(_resolve_skills_dir(skills_dir), f"learned-global-{_slugify(rule)}")
+    skill_dir = _own_skill_dir(_resolve_skills_dir(skills_dir, "global"), f"learned-global-{_slugify(rule)}")
     (skill_dir / "SKILL.md").write_text(GLOBAL_TEMPLATE.format(
         rule=rule,
         slug=_slugify(rule),

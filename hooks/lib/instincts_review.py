@@ -2,7 +2,10 @@
 """The instinct review queue as JSON (ADR-0031).
 
 Usage:
-  instincts_review.py <db> <project_hash>
+  instincts_review.py <db> <project_hash> [skills_dir]
+
+skills_dir is where Approve would write, validated as approve validates it;
+left out, the current host's (hooks/host-capabilities.json).
 
 Refreshes the candidates the way `instincts.py candidates` does, then prints
 {"candidates": [...], "approved": [...]} for one project. A program reads
@@ -18,7 +21,8 @@ import sqlite3
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from instinct_skills import _evidence_contexts, _rule_info, _skill_for, _slugify, _untrusted  # noqa: E402
+from instinct_skills import (_evidence_contexts, _resolve_skills_dir, _rule_info,  # noqa: E402
+                             _skill_for, _slugify, _untrusted)
 from instincts import _connect, refresh_candidates  # noqa: E402
 
 
@@ -32,7 +36,7 @@ def _refusals(conn: sqlite3.Connection, project_hash: str, rule: str) -> dict:
     return {"ignored": ignored, "scoped": scoped, "last_fixed": last_fixed or ""}
 
 
-def _candidate_entry(conn: sqlite3.Connection, project_hash: str, row: tuple) -> dict:
+def _candidate_entry(conn: sqlite3.Connection, project_hash: str, row: tuple, skills_dir) -> dict:
     iid, rule, confidence, fixed, rejected, files, summary, _status = row
     entry = {"id": iid, "rule": _untrusted(rule, 40), "confidence": confidence, "fixed": fixed,
              "files": files, "rejected": rejected, "summary": _untrusted(summary)}
@@ -42,7 +46,7 @@ def _candidate_entry(conn: sqlite3.Connection, project_hash: str, row: tuple) ->
         {"file": _untrusted(file_pattern, 120), "context": _untrusted(context, 120)}
         for context, file_pattern in _evidence_contexts(conn, project_hash, rule)
     ]
-    entry["skill_path"] = f".claude/skills/learned-{_slugify(rule)}/SKILL.md"
+    entry["skill_path"] = str(skills_dir / f"learned-{_slugify(rule)}" / "SKILL.md")
     entry["skill_preview"] = _skill_for(conn, project_hash, (rule, summary, fixed, files, confidence))
     return entry
 
@@ -51,7 +55,8 @@ def _candidate_entry(conn: sqlite3.Connection, project_hash: str, row: tuple) ->
 # draws its pane from this and never from the prose `list` prints, so a
 # reworded line cannot silently empty the pane. Every text that came out of
 # the audited repository goes through `_untrusted`, as it does into a skill.
-def review_queue(conn: sqlite3.Connection, project_hash: str) -> dict:
+def review_queue(conn: sqlite3.Connection, project_hash: str, skills_dir: str | None = None) -> dict:
+    destination = _resolve_skills_dir(skills_dir)
     refresh_candidates(conn, project_hash)
     rows = conn.execute(
         "SELECT id, rule, confidence, occurrences, ignored, distinct_files, pattern_summary, status"
@@ -66,17 +71,17 @@ def review_queue(conn: sqlite3.Connection, project_hash: str) -> dict:
             queue["approved"].append({"id": iid, "rule": _untrusted(rule, 40), "confidence": confidence,
                                       "fixed": fixed, "files": files})
             continue
-        queue["candidates"].append(_candidate_entry(conn, project_hash, row))
+        queue["candidates"].append(_candidate_entry(conn, project_hash, row, destination))
     return queue
 
 
 def main() -> None:
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (3, 4):
         print(__doc__, file=sys.stderr)
         sys.exit(1)
     conn = _connect(sys.argv[1])
     try:
-        print(json.dumps(review_queue(conn, sys.argv[2])))
+        print(json.dumps(review_queue(conn, sys.argv[2], sys.argv[3] if len(sys.argv) == 4 else None)))
     finally:
         conn.close()
 

@@ -77,7 +77,9 @@ async function helper($: EngineInterface, options: PluginOptions, args: string[]
 }
 
 async function refresh($: EngineInterface, options: PluginOptions, notice: string): Promise<void> {
-  const answer = await helper($, options, ['review']).catch((error: unknown) => ({ error: String(error) }))
+  // The same directory approve writes to, so the preview names the file it will be.
+  const skillsDir = `${await $.session.cwd()}/.claude/skills`
+  const answer = await helper($, options, ['review', skillsDir]).catch((error: unknown) => ({ error: String(error) }))
   await update($, view, (): CockpitView => toView(answer, notice))
 }
 

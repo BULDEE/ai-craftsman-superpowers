@@ -104,7 +104,7 @@ if c.get("rule_text") != "no non-null assertion (!) - handle null explicitly": p
 if (c.get("rule_owner"), c.get("default_severity")) != ("react", "warn"): problems.append("owner/severity")
 if (c.get("ignored"), c.get("scoped"), c.get("rejected")) != (1, 1, 2): problems.append("breakdown")
 if not c.get("last_fixed"): problems.append("last_fixed")
-if c.get("skill_path") != ".claude/skills/learned-ts003/SKILL.md": problems.append("skill_path=%r" % c.get("skill_path"))
+if not c.get("skill_path", "").endswith("/.claude/skills/learned-ts003/SKILL.md"): problems.append("skill_path=%r" % c.get("skill_path"))
 preview = c.get("skill_preview", "")
 if "name: learned-ts003" not in preview: problems.append("preview frontmatter")
 if "handle null explicitly" not in preview: problems.append("preview carries no fix when no context was recorded")

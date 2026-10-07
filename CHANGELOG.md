@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- On Grok, `instincts approve` refused `.grok/skills`, the one directory Grok
+  reads skills from: `instinct_skills.py` kept its own list of host
+  directories with Claude Code's and Codex's only. The destinations now come
+  from `hooks/host-capabilities.json`, which declares `user_skills_dir` for
+  Claude Code and Codex; global promotion on a host that declares none (Grok)
+  is refused instead of guessed.
+
 ### Added
 
 - ADR-0031: function-hook mods are a companion surface for Claude Code, never
@@ -33,6 +42,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `/craftsman:metrics` step 9 reads `instincts review` and presents each
+  candidate from its fields (wording, severity, refusal split, last fix,
+  evidence, the exact skill Approve writes), the same data as the cockpit
+  pane, on every host. Repository text in the queue is quoted as data.
+- `instincts approve`, `review` and `promote` take the skills directory as
+  an optional argument: left out, it is the current host's, so the skill no
+  longer spells a directory per host.
 - `scripts/native-manifests.py` keeps only the root plugin in the Grok
   catalogue: no other host loads a mod.
 - A mod's version lives in its marketplace entry only, which

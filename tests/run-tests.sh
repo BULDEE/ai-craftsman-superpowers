@@ -550,7 +550,7 @@ test_observation() {
 test_instincts() {
     echo ""
     log_info "Testing instinct pipeline, review queue and companion mods (functional, ADR-0020/0031)"
-    for suite in core/test-instincts.sh core/test-instincts-review.sh mods/test-mods.sh; do
+    for suite in core/test-instincts.sh core/test-instincts-review.sh core/test-instinct-hosts.sh mods/test-mods.sh; do
         run_subtest "${suite#*/} passes" "$SCRIPT_DIR/$suite" || true; done
 }
 

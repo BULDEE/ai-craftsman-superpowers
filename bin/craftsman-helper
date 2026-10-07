@@ -24,7 +24,7 @@ case "$COMMAND" in
         shift || true
         case "$ACTION" in
             review)
-                exec python3 "$ROOT/hooks/lib/instincts_review.py" "$DATA/metrics.db" "$(metrics_project_hash)" ;;
+                exec python3 "$ROOT/hooks/lib/instincts_review.py" "$DATA/metrics.db" "$(metrics_project_hash)" "$@" ;;
             approve|reject|global-candidates|promote)
                 exec python3 "$ROOT/hooks/lib/instincts.py" "$ACTION" "$DATA/metrics.db" "$@" ;;
             *) exec python3 "$ROOT/hooks/lib/instincts.py" "$ACTION" "$DATA/metrics.db" "$(metrics_project_hash)" "$@" ;;
