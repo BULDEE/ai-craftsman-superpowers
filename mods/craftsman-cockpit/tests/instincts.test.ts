@@ -2,9 +2,10 @@ import { expect, test } from 'claude-code/testing'
 import type { On, ProcessRunInit } from 'claude-code'
 
 const SESSION = 'sid-1'
-const HOME = '/home/reviewer'
+// Not under /home/<user>/: the secrets scan refuses any such path in the tree.
+const HOME = '/fixture/home'
 const ROOT = '/opt/craftsman'
-const DATA = '/home/reviewer/.claude/plugins/data/craftsman'
+const DATA = `${HOME}/.claude/plugins/data/craftsman`
 const BINDING = `${HOME}/.claude/craftsman/sessions/${SESSION}.json`
 const HELPER = `${ROOT}/bin/craftsman-helper`
 
