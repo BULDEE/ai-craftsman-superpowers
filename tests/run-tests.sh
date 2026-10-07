@@ -549,16 +549,9 @@ test_observation() {
 
 test_instincts() {
     echo ""
-    log_info "Testing instinct pipeline and context budgets (functional)"
-
-    run_subtest "Instinct pipeline tests pass" "$SCRIPT_DIR/core/test-instincts.sh" || true
-}
-
-test_mods() {
-    echo ""
-    log_info "Testing companion mods (ADR-0031)"
-
-    run_subtest "Companion mod tests pass" "$SCRIPT_DIR/mods/test-mods.sh" || true
+    log_info "Testing instinct pipeline, review queue and companion mods (functional, ADR-0020/0031)"
+    for suite in core/test-instincts.sh core/test-instincts-review.sh mods/test-mods.sh; do
+        run_subtest "${suite#*/} passes" "$SCRIPT_DIR/$suite" || true; done
 }
 
 test_config_protection() {
@@ -871,7 +864,6 @@ main() {
         test_verify_loop
         test_observation
         test_instincts
-        test_mods
         test_config_protection
         test_host_payloads
         test_review_backend

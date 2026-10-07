@@ -5,13 +5,6 @@ import json
 from pathlib import Path
 
 
-def root_plugins(entries: list) -> list:
-    """Only the plugin at the repository root has a native entry point. A mod
-    under mods/ is a Claude Code function-hook module no other host loads
-    (ADR-0031), and rewriting its source to './' would list the core twice."""
-    return [entry for entry in entries if not str(entry.get('source', '')).startswith('./mods/')]
-
-
 def manifests(root: Path) -> dict:
     source = json.loads((root / '.claude-plugin/plugin.json').read_text())
     codex = {key: value for key, value in source.items() if key != 'userConfig'}
@@ -19,9 +12,8 @@ def manifests(root: Path) -> dict:
     grok = {key: value for key, value in source.items() if key != 'userConfig'}
     grok['hooks'] = './hooks/hooks.json'
     marketplace = json.loads((root / '.claude-plugin/marketplace.json').read_text())
-    marketplace['plugins'] = root_plugins(marketplace['plugins'])
-    for entry in marketplace['plugins']:
-        entry['source'] = {'type': 'local', 'path': './'}
+    marketplace['plugins'] = [dict(entry, source={'type': 'local', 'path': './'}) for entry in marketplace['plugins']
+                              if not str(entry.get('source', '')).startswith('./mods/')]  # ADR-0031: no other host loads a mod
     codex_catalog = {
         'name': marketplace['name'],
         'interface': {'displayName': 'AI Craftsman Superpowers'},

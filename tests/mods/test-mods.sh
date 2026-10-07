@@ -32,6 +32,10 @@ mod_problems() {
     jq -e --arg name "$name" --arg source "$relative" \
         '.plugins | any(.name == $name and .source == $source)' "$marketplace" >/dev/null 2>&1 \
         || echo "not listed in the marketplace as $name from $relative"
+    # One version, the marketplace entry's, which bump-version.sh already
+    # carries: a second copy in the manifest drifts the first release it misses.
+    [[ "$(jq -r 'has("version")' "$mod/.claude-plugin/plugin.json" 2>/dev/null)" == "false" ]] \
+        || echo "plugin.json carries a version: the marketplace entry is the one place it lives"
     [[ "$(jq -c 'keys' "$mod/hooks/hooks.json" 2>/dev/null)" == '["modules"]' ]] \
         || echo "hooks/hooks.json holds more than modules (command hooks belong to the craftsman plugin)"
     grep -rnEi --include='*.ts' --include='*.tsx' \
@@ -103,6 +107,10 @@ fi
 unlisted=$(make_mod unlisted)
 echo '{"plugins": [{"name": "bad", "source": "./"}]}' > "$FIXTURES/unlisted/marketplace.json"
 expect_problem "a mod the marketplace lists from the wrong folder is refused" "$unlisted" "not listed"
+
+versioned=$(make_mod versioned)
+echo '{"name": "bad", "version": "1.0.0"}' > "$versioned/.claude-plugin/plugin.json"
+expect_problem "a mod whose manifest carries its own version is refused" "$versioned" "carries a version"
 
 mixed=$(make_mod mixed)
 echo '{"modules": ["./register.ts"], "hooks": {"Stop": []}}' > "$mixed/hooks/hooks.json"

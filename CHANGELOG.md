@@ -23,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   do, and a preview of the exact skill Approve writes.
 - A learned skill whose corrections recorded no context carries the rule's
   own wording as its pattern instead of "see the rule definition".
-- `instincts review`: the review queue as JSON (candidates with evidence,
+- `craftsman-helper instincts review` (`hooks/lib/instincts_review.py`):
+  the review queue as JSON (candidates with evidence,
   approved instincts), refreshed like `candidates`; repository text passes
   the same single-line filter a generated skill uses.
 - `tests/mods/test-mods.sh`: the ADR-0031 rules on every mod, each proved
@@ -34,7 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `scripts/native-manifests.py` keeps only the root plugin in the Grok
   catalogue: no other host loads a mod.
-- `scripts/bump-version.sh` carries `mods/*/.claude-plugin/plugin.json`.
+- A mod's version lives in its marketplace entry only, which
+  `scripts/bump-version.sh` already carries.
 
 ## [4.12.3] - 2026-09-28
 

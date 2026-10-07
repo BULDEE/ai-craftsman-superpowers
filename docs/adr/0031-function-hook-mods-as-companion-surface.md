@@ -95,7 +95,8 @@ been codified is visible in the same place.
 
 - The ADR-0020 review becomes one command and one keypress, with the
   evidence on screen, instead of a paragraph of the metrics skill.
-- The core gains a JSON view of the instinct queue (`instincts.py review`),
+- The core gains a JSON view of the instinct queue (`instincts_review.py`,
+  reached as `craftsman-helper instincts review`),
   usable by any front-end: the missing half of Hermes' `inject` verb
   (ADR-0029 amendment) needs the same data.
 - Mods give the project a place to try the other openings (a status band, a
@@ -104,9 +105,9 @@ been codified is visible in the same place.
 
 ### Negative
 
-- A second plugin to install, document and version. Mitigation: it carries
-  the repository's version, and `scripts/bump-version.sh` takes it on when
-  the first mod ships in a release.
+- A second plugin to install, document and version. Mitigation: its version
+  lives only in its marketplace entry, which `scripts/bump-version.sh`
+  already carries; the mod's own manifest declares none.
 - An early-access dependency. Mitigation: nothing that blocks a write depends
   on it, and the suite runs the mod's tests against the installed build, so a
   breaking change shows as a red mod test, never as a missing gate.

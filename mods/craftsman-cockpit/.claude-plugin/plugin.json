@@ -1,6 +1,5 @@
 {
   "name": "craftsman-cockpit",
-  "version": "4.12.3",
   "description": "Companion panes for the craftsman plugin (ADR-0031): review learned-instinct candidates with their evidence and approve or reject them by hand.",
   "author": {
     "name": "Alexandre Mallet",
