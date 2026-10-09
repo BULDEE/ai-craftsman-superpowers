@@ -15,9 +15,16 @@ case "$COMMAND" in
     dashboard) exec python3 "$ROOT/hooks/lib/dashboard.py" "$DATA/metrics.db" "$@" ;;
     instincts)
         source "$ROOT/hooks/lib/metrics-db.sh"
+        # The rule wording a review shows and a learned skill carries comes from
+        # the registry the hooks compile (CRAFTSMAN_RULE_REGISTRY); without it the
+        # queue still answers, with the wording left empty.
+        source "$ROOT/hooks/lib/rule-registry.sh"
+        _rule_registry_autoinit >/dev/null 2>&1 || true
         ACTION="${1:-candidates}"
         shift || true
         case "$ACTION" in
+            review)
+                exec python3 "$ROOT/hooks/lib/instincts_review.py" "$DATA/metrics.db" "$(metrics_project_hash)" "$@" ;;
             approve|reject|global-candidates|promote)
                 exec python3 "$ROOT/hooks/lib/instincts.py" "$ACTION" "$DATA/metrics.db" "$@" ;;
             *) exec python3 "$ROOT/hooks/lib/instincts.py" "$ACTION" "$DATA/metrics.db" "$(metrics_project_hash)" "$@" ;;

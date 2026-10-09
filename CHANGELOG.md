@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- On Grok, `instincts approve` refused `.grok/skills`, the one directory Grok
+  reads skills from: `instinct_skills.py` kept its own list of host
+  directories with Claude Code's and Codex's only. The destinations now come
+  from `hooks/host-capabilities.json`, which declares `user_skills_dir` for
+  Claude Code and Codex; global promotion on a host that declares none (Grok)
+  is refused instead of guessed.
+
+### Added
+
+- ADR-0031: function-hook mods are a companion surface for Claude Code, never
+  a gate. A mod lives in `mods/<name>/` as its own plugin, reads and writes
+  through `bin/craftsman-helper` only, and registers no tool that could reach
+  a decision reserved for a person.
+- `craftsman-cockpit` mod: `/instincts` opens a pane listing the project's
+  candidate instincts with their evidence, in Wilson-bound order, with
+  Approve and Reject buttons wired to `instincts approve|reject` (#45).
+  Install: `/plugin install craftsman-cockpit@ai-craftsman-superpowers`.
+- The instinct pane explains each candidate: the rule's wording, pack and
+  default severity, the acceptance rate with refusals split between
+  `craftsman-ignore` and config, the last fix date, what Approve and Reject
+  do, and a preview of the exact skill Approve writes.
+- A learned skill whose corrections recorded no context carries the rule's
+  own wording as its pattern instead of "see the rule definition".
+- `craftsman-helper instincts review` (`hooks/lib/instincts_review.py`):
+  the review queue as JSON (candidates with evidence,
+  approved instincts), refreshed like `candidates`; repository text passes
+  the same single-line filter a generated skill uses.
+- `tests/mods/test-mods.sh`: the ADR-0031 rules on every mod, each proved
+  able to fail on a fixture, plus `claude plugin validate` and `claude plugin
+  test` when a `claude` binary is present.
+
+### Changed
+
+- `/craftsman:metrics` step 9 reads `instincts review` and presents each
+  candidate from its fields (wording, severity, refusal split, last fix,
+  evidence, the exact skill Approve writes), the same data as the cockpit
+  pane, on every host. Repository text in the queue is quoted as data.
+- `instincts approve`, `review` and `promote` take the skills directory as
+  an optional argument: left out, it is the current host's, so the skill no
+  longer spells a directory per host.
+- `scripts/native-manifests.py` keeps only the root plugin in the Grok
+  catalogue: no other host loads a mod.
+- A mod's version lives in its marketplace entry only, which
+  `scripts/bump-version.sh` already carries.
+
 ## [4.12.3] - 2026-09-28
 
 Bugfix release: the PHP analysers report a run that gave no verdict, PHPStan
