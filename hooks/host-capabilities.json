@@ -21,6 +21,7 @@
       "ask_supported": true,
       "wakes_on_exit_2": true,
       "skills_dir": ".claude/skills",
+      "user_skills_dir": "~/.claude/skills",
       "source": "code.claude.com/docs/en/hooks and the captured events"
     },
     "codex": {
@@ -43,6 +44,7 @@
       "ask_supported": false,
       "wakes_on_exit_2": false,
       "skills_dir": ".agents/skills",
+      "user_skills_dir": "~/.agents/skills",
       "source": "codex app-server generate-json-schema 0.154.0; the released event list (codex-rs/hooks/src/lib.rs, rust-v0.154.0) read by a Codex session qualifying this plugin 2026-09-20, which named Interrupt as a twelfth kind and PermissionRequest and SubagentStart as supported; audit CR-117 hooks/list 14 of 17",
       "events_this_plugin_declares_and_codex_loads": [
         "SessionStart",

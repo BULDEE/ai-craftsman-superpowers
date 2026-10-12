@@ -56,7 +56,7 @@ echo "=== Every test file is reachable from the runner ==="
 UNREFERENCED=""
 CHECKED=0
 for script in "$ROOT_DIR"/tests/core/test-*.sh "$ROOT_DIR"/tests/ci/test-*.sh \
-              "$ROOT_DIR"/tests/adapters/test-*.sh "$ROOT_DIR"/tests/templates/test-*.sh; do
+              "$ROOT_DIR"/tests/adapters/test-*.sh "$ROOT_DIR"/tests/templates/test-*.sh "$ROOT_DIR"/tests/mods/test-*.sh; do
     [[ -f "$script" ]] || continue
     CHECKED=$((CHECKED + 1))
     name="$(basename "$script")"

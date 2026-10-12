@@ -12,8 +12,8 @@ def manifests(root: Path) -> dict:
     grok = {key: value for key, value in source.items() if key != 'userConfig'}
     grok['hooks'] = './hooks/hooks.json'
     marketplace = json.loads((root / '.claude-plugin/marketplace.json').read_text())
-    for entry in marketplace['plugins']:
-        entry['source'] = {'type': 'local', 'path': './'}
+    marketplace['plugins'] = [dict(entry, source={'type': 'local', 'path': './'}) for entry in marketplace['plugins']
+                              if not str(entry.get('source', '')).startswith('./mods/')]  # ADR-0031: no other host loads a mod
     codex_catalog = {
         'name': marketplace['name'],
         'interface': {'displayName': 'AI Craftsman Superpowers'},

@@ -549,9 +549,9 @@ test_observation() {
 
 test_instincts() {
     echo ""
-    log_info "Testing instinct pipeline and context budgets (functional)"
-
-    run_subtest "Instinct pipeline tests pass" "$SCRIPT_DIR/core/test-instincts.sh" || true
+    log_info "Testing instinct pipeline, review queue and companion mods (functional, ADR-0020/0031)"
+    for suite in core/test-instincts.sh core/test-instincts-review.sh core/test-instinct-hosts.sh mods/test-mods.sh; do
+        run_subtest "${suite#*/} passes" "$SCRIPT_DIR/$suite" || true; done
 }
 
 test_config_protection() {

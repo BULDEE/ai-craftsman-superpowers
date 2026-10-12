@@ -20,6 +20,18 @@
       "source": "./",
       "category": "development",
       "tags": ["architecture", "quality", "php", "symfony", "react", "typescript", "ci", "rule-engine"]
+    },
+    {
+      "name": "craftsman-cockpit",
+      "version": "4.12.3",
+      "description": "Companion panes for craftsman on Claude Code (ADR-0031): review learned-instinct candidates with their evidence and approve or reject them by hand. Needs the craftsman plugin.",
+      "author": {
+        "name": "Alexandre Mallet",
+        "email": "contact@buldee.com"
+      },
+      "source": "./mods/craftsman-cockpit",
+      "category": "development",
+      "tags": ["craftsman", "instincts", "review", "mod"]
     }
   ]
 }

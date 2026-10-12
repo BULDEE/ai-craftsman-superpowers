@@ -262,6 +262,12 @@ Bitbucket and Jenkins all get native annotations.
 3+ times across 3+ files is promoted to a candidate instinct you approve in
 `/craftsman:metrics`, and it becomes a project skill with provenance. Detection
 is automatic, codification stays human-gated.
+On Claude Code 2.1.291 or later, the optional `craftsman-cockpit` mod reviews
+them in a pane: `/plugin install craftsman-cockpit@ai-craftsman-superpowers`,
+then `/instincts` shows each candidate's rule, how often it was accepted or
+refused, where it was fixed, and the exact skill Approve would write. You press
+Approve or Reject; the mod decides nothing itself
+([ADR-0031](docs/adr/0031-function-hook-mods-as-companion-surface.md)).
 
 **It proves.** "Done" requires evidence. A task cannot be marked complete
 without a verification record, and a failing test run revokes one that already
