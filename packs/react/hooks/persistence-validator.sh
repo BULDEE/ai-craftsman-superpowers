@@ -14,7 +14,7 @@
 _persistence_ts_check_domain_client() {
     local file="$1"
     [[ "$file" == *"/domain/"* ]] || return 0
-    if grep -qE "from\s+['\"](pg|mysql2?|mongoose|mongodb|@prisma/client|drizzle-orm|typeorm|knex|redis|ioredis)['\"]" "$file" 2>/dev/null; then
+    if grep -qE "(from\s+|require\s*\(\s*|import\s*\(\s*)['\"](pg|mysql2?|mongoose|mongodb|@prisma/client|drizzle-orm|typeorm|knex|redis|ioredis)['\"]" "$file" 2>/dev/null; then
         add_violation "LAYER004" "Database client imported inside domain/ - persistence belongs behind a repository interface in infrastructure"
     fi
 }
@@ -43,4 +43,8 @@ pack_validate_typescript_persistence() {
     _persistence_ts_check_domain_client "$file"
     _persistence_ts_check_select_star "$file"
     _persistence_ts_check_query_in_loop "$file"
+}
+
+pack_validate_javascript_persistence() {
+    pack_validate_typescript_persistence "$1"
 }

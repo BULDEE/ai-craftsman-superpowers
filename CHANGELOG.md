@@ -18,6 +18,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- JavaScript gets the craftsman rules: `.js`, `.jsx`, `.mjs` and `.cjs`,
+  native JavaScript and jQuery included. A `src/domain/order.js` importing
+  `../infrastructure/db` was written with no rule at all while the same file
+  as `.ts` was refused. The `javascript` language of the react pack now runs
+  LAYER001, LAYER004, SEC002 and SEC003 through the same function bodies as
+  TypeScript, so the two cannot disagree, plus ESLint at Level 2, the
+  protected linter configs and the test runners (`mocha` added). The
+  TypeScript-only rules (TS001 to TS003) and SEC001 (secrets, repository
+  security rather than code quality) stay out of it (CR-231).
+- SEC004, TypeScript and JavaScript: an HTML sink fed by a value the code did
+  not write as a literal (`innerHTML`, `outerHTML`, `document.write`,
+  `insertAdjacentHTML`, jQuery `.html()`, `dangerouslySetInnerHTML`, and
+  interpolated or concatenated markup passed to `.append()` and its
+  siblings). `DOMPurify.sanitize(...)` is accepted. Unlike SEC001 to SEC003 it
+  is ignorable with a stated `craftsman-ignore: SEC004`, because "a variable
+  reaches a sink" is a heuristic.
+
 - ADR-0031: function-hook mods are a companion surface for Claude Code, never
   a gate. A mod lives in `mods/<name>/` as its own plugin, reads and writes
   through `bin/craftsman-helper` only, and registers no tool that could reach
@@ -41,6 +58,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   test` when a `claude` binary is present.
 
 ### Changed
+
+- LAYER001 and LAYER004 also read `require(...)` and `import(...)`, not only
+  ESM `from`. A TypeScript domain file that reached infrastructure through
+  `require` was let through before and is now refused.
 
 - `/craftsman:metrics` step 9 reads `instincts review` and presents each
   candidate from its fields (wording, severity, refusal split, last fix,

@@ -75,9 +75,54 @@ _security_ts_check_sql_injection() {
         "SQL built by interpolation or concatenation - use a parameterized query"
 }
 
+# An HTML sink fed by a value the code did not write as a literal. Interpolation
+# and concatenation are always flagged; a bare identifier is flagged where the
+# sink only takes markup (innerHTML, outerHTML, document.write,
+# insertAdjacentHTML, jQuery .html, dangerouslySetInnerHTML), not where jQuery
+# also accepts a DOM node (.append, .prepend, .before, .after, .replaceWith).
+_security_ts_check_html_sink() {
+    local hit
+    grep -qE 'HTML|document\.write|\.(html|append|prepend|before|after|replaceWith)[[:space:]]*\(' "$1" 2>/dev/null || return 0
+    hit=$(_security_ts_code_lines "$1" | awk '
+        function unsafe(v, markup_only) {
+            if (v ~ /DOMPurify\.sanitize[[:space:]]*\(/) return 0
+            if (v ~ /\$\{/) return 1
+            if (v ~ /["'\''`][[:space:]]*\+|\+[[:space:]]*["'\''`]/) return 1
+            if (!markup_only) return 0
+            sub(/^[[:space:]]+/, "", v)
+            return !(v == "" || v ~ /^[)"'\''`]/)
+        }
+        function flag(pattern, markup_only) {
+            if (!match(code, pattern)) return 0
+            if (unsafe(substr(code, RSTART + RLENGTH), markup_only)) { print; exit }
+            return 1
+        }
+        {
+            code = $0; sub(/^[0-9]+:/, "", code)
+            if (flag("\\.(inner|outer)HTML[[:space:]]*\\+?=[[:space:]]*", 1)) next
+            if (flag("document\\.write(ln)?[[:space:]]*\\([[:space:]]*", 1)) next
+            if (flag("insertAdjacentHTML[[:space:]]*\\([^,]*,[[:space:]]*", 1)) next
+            if (flag("dangerouslySetInnerHTML[[:space:]]*=[[:space:]]*\\{\\{[[:space:]]*__html[[:space:]]*:[[:space:]]*", 1)) next
+            if (flag("\\.html[[:space:]]*\\([[:space:]]*", 1)) next
+            flag("\\.(append|prepend|before|after|replaceWith)[[:space:]]*\\([[:space:]]*", 0)
+        }')
+    _security_ts_report "SEC004" "$hit" \
+        "HTML sink fed by an unescaped value - render it as text (textContent, .text()) or sanitize it first"
+}
+
 pack_validate_typescript_security() {
     local file="$1"
     _security_ts_check_secrets "$file"
     _security_ts_check_eval "$file"
     _security_ts_check_sql_injection "$file"
+    _security_ts_check_html_sink "$file"
+}
+
+# Secrets are repository security, not code quality: JavaScript gets the
+# code-quality rules only (data executed as code, SQL built from values).
+pack_validate_javascript_security() {
+    local file="$1"
+    _security_ts_check_eval "$file"
+    _security_ts_check_sql_injection "$file"
+    _security_ts_check_html_sink "$file"
 }

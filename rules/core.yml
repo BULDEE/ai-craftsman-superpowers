@@ -66,6 +66,12 @@ rules:
     text: "no SQL built by concatenation or template literal - bind the parameters"
     default_severity: block
     never_ignorable: true
+  # Ignorable, unlike its siblings: "a variable reaches an HTML sink" is a
+  # heuristic, and a sink fed by a trusted constant needs a stated exception.
+  - id: SEC004
+    group: Security
+    text: "no HTML sink fed by an unescaped value - render text, or sanitize first"
+    default_severity: block
 
   # The structural rules ship advisory-first so a team can measure the real
   # noise on an existing codebase before escalating; LOC001 stays advisory

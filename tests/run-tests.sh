@@ -666,6 +666,7 @@ test_session_metrics() {
     run_subtest "Circuit breaker and cache tests pass" "$SCRIPT_DIR/core/test-circuit-breaker.sh" || true
     run_subtest "External pack gating tests pass" "$SCRIPT_DIR/core/test-external-packs.sh" || true
     run_subtest "Language registry tests pass" "$SCRIPT_DIR/core/test-lang-registry.sh" || true
+    run_subtest "JavaScript gets the craftsman rules" "$SCRIPT_DIR/core/test-javascript-coverage.sh" || true
     run_subtest "Level precedence tests pass" "$SCRIPT_DIR/core/test-precedence.sh" || true
     run_subtest "Brace scanner tests pass" "$SCRIPT_DIR/core/test-brace-scanner.sh" || true
     run_subtest "Gate independence tests pass" "$SCRIPT_DIR/core/test-gate-independence.sh" || true

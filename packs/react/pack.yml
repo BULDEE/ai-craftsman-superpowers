@@ -1,6 +1,6 @@
 name: react
 version: "1.0.0"
-description: "React/TypeScript craftsman pack - React 19, TanStack Query, Tailwind, shadcn/ui"
+description: "React/TypeScript/JavaScript craftsman pack - React 19, TanStack Query, Tailwind, shadcn/ui"
 compatibility:
   core: ">=2.4.0"
   # `*`, not a stack list. Dispatch happens by extension through the language
@@ -32,8 +32,13 @@ languages:
   # declares no validator and no static analysis: the pack's doctrine is
   # TypeScript, and silently running TS rules on .js would be a scope change.
   - id: javascript
-    extensions: [js, jsx]
+    extensions: [js, jsx, mjs, cjs]
     literal_syntax: slash-template
+    entry_markers: [package.json]
+    protected_configs: [".eslintrc", ".eslintrc.json", ".eslintrc.js", ".eslintrc.cjs", ".eslintrc.yml", ".eslintrc.yaml", "eslint.config.js", "eslint.config.mjs", "eslint.config.cjs", "eslint.config.ts", ".dependency-cruiser.js", ".dependency-cruiser.json", ".dependency-cruiser.cjs", "dependency-cruiser.config.js"]
+    validators: ["hooks/layer-validator.sh", "hooks/persistence-validator.sh", "hooks/security-validator.sh"]
+    static_analysis: ["static-analysis/eslint.sh"]
+    test_commands: ["jest", "vitest", "mocha", "npm test", "pnpm test", "yarn test"]
     metrics_dialect: c-like
 
 rules:
