@@ -31,6 +31,7 @@ _doctrine_emit_group() {
             printf '\n### %s\n\n' "$title"
             emitted=true
         fi
+        rule_never_ignorable "$rule" && severity="${severity}, no marker"
         printf -- '- **%s** (%s): %s\n' "$rule" "$severity" "$(rule_text "$rule")"
     done
 }
@@ -68,7 +69,7 @@ _doctrine_footer() {
 - Write the failing test first; never modify a test to make it pass.
 - Refactor only under a passing suite: run it before and after.
 - Never claim completion without the command output that proves it.
-- Suppress a rule inline only with `craftsman-ignore: <RULE_ID>` and a reason.
+- Suppress a rule inline only with `craftsman-ignore: <RULE_ID>` and a reason; a rule marked `no marker` takes none: fix the code.
 FOOTER
 }
 

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A refusal offered a way out the gate then refused: SEC001 ended on "Use //
+  craftsman-ignore: <RULE_ID> to suppress", a marker SEC001 to SEC003 never
+  honour (`never_ignorable: true`), the post-write JSON and the project-wide
+  pattern said the same, and post-write's stderr claimed no SEC rule takes a
+  marker, false for SEC004. `rule_marker_advice` now reads the manifest: the
+  marker is offered only to the rules that honour it, the others are named as
+  "No marker silences ...: fix the code.", in stderr, in the JSON, in the
+  warning actions, and in the exported doctrine (`no marker`). The subagent
+  gate let a marker hide SEC001; it honours the manifest like the write gates
+  (CR-230).
+
 ## [4.13.0] - 2026-10-19
 
 JavaScript gets the craftsman rules (`.js`, `.jsx`, `.mjs`, `.cjs`, native

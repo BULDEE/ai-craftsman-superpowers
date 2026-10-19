@@ -105,12 +105,14 @@ FILE_PATTERN=""
 # The pack validators call these; identical contracts to post-write-check.
 line_has_ignore() {
     local line="$1" rule="$2"
+    rule_never_ignorable "$rule" && return 1
     echo "$line" | grep -qE "craftsman-ignore:\s*[^#]*\b${rule}\b" 2>/dev/null && return 0
     echo "$line" | grep -qE "craftsman-ignore\s*$" 2>/dev/null && return 0
     return 1
 }
 
 file_has_ignore() {
+    rule_never_ignorable "$1" && return 1
     grep -qE "craftsman-ignore:\s*[^#]*\b${1}\b" "$FILE_PATH" 2>/dev/null
 }
 
