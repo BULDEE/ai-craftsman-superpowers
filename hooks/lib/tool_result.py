@@ -19,6 +19,11 @@ Nothing here reads a field a capture did not show:
                                        status, exitCode, output; the command
                                        is not in it, the caller maps task_id
                                        back to the Bash that started it.
+                                       Removed in 2.1.277.
+  Claude Code, UserPromptSubmit        from 2.1.277 a background run ends as
+    task notification                  a task notification, and the prompt IS
+                                       it: <task-id>, <status>, and "exit code
+                                       N" in <summary>. Same task_id mapping.
   Codex, PostToolUse Bash              `tool_response` is the output string.
                                        `exit 3` gave the output, `false` gave
                                        "": the exit code is not observable.
@@ -39,6 +44,7 @@ import re
 import sys
 
 EXIT_CODE_RE = re.compile(r"^\s*Exit code:?\s+(-?\d+)", re.IGNORECASE | re.MULTILINE)
+NOTIFICATION_EXIT_RE = re.compile(r"\bexit code (-?\d+)\b", re.IGNORECASE)
 
 
 def _int(value) -> int | None:
@@ -89,10 +95,37 @@ def _decode_task_output(result: dict, response: dict, args: dict) -> dict:
     return _verdict(result, "unknown", code, f"TaskOutput status {status!r} without a usable exitCode", task_id)
 
 
+def _decode_task_notification(result: dict, prompt: str) -> dict:
+    result["tool"] = "TaskNotification"
+    task_id = _tag(prompt, "task-id")
+    status = _tag(prompt, "status")
+    match = NOTIFICATION_EXIT_RE.search(_tag(prompt, "summary") or "")
+    code = int(match.group(1)) if match else None
+    if status in ("completed", "failed") and code is not None:
+        return _from_exit_code(result, code, f"task notification {status} with exit code", task_id)
+    if status in ("killed", "stopped", "cancelled", "canceled"):
+        return _verdict(result, "interrupted", code, f"task notification {status}", task_id)
+    return _verdict(result, "unknown", code, f"task notification status {status!r} without an exit code", task_id)
+
+
+def _decode_event(result: dict, payload: dict) -> dict:
+    event, prompt = result["event"], payload.get("prompt")
+    if event == "PostToolUseFailure":
+        return _decode_failure(result, payload)
+    if event == "UserPromptSubmit" and isinstance(prompt, str) and prompt.lstrip().startswith("<task-notification>"):
+        return _decode_task_notification(result, prompt)
+    return _verdict(result, "unknown", None, f"{event} carries no command result")
+
+
+def _tag(text: str, name: str) -> str | None:
+    match = re.search(rf"<{name}>([^<]*)</{name}>", text)
+    return match.group(1).strip() if match else None
+
+
 def _decode_object(result: dict, response: dict) -> dict:
     task_id = response.get("backgroundTaskId")
     if task_id:
-        return _verdict(result, "running", None, "Bash started in the background; result arrives on TaskOutput", task_id)
+        return _verdict(result, "running", None, "Bash started in the background; result arrives on its task notification (TaskOutput before 2.1.277)", task_id)
     if response.get("interrupted") is True:
         return _verdict(result, "interrupted", None, "tool_response.interrupted")
     code = _int(response.get("exit_code", response.get("exitCode")))
@@ -131,10 +164,8 @@ def decode(payload: dict) -> dict:
     result = _result(payload)
     event, tool, response = result["event"], result["tool"], payload.get("tool_response")
     args = payload.get("tool_input") if isinstance(payload.get("tool_input"), dict) else {}
-    if event == "PostToolUseFailure":
-        return _decode_failure(result, payload)
     if event and event != "PostToolUse":
-        return _verdict(result, "unknown", None, f"{event} carries no command result")
+        return _decode_event(result, payload)
     if tool == "TaskOutput" and isinstance(response, dict):
         return _decode_task_output(result, response, args)
     copilot = payload.get("tool_result")

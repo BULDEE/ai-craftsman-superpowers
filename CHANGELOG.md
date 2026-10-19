@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A test suite run in the background never counted as verification
+  evidence: Claude Code 2.1.277 removed `TaskOutput`, the only event that
+  carried its result. On 2.1.302 the run ends as a task notification and
+  `UserPromptSubmit` fires on it, so `post-bash-test-verify.sh` now also
+  listens there (async) and reads `<task-id>`, `<status>` and the exit code,
+  tied to the Bash that started it by task id. Captured, not documented for
+  shell tasks: see `tests/fixtures/hosts/PROVENANCE.md` (CR-218).
+- `/craftsman:team`, `/craftsman:plan` and the `team-lead` agent required
+  TaskCreate/TaskUpdate/TaskList, which Claude Code no longer offers on
+  Opus 4.8, Sonnet 5, Fable 5 and newer without
+  `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`. Each now says what to do without the
+  Task tools: coordinate through messages and keep the ledger in the
+  reports, as the agent teams documentation prescribes (CR-219).
+- A write gate that timed out, was killed or could not start let the write
+  through. `pre-write-check.sh` and `config-protection.sh` now declare
+  `onFailure: "block"` (Claude Code 2.1.295); older builds ignore the key
+  (run on 2.1.294). `pre-push-verify.sh` stays advisory (CR-220).
+- The PHP001 auto-fix wrote a file PHP refuses to compile when code shared
+  the opening line: `<?php echo 1;` came back with `declare(strict_types=1);`
+  below it ("strict_types declaration must be the very first statement").
+  The declare now goes right after the tag and that code moves below it; a
+  first line that is not a real opening tag (`<?phpx`) is refused instead of
+  rewritten. `php -l` judges the result (CR-226).
+
 - On Grok, `instincts approve` refused `.grok/skills`, the one directory Grok
   reads skills from: `instinct_skills.py` kept its own list of host
   directories with Claude Code's and Codex's only. The destinations now come

@@ -447,6 +447,7 @@ test_agent_hooks() {
     log_info "Testing agent hook gates (functional)"
 
     run_subtest "Agent hook gate tests pass" "$SCRIPT_DIR/core/test-agent-hooks.sh" || true
+    run_subtest "PHP001 auto-fix keeps the declare first" "$SCRIPT_DIR/core/test-php001-autofix.sh" || true
 }
 
 test_hostile_repo() {
@@ -566,6 +567,7 @@ test_host_payloads() {
     log_info "Testing host payload contracts on real captures (functional)"
 
     run_subtest "Host payload contract tests pass" "$SCRIPT_DIR/core/test-host-payloads.sh" || true
+    run_subtest "Background test runs resolve on their task notification" "$SCRIPT_DIR/core/test-background-test-runs.sh" || true
 }
 
 test_copilot_adapter() {
@@ -724,6 +726,8 @@ test_invocation_policy() {
     log_info "Testing skill invocation policy (agents, workflow claims)"
 
     run_subtest "Invocation policy tests pass" "$SCRIPT_DIR/core/test-invocation-policy.sh" || true
+    run_subtest "Task tool fallback tests pass" "$SCRIPT_DIR/core/test-task-tool-fallback.sh" || true
+    run_subtest "Write gates fail closed on the host side" "$SCRIPT_DIR/core/test-gate-failure-mode.sh" || true
 }
 
 # Test: Every command is documented where the README sends readers

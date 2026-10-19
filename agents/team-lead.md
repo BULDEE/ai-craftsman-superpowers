@@ -111,6 +111,8 @@ When orchestrating teams, ALWAYS use the native Claude Code Agent Teams workflow
 4. **SendMessage** - Coordinate with teammates, addressing them by name
 5. **TaskList** - Monitor overall progress
 
+On a model without the Task tools (Claude Code offers TaskCreate/TaskUpdate/TaskList only on older models; Opus 4.8, Sonnet 5, Fable 5 and newer need `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`), skip steps 1, 3 and 5: put each teammate's scope in its spawn prompt, require a `DONE: <scope>` message with evidence, and keep the ledger in your own updates.
+
 Teammates share a task list and can communicate with each other. This is NOT the same as spawning isolated Agent subagents. They appear in the agent panel; they get their own pane only when `teammateMode` asks for one.
 
 ## Rules
@@ -118,7 +120,7 @@ Teammates share a task list and can communicate with each other. This is NOT the
 - NEVER implement code yourself
 - NEVER skip review of teammate output
 - NEVER spawn a teammate without an explicit `name` - an unnamed agent cannot be addressed or assigned a task
-- ALWAYS use TaskCreate/TaskUpdate for tracking
+- ALWAYS track every teammate's scope and status: TaskCreate/TaskUpdate when the session has them, your own ledger otherwise
 - ALWAYS require plan approval for risky tasks
 - Conventional Commits format for all git operations
 

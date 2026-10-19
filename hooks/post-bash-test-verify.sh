@@ -6,15 +6,17 @@
 # (hooks/lib/tool_result.py, fixtures under tests/fixtures/hosts):
 #   Claude Code   a passing run is a PostToolUse (no exit code in the object:
 #                 a non-zero exit is a PostToolUseFailure, whose `error` names
-#                 it); a run_in_background run resolves later on TaskOutput,
-#                 tied to its Bash by task id.
+#                 it); a run_in_background run resolves later on its task
+#                 notification (a UserPromptSubmit since 2.1.277, TaskOutput
+#                 before), tied to its Bash by task id.
 #   Codex         the shell output is a bare string with no exit code, so a
 #                 run there is `unknown`: no evidence granted, none revoked.
 # The reader this replaces took `tool_result.exit_code` (a field no host
 # sends) and defaulted it to 1: a passing suite became "REGRESSED" (audit
 # CR-117, C2).
 #
-# TRIGGERS: PostToolUse for Bash|TaskOutput, PostToolUseFailure for Bash
+# TRIGGERS: PostToolUse for Bash|TaskOutput, PostToolUseFailure for Bash,
+#           UserPromptSubmit (task notifications)
 # EXIT CODES: 0 = pass; 2 = a suite green earlier this session now fails
 # =============================================================================
 set -uo pipefail
@@ -80,9 +82,12 @@ SESSION_STATE=$(session_file session-state.json)
 
 LIB_DIR="${SCRIPT_DIR}/lib"
 
-# A TaskOutput names the task, not the command: the Bash that started it
-# recorded the pair below, and the result is read back against it.
-if [[ "$TOOL" == "TaskOutput" ]]; then
+# A task result (TaskOutput, or the notification that replaced it) names the
+# task, not the command: the Bash that started it recorded the pair below,
+# and the result is read back against it.
+TASK_RESULT=false
+[[ "$TOOL" == "TaskOutput" || "$TOOL" == "TaskNotification" ]] && TASK_RESULT=true
+if [[ "$TASK_RESULT" == true ]]; then
     [[ -z "$TASK_ID" ]] && exit 0
     COMMAND=$(python3 "$LIB_DIR/session_state.py" read "$SESSION_STATE" pending_test_tasks '[]' 2>/dev/null \
         | jq -r --arg id "$TASK_ID" '[.[] | select(.task_id == $id)] | last | .command // empty' 2>/dev/null)
@@ -148,7 +153,7 @@ fi
 
 case "$STATE" in
     running)
-        # Started in the background: remembered so the TaskOutput that ends
+        # Started in the background: remembered so the task result that ends
         # it can be read as this command's result. One entry per task: a poll
         # that reports "still running" is the same task, and appending it
         # again evicted the other pending tasks (review of e372e85, F4).
@@ -168,7 +173,7 @@ esac
 
 # A task that ended is consumed: polling its result again must not grant the
 # evidence a later failure revoked (review of e372e85, F5).
-[[ "$TOOL" == "TaskOutput" ]] && python3 "$LIB_DIR/session_state.py" list-remove "$SESSION_STATE" pending_test_tasks task_id "$TASK_ID" 2>/dev/null || true
+[[ "$TASK_RESULT" == true ]] && python3 "$LIB_DIR/session_state.py" list-remove "$SESSION_STATE" pending_test_tasks task_id "$TASK_ID" 2>/dev/null || true
 
 CURRENT=$(python3 "$LIB_DIR/session_state.py" check-flag "$SESSION_STATE" verified 2>/dev/null || echo "false")
 

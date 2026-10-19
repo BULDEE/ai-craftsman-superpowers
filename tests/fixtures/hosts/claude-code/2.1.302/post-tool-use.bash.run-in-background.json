@@ -1,0 +1,28 @@
+{
+  "session_id": "2e61b208-9cdc-4d3c-b11f-108461ec3003",
+  "transcript_path": "__HOME__/.claude/projects/__WORKSPACE_SLUG__/2e61b208-9cdc-4d3c-b11f-108461ec3003.jsonl",
+  "cwd": "__WORKSPACE__",
+  "scratchpad_dir": "__SESSION_TMP__/scratchpad",
+  "prompt_id": "852edc6a-23ac-4f8f-b74a-8e465b137caf",
+  "permission_mode": "bypassPermissions",
+  "effort": {
+    "level": "xhigh"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "sh -c 'echo capture-probe; exit 0'",
+    "description": "Run passing probe in background for capture",
+    "run_in_background": true
+  },
+  "tool_response": {
+    "stdout": "",
+    "stderr": "",
+    "interrupted": false,
+    "isImage": false,
+    "noOutputExpected": false,
+    "backgroundTaskId": "bpooxtznu"
+  },
+  "tool_use_id": "toolu_01QdBeNBpcbRAkAYDomnweuz",
+  "duration_ms": 52
+}
