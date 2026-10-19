@@ -193,15 +193,13 @@ export const register: Register = (on, options) => {
 
     const { candidates, approved } = current.queue
     const opened = await read($, preview)
-    const room = Math.max(1, Math.floor(((e.viewport?.rows ?? 30) - 8) / 14))
-    const shown = candidates.slice(0, room)
 
     return (
       <Box flexDirection="column">
         {current.notice !== '' && <Text color="green">{current.notice}</Text>}
         <Text bold>Candidates ({candidates.length})</Text>
         {candidates.length === 0 && <Text dimColor>Nothing awaits review.</Text>}
-        {shown.map(candidate => (
+        {candidates.map(candidate => (
           <Box key={`candidate-${candidate.id}`} flexDirection="column" marginTop={1}>
             <Text>
               <Text bold>{candidate.rule}</Text>{candidate.rule_text !== '' ? ` · ${candidate.rule_text}` : ''}
@@ -235,7 +233,6 @@ export const register: Register = (on, options) => {
             )}
           </Box>
         ))}
-        {candidates.length > shown.length && <Text dimColor>{candidates.length - shown.length} more below the fold; decide these first.</Text>}
         <Box marginTop={1} flexDirection="column">
           <Text bold>Approved ({approved.length})</Text>
           {approved.map(item => (
