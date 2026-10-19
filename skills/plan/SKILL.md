@@ -174,6 +174,12 @@ When user says "execute" or confirms the plan:
 
 3. **Check progress** using TaskList between batches
 
+On a model without the Task tools (Claude Code offers them only on older
+models; Opus 4.8, Sonnet 5, Fable 5 and newer need
+`CLAUDE_CODE_ENABLE_TODO_TOOLS=1`), keep the same `TASK-NNN` ledger in your
+batch reports instead: every status change is written there, with its
+evidence, and nothing is tracked silently.
+
 ```markdown
 ## Executing Batch 1
 

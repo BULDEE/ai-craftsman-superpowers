@@ -725,6 +725,7 @@ test_invocation_policy() {
     log_info "Testing skill invocation policy (agents, workflow claims)"
 
     run_subtest "Invocation policy tests pass" "$SCRIPT_DIR/core/test-invocation-policy.sh" || true
+    run_subtest "Task tool fallback tests pass" "$SCRIPT_DIR/core/test-task-tool-fallback.sh" || true
 }
 
 # Test: Every command is documented where the README sends readers

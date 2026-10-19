@@ -45,7 +45,14 @@ from what the session actually offers, in this order:
 
 1. `TaskCreate`, `SendMessage` and named teammates are available: Claude Code
    native teams (the section above).
-2. `spawn_agent` is available (Codex): the same composition, one
+2. `SendMessage` and named teammates, without the Task tools: Claude Code
+   offers TaskCreate/TaskUpdate/TaskList only on older models (Opus 4.8,
+   Sonnet 5, Fable 5 and newer need `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`). The
+   team is still native; agents without the Task tools coordinate through
+   messages instead of the shared task list. Put each member's scope in the
+   spawn prompt, ask for a `DONE: <scope>` message with its evidence, and keep
+   the ledger yourself in your progress updates. Say so in the first line.
+3. `spawn_agent` is available (Codex): the same composition, one
    `spawn_agent` per member with the matching `craftsman-<name>` role
    (`craftsman-ci export --target codex-agents --into "$HOME/.codex/agents"`
    writes the roles from the shared `agents/*.md`; on codex-cli 0.154.0 only
@@ -53,9 +60,9 @@ from what the session actually offers, in this order:
    `.codex/agents/` was not), each task the member's focus, then `wait_agent` and
    consolidate. If the role is not offered, spawn the default role with the
    agent's mission pasted as the task; say which you did.
-3. Only an `Agent` (or equivalent single-dispatch) tool: parallel dispatch, one
+4. Only an `Agent` (or equivalent single-dispatch) tool: parallel dispatch, one
    per member, as described below.
-4. None of the above: run the members sequentially yourself, in the order the
+5. None of the above: run the members sequentially yourself, in the order the
    composition lists, and say so in the first line.
 
 Model names, effort levels and tool lists are never carried across hosts:
