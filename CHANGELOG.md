@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.13.1] - 2026-10-20
+
+A refusal no longer offers a `craftsman-ignore` marker that the rule ignores
+(CR-230). LAYER004 recognises the Domain under any root namespace your
+`composer.json` declares, not only `App\` (CR-244). The FAQ and both READMEs
+now say which PHP rules hold on any framework (CR-242).
+
+Upgrading can refuse a file that 4.13.0 let through: raw SQL in a Domain
+namespace under a root other than `App\`, outside a `/Domain/` path. To phase
+it in, set `LAYER004: warn` for that directory in its `.craft-rules.yml`.
+
 ### Fixed
 
 - LAYER004 (raw SQL or DQL inside the Domain) recognised a Domain namespace
