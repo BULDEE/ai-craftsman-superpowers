@@ -137,10 +137,13 @@ assert_json_field() {
     fi
 }
 
+# The text goes to grep as a here-string, never through a pipe: grep -q exits
+# on the first match, and under pipefail the writer's SIGPIPE turned a match
+# into a failure (tests/core/test-assert-helpers.sh).
 # assert_json_contains "description" "json_string" "pattern"
 assert_json_contains() {
     local desc="$1" json="$2" pattern="$3"
-    if echo "$json" | grep -qi "$pattern"; then
+    if grep -qi -- "$pattern" <<<"$json"; then
         log_pass "$desc"
     else
         log_fail "$desc" "JSON output does not contain '$pattern'"
@@ -150,7 +153,7 @@ assert_json_contains() {
 # assert_contains "description" "haystack" "needle"
 assert_contains() {
     local desc="$1" haystack="$2" needle="$3"
-    if echo "$haystack" | grep -qi -- "$needle"; then
+    if grep -qi -- "$needle" <<<"$haystack"; then
         log_pass "$desc"
     else
         log_fail "$desc" "output does not contain '$needle'"
@@ -160,7 +163,7 @@ assert_contains() {
 # assert_not_contains "description" "haystack" "needle"
 assert_not_contains() {
     local desc="$1" haystack="$2" needle="$3"
-    if ! echo "$haystack" | grep -qi -- "$needle"; then
+    if ! grep -qi -- "$needle" <<<"$haystack"; then
         log_pass "$desc"
     else
         log_fail "$desc" "output should not contain '$needle'"

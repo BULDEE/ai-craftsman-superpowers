@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.13.0] - 2026-10-19
+
+JavaScript gets the craftsman rules (`.js`, `.jsx`, `.mjs`, `.cjs`, native
+JavaScript and jQuery included), SEC004 refuses unescaped values reaching an
+HTML sink in TypeScript and JavaScript, the instinct review pane ships as the
+`craftsman-cockpit` companion mod (ADR-0031), and the hooks follow Claude
+Code's recent changes: background test runs, the Task tools, a write gate that
+fails (CR-218 to CR-220, CR-226, CR-231).
+
+Upgrading can refuse a JavaScript file that 4.12.3 wrote without a word. To
+phase the rules in on an existing codebase, set them to `warn` for a directory
+in its `.craft-rules.yml`.
+
 ### Fixed
 
 - A test suite run in the background never counted as verification
@@ -39,6 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from `hooks/host-capabilities.json`, which declares `user_skills_dir` for
   Claude Code and Codex; global promotion on a host that declares none (Grok)
   is refused instead of guessed.
+- The suite's shared assertions could give the wrong verdict on a long text:
+  `echo "$text" | grep -q` under `pipefail` reports the writer's SIGPIPE when
+  grep stops at the first match, so `assert_contains` failed on a text that
+  held the needle (macOS CI) and `assert_not_contains` passed on one that held
+  the forbidden text. Measured on a 1 MB text: 100 wrong verdicts out of 100,
+  none with a here-string, which they read now
+  (`tests/core/test-assert-helpers.sh`).
 
 ### Added
 
