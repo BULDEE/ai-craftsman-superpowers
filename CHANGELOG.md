@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`. Each now says what to do without the
   Task tools: coordinate through messages and keep the ledger in the
   reports, as the agent teams documentation prescribes (CR-219).
+- A write gate that timed out, was killed or could not start let the write
+  through. `pre-write-check.sh` and `config-protection.sh` now declare
+  `onFailure: "block"` (Claude Code 2.1.295); older builds ignore the key
+  (run on 2.1.294). `pre-push-verify.sh` stays advisory (CR-220).
 
 - On Grok, `instincts approve` refused `.grok/skills`, the one directory Grok
   reads skills from: `instinct_skills.py` kept its own list of host

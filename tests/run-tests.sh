@@ -726,6 +726,7 @@ test_invocation_policy() {
 
     run_subtest "Invocation policy tests pass" "$SCRIPT_DIR/core/test-invocation-policy.sh" || true
     run_subtest "Task tool fallback tests pass" "$SCRIPT_DIR/core/test-task-tool-fallback.sh" || true
+    run_subtest "Write gates fail closed on the host side" "$SCRIPT_DIR/core/test-gate-failure-mode.sh" || true
 }
 
 # Test: Every command is documented where the README sends readers

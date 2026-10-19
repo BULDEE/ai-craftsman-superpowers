@@ -18,12 +18,14 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/config-protection.sh\"",
-            "statusMessage": "Craftsman: checking the write does not reconfigure the gate"
+            "statusMessage": "Craftsman: checking the write does not reconfigure the gate",
+            "onFailure": "block"
           },
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-write-check.sh\"",
-            "statusMessage": "Craftsman: judging the would-be file before it lands"
+            "statusMessage": "Craftsman: judging the would-be file before it lands",
+            "onFailure": "block"
           }
         ]
       },
