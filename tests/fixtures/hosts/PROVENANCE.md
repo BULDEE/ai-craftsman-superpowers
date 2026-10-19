@@ -16,6 +16,8 @@ redactions, applied uniformly:
 
 - the capture workspace path becomes `__WORKSPACE__`
 - any `/Users/<name>` becomes `__HOME__`
+- the project slug in a transcript path becomes `__WORKSPACE_SLUG__`, and a
+  session's temporary directory becomes `__SESSION_TMP__` (from 2.1.302)
 
 Nothing else is edited. `hook-env.*.json` lists variable NAMES only.
 
@@ -61,6 +63,34 @@ Nothing else is edited. `hook-env.*.json` lists variable NAMES only.
   are kept with their `user` and `assistant` rows only, paths redacted. One
   more edit: a U+2014 in Claude Code's own Write tool-result text was
   replaced by a colon (repository rule; no hook reads that string).
+
+## claude-code/2.1.302
+
+- Date: 2026-10-18. `claude --version`: `2.1.302 (Claude Code)`. Interactive
+  session, hooks added for the capture to `<project>/.claude/settings.local.json`
+  (`cat > file` on `UserPromptSubmit` and on `PostToolUse` for `Bash`), then
+  removed. Raw sha256 (first 16): user-prompt-submit `41b22f50eefe9989`,
+  post-tool-use `2afa32a0110a33fa`.
+- Why: 2.1.277 removed the `TaskOutput` tool (changelog: "Claude reads a
+  background task's output file with Read instead"), so the third run under
+  2.1.272 above is now the only path, and nothing polled.
+- Observed, and load-bearing for the hooks:
+  - `post-tool-use.bash.run-in-background.json`: unchanged shape,
+    `tool_response.backgroundTaskId` set, no exit code.
+  - `user-prompt-submit.task-notification.completed.json`: when the task ends,
+    `UserPromptSubmit` fires with the notification as `prompt`:
+    `<task-notification>` with `<task-id>` (the `backgroundTaskId`),
+    `<tool-use-id>`, `<output-file>`, `<status>completed</status>` and
+    `<summary>... completed (exit code 0)</summary>`. The hooks documentation
+    lists scheduled tasks, background subagents and cross-session messages as
+    the turns that fire `UserPromptSubmit`; a background shell task is not
+    listed, so this is observed, not documented.
+  - `user-prompt-submit.task-notification.failed.json`: same envelope as the
+    completed capture; its `prompt` is the transcript's `queued_command`
+    record for a command that exited 3 in the same session
+    (`<status>failed</status>`, `... failed with exit code 3`). The completed
+    capture shows that record and the hook's `prompt` are the same text.
+  - The output file ends with `[exited with code N]`; not read by any hook.
 
 ## codex/0.154.0
 

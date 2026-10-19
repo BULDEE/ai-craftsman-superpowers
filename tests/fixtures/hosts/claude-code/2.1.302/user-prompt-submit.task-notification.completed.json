@@ -1,0 +1,10 @@
+{
+  "session_id": "2e61b208-9cdc-4d3c-b11f-108461ec3003",
+  "transcript_path": "__HOME__/.claude/projects/__WORKSPACE_SLUG__/2e61b208-9cdc-4d3c-b11f-108461ec3003.jsonl",
+  "cwd": "__WORKSPACE__",
+  "scratchpad_dir": "__SESSION_TMP__/scratchpad",
+  "prompt_id": "852edc6a-23ac-4f8f-b74a-8e465b137caf",
+  "permission_mode": "bypassPermissions",
+  "hook_event_name": "UserPromptSubmit",
+  "prompt": "<task-notification>\n<task-id>bpooxtznu</task-id>\n<tool-use-id>toolu_01QdBeNBpcbRAkAYDomnweuz</tool-use-id>\n<output-file>__SESSION_TMP__/tasks/bpooxtznu.output</output-file>\n<status>completed</status>\n<summary>Background command \"Run passing probe in background for capture\" completed (exit code 0)</summary>\n</task-notification>"
+}

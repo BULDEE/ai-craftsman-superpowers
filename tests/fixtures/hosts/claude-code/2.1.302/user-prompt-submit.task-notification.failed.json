@@ -1,0 +1,10 @@
+{
+  "session_id": "2e61b208-9cdc-4d3c-b11f-108461ec3003",
+  "transcript_path": "__HOME__/.claude/projects/__WORKSPACE_SLUG__/2e61b208-9cdc-4d3c-b11f-108461ec3003.jsonl",
+  "cwd": "__WORKSPACE__",
+  "scratchpad_dir": "__SESSION_TMP__/scratchpad",
+  "prompt_id": "852edc6a-23ac-4f8f-b74a-8e465b137caf",
+  "permission_mode": "bypassPermissions",
+  "hook_event_name": "UserPromptSubmit",
+  "prompt": "<task-notification>\n<task-id>bjhe9of9t</task-id>\n<tool-use-id>toolu_01N4jGHUgfG2ZJccmXuM2pjC</tool-use-id>\n<output-file>__SESSION_TMP__/tasks/bjhe9of9t.output</output-file>\n<status>failed</status>\n<summary>Background command \"Run a failing probe command in background\" failed with exit code 3</summary>\n</task-notification>"
+}

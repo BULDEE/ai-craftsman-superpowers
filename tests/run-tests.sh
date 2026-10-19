@@ -566,6 +566,7 @@ test_host_payloads() {
     log_info "Testing host payload contracts on real captures (functional)"
 
     run_subtest "Host payload contract tests pass" "$SCRIPT_DIR/core/test-host-payloads.sh" || true
+    run_subtest "Background test runs resolve on their task notification" "$SCRIPT_DIR/core/test-background-test-runs.sh" || true
 }
 
 test_copilot_adapter() {

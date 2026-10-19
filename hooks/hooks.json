@@ -108,6 +108,13 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/bias-detector.sh\"",
             "statusMessage": "Craftsman: scanning the prompt for cognitive bias signals"
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-bash-test-verify.sh\"",
+            "async": true,
+            "asyncRewake": true,
+            "statusMessage": "Craftsman: reading a background test run's result"
           }
         ]
       }

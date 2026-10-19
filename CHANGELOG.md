@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A test suite run in the background never counted as verification
+  evidence: Claude Code 2.1.277 removed `TaskOutput`, the only event that
+  carried its result. On 2.1.302 the run ends as a task notification and
+  `UserPromptSubmit` fires on it, so `post-bash-test-verify.sh` now also
+  listens there (async) and reads `<task-id>`, `<status>` and the exit code,
+  tied to the Bash that started it by task id. Captured, not documented for
+  shell tasks: see `tests/fixtures/hosts/PROVENANCE.md` (CR-218).
+
 - On Grok, `instincts approve` refused `.grok/skills`, the one directory Grok
   reads skills from: `instinct_skills.py` kept its own list of host
   directories with Claude Code's and Codex's only. The destinations now come
