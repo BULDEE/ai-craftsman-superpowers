@@ -447,6 +447,7 @@ test_agent_hooks() {
     log_info "Testing agent hook gates (functional)"
 
     run_subtest "Agent hook gate tests pass" "$SCRIPT_DIR/core/test-agent-hooks.sh" || true
+    run_subtest "PHP001 auto-fix keeps the declare first" "$SCRIPT_DIR/core/test-php001-autofix.sh" || true
 }
 
 test_hostile_repo() {

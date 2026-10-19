@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   through. `pre-write-check.sh` and `config-protection.sh` now declare
   `onFailure: "block"` (Claude Code 2.1.295); older builds ignore the key
   (run on 2.1.294). `pre-push-verify.sh` stays advisory (CR-220).
+- The PHP001 auto-fix wrote a file PHP refuses to compile when code shared
+  the opening line: `<?php echo 1;` came back with `declare(strict_types=1);`
+  below it ("strict_types declaration must be the very first statement").
+  The declare now goes right after the tag and that code moves below it; a
+  first line that is not a real opening tag (`<?phpx`) is refused instead of
+  rewritten. `php -l` judges the result (CR-226).
 
 - On Grok, `instincts approve` refused `.grok/skills`, the one directory Grok
   reads skills from: `instinct_skills.py` kept its own list of host

@@ -169,8 +169,10 @@ local_should_block=false
 # (Write, write_file, Grok's `write`); the fix rewrites `content` in place.
 if [[ $VIOLATION_COUNT -eq 1 && -n "$FILE_CONTENT" && "$LANG_ID" == "php" && "$local_should_block" == true ]] \
    && [[ "$VIOLATIONS" == PHP001* ]] \
-   && echo "$FILE_CONTENT" | head -1 | grep -q "^<?php" 2>/dev/null; then
-    FIXED_CONTENT=$(printf '%s\n' "$FILE_CONTENT" | awk 'NR==1 && $0 ~ /^<\?php/ {print; print ""; print "declare(strict_types=1);"; next} {print}')
+   && echo "$FILE_CONTENT" | head -1 | grep -qE '^<\?php([[:space:]]|$)' 2>/dev/null; then
+    # PHP refuses a declare that is not the very first statement, so code
+    # sharing the opening line moves below it (CR-226).
+    FIXED_CONTENT=$(printf '%s\n' "$FILE_CONTENT" | awk 'NR==1 {rest = substr($0, 6); sub(/^[[:space:]]+/, "", rest); print "<?php"; print ""; print "declare(strict_types=1);"; if (rest != "") {print ""; print rest}; next} {print}')
     echo "$INPUT" | jq --arg content "$FIXED_CONTENT" \
     '{
         hookSpecificOutput: {
