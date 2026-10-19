@@ -440,6 +440,7 @@ test_hook_behavior() {
     log_info "Testing hook behavior (functional)"
 
     run_subtest "Hook behavior tests pass" "$SCRIPT_DIR/core/test-hooks.sh" || true
+    run_subtest "Shared assertions hold on large texts" "$SCRIPT_DIR/core/test-assert-helpers.sh" || true
 }
 
 test_agent_hooks() {

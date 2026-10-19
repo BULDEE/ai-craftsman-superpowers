@@ -52,6 +52,13 @@ in its `.craft-rules.yml`.
   from `hooks/host-capabilities.json`, which declares `user_skills_dir` for
   Claude Code and Codex; global promotion on a host that declares none (Grok)
   is refused instead of guessed.
+- The suite's shared assertions could give the wrong verdict on a long text:
+  `echo "$text" | grep -q` under `pipefail` reports the writer's SIGPIPE when
+  grep stops at the first match, so `assert_contains` failed on a text that
+  held the needle (macOS CI) and `assert_not_contains` passed on one that held
+  the forbidden text. Measured on a 1 MB text: 100 wrong verdicts out of 100,
+  none with a here-string, which they read now
+  (`tests/core/test-assert-helpers.sh`).
 
 ### Added
 
