@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted.
+Accepted (amended 2026-10-20: the API left early access, see Amendment).
 
 ## Date
 
@@ -145,6 +145,33 @@ for a person.
   companion.
 - Claude Code adds option gating to native `agent`/`prompt` hooks, which
   makes an in-process ADR-0018 verifier unnecessary.
+
+## Amendment (2026-10-20): the API left early access, the companion stays
+
+The context above describes Claude Code 2.1.291, whose declarations carried
+"EARLY ACCESS: this surface may change between releases without notice". The
+public copy of those declarations (`mods/types/claude-code.d.ts`, written by
+2.1.277) still does. The installed 2.1.304 binary holds no such string, the
+mods documentation makes mods on by default from v2.1.287 and describes
+`CLAUDE_CODE_ENABLE_FUNCTION_HOOKS` as a flag of the early-access period that
+later builds ignore. The surface is a released one.
+
+What that changes:
+
+- The first "Re-evaluate if" condition is half met: the API is out of early
+  access, and no other host loads a hooks module. The companion decision
+  stands on the second half alone, which ADR-0029 already states: a verdict
+  the other front-ends cannot reproduce is not a verdict. Nothing in the
+  Decision section moves.
+- The "API moves" constraint is kept, downgraded from "may stop loading" to
+  the ordinary drift of a versioned surface: the mods reference still says
+  events and methods can change between versions, so the mod's tests keep
+  running against the installed build and the mod's README names the builds
+  it was tested on, as the documentation asks.
+- The floor stays 2.1.291, the build the mod was written and tested against,
+  not 2.1.287, the build the documentation names: `$.state` and the
+  `atom`/`read`/`update` helpers this mod relies on were not checked on
+  anything older.
 
 ## References
 
