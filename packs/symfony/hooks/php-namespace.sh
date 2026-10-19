@@ -51,3 +51,15 @@ _php_psr4_root() {
     # psr-4 keys carry a trailing separator: "App\\" in JSON is App\ once read.
     printf '%s' "${root%%\\}"
 }
+
+# The root as an ERE fragment for the file's own project. The root is
+# repository-supplied (a composer.json psr-4 key), so it is data spliced into a
+# pattern: every ERE metacharacter is quoted, not only the backslash. A key like
+# "A(pp\\" left live makes grep exit 2, which a caller reads as "not this
+# layer", and the rule then stops firing for the whole repository.
+php_namespace_root_regex() {
+    local file="$1" root
+    root=$(php_namespace_root "$(dirname "$file")")
+    [[ -n "${root:-}" ]] || root="App"
+    printf '%s' "$root" | sed 's/[][\\^$.*+?(){}|]/\\&/g'
+}
