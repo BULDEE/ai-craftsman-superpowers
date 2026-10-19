@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.13.0] - 2026-10-19
+
+JavaScript gets the craftsman rules (`.js`, `.jsx`, `.mjs`, `.cjs`, native
+JavaScript and jQuery included), SEC004 refuses unescaped values reaching an
+HTML sink in TypeScript and JavaScript, the instinct review pane ships as the
+`craftsman-cockpit` companion mod (ADR-0031), and the hooks follow Claude
+Code's recent changes: background test runs, the Task tools, a write gate that
+fails (CR-218 to CR-220, CR-226, CR-231).
+
+Upgrading can refuse a JavaScript file that 4.12.3 wrote without a word. To
+phase the rules in on an existing codebase, set them to `warn` for a directory
+in its `.craft-rules.yml`.
+
 ### Fixed
 
 - A test suite run in the background never counted as verification

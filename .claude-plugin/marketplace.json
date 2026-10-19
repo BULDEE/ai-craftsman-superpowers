@@ -1,6 +1,6 @@
 {
   "name": "ai-craftsman-superpowers",
-  "version": "4.12.3",
+  "version": "4.13.0",
   "owner": {
     "name": "Alexandre Mallet",
     "email": "contact@buldee.com"
@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "craftsman",
-      "version": "4.12.3",
+      "version": "4.13.0",
       "description": "A pre-write hook that refuses edits breaking your layer boundaries, plus a structural ratchet so inherited legacy never turns the repository red on day one.",
       "author": {
         "name": "Alexandre Mallet",
@@ -23,7 +23,7 @@
     },
     {
       "name": "craftsman-cockpit",
-      "version": "4.12.3",
+      "version": "4.13.0",
       "description": "Companion panes for craftsman on Claude Code (ADR-0031): review learned-instinct candidates with their evidence and approve or reject them by hand. Needs the craftsman plugin.",
       "author": {
         "name": "Alexandre Mallet",
