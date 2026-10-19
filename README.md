@@ -252,6 +252,18 @@ Your real alternative is not another plugin. It is the `CLAUDE.md` or
 | Stops the model from repeating the same mistake | no | no | yes |
 | Warns when a domain model is written without a design pass | no | no | yes |
 
+## Any language, any framework
+
+Every shipped pack that owns a language judges its own files on every
+project: PHP, TypeScript and JavaScript, Python, Go, Rust and Bash. The `stack`
+setting labels the setup; it switches no shipped pack's rule on or off. The PHP
+craft rules (strict types, `final`, no setters, an injected clock, no empty
+`catch`) hold the same way on Symfony, Laravel, Slim or plain PHP, and the
+layer rules read your root namespace from `composer.json` and only fire where a
+Domain or Application layer exists. Symfony depth (Doctrine, API Platform,
+Messenger) comes on top as knowledge, reviewers and templates. Two rule
+behaviours know Doctrine; the [FAQ](FAQ.md) names them.
+
 ## What it actually does
 
 **It blocks.** One rules engine, enforced identically in hooks and CI. No drift

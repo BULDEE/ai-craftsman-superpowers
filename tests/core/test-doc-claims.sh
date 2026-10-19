@@ -289,4 +289,42 @@ else
 fi
 rm -rf "$CP_DIR"
 
+# -----------------------------------------------------------------------------
+# 10. No document makes a rule depend on the framework or on an enabled pack
+#     (CR-242).
+# -----------------------------------------------------------------------------
+# A PHP developer on Slim read the setup's stack question and the pack's
+# Symfony name as "this is a Symfony tool". The FAQ agreed with him: it said
+# rule enforcement "only activates for the packs you enable", while every
+# shipped pack declares `stack: ["*"]` and judges its own file types whatever
+# the stack says (#35). The code is read first: when every pack is
+# framework-agnostic, the documents must say so and must not say otherwise.
+gated_packs=""
+for manifest in "$ROOT_DIR"/packs/*/pack.yml; do
+    compat=$(awk '/^compatibility:/{c=1;next} c&&/^[^ #]/{c=0} c&&/^[[:space:]]*stack:/{print; exit}' "$manifest")
+    [[ "$compat" =~ \[\ *\"\*\"\ *\] ]] || gated_packs+="$(basename "$(dirname "$manifest")"): ${compat:-no stack}; "
+done
+if [[ -z "$gated_packs" ]]; then
+    log_pass "every shipped pack judges its files whatever the stack setting says"
+    pack_gating=$(grep -rniE '(only|just) (activates?|applies|runs?) for the packs you (enable|choose|select)|rules? (are|is) (enabled|disabled|switched) by (the|your) stack' \
+        "$ROOT_DIR"/README.md "$ROOT_DIR"/README.fr.md "$ROOT_DIR"/FAQ.md "$ROOT_DIR"/docs/guides "$ROOT_DIR"/docs/getting-started "$ROOT_DIR"/docs/reference 2>/dev/null || true)
+    [[ -z "$pack_gating" ]] \
+        && log_pass "no document makes rule enforcement depend on an enabled pack or on the stack" \
+        || log_fail "a document makes rule enforcement depend on an enabled pack or on the stack" "$(printf '%s' "$pack_gating" | sed "s|$ROOT_DIR/||" | tr '\n' ' ')"
+    missing_answer=""
+    for doc in FAQ.md README.md README.fr.md; do
+        grep -q 'Slim' "$ROOT_DIR/$doc" && grep -q 'composer.json' "$ROOT_DIR/$doc" || missing_answer+="$doc "
+    done
+    [[ -z "$missing_answer" ]] \
+        && log_pass "the FAQ and both READMEs tell a PHP developer outside Symfony that the rules hold for any framework" \
+        || log_fail "no framework-agnostic answer for a PHP developer outside Symfony" "missing in: $missing_answer"
+else
+    log_fail "a pack is gated by the stack, so the framework-agnostic claim in FAQ.md and the READMEs is false" "$gated_packs"
+fi
+if grep -q 'composer.json' "$ROOT_DIR/FAQ.md"; then
+    grep -q 'autoload\["psr-4"\]' "$ROOT_DIR/packs/symfony/hooks/php-namespace.sh" \
+        && log_pass "the root namespace the FAQ says comes from composer.json is the one the layer rules read" \
+        || log_fail "FAQ says the layer rules read composer.json" "php-namespace.sh no longer reads the psr-4 map"
+fi
+
 test_summary
