@@ -154,6 +154,32 @@ else
     log_fail "false positive" "V=${VIOLATIONS[*]:-} W=${WARNINGS[*]:-}"
 fi
 
+# A renamed root namespace (Slim, Laravel, any composer.json with its own
+# psr-4 key) is still a Domain namespace: LAYER004 read `App\Domain` literally,
+# so `Acme\Domain` outside a /Domain/ path passed in silence while LAYER001 to
+# LAYER003 already read the root from composer.json (CR-244).
+ACME_DIR="$TEST_DIR/acme"
+mkdir -p "$ACME_DIR/src/Billing"
+printf '%s\n' '{"autoload": {"psr-4": {"Acme\\": "src/"}}}' > "$ACME_DIR/composer.json"
+cat > "$ACME_DIR/src/Billing/Invoice.php" <<'PHP'
+<?php
+declare(strict_types=1);
+namespace Acme\Domain\Billing;
+final class Invoice {
+    public function total(): int {
+        $rows = $this->connection->executeQuery("SELECT amount FROM invoice_lines");
+        return 0;
+    }
+}
+PHP
+reset_findings
+pack_validate_php_persistence "$ACME_DIR/src/Billing/Invoice.php"
+if printf '%s\n' "${VIOLATIONS[@]:-}" | grep -q "LAYER004"; then
+    log_pass "LAYER004: raw SQL in a Domain namespace under a composer.json root other than App"
+else
+    log_fail "LAYER004 with a renamed root namespace" "Acme\\Domain not recognised: ${VIOLATIONS[*]:-none}"
+fi
+
 rm -rf "$TEST_DIR"
 
 test_summary

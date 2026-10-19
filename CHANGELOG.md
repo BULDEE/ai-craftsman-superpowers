@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- LAYER004 (raw SQL or DQL inside the Domain) recognised a Domain namespace
+  only as `App\Domain`, so a project whose `composer.json` declares another
+  root (`Acme\`, a Slim or Laravel application, a monorepo package) passed it
+  outside a `/Domain/` path. It now reads the root from the psr-4 map, as
+  LAYER001 to LAYER003 already did, through one shared reader in the PHP pack
+  (CR-244).
+- The FAQ said language rules "only activate for the packs you enable". Every
+  shipped pack judges its own files whatever the `stack` setting says, and the
+  setup's framework question and the pack's Symfony name read as "Symfony
+  only" to a PHP developer on Slim. The FAQ and both READMEs now say which PHP
+  rules hold on any framework, which two rule behaviours know Doctrine, and
+  that `stack` switches no shipped pack's rule; `tests/core/test-doc-claims.sh`
+  reads the pack manifests and the namespace reader before it reads the
+  documents (CR-242).
 - A refusal offered a way out the gate then refused: SEC001 ended on "Use //
   craftsman-ignore: <RULE_ID> to suppress", a marker SEC001 to SEC003 never
   honour (`never_ignorable: true`), the post-write JSON and the project-wide

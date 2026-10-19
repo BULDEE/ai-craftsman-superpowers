@@ -12,10 +12,18 @@
 #   Provided by the orchestrator (post-write-check.sh or craftsman-ci.sh).
 # =============================================================================
 
+# The Domain namespace hangs off the project's own root, read from
+# composer.json like LAYER001 to LAYER003 read it. `App\Domain` written
+# literally let every project with another root (Acme\, a monorepo package)
+# pass LAYER004 outside a /Domain/ path.
+# shellcheck source=./php-namespace.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/php-namespace.sh"
+
 _persistence_php_is_domain() {
-    local file="$1"
+    local file="$1" ns
     [[ "$file" == *"/Domain/"* ]] && return 0
-    grep -qE "namespace\s+App\\\\Domain" "$file" 2>/dev/null
+    ns=$(php_namespace_root_regex "$file")
+    grep -qE "namespace\s+${ns}\\\\Domain" "$file" 2>/dev/null
 }
 
 _persistence_php_check_domain_sql() {

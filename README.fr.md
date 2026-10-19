@@ -264,6 +264,20 @@ tourner.
 | Empêche le modèle de refaire la même erreur | non | non | oui |
 | Avertit quand un modèle de domaine est écrit sans passe de design | non | non | oui |
 
+## Tous les langages, tous les frameworks
+
+Chaque pack livré qui porte un langage juge ses propres fichiers sur tous les
+projets : PHP, TypeScript et JavaScript, Python, Go, Rust et Bash. Le réglage
+`stack` étiquette le setup, il n'active ni ne désactive aucune règle d'un pack
+livré. Les règles de craft PHP (types stricts, `final`, pas de setters, horloge
+injectée, pas de `catch` vide) s'appliquent de la même façon sur Symfony,
+Laravel, Slim ou du PHP sans framework, et les règles de couches lisent votre
+namespace racine dans `composer.json` et ne se déclenchent que là où une couche
+Domain ou Application existe. La profondeur Symfony (Doctrine, API Platform,
+Messenger) s'ajoute par-dessus, en connaissances, en relecteurs et en
+templates. Deux comportements de règle connaissent Doctrine ; la [FAQ](FAQ.md)
+les nomme.
+
 ## Ce qu'il fait vraiment
 
 **Il bloque.** Un seul moteur de règles, appliqué à l'identique en hooks et en
