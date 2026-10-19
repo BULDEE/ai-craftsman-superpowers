@@ -638,7 +638,9 @@ if [[ $CRITICAL_COUNT -gt 0 ]]; then
             if [[ "$ps_line" == PATTERN:* ]]; then
                 ps_rule=$(echo "$ps_line" | cut -d: -f2)
                 ps_count=$(echo "$ps_line" | cut -d: -f3)
-                pattern_msg="${pattern_msg}PROJECT-WIDE PATTERN: ${ps_rule} found in ${ps_count} - consider a project-wide fix or global craftsman-ignore.\n"
+                ps_way_out=" or global craftsman-ignore"
+                rule_never_ignorable "$ps_rule" && ps_way_out=""
+                pattern_msg="${pattern_msg}PROJECT-WIDE PATTERN: ${ps_rule} found in ${ps_count} - consider a project-wide fix${ps_way_out}.\n"
             elif [[ "$ps_line" == DIR_PATTERN:* ]]; then
                 ps_rule=$(echo "$ps_line" | cut -d: -f2)
                 ps_dir=$(echo "$ps_line" | cut -d: -f3)
@@ -661,10 +663,8 @@ if [[ $CRITICAL_COUNT -gt 0 ]]; then
     echo "Fix these, or scope the rule in $(dirname "$FILE_PATH")/.craft-rules.yml:" >&2
     echo "  rules:" >&2
     echo "    <RULE_ID>: warn" >&2
-    echo "Or silence this one case: // craftsman-ignore: <RULE_ID> (wrong: why the rule is wrong here) or (debt: why the code stays)" >&2
-    if echo -e "$CRITICAL_VIOLATIONS" | grep -q "^SEC"; then
-        echo "A SEC* finding is never silenced by a marker: read the value from the environment or a vault, then rotate it." >&2
-    fi
+    MARKER_ADVICE=$(rule_marker_advice "$(echo -e "$CRITICAL_VIOLATIONS")")
+    echo "$MARKER_ADVICE" >&2
 
     # OKF doctrine pointer (ADR-0024): route the first blocked rule to the
     # concept that explains it - deterministic frontmatter match, no index.
@@ -692,10 +692,11 @@ if [[ $CRITICAL_COUNT -gt 0 ]]; then
     jq -n --arg violations "$(echo -e "$CRITICAL_VIOLATIONS")" \
            --arg count "$CRITICAL_COUNT" \
            --arg patterns "$(echo -e "$pattern_msg")" \
+           --arg advice "$MARKER_ADVICE" \
     '{
         hookSpecificOutput: {
             hookEventName: "PostToolUse",
-            additionalContext: ("BLOCKED: " + $count + " critical violation(s):\n" + $violations + "\nFix these before proceeding. Use // craftsman-ignore: <rule> to suppress if justified." + (if $patterns != "" then "\n" + $patterns else "" end))
+            additionalContext: ("BLOCKED: " + $count + " critical violation(s):\n" + $violations + "\nFix these before proceeding.\n" + $advice + (if $patterns != "" then "\n" + $patterns else "" end))
         }
     }'
     exit 2
@@ -735,9 +736,9 @@ if [[ $WARNING_COUNT -gt 0 ]]; then
     # turn <RULE_ID> into a shell redirect.
     WARNING_ACTIONS="Act on each: fix it, or scope the rule where it does not apply"
     WARNING_ACTIONS="${WARNING_ACTIONS} (in $(dirname "$FILE_PATH")/.craft-rules.yml, under a \"rules:\" key,"
-    WARNING_ACTIONS="${WARNING_ACTIONS} indented two spaces: \"<RULE_ID>: ignore\"),"
-    WARNING_ACTIONS="${WARNING_ACTIONS} or silence this one case with a craftsman-ignore comment naming the rule."
-    WARNING_ACTIONS="${WARNING_ACTIONS} Leaving it unaddressed is the one outcome that teaches nothing."
+    WARNING_ACTIONS="${WARNING_ACTIONS} indented two spaces: \"<RULE_ID>: ignore\")."
+    WARNING_ACTIONS="${WARNING_ACTIONS} $(rule_marker_advice "$(echo -e "$WARNING_VIOLATIONS")" | tr '\n' ' ')"
+    WARNING_ACTIONS="${WARNING_ACTIONS}Leaving it unaddressed is the one outcome that teaches nothing."
 
     jq -n --arg warnings "$(echo -e "$WARNING_VIOLATIONS")" \
            --arg count "$WARNING_COUNT" \

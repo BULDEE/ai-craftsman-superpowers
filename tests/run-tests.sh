@@ -590,6 +590,7 @@ test_security_invariants() {
     log_info "Testing security invariants (functional)"
 
     run_subtest "Security invariant tests pass" "$SCRIPT_DIR/core/test-security-invariants.sh" || true
+    run_subtest "No message offers a marker the rule refuses" "$SCRIPT_DIR/core/test-ignore-advice.sh" || true
 }
 
 # Test: Config resolution (unit tests)

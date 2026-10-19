@@ -196,7 +196,9 @@ if [[ $VIOLATION_COUNT -gt 0 ]]; then
         while IFS= read -r vline; do
             [[ -n "$vline" ]] && echo "  ✗ $vline" >&2
         done <<< "$(echo -e "$VIOLATIONS")"
-        echo "Fix these before writing. Use // craftsman-ignore: <RULE_ID> to suppress." >&2
+        MARKER_ADVICE=$(rule_marker_advice "$(echo -e "$VIOLATIONS")")
+        echo "Fix these before writing." >&2
+        echo "$MARKER_ADVICE" >&2
 
         # Structured JSON on stdout. Exit 2 is the refusal on every host; the
         # deny is stated as well, since a host that reads the JSON before the
@@ -204,12 +206,13 @@ if [[ $VIOLATION_COUNT -gt 0 ]]; then
         # the whole verdict.
         jq -n --arg v "$(echo -e "$VIOLATIONS")" \
                --arg c "$VIOLATION_COUNT" \
+               --arg a "$MARKER_ADVICE" \
         '{
             hookSpecificOutput: {
                 hookEventName: "PreToolUse",
                 permissionDecision: "deny",
-                permissionDecisionReason: ("BLOCKED before write: " + $c + " violation(s):\n" + $v + "\nFix the code before writing."),
-                additionalContext: ("BLOCKED before write: " + $c + " violation(s):\n" + $v + "\nFix the code before writing.")
+                permissionDecisionReason: ("BLOCKED before write: " + $c + " violation(s):\n" + $v + "\nFix the code before writing.\n" + $a),
+                additionalContext: ("BLOCKED before write: " + $c + " violation(s):\n" + $v + "\nFix the code before writing.\n" + $a)
             }
         }'
         exit 2

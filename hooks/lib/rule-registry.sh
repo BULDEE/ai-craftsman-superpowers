@@ -131,6 +131,24 @@ rule_is_known() {
     [[ -n "$(rule_owner "$1")" ]]
 }
 
+# How the rules named in a findings text ("RULE: message" per line) may be
+# silenced, as the manifest says: the marker is offered only to the rules that
+# honour it. A refusal that offered it to SEC001 sent the agent to a way out the
+# gate then refused (CR-230).
+rule_marker_advice() {
+    local rule open="" closed=""
+    for rule in $(printf '%s\n' "$1" | awk -F: '$1 ~ /^[A-Z][A-Z0-9-]*[0-9]$/ { print $1 }' | sort -u); do
+        if rule_never_ignorable "$rule"; then
+            closed="${closed}, ${rule}"
+            continue
+        fi
+        open="${open}, ${rule}"
+    done
+    [[ -n "$open" ]] && printf 'Or silence one case of %s: // craftsman-ignore: <RULE_ID> (wrong: why the rule is wrong here) or (debt: why the code stays)\n' "${open#, }"
+    [[ -n "$closed" ]] && printf 'No marker silences %s: fix the code.\n' "${closed#, }"
+    return 0
+}
+
 # Every registered rule id. Callers that need to walk the doctrine should use
 # this rather than reading the TSV, which also carries the group marker rows and
 # is only built once _rule_registry_ready has run.

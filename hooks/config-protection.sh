@@ -194,15 +194,15 @@ done <<< "$FILE_PATHS"
 BASENAME="$PROTECTED"
 
 echo "🚫 BLOCKED by AI Craftsman - config-protection: ${BASENAME} is a quality-gate config file." >&2
-echo "Fix the flagged code instead of relaxing the rule, or use // craftsman-ignore: <RULE_ID> for a justified exception." >&2
+echo "Fix the flagged code instead of relaxing the rule, or, where the rule allows it, use // craftsman-ignore: <RULE_ID> for a justified exception." >&2
 echo "If this config change is genuinely intended, ask the user to make it directly." >&2
 
 jq -n --arg file "$BASENAME" '{
     hookSpecificOutput: {
         hookEventName: "PreToolUse",
         permissionDecision: "deny",
-        permissionDecisionReason: ($file + " is a quality-gate config file. Fix the underlying code instead of weakening the rule. Use // craftsman-ignore: <RULE_ID> for a justified single-file exception, or ask the user to change this config directly."),
-        additionalContext: ("BLOCKED: " + $file + " is a quality-gate config file. Fix the underlying code instead of weakening the rule. Use // craftsman-ignore: <RULE_ID> for a justified single-file exception, or ask the user to change this config directly.")
+        permissionDecisionReason: ($file + " is a quality-gate config file. Fix the underlying code instead of weakening the rule. Where the rule allows it, use // craftsman-ignore: <RULE_ID> for a justified single-file exception, or ask the user to change this config directly."),
+        additionalContext: ("BLOCKED: " + $file + " is a quality-gate config file. Fix the underlying code instead of weakening the rule. Where the rule allows it, use // craftsman-ignore: <RULE_ID> for a justified single-file exception, or ask the user to change this config directly.")
     }
 }'
 exit 2
