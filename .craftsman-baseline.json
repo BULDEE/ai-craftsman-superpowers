@@ -57,7 +57,7 @@
 {"complexity":12,"ignores":0,"instrument":3,"max_fn_lines":29,"path":"hooks/lib/healthcheck.sh","reason":"4.12.2 integration: a pre-v4 config is a warning with its migration, an invalid v4 config an error"},
 {"complexity":3,"ignores":0,"instrument":3,"max_fn_lines":17,"path":"hooks/lib/hook-events.sh"},
 {"complexity":5,"ignores":0,"instrument":3,"max_fn_lines":22,"path":"hooks/lib/hook-profile.sh"},
-{"complexity":8,"ignores":0,"instrument":3,"max_fn_lines":11,"path":"hooks/lib/host.sh","reason":"what a Codex session measured on this plugin (2026-09-20): model without prompt_id names Codex, CODEX_THREAD_ID names it in a shell, the bridge row is per host, the rules store honours TMPDIR, each with its witness"},
+{"complexity":8,"ignores":0,"instrument":3,"max_fn_lines":13,"path":"hooks/lib/host.sh","reason":"CR-291: Claude Code's interactive SessionStart (model, scratchpad_dir, no permission_mode) is no longer read as Codex; two lines in _host_from_payload"},
 {"complexity":6,"ignores":0,"instrument":3,"max_fn_lines":25,"path":"hooks/lib/hotspot_analysis.py"},
 {"complexity":3,"ignores":0,"instrument":3,"max_fn_lines":25,"path":"hooks/lib/instinct_skills.py"},
 {"complexity":4,"ignores":0,"instrument":3,"max_fn_lines":27,"path":"hooks/lib/instincts.py","reason":"independent verification 2026-09-15 (Codex + Grok on d08e0ec): symlinked parents refused, compound commands unknown, landed patches listed without re-applying, host hook wiring is gate machinery, unreadable verdicts unavailable, registry cache never poisoned, Copilot data dir of its own"},

@@ -33,6 +33,15 @@
 # and a host may grow a `model` field between two releases, which a
 # `model`-first rule would read as a change of host.
 #
+# `model` alone was wrong on one event. Claude Code's interactive SessionStart
+# carries `model` and no `prompt_id` (captured on 2.1.304, fixture
+# claude-code/2.1.304/session-start.interactive.json; the hooks reference:
+# "Only SessionStart hooks can receive a model field"), so every new
+# interactive session was filed as Codex: its binding went under ~/.codex
+# and the cockpit mod could not find the helper (CR-291). Codex's
+# SessionStart carries `permission_mode` (both 0.154.0 captures), Claude
+# Code's does not; and `scratchpad_dir` is Claude Code's own field.
+#
 # An adapter that translated the payload names the host itself
 # (adapters/copilot/translate.py). Grok 1.0.30 (captured) sends every key in
 # both cases plus `workspaceRoot` and a lowercase `hookEventName`; it also
@@ -44,8 +53,10 @@ _host_from_payload() {
         if (.craftsman_host // "") != "" then .craftsman_host
         elif has("workspaceRoot") and has("hookEventName") then "grok"
         elif has("timestamp") and (has("toolName") or has("tool_name") or has("sessionId")) then "copilot"
+        elif has("scratchpad_dir") then "claude-code"
         elif .tool_name == "apply_patch" then "codex"
-        elif has("model") and (has("prompt_id") | not) then "codex"
+        elif has("model") and (has("prompt_id") | not)
+            and (.hook_event_name != "SessionStart" or has("permission_mode")) then "codex"
         elif has("prompt_id") or (.transcript_path | type) == "string" then "claude-code"
         elif has("transcript_path") and .transcript_path == null then "codex"
         else "" end' 2>/dev/null
