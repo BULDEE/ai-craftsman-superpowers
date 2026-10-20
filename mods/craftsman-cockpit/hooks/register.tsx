@@ -14,7 +14,7 @@ const preview = atom({ plugin: 'craftsman-cockpit', key: 'preview' } as const, 0
 
 type Helper = { argv0: string; env: Record<string, string> }
 type Located = { helper: Helper } | { tried: string[] }
-type Answer = { ran: ProcessRunResult } | { missing: string[] } | { error: string }
+type Answer = { ran: ProcessRunResult; argv0: string } | { missing: string[] } | { error: string }
 
 // The order ADR-0031 fixes: the option, the session binding the craftsman
 // hooks write, the repository layout this mod ships in, then PATH. Each place
@@ -73,7 +73,7 @@ async function helper($: EngineInterface, options: PluginOptions, args: string[]
   if ('tried' in located) return { missing: located.tried }
   const ran = await $.process.run([located.helper.argv0, 'instincts', ...args], { env: located.helper.env })
 
-  return { ran }
+  return { ran, argv0: located.helper.argv0 }
 }
 
 async function refresh($: EngineInterface, options: PluginOptions, notice: string): Promise<void> {
@@ -89,7 +89,7 @@ function toView(answer: Answer, notice: string): CockpitView {
   const { exitCode, stdout, stderr } = answer.ran
   const queue = exitCode === 0 ? parseQueue(stdout) : undefined
   return queue === undefined
-    ? { kind: 'failed', message: firstLine(stderr) || `instincts review exited ${exitCode}` }
+    ? { kind: 'failed', message: `${answer.argv0}: ${firstLine(stderr) || `instincts review exited ${exitCode}`}` }
     : { kind: 'ready', queue, notice }
 }
 
@@ -122,7 +122,7 @@ async function decide($: EngineInterface, { options, verb: decision, candidate }
       ? `${decision} ${candidate.rule}: craftsman-helper not found`
       : answer.ran.exitCode === 0
         ? firstLine(answer.ran.stdout)
-        : `${decision} ${candidate.rule} failed: ${firstLine(answer.ran.stderr)}`
+        : `${decision} ${candidate.rule} failed (${answer.argv0}): ${firstLine(answer.ran.stderr)}`
   await refresh($, options, notice)
 }
 

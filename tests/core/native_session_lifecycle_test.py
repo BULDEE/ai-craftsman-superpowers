@@ -223,6 +223,31 @@ class NativeSessionLifecycleTest(unittest.TestCase):
         self.assertEqual(json.loads((self.native / 'session-state-child.json').read_text())['tool_failure_count'], 1)
         self.assertEqual(list(self.parent.iterdir()), [])
 
+    def test_hook_rebinds_the_session_when_the_running_plugin_root_changes(self):
+        # A plugin update inside a session (4.12.3 to 4.13.1, measured 2026-10-20):
+        # SessionStart bound the root that ran then, every later hook runs from
+        # the new root, and the cockpit mod trusts the binding first to find
+        # bin/craftsman-helper. A stale root is a helper that does not speak the
+        # mod's protocol, so the binding follows the hooks that actually run.
+        self.select_host('claude-code')
+        stale = self.root / 'stale-plugin'
+        stale.mkdir()
+        subprocess.run(['python3', str(self.plugin / 'hooks/lib/runtime_paths.py'), 'bind',
+                        self.host, 'child', str(stale), str(self.native)],
+                       env=self.env, check=True, capture_output=True)
+        result = self.run_hook('pre-compact-save.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        binding = json.loads(self.binding().read_text())
+        self.assertEqual(binding['root'], str(self.plugin))
+        self.assertEqual(binding['data'], str(self.native))
+
+    def test_hook_without_a_binding_never_writes_one(self):
+        # Re-binding is for drift only: SessionStart owns the first binding.
+        self.select_host('claude-code')
+        result = self.run_hook('pre-compact-save.sh')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(self.binding().exists())
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -31,10 +31,12 @@ const OPEN = {
 } as const
 
 type Call = { argv: readonly string[]; init?: ProcessRunInit }
+// What a helper answers instead of the queue: how a stale one fails.
+type Reply = (argv: readonly string[]) => { exitCode: number; stdout: string; stderr: string }
 
 // The engine beneath the mod: a host where the craftsman hooks bound this
 // session, and a helper that answers the review queue and records each argv.
-function host(on: On, files: Record<string, string>, queue: typeof QUEUE = QUEUE): Call[] {
+function host(on: On, files: Record<string, string>, queue: typeof QUEUE = QUEUE, reply?: Reply): Call[] {
   const calls: Call[] = []
   on('env.get', ($, e) => ({ value: e.name === 'HOME' ? HOME : undefined }))
   on('session.id', () => ({ value: SESSION }))
@@ -46,7 +48,7 @@ function host(on: On, files: Record<string, string>, queue: typeof QUEUE = QUEUE
     calls.push({ argv: e.argv, init: e.init })
     if (e.argv[0] !== HELPER) throw new Error('not found')
     const stdout = e.argv[2] === 'review' ? JSON.stringify(queue) : `${e.argv[2]}: #${e.argv[3]}`
-    return { value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    return { value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false, ...reply?.(e.argv) } }
   })
   return calls
 }
@@ -144,4 +146,18 @@ test('every candidate is drawn with its buttons, whatever the viewport says', as
     expect(await ui.find({ type: 'Text', text: /below the fold/ })).toBeUndefined()
     await ui.unmount()
   }
+})
+
+// A helper that does not speak the protocol: the session binding named a
+// plugin root the hooks no longer run from (4.12.3 after an update to 4.13.1,
+// measured 2026-10-20), and that helper printed a usage text. The pane names
+// the helper it ran, so the stale path is read in the pane and not guessed.
+test('a failed review names the helper that was run', async ($, on) => {
+  host(on, BOUND, QUEUE, () => ({ exitCode: 1, stdout: '', stderr: 'Instinct pipeline (ADR-0020): corrections -> candidates\nUsage: instincts.py' }))
+  await $.command.run(OPEN)
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  const failed = await ui.find({ type: 'Text', text: /instincts review failed/ })
+  expect(failed?.text).toContain('/opt/craftsman/bin/craftsman-helper')
+  expect(failed?.text).toContain('Instinct pipeline (ADR-0020)')
+  await ui.unmount()
 })
