@@ -119,12 +119,15 @@ whose names start with `agent-` are shell scripts that shell out to a headless
 | `CRAFTSMAN_VERIFY_MODEL` | The model the headless verification calls through `claude -p` |
 | `CRAFTSMAN_VERIFY_MODEL_CODEX` | The model handed to `codex exec` for a semantic review; unset, Codex's default applies |
 
-The shell helper also maintains three internal, non-exported variables:
+The shell helper also maintains four internal, non-exported variables:
 `_CRAFTSMAN_SESSION_DATA_DIR` caches the resolved session store,
 `_CRAFTSMAN_CACHE_DIR` caches the store or the host-local mechanical cache,
-and `_CRAFTSMAN_SESSION_FILES_LOADED` prevents repeated library initialization.
-They are process-local implementation state, not configuration switches. A new
-payload binding refreshes both directories; an unavailable store stays empty.
+`_CRAFTSMAN_BOUND_ROOT` holds the plugin root the session binding names, so a
+hook that runs from another root (a plugin update inside the session)
+re-registers the binding, and `_CRAFTSMAN_SESSION_FILES_LOADED` prevents
+repeated library initialization. They are process-local implementation state,
+not configuration switches. A new payload binding refreshes both directories;
+an unavailable store stays empty.
 
 ## Optional Features
 
