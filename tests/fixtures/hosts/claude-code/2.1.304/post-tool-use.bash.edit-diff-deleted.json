@@ -1,0 +1,52 @@
+{
+  "session_id": "8b51cb23-c543-447c-b9b9-5667857fecb9",
+  "transcript_path": "__HOME__/.claude/projects/__WORKSPACE_SLUG__/8b51cb23-c543-447c-b9b9-5667857fecb9.jsonl",
+  "cwd": "__WORKSPACE__",
+  "prompt_id": "9701353c-c4b1-4c5b-8202-6894e7f20fb5",
+  "permission_mode": "bypassPermissions",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "rm src/Domain/Order.php",
+    "description": "Delete src/Domain/Order.php"
+  },
+  "tool_response": {
+    "stdout": "",
+    "stderr": "",
+    "interrupted": false,
+    "isImage": false,
+    "noOutputExpected": true,
+    "bashEditDiff": {
+      "files": [
+        {
+          "filePath": "__WORKSPACE__/src/Domain/Order.php",
+          "hunks": [
+            {
+              "oldStart": 1,
+              "oldLines": 5,
+              "newStart": 0,
+              "newLines": 0,
+              "lines": [
+                "-<?php",
+                "-class Invoice",
+                "-{",
+                "-    public function setStatus(string $s): void {}",
+                "-}"
+              ]
+            }
+          ],
+          "deleted": true
+        }
+      ],
+      "moreFiles": 0,
+      "changedFiles": [
+        "__WORKSPACE__/src/Domain/Order.php"
+      ]
+    }
+  },
+  "tool_use_id": "toolu_01JDTZSHei3FH8RuvSLMtjm3",
+  "duration_ms": 335
+}

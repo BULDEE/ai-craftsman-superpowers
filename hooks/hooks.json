@@ -60,6 +60,16 @@
         ]
       },
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-write-check.sh\"",
+            "statusMessage": "Craftsman: validating the files the command changed"
+          }
+        ]
+      },
+      {
         "matcher": "Bash|TaskOutput|run_terminal_command",
         "hooks": [
           {
