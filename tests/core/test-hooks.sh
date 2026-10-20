@@ -917,7 +917,7 @@ if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 bash_entry = d['hooks']['PreToolUse'][1]
-handler = bash_entry['hooks'][0]
+handler = next(h for h in bash_entry['hooks'] if 'pre-push-verify.sh' in h['command'])
 assert handler.get('if') is not None, 'Expected if field on the Bash PreToolUse handler'
 assert 'git push' in handler['if'], f'Expected git push in if, got: {handler[\"if\"]}'
 " 2>/dev/null; then

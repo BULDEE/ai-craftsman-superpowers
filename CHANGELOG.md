@@ -27,6 +27,19 @@ SEC001 is never ignorable: move the value to the environment and rotate it.
   keys stay silent. An env read on the line no longer hides an issued key:
   `process.env.KEY ?? "sk-ant-..."` ships the key. This reverses the CR-231
   choice to leave secrets out of JavaScript (CR-257).
+- The agent can no longer switch the project's git hooks off. A new
+  PreToolUse hook, `git-bypass-guard.sh`, refuses `--no-verify` on any git
+  subcommand, `git commit -n`, `-c core.hooksPath=...`, `git config
+  core.hooksPath <dir>`, `HUSKY=0`, `SKIP=...`, `LEFTHOOK=0`, and a `git
+  stash` run in the same command as a commit, with the reason. A model has
+  been seen committing six times in a row with `--no-verify` and `git stash`
+  against rules forbidding it (anthropics/claude-code #40117): a rule the
+  model reads is advice, a refusal is not. The command is read token by
+  token, so `--no-verify` quoted in a commit message passes. It runs on the
+  git subcommands Claude Code's `if` filter sees, which is best effort
+  (`env git ...` and `sh -c` are not seen), and fails closed. The user keeps
+  the choice: run the command themselves, or set `hooks.disabled:
+  git-bypass-guard` (CR-258).
 - Files a Bash command changed are reviewed. Claude Code 2.1.269+ lists them
   in `tool_response.bashEditDiff`; `post-write-check.sh` now runs after every
   Bash call and judges each listed file as a Write, under its own path. A

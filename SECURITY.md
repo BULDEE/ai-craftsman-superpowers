@@ -33,7 +33,7 @@ than inheriting the full tool pool:
 - ✅ Follow domain-specific best practices
 - ✅ Operate within Claude Code's permission system
 
-### Hooks (17 scripts, 12 events)
+### Hooks (18 scripts, 12 events)
 
 Every hook is a `command` hook: a shell script this repository ships. There
 are no native `agent` or `prompt` hooks (see
@@ -47,6 +47,7 @@ whose names start with `agent-` are shell scripts that shell out to a headless
 | `config-protection.sh` | PreToolUse | Refuses writes to tool configs and to the gate's machinery (Claude Code settings, the installed plugin); hands the gate's own `.craft-*` files to the user's permission prompt | None |
 | `pre-write-check.sh` | PreToolUse | The would-be file judged by the pack validators on a mirror under `$TMPDIR`, removed on exit | Rewrites the pending content (see below) |
 | `pre-push-verify.sh` | PreToolUse | Warns on `git push` from a session that never ran `/craftsman:verify`; the push is allowed | None |
+| `git-bypass-guard.sh` | PreToolUse | Refuses a git command that switches the project's hooks off (`--no-verify`, `commit -n`, `core.hooksPath`, `HUSKY=0`, `SKIP=`, `LEFTHOOK=0`, `git stash` with a commit); runs only on git subcommands the `if` filter sees, fails closed | None |
 | `post-write-check.sh` | PostToolUse | Rule enforcement after write, and on the files a Bash command changed when Claude Code lists them (`bashEditDiff`) | Metrics DB |
 | `agent-ddd-verifier.sh` | PostToolUse | Semantic architecture check | Metrics DB |
 | `post-bash-test-verify.sh` | PostToolUse | Reads test results off a Bash run | Session state |
