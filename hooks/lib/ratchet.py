@@ -3,13 +3,15 @@
 
 Usage:
   ratchet.py measure <file>
-  ratchet.py check <file> [--baseline FILE]
+  ratchet.py check <file> [--baseline FILE] [--tight]
   ratchet.py update <file> [--baseline FILE]
   ratchet.py init [paths...] [--baseline FILE]
 
 Debt can tighten (metrics improve) but never loosen: `check` exits 1 when a
 touched file regresses against its committed high-water mark, and `update`
-only ever writes lower values.
+only ever writes lower values. `check --tight` also exits 1 when the mark is
+looser than the file, so a pipeline can require the tightened mark to be
+committed rather than trust a hook that only runs after a Write or Edit.
 
 `complexity` counts decision points (branch keywords, boolean operators,
 ternaries) inside the WORST function span of the file, so extracting a method
@@ -41,7 +43,14 @@ MAX_SOURCE_BYTES = 2 * 1024 * 1024
 # The baseline is repo-supplied too, and it is parsed on every write.
 MAX_BASELINE_BYTES = 8 * 1024 * 1024
 BASELINE_NAME = ".craftsman-baseline.json"
-RATCHETED_METRICS = ["complexity", "file_lines", "max_fn_lines", "fan_out", "ignores"]
+RATCHETED_METRICS = ["complexity", "max_fn_lines", "ignores"]
+
+# Measured by `measure`, never recorded in a mark (CR-288). On this repository
+# 270 of 473 budget raises moved file_lines alone, and only 15% touched a
+# function-level metric of production code: a file that grows with a feature
+# is not debt, and LOC001, the rule that owns file length, is advisory for
+# good. A row from an older baseline loses them on its next update.
+RETIRED_METRICS = ("file_lines", "fan_out")
 
 # The version of the ruler, written into every mark it takes.
 #
@@ -58,7 +67,11 @@ RATCHETED_METRICS = ["complexity", "file_lines", "max_fn_lines", "fan_out", "ign
 # next touch, the way a file with no mark is, and `check` says so on stderr
 # rather than judging the present with a ruler that no longer exists. ADR-0025
 # left versioning unaddressed; this is the case that required it.
-RATCHET_INSTRUMENT = 2
+#
+# Instrument 3 (CR-288) finds a body whose brace opens on the line after the
+# header (PSR-12 methods) or after a signature over several lines; instrument
+# 2 closed such a function on its brace and measured complexity 0.
+RATCHET_INSTRUMENT = 3
 
 
 def _mark_is_current(entry) -> bool:
@@ -366,11 +379,33 @@ def _body_end(lines, start: int, limit: int) -> int:
     on the first line indented no deeper than the header. Anything unresolved
     falls back to the old bound, so this can only narrow a span, never widen it.
     """
-    header = lines[start]
-    depth = header.count("{") - header.count("}")
-    if depth > 0:
-        return _brace_end(lines, start, limit, depth)
-    return _indent_end(lines, start, limit)
+    opening, signature_end = _body_opening(lines, start, limit)
+    if opening is not None:
+        depth = sum(line.count("{") - line.count("}") for line in lines[start:opening + 1])
+        return _brace_end(lines, opening, limit, depth)
+    return _indent_end(lines, start, limit, signature_end)
+
+
+# Where the body opens: the line whose `{` is not closed on it, found on the
+# header, after a signature whose parentheses run over several lines, or alone
+# on the line after it. PSR-12 puts a method's brace on its own line, and a
+# finder that looked at the header only fell back to indentation and closed
+# the method on that brace: every PSR-12 method measured complexity 0 over one
+# line (CR-288). With no brace, the signature's last line is returned so the
+# indentation scan starts past it, not on a continuation line.
+def _body_opening(lines, start: int, limit: int):
+    parens = 0
+    for index in range(start, limit):
+        line = lines[index]
+        parens += line.count("(") - line.count(")")
+        if line.count("{") > line.count("}"):
+            return index, index
+        if parens <= 0:
+            following = index + 1
+            if following < limit and lines[following].lstrip().startswith("{"):
+                return following, index
+            return None, index
+    return None, start
 
 
 def _brace_end(lines, start: int, limit: int, depth: int) -> int:
@@ -381,9 +416,9 @@ def _brace_end(lines, start: int, limit: int, depth: int) -> int:
     return limit
 
 
-def _indent_end(lines, start: int, limit: int) -> int:
+def _indent_end(lines, start: int, limit: int, signature_end: int) -> int:
     base = _indent_of(lines[start])
-    for index in range(start + 1, limit):
+    for index in range(signature_end + 1, limit):
         line = lines[index]
         if not line.strip() or line.lstrip().startswith("#"):
             continue
@@ -409,7 +444,8 @@ def _decision_points(lines) -> int:
 
 
 def measure(path: Path) -> dict:
-    """Structural fingerprint of one file: the five ratcheted metrics.
+    """Structural fingerprint of one file: the ratcheted metrics, plus
+    file_lines and fan_out for whoever reads `measure` (no mark records them).
 
     Four of the five are measured on the source with comments and string
     literals blanked, so a rename or a reworded message cannot move them.
@@ -614,7 +650,7 @@ def _current_entry(file_path: Path):
     relative = _relative(file_path)
     if relative is None:
         return None
-    entry = measure(file_path)
+    entry = {key: value for key, value in measure(file_path).items() if key not in RETIRED_METRICS}
     entry["path"] = relative
     entry["instrument"] = RATCHET_INSTRUMENT
     return entry
@@ -738,9 +774,22 @@ def _mark_to_check_against(entries: dict, current: dict, baseline_file: Path):
         if known is not None:
             save_baseline(baseline_file, entries)
     if known is None:
-        entries[current["path"]] = current
+        entries[current["path"]] = _retaken(entries.get(current["path"]), current)
         save_baseline(baseline_file, entries)
     return known
+
+
+# A new ruler re-takes the numbers, never the rest of the row. Replacing the
+# whole row dropped its reason and the rule baseline's `rules` counts, which
+# share it: an instrument bump made every inherited rule finding block again.
+def _retaken(previous, current: dict) -> dict:
+    kept = {}
+    if isinstance(previous, dict):
+        kept = {
+            key: value for key, value in previous.items()
+            if key not in RATCHETED_METRICS and key not in RETIRED_METRICS
+        }
+    return {**kept, **current}
 
 
 def _cmd_check(args) -> int:
@@ -756,7 +805,7 @@ def _cmd_check(args) -> int:
         return 0
     known = _mark_to_check_against(entries, current, baseline_file)
     if known is None:
-        return 0
+        return _unmarked(current["path"]) if "--tight" in args else 0
     regressions = [
         (name, known[name], current[name])
         for name in RATCHETED_METRICS
@@ -764,7 +813,29 @@ def _cmd_check(args) -> int:
     ]
     for name, mark, value in regressions:
         print(f"RATCHET001 {name} {mark} -> {value}")
-    return 1 if regressions else 0
+    slack = _slack(known, current) if "--tight" in args else []
+    for name, mark, value in slack:
+        print(f"slack {name} {mark} -> {value}: run python3 hooks/lib/ratchet.py update {current['path']}")
+    return 1 if regressions or slack else 0
+
+
+# Born clean is right for the hook, which writes the row it just took. A
+# pipeline reads a checkout: the row it writes there is never committed, so
+# the file stays unmarked on main and every later pull request is born clean
+# again.
+def _unmarked(path: str) -> int:
+    print(f"unmarked {path}: run python3 hooks/lib/ratchet.py check {path} and commit .craftsman-baseline.json")
+    return 1
+
+
+# A mark looser than the file it measures: the improvement happened, the mark
+# never heard of it, and the file can grow back to the old number unseen.
+def _slack(known: dict, current: dict) -> list:
+    return [
+        (name, known[name], current[name])
+        for name in RATCHETED_METRICS
+        if name in known and known[name] > current[name]
+    ]
 
 
 # The tightened row. A mark from an older instrument is replaced, never
@@ -776,8 +847,8 @@ def _cmd_check(args) -> int:
 # added by someone else must not need an edit here to survive.
 def _tightened(known: dict, current: dict) -> dict:
     if not _mark_is_current(known):
-        known = current
-    tightened = {key: value for key, value in known.items() if key != "path"}
+        return _retaken(known, current)
+    tightened = {key: value for key, value in known.items() if key != "path" and key not in RETIRED_METRICS}
     tightened["path"] = current["path"]
     tightened["instrument"] = RATCHET_INSTRUMENT
     for name in RATCHETED_METRICS:
@@ -857,7 +928,7 @@ def _photograph_into(entries: dict, roots: list, reason: str) -> int:
         previous = entries.get(entry["path"])
         if isinstance(previous, dict):
             for key, value in previous.items():
-                if key not in entry and key != "path":
+                if key not in entry and key != "path" and key not in RETIRED_METRICS:
                     entry[key] = value
         entries[entry["path"]] = entry
         written += 1

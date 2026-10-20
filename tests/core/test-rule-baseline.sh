@@ -978,8 +978,9 @@ paid_recorded() {
     ( cd "$PAID" && python3 "$ROOT_DIR/hooks/lib/rule_baseline.py" get "src/Domain/Paid.php" "$1" 2>/dev/null )
 }
 # Eight lines at the mark, so the fix below (which adds the declaration the
-# mark lacked) does not grow the file: the structural ratchet refuses a longer
-# file, and a refused write is not the green pass this scenario is about.
+# mark lacked) does not grow the file. The ratchet refused a longer file until
+# CR-288 retired file_lines; a refused write is not the green pass this
+# scenario is about, so the fixture keeps the margin.
 cat > "$PAID/src/Domain/Paid.php" <<'PHP'
 <?php
 
@@ -1054,17 +1055,24 @@ fi
 # judged against the mark the file had.
 ( cd "$PAID" && git add -A && git -c user.email=t@t -c user.name=t commit -qm m && git mv src/Domain/Paid.php src/Domain/Moved.php ) >/dev/null 2>&1
 # Clean on every rule, so the only finding is the structural one: a blocking
-# PHP001 would own the message and hide the warning this assertion reads.
+# PHP001 would own the message and hide the warning this assertion reads. The
+# regression is a function that gained branches: file length alone is no
+# longer ratcheted (CR-288).
 cat > "$PAID/src/Domain/Moved.php" <<'PHP'
 <?php
 declare(strict_types=1);
 namespace App\Domain;
 final class Moved {
-    public function total(int $amount): int { return $amount * 2; }
-    public function twice(int $amount): int { return $amount * 4; }
-    public function thrice(int $amount): int { return $amount * 6; }
-    public function again(int $amount): int { return $amount * 8; }
-    public function more(int $amount): int { return $amount * 10; }
+    public function total(int $amount): int
+    {
+        if ($amount > 100) {
+            return $amount * 3;
+        }
+        if ($amount > 10) {
+            return $amount * 2;
+        }
+        return $amount;
+    }
 }
 PHP
 moved_out="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"cwd":"%s"}' \

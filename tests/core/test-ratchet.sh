@@ -9,6 +9,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$SCRIPT_DIR/../lib/test-helpers.sh"
 
 RATCHET="$ROOT_DIR/hooks/lib/ratchet.py"
+INSTRUMENT=$(grep -oE '^RATCHET_INSTRUMENT = [0-9]+' "$RATCHET" | grep -oE '[0-9]+$')
 WORK="/tmp/craftsman-ratchet-test-$$"
 mkdir -p "$WORK"
 
@@ -719,7 +720,7 @@ remarked=$( cd "$INSTR" && python3 -c "
 import json
 entry = json.load(open('.craftsman-baseline.json'))[0]
 print('%s %s' % (entry.get('instrument'), entry.get('complexity')))")
-if [[ "$remarked" == "2 2" ]]; then
+if [[ "$remarked" == "$INSTRUMENT 2" ]]; then
     log_pass "the re-taken mark carries the current instrument and the current number"
 else
     log_fail "the re-taken mark carries the current instrument and the current number" "got '$remarked'"
@@ -754,7 +755,7 @@ updated=$( cd "$INSTR" && python3 -c "
 import json
 entry = json.load(open('.craftsman-baseline.json'))[0]
 print('%s %s' % (entry.get('instrument'), entry.get('complexity')))")
-if [[ "$updated" == "2 3" ]]; then
+if [[ "$updated" == "$INSTRUMENT 3" ]]; then
     log_pass "update replaces an older mark instead of taking min() across instruments"
 else
     log_fail "update replaces an older mark instead of taking min() across instruments" "got '$updated'"
@@ -791,5 +792,259 @@ else
     log_fail "the ratchet is anchored on the file, not on the shell's directory" "exit=$SUB_EXIT out=$(echo "$SUB_OUT" | tr '\n' ' ' | cut -c1-120)"
 fi
 rm -rf "$INERT"
+
+echo ""
+echo "=== CR-288: a body whose brace opens on its own line is measured ==="
+# PSR-12 puts a method's opening brace on its own line. The span finder only
+# looked for `{` on the header, fell back to indentation, and closed the
+# function on that brace, at the same indent: every PSR-12 method measured
+# complexity 0 and max_fn_lines 1, so the ratchet saw nothing in the PHP it
+# was built for, and file_lines was the only number that ever moved.
+SPAN=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-ratchet-span.XXXXXX")
+cat > "$SPAN/Psr12.php" <<'PHP'
+<?php
+final class Invoice
+{
+    public function total(int $amount): int
+    {
+        if ($amount > 100) {
+            return $amount * 3;
+        }
+        if ($amount > 10) {
+            return $amount * 2;
+        }
+        return $amount;
+    }
+}
+PHP
+cat > "$SPAN/Multi.php" <<'PHP'
+<?php
+final class Order
+{
+    public function ship(
+        int $quantity,
+        string $carrier,
+    ): string {
+        if ($quantity > 0 && $carrier !== '') {
+            return $carrier;
+        }
+        return 'none';
+    }
+}
+PHP
+cat > "$SPAN/indent.py" <<'PY'
+def ship(
+    quantity,
+    carrier,
+):
+    labels = {
+        "fast": 1,
+    }
+    if quantity and carrier:
+        return labels
+    return None
+PY
+measure_of() { python3 "$RATCHET" measure "$SPAN/$1" | jq -c '{complexity, max_fn_lines}'; }
+PSR=$(measure_of Psr12.php)
+if [[ "$PSR" == '{"complexity":2,"max_fn_lines":10}' ]]; then
+    log_pass "a PSR-12 method (brace on its own line) is measured: $PSR"
+else
+    log_fail "PSR-12 method span" "got $PSR, want complexity 2 over 10 lines"
+fi
+MULTI=$(measure_of Multi.php)
+if [[ "$MULTI" == '{"complexity":2,"max_fn_lines":9}' ]]; then
+    log_pass "a signature over several lines is measured to its closing brace: $MULTI"
+else
+    log_fail "multi-line signature span" "got $MULTI"
+fi
+INDENT=$(measure_of indent.py)
+if [[ "$INDENT" == '{"complexity":1,"max_fn_lines":11}' ]]; then
+    log_pass "an indented body after a signature over several lines is measured, a dict literal is not a brace body: $INDENT"
+else
+    log_fail "indentation body after a multi-line signature" "got $INDENT"
+fi
+cat > "$SPAN/aligned.py" <<'PY'
+def ship(quantity,
+         carrier):
+    if quantity:
+        return carrier
+    return None
+PY
+ALIGNED=$(measure_of aligned.py)
+if [[ "$ALIGNED" == '{"complexity":1,"max_fn_lines":6}' ]]; then
+    log_pass "continuation lines aligned on the parenthesis do not end the body: $ALIGNED"
+else
+    log_fail "aligned continuation" "got $ALIGNED"
+fi
+cat > "$SPAN/oneliner.php" <<'PHP'
+<?php
+final class Line
+{
+    public function total(int $amount): int { return $amount * 2; }
+    public function half(int $amount): int { return $amount > 1 ? intdiv($amount, 2) : 0; }
+}
+PHP
+ONE=$(measure_of oneliner.php)
+if [[ "$ONE" == '{"complexity":1,"max_fn_lines":1}' ]]; then
+    log_pass "control: one-line methods keep their one-line span: $ONE"
+else
+    log_fail "one-line methods" "got $ONE"
+fi
+rm -rf "$SPAN"
+
+echo ""
+echo "=== CR-288: the gate holds function-level debt, CI sees slack ==="
+# Measured 2026-10-20 on this repository: 473 budget raises in 116 commits,
+# 270 of them on file_lines alone, 15% on a function-level metric of
+# production code. A file that grows with a feature is not debt (LOC001, the
+# rule that owns file length, is advisory permanently), so file_lines and
+# fan_out leave the mark. And the mark only tightened after a Write or Edit
+# through the local hook: 13 rows were looser than their file, one by 212
+# lines, which `check --tight` now refuses in the repository's own CI.
+SIG=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-ratchet-signal.XXXXXX")
+mkdir -p "$SIG/src"
+( cd "$SIG" && git init -q )
+cat > "$SIG/src/order.php" <<'PHP'
+<?php
+final class Order {
+    public function total(int $count): int {
+        if ($count > 0) { return $count; }
+        return 0;
+    }
+}
+PHP
+( cd "$SIG" && python3 "$RATCHET" init src >/dev/null )
+ROW=$(grep '"src/order.php"' "$SIG/.craftsman-baseline.json" | sed 's/,$//')
+if [[ -n "$ROW" ]] && echo "$ROW" | jq -e 'has("file_lines") or has("fan_out") | not' >/dev/null 2>&1 \
+    && echo "$ROW" | jq -e 'has("complexity") and has("max_fn_lines") and has("ignores")' >/dev/null 2>&1; then
+    log_pass "a mark records complexity, max_fn_lines and ignores, not file_lines or fan_out"
+else
+    log_fail "the mark still records file size" "$ROW"
+fi
+
+cat > "$SIG/src/order.php" <<'PHP'
+<?php
+use App\Domain\Invoice;
+use App\Domain\Customer;
+final class Order {
+    public function total(int $count): int {
+        if ($count > 0) { return $count; }
+        return 0;
+    }
+    public function lines(): array { return []; }
+    public function customer(): string { return 'c'; }
+}
+PHP
+EXIT_CODE=0
+OUT=$( cd "$SIG" && python3 "$RATCHET" check src/order.php ) || EXIT_CODE=$?
+if [[ $EXIT_CODE -eq 0 && -z "$OUT" ]]; then
+    log_pass "a file that only grew (more lines, more imports) passes check"
+else
+    log_fail "file growth still fails the ratchet" "exit=$EXIT_CODE out=$OUT"
+fi
+
+cat > "$SIG/src/order.php" <<'PHP'
+<?php
+final class Order {
+    public function total(int $count): int {
+        if ($count > 0) { return $count; }
+        if ($count < -10) { return -1; }
+        return 0;
+    }
+}
+PHP
+EXIT_CODE=0
+OUT=$( cd "$SIG" && python3 "$RATCHET" check src/order.php ) || EXIT_CODE=$?
+if [[ $EXIT_CODE -eq 1 ]] && echo "$OUT" | grep -q "RATCHET001 complexity" && echo "$OUT" | grep -q "RATCHET001 max_fn_lines"; then
+    log_pass "control: a function that grew still fails check"
+else
+    log_fail "function-level regression no longer caught" "exit=$EXIT_CODE out=$OUT"
+fi
+
+printf '[\n{"complexity":1,"fan_out":3,"file_lines":40,"ignores":0,"instrument":%s,"max_fn_lines":9,"path":"src/order.php","reason":"legacy row"}\n]\n' "$INSTRUMENT" \
+    > "$SIG/.craftsman-baseline.json"
+( cd "$SIG" && python3 "$RATCHET" update src/order.php >/dev/null )
+ROW=$(grep '"src/order.php"' "$SIG/.craftsman-baseline.json" | sed 's/,$//')
+if echo "$ROW" | jq -e '(has("file_lines") or has("fan_out") | not) and .reason == "legacy row"' >/dev/null 2>&1; then
+    log_pass "update drops the retired metrics of an older row and keeps its reason"
+else
+    log_fail "an older row keeps file_lines or fan_out after update" "$ROW"
+fi
+
+printf '[\n{"complexity":7,"ignores":0,"instrument":%s,"max_fn_lines":30,"path":"src/order.php"}\n]\n' "$INSTRUMENT" \
+    > "$SIG/.craftsman-baseline.json"
+EXIT_CODE=0
+OUT=$( cd "$SIG" && python3 "$RATCHET" check src/order.php ) || EXIT_CODE=$?
+TIGHT_EXIT=0
+TIGHT_OUT=$( cd "$SIG" && python3 "$RATCHET" check src/order.php --tight ) || TIGHT_EXIT=$?
+if [[ $EXIT_CODE -eq 0 && $TIGHT_EXIT -eq 1 ]] && echo "$TIGHT_OUT" | grep -q "slack complexity 7 -> 2" \
+    && echo "$TIGHT_OUT" | grep -q "ratchet.py update src/order.php"; then
+    log_pass "check --tight refuses a mark looser than the file and names the update"
+else
+    log_fail "slack not refused" "plain exit=$EXIT_CODE tight exit=$TIGHT_EXIT out=$TIGHT_OUT"
+fi
+
+( cd "$SIG" && python3 "$RATCHET" update src/order.php >/dev/null )
+TIGHT_EXIT=0
+TIGHT_OUT=$( cd "$SIG" && python3 "$RATCHET" check src/order.php --tight ) || TIGHT_EXIT=$?
+if [[ $TIGHT_EXIT -eq 0 && -z "$TIGHT_OUT" ]]; then
+    log_pass "check --tight passes once the mark is tightened"
+else
+    log_fail "--tight after update" "exit=$TIGHT_EXIT out=$TIGHT_OUT"
+fi
+printf 'final class Invoice {}\n' > "$SIG/src/invoice.php"
+UNMARKED_EXIT=0
+UNMARKED_OUT=$( cd "$SIG" && python3 "$RATCHET" check src/invoice.php --tight ) || UNMARKED_EXIT=$?
+if [[ $UNMARKED_EXIT -eq 1 ]] && echo "$UNMARKED_OUT" | grep -q "unmarked src/invoice.php"; then
+    log_pass "check --tight refuses a touched file with no committed row"
+else
+    log_fail "an unmarked file passes --tight" "exit=$UNMARKED_EXIT out=$UNMARKED_OUT"
+fi
+rm -rf "$SIG"
+
+if grep -qE 'ratchet\.py check "\$file" --tight' "$ROOT_DIR/.github/workflows/ci.yml"; then
+    log_pass "the repository's CI runs the ratchet with --tight"
+else
+    log_fail "ci.yml does not pass --tight" "Structural Ratchet job"
+fi
+
+# A ruler change re-takes the numbers, never the rest of the row. The re-take
+# replaced the whole row with a fresh measure, so the reason and the rule
+# baseline's counts (`rules`, written into the same row) went with it: bumping
+# the instrument would have made every user's inherited rule debt block again.
+KEEP=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-ratchet-keep.XXXXXX")
+mkdir -p "$KEEP/src"
+( cd "$KEEP" && git init -q )
+printf 'def ship(order):\n    if order:\n        return order\n    return None\n' > "$KEEP/src/ship.py"
+OLD_ROW='{"complexity":0,"ignores":0,"instrument":1,"max_fn_lines":1,"path":"src/ship.py","reason":"kept reason","rules":{"PY001":2}}'
+printf '[\n%s\n]\n' "$OLD_ROW" > "$KEEP/.craftsman-baseline.json"
+( cd "$KEEP" && python3 "$RATCHET" check src/ship.py >/dev/null 2>&1 )
+AFTER_CHECK=$(jq -c '.[0] | {reason, rules, complexity, instrument}' "$KEEP/.craftsman-baseline.json")
+printf '[\n%s\n]\n' "$OLD_ROW" > "$KEEP/.craftsman-baseline.json"
+( cd "$KEEP" && python3 "$RATCHET" update src/ship.py >/dev/null 2>&1 )
+AFTER_UPDATE=$(jq -c '.[0] | {reason, rules, complexity, instrument}' "$KEEP/.craftsman-baseline.json")
+WANT="{\"reason\":\"kept reason\",\"rules\":{\"PY001\":2},\"complexity\":1,\"instrument\":$INSTRUMENT}"
+if [[ "$AFTER_CHECK" == "$WANT" && "$AFTER_UPDATE" == "$WANT" ]]; then
+    log_pass "a re-take after an instrument change keeps the reason and the rule counts"
+else
+    log_fail "an instrument change erases the row" "check=$AFTER_CHECK update=$AFTER_UPDATE"
+fi
+rm -rf "$KEEP"
+
+# The committed mark itself: one reason per row (git keeps the history), and
+# no retired metric. 87 KB of which 55% was concatenated reasons before.
+MARK_CHECK=$(python3 - "$ROOT_DIR/.craftsman-baseline.json" <<'PY'
+import json, sys
+rows = json.load(open(sys.argv[1]))
+bad = [r["path"] for r in rows if "file_lines" in r or "fan_out" in r]
+long = [r["path"] for r in rows if len(r.get("reason", "")) > 500]
+print(f"retired={len(bad)} long_reasons={len(long)} {bad[:2]} {long[:2]}")
+PY
+)
+if [[ "$MARK_CHECK" == "retired=0 long_reasons=0 "* ]]; then
+    log_pass "the repository's mark holds no retired metric and no reason past 500 characters"
+else
+    log_fail "the repository's mark" "$MARK_CHECK"
+fi
 
 test_summary

@@ -196,9 +196,9 @@ there is no `composer.json` to read.
 
 | Rule | Severity | Check | Blocking |
 |------|----------|-------|----------|
-| RATCHET001 | advisory | A touched file must not regress its committed structural baseline (complexity, file lines, longest function, import fan-out, suppression count) | No by default; set `RATCHET001: block` to enforce |
+| RATCHET001 | advisory | A touched file must not regress its committed structural baseline (worst-function complexity, longest function, suppression count; file length is LOC001's, advisory) | No by default; set `RATCHET001: block` to enforce |
 
-The baseline lives in `.craftsman-baseline.json` at the repository root, is committed, and only moves one way: a green pass tightens it, nothing loosens it except a documented `craftsman-ignore` (itself counted and ratcheted). Untouched files and relaxed directories are never evaluated. See [ADR-0025](../adr/0025-structural-ratchet.md).
+The baseline lives in `.craftsman-baseline.json` at the repository root, is committed, and only moves one way: a green pass tightens it, and a budget is raised only by `ratchet.py init <file> --reason "..."`, whose reason replaces the previous one (git keeps the history). `ratchet.py check --tight` also refuses a mark looser than its file or a touched file with no row, for a pipeline that wants the tightened mark committed. Untouched files and relaxed directories are never evaluated. See [ADR-0025](../adr/0025-structural-ratchet.md).
 
 ### Security Rules (PostToolUse + CI)
 
