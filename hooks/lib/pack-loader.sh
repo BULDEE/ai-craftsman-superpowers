@@ -26,6 +26,10 @@ _PACK_MANIFESTS_ALL=""
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lang-registry.sh"
 # shellcheck source=./rule-registry.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/rule-registry.sh"
+# The credential shapes SEC001 reads in every pack: one list, so a new key
+# prefix reaches each language at once (CR-257).
+# shellcheck source=./secret-patterns.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/secret-patterns.sh"
 
 _pack_reset() {
     _LOADED_PACKS=""

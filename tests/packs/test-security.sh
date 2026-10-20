@@ -23,6 +23,7 @@ line_has_ignore() { return 1; }
 file_has_ignore() { return 1; }
 reset_findings() { VIOLATIONS=(); WARNINGS=(); }
 
+source "$ROOT_DIR/hooks/lib/secret-patterns.sh"
 source "$ROOT_DIR/packs/symfony/hooks/security-validator.sh"
 source "$ROOT_DIR/packs/react/hooks/security-validator.sh"
 

@@ -21,7 +21,7 @@ A credential written in a source file is not "temporary". It is committed, pushe
 - **CI and production mean a secret store**, not a variable pasted into a pipeline definition file.
 - **A secret that was ever committed is burned.** Deleting the line does not remove it from history, forks, or the attacker's scraper. Rotate first, remove second, then scan the history (`gitleaks detect`) for the rest of the family.
 
-The gate flags string literals that look like credentials. It cannot see a secret you passed in from a config file that is itself committed, so the discipline matters more than the regex.
+The gate flags string literals that look like credentials, by name or by issuer prefix, in every language a pack covers. It cannot see a secret you passed in from a config file that is itself committed, so the discipline matters more than the regex.
 
 ## Parse, do not validate, at every boundary
 

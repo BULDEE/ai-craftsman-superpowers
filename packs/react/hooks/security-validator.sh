@@ -7,8 +7,10 @@
 #   SEC001 - hardcoded secret (api key, token, password) shipped in the bundle
 #   SEC002 - data executed as code (eval, new Function)
 #   SEC003 - SQL assembled by template literal or concatenation instead of binding
-# Requires: add_violation(), line_has_ignore()
-#   These are provided by the orchestrator (post-write-check.sh, craftsman-ci.sh).
+# Requires: add_violation(), line_has_ignore(), secret_hits()
+#   The orchestrator provides the first two (post-write-check.sh,
+#   craftsman-ci.sh); secret_hits and the credential shapes come from
+#   hooks/lib/secret-patterns.sh, sourced by pack-loader.sh.
 #
 # NOTE: This file is source'd by pack-loader, NOT executed directly.
 #   Do NOT add set -euo pipefail - it would affect the sourcing script.
@@ -24,14 +26,8 @@ _SECURITY_TS_SQL='(SELECT[[:space:]]+[^;]+[[:space:]]+FROM[[:space:]]|INSERT[[:s
 # A database sink on the same line: a SQL string on its own injects nothing
 _SECURITY_TS_SINK='(query|execute|exec|prepare|raw|unsafe)[A-Za-z]*[[:space:]]*\('
 
-# Values that document a credential instead of being one
-_SECURITY_TS_FAKE='(YOUR[_-]?|CHANGE[_-]?ME|EXAMPLE|PLACEHOLDER|DUMMY|SAMPLE|REDACTED|X{6,}|\.\.\.)'
-
 # Credentials resolved at runtime (build env, edge runtime, server config)
 _SECURITY_TS_RUNTIME='(process\.env|import\.meta\.env|Deno\.env|useRuntimeConfig|getServerSideProps)'
-
-# Secret-shaped assignments plus known provider key prefixes
-_SECURITY_TS_SECRET='(api_?key|secret|password|passwd|token)["'"'"']?[[:space:]]*[:=][[:space:]]*["'"'"'`][A-Za-z0-9_/+.=-]{12,}["'"'"'`]|(sk_live|ghp_|gho_|github_pat_|xox[bapr]-|AKIA|AIza)[A-Za-z0-9_-]{8,}|BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY'
 
 # Numbered source lines minus comment-only lines: a warning about eval is not eval
 _security_ts_code_lines() {
@@ -47,9 +43,7 @@ _security_ts_report() {
 
 _security_ts_check_secrets() {
     local hit
-    hit=$(_security_ts_code_lines "$1" \
-        | grep -Ei "$_SECURITY_TS_SECRET" \
-        | grep -viE "$_SECURITY_TS_FAKE|$_SECURITY_TS_RUNTIME" | head -1)
+    hit=$(_security_ts_code_lines "$1" | secret_hits "$_SECURITY_TS_RUNTIME" | head -1)
     _security_ts_report "SEC001" "$hit" \
         "Hardcoded secret - anything in the bundle is public; read it from the environment on the server and rotate the leaked value"
 }
@@ -118,10 +112,11 @@ pack_validate_typescript_security() {
     _security_ts_check_html_sink "$file"
 }
 
-# Secrets are repository security, not code quality: JavaScript gets the
-# code-quality rules only (data executed as code, SQL built from values).
+# The same bodies as TypeScript: a key in a .js file ships in the bundle just
+# the same (CR-257 reverses the CR-231 exclusion of SEC001).
 pack_validate_javascript_security() {
     local file="$1"
+    _security_ts_check_secrets "$file"
     _security_ts_check_eval "$file"
     _security_ts_check_sql_injection "$file"
     _security_ts_check_html_sink "$file"

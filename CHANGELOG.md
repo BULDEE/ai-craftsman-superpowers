@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Upgrading can refuse a file that 4.13.1 let through: a credential literal in
+a `.js`, `.jsx`, `.mjs`, `.cjs` or `.py` file, and a key with a recent issuer
+prefix (`sk-ant-`, `sk-proj-`, `glpat-`, `npm_`) in any covered language.
+SEC001 is never ignorable: move the value to the environment and rotate it.
+
+### Added
+
+- SEC001 covers JavaScript and Python, and knows today's key shapes. An
+  Anthropic or OpenAI project key was written to a `.ts` file with no
+  finding while the repository's own secrets scanner knew both prefixes, and
+  a `.js` or `.py` file got no SEC001 at all. The shapes now live in one list,
+  `hooks/lib/secret-patterns.sh`, that every pack reads: Anthropic `sk-ant-`,
+  OpenAI `sk-proj-`, `sk-svcacct-`, `sk-admin-` and legacy `sk-`, GitLab
+  `glpat-`, npm `npm_`, Slack webhooks, GitHub `ghs_`, `ghu_`, `ghr_`, Stripe
+  `rk_live`, AWS `ASIA`, a typed `API_TOKEN: str = "..."`, and a `*_KEY`
+  constant holding a 32-character key. Issuer prefixes match with case and
+  never inside a longer word, so `Asia/Kolkata`, `task-...` ids and storage
+  keys stay silent. An env read on the line no longer hides an issued key:
+  `process.env.KEY ?? "sk-ant-..."` ships the key. This reverses the CR-231
+  choice to leave secrets out of JavaScript (CR-257).
+- Files a Bash command changed are reviewed. Claude Code 2.1.269+ lists them
+  in `tool_response.bashEditDiff`; `post-write-check.sh` now runs after every
+  Bash call and judges each listed file as a Write, under its own path. A
+  call that changed nothing leaves before any library loads. The host records
+  the list in bypass and auto mode, elsewhere only with `bashEditDiffEnabled`
+  in user or managed settings, and documents it as best effort: the pre-write
+  gate remains the only refusal before the disk (CR-256).
+
+### Fixed
+
+- A test command that exits 0 no longer grants verification evidence when it
+  tested nothing: an npm script that only echoes, a suite with every test
+  skipped, PHPUnit with zero assertions. Packs declare the wording in a new
+  `empty_run_markers` capability, each marker taken from a real capture in
+  `tests/fixtures/test-runs`; the skill's `set-verified` is refused until a
+  run that tested something passes (CR-255).
+- A plugin update inside a session left the session binding on the old
+  plugin root, so the cockpit mod ran the previous version's helper
+  (`/instincts` printed a usage line in its pane). The binding now follows
+  the root the hooks run from, and the pane names the helper it ran when it
+  fails (CR-279).
+
 ## [4.13.1] - 2026-10-20
 
 A refusal no longer offers a `craftsman-ignore` marker that the rule ignores

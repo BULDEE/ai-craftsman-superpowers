@@ -132,14 +132,14 @@ expect_pass "src/ui/comment.js"  "el.innerHTML = DOMPurify.sanitize(comment);"
 expect_pass "src/ui/Comment.jsx" "export const Comment = ({ body }) => <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(body) }} />;"
 
 echo ""
-echo "--- TypeScript-only rules and secrets stay out of JavaScript ---"
+echo "--- TypeScript-only rules stay out of JavaScript, secrets do not (CR-257) ---"
 expect_absent TS001 "src/ui/schema.js" "const any = 1; export const schema = { field: any };"
 expect_absent TS003 "src/ui/guard.js" "export const present = (user) => user !== null && !user.deleted;"
 # Assembled at run time so the repository never holds a key-shaped literal
 # (GitHub push protection refuses one, fake or not).
 FAKE_KEY="sk_""live_51HxQ$(printf 'a%.0s' {1..24})"
 expect_block SEC001 "src/ui/pay.ts" "const stripe = \"$FAKE_KEY\";"
-expect_absent SEC001 "src/ui/pay.js" "const stripe = \"$FAKE_KEY\";"
+expect_block SEC001 "src/ui/pay.js" "const stripe = \"$FAKE_KEY\";"
 
 echo ""
 echo "--- the agent cannot lower a JavaScript project's bar ---"
