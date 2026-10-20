@@ -50,6 +50,14 @@ SEC001 is never ignorable: move the value to the environment and rotate it.
 
 ### Changed
 
+- Every write costs less: a post-write about half, a pre-write about a
+  third less (median of seven alternating runs against the previous code,
+  2043 to 1030 ms and 1421 to 905 ms on a loaded machine). Claude Code had
+  started offering to disable the plugin's slow hooks. Each hook now reads
+  a pack manifest once instead of four times through subshells, a write
+  reads the metrics schema stamp instead of running ten migration probes,
+  and the craft config is read in one jq instead of five per custom rule
+  (CR-278).
 - The structural ratchet records function-level debt only: worst-function
   complexity, longest function and suppression count. A file that grew with a
   feature failed the ratchet until someone raised its budget: on this
