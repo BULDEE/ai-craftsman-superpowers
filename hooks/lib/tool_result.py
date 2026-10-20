@@ -34,7 +34,12 @@ evidence and invents no regression; the old reader defaulted a missing
 
 Usage: tool_result.py < payload.json   prints one JSON object:
   {"state", "exit_code" (int or null), "command" (or null), "task_id" (or
-   null), "tool", "event", "why"}
+   null), "tool", "event", "why", "output"}
+
+`output` is what the command printed, stdout then stderr, when the event
+carries it (a Claude Code Bash object, a TaskOutput task); "" otherwise. It
+is read for what a runner says about the tests it ran, never for an exit
+code (CR-255).
 """
 
 from __future__ import annotations
@@ -59,7 +64,7 @@ def _result(payload: dict) -> dict:
     command = args.get("command") if isinstance(args.get("command"), str) else None
     return {"state": "unknown", "exit_code": None, "command": command, "task_id": None,
             "tool": payload.get("tool_name") or "", "event": payload.get("hook_event_name") or "",
-            "why": "no rule matched this event shape"}
+            "why": "no rule matched this event shape", "output": ""}
 
 
 def _verdict(result: dict, state: str, code=None, why: str = "", task_id=None) -> dict:
@@ -83,6 +88,7 @@ def _decode_failure(result: dict, payload: dict) -> dict:
 
 def _decode_task_output(result: dict, response: dict, args: dict) -> dict:
     task = response.get("task") if isinstance(response.get("task"), dict) else {}
+    result["output"] = _printed(task.get("output"))
     task_id = task.get("task_id") or args.get("task_id")
     status = task.get("status")
     code = _int(task.get("exitCode"))
@@ -122,7 +128,12 @@ def _tag(text: str, name: str) -> str | None:
     return match.group(1).strip() if match else None
 
 
+def _printed(*parts) -> str:
+    return "\n".join(part for part in parts if isinstance(part, str) and part)
+
+
 def _decode_object(result: dict, response: dict) -> dict:
+    result["output"] = _printed(response.get("stdout"), response.get("stderr"))
     task_id = response.get("backgroundTaskId")
     if task_id:
         return _verdict(result, "running", None, "Bash started in the background; result arrives on its task notification (TaskOutput before 2.1.277)", task_id)

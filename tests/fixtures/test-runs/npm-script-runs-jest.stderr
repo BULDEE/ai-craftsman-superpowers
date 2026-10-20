@@ -1,0 +1,7 @@
+PASS t/ok.test.js
+
+Test Suites: 1 skipped, 1 passed, 1 of 2 total
+Tests:       2 skipped, 1 passed, 3 total
+Snapshots:   0 total
+Time:        0.2 s
+Ran all test suites.

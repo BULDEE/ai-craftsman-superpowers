@@ -26,6 +26,20 @@ languages:
     validators: ["hooks/typescript-validator.sh", "hooks/layer-validator.sh", "hooks/persistence-validator.sh", "hooks/security-validator.sh"]
     static_analysis: ["static-analysis/eslint.sh"]
     test_commands: ["jest", "vitest", "npm test", "pnpm test", "yarn test"]
+    # What these runners print on a run that exits 0 having tested nothing,
+    # so that run grants no verification evidence (CR-255). POSIX ERE, matched
+    # per output line; each one was captured from the real runner
+    # (tests/fixtures/test-runs/PROVENANCE.md): an npm or pnpm script that only
+    # echoes, jest and vitest with no test or every test skipped, mocha with
+    # none passing. A focused run (`test.only`) prints what a partial skip
+    # prints, so it is not here.
+    empty_run_markers:
+      - '^> (echo([[:space:]][^&|;]*)?|true|exit 0|:)[[:space:]]*$'
+      - '^No tests found, exiting with code 0'
+      - '^Tests:[[:space:]]+([0-9]+ (skipped|todo), )+[0-9]+ total'
+      - '^No test files found, exiting with code 0'
+      - '^[[:space:]]*Tests[[:space:]]+[0-9]+ (skipped|todo)( [|] [0-9]+ (skipped|todo))* [(][0-9]+[)]'
+      - '^[[:space:]]*0 passing [(]'
     lsp: "typescript-language-server"
     metrics_dialect: c-like
   # JavaScript is claimed so custom rules scoped to it still resolve, but it
@@ -39,6 +53,20 @@ languages:
     validators: ["hooks/layer-validator.sh", "hooks/persistence-validator.sh", "hooks/security-validator.sh"]
     static_analysis: ["static-analysis/eslint.sh"]
     test_commands: ["jest", "vitest", "mocha", "npm test", "pnpm test", "yarn test"]
+    # What these runners print on a run that exits 0 having tested nothing,
+    # so that run grants no verification evidence (CR-255). POSIX ERE, matched
+    # per output line; each one was captured from the real runner
+    # (tests/fixtures/test-runs/PROVENANCE.md): an npm or pnpm script that only
+    # echoes, jest and vitest with no test or every test skipped, mocha with
+    # none passing. A focused run (`test.only`) prints what a partial skip
+    # prints, so it is not here.
+    empty_run_markers:
+      - '^> (echo([[:space:]][^&|;]*)?|true|exit 0|:)[[:space:]]*$'
+      - '^No tests found, exiting with code 0'
+      - '^Tests:[[:space:]]+([0-9]+ (skipped|todo), )+[0-9]+ total'
+      - '^No test files found, exiting with code 0'
+      - '^[[:space:]]*Tests[[:space:]]+[0-9]+ (skipped|todo)( [|] [0-9]+ (skipped|todo))* [(][0-9]+[)]'
+      - '^[[:space:]]*0 passing [(]'
     metrics_dialect: c-like
 
 rules:

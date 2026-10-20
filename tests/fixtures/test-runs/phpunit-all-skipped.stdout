@@ -1,0 +1,10 @@
+PHPUnit 12.5.40 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.5.9
+
+SS                                                                  2 / 2 (100%)
+
+Time: 00:00, Memory: 16.00 MB
+
+OK, but some tests were skipped!
+Tests: 2, Assertions: 0, Skipped: 2.

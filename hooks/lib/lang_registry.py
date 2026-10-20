@@ -37,6 +37,11 @@ LIST_CAPABILITIES = (
     "validators",
     "static_analysis",
     "test_commands",
+    # POSIX ERE matched against each line a passing test run printed: a line
+    # that says no test ran (a script that only echoes, every test skipped,
+    # zero assertions) keeps that run from granting verification evidence.
+    # Read by hooks/post-bash-test-verify.sh (CR-255).
+    "empty_run_markers",
     "supersedes",  # <tool>=<RULE>,... see precedence_defers in precedence.sh
 )
 

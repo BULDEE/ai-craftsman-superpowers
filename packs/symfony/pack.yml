@@ -33,6 +33,12 @@ languages:
     supersedes:
       - vendor/bin/deptrac=LAYER001,LAYER002,LAYER003,LAYER004
     test_commands: ["phpunit", "vendor/bin/phpunit", "bin/phpunit"]
+    # A PHPUnit run that exits 0 having executed no test, or no assertion,
+    # tested nothing and grants no verification evidence (CR-255). Captured
+    # from PHPUnit 12 in tests/fixtures/test-runs.
+    empty_run_markers:
+      - '^No tests executed!'
+      - '^Tests: [0-9]+, Assertions: 0[,.]'
     lsp: "intelephense"
     metrics_dialect: php-like
 

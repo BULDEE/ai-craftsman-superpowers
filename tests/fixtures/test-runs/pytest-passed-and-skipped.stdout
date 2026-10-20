@@ -1,0 +1,9 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.11, pytest-9.1.1, pluggy-1.7.0
+rootdir: /work/py
+collected 3 items
+
+test_ok.py .                                                             [ 33%]
+test_s.py ss                                                             [100%]
+
+========================= 1 passed, 2 skipped in 0.01s =========================

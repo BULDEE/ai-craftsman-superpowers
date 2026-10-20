@@ -35,6 +35,7 @@ EXIT_CODE=$(printf '%s' "$DECODED" | jq -r '.exit_code // empty')
 COMMAND=$(printf '%s' "$DECODED" | jq -r '.command // empty')
 TASK_ID=$(printf '%s' "$DECODED" | jq -r '.task_id // empty')
 TOOL=$(printf '%s' "$DECODED" | jq -r '.tool // empty')
+OUTPUT=$(printf '%s' "$DECODED" | jq -r '.output // empty')
 
 # Which commands run a test suite is the packs' knowledge. The literal list
 # this replaces meant the deterministic verification loop (ADR-0023) was blind
@@ -69,6 +70,18 @@ _test_command_pattern() {
         pattern="${pattern}|$(printf '%s' "$command" | sed 's/[.]/\\./g')"
     done <<< "$(lang_all_capability test_commands 2>/dev/null)"
     printf '^[[:space:]]*((npx|bunx|poetry run|pipenv run|uv run|python3? -m|php|time|env) )?([^[:space:]'"'"'"]*/)?(%s)([[:space:]]|$)' "$pattern"
+}
+
+# A green run proves the suite only when the suite ran. Each pack declares
+# what its runners print when nothing did (`empty_run_markers` in pack.yml):
+# a script that only echoes, every test skipped, zero assertions. All of them
+# exit 0 and used to grant `verified` (CR-255). The wording is the packs':
+# this hook names no runner's output.
+_ran_no_test() {
+    local markers
+    markers=$(lang_all_capability empty_run_markers 2>/dev/null)
+    [[ -n "$markers" && -n "$1" ]] || return 1
+    printf '%s\n' "$1" | grep -qE -f <(printf '%s\n' "$markers")
 }
 
 # This session's file, named by the payload's session_id (lib/session-files.sh).
@@ -174,6 +187,15 @@ esac
 # A task that ended is consumed: polling its result again must not grant the
 # evidence a later failure revoked (review of e372e85, F5).
 [[ "$TASK_RESULT" == true ]] && python3 "$LIB_DIR/session_state.py" list-remove "$SESSION_STATE" pending_test_tasks task_id "$TASK_ID" 2>/dev/null || true
+
+# A run that tested nothing neither grants nor revokes: evidence already
+# recorded stands, and the skill's set-verified is refused until a run that
+# tested something passes (lib/session_state.py, as after a failure).
+if [[ "$STATE" == "succeeded" ]] && _ran_no_test "$OUTPUT"; then
+    python3 "$LIB_DIR/session_state.py" merge "$SESSION_STATE" last_test_empty true 2>/dev/null || true
+    echo "craftsman: '${COMMAND}' exited 0, but its output says no test ran (a script that only echoes, every test skipped, or no assertion); it grants no verification evidence. Evidence already recorded in this session stands." >&2
+    exit 0
+fi
 
 CURRENT=$(python3 "$LIB_DIR/session_state.py" check-flag "$SESSION_STATE" verified 2>/dev/null || echo "false")
 
