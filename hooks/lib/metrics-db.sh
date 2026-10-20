@@ -343,6 +343,35 @@ metrics_init() {
     _metrics_migrate_file_path_column
     _metrics_create_verdicts_table
     _metrics_migrate_haiku_content_hash
+    _metrics_stamp_schema
+}
+
+# The schema stamp. metrics_init probes the schema 14 times to find which
+# migrations a database still needs, and post-write ran it on every Write to
+# rediscover what SessionStart had already migrated (CR-278). PRAGMA
+# user_version holds a checksum of this file: a database stamped by this
+# library costs one read, and any edit here runs the migrations again once.
+_metrics_schema_stamp() {
+    local sum
+    sum=$(cksum < "${METRICS_LIB_DIR}/metrics-db.sh" 2>/dev/null) || return 1
+    printf '%s' "$(( ${sum%% *} % 2147483647 + 1 ))"
+}
+
+_metrics_stamp_schema() {
+    local stamp
+    stamp=$(_metrics_schema_stamp) || return 0
+    printf 'PRAGMA user_version = %s;\n' "$stamp" | _metrics_sql >/dev/null 2>&1 || true
+}
+
+# metrics_init for a hook that only writes rows: one read when the stamp is
+# current, the whole migration otherwise (missing database included).
+metrics_init_once() {
+    [[ -z "$METRICS_DB" ]] && return 0
+    local stamp stored=""
+    stamp=$(_metrics_schema_stamp) || { metrics_init; return; }
+    [[ -f "$METRICS_DB" ]] && stored=$(_metrics_sql_read "PRAGMA user_version;")
+    [[ "$stored" == "$stamp" ]] && return 0
+    metrics_init
 }
 
 # What the file looked like when the verifier last judged it. A CLEAN on the

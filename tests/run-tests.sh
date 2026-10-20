@@ -673,6 +673,7 @@ test_session_metrics() {
     run_subtest "JavaScript gets the craftsman rules" "$SCRIPT_DIR/core/test-javascript-coverage.sh" || true
     run_subtest "SEC001 knows today's credential shapes" "$SCRIPT_DIR/core/test-secret-shapes.sh" || true
     run_subtest "The agent cannot switch git hooks off" "$SCRIPT_DIR/core/test-git-bypass-guard.sh" || true
+    run_subtest "A write pays one schema read" "$SCRIPT_DIR/core/test-metrics-stamp.sh" || true
     run_subtest "Level precedence tests pass" "$SCRIPT_DIR/core/test-precedence.sh" || true
     run_subtest "Brace scanner tests pass" "$SCRIPT_DIR/core/test-brace-scanner.sh" || true
     run_subtest "Gate independence tests pass" "$SCRIPT_DIR/core/test-gate-independence.sh" || true

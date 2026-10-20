@@ -232,6 +232,7 @@
 {"complexity":20,"ignores":0,"instrument":3,"max_fn_lines":113,"path":"tests/core/test-legacy-command.sh","reason":"ratchet inert without a mark and anchored on the file; routing asked of the consumer (architecture review)"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":4,"path":"tests/core/test-legacy-example.sh"},
 {"complexity":7,"ignores":0,"instrument":3,"max_fn_lines":44,"path":"tests/core/test-lsp-policy.sh"},
+{"complexity":1,"ignores":0,"instrument":3,"max_fn_lines":2,"path":"tests/core/test-metrics-stamp.sh"},
 {"complexity":4,"ignores":0,"instrument":3,"max_fn_lines":51,"path":"tests/core/test-no-language-literals.sh","reason":"new file (CR-108)"},
 {"complexity":15,"ignores":0,"instrument":3,"max_fn_lines":129,"path":"tests/core/test-observation.sh"},
 {"complexity":16,"ignores":0,"instrument":3,"max_fn_lines":104,"path":"tests/core/test-okf-knowledge.sh"},
@@ -283,6 +284,6 @@
 {"complexity":3,"ignores":0,"instrument":3,"max_fn_lines":10,"path":"tests/packs/test-structural.sh"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":1,"path":"tests/packs/test-symfony.sh"},
 {"complexity":2,"ignores":0,"instrument":3,"max_fn_lines":23,"path":"tests/perf/test-hook-latency.sh","reason":"CR-179: Darwin ceilings set from thirty macOS runner readings, guarded against masking a 50 percent regression"},
-{"complexity":38,"ignores":1,"instrument":3,"max_fn_lines":133,"path":"tests/run-tests.sh","reason":"CR-258: registers test-git-bypass-guard.sh (each suite is one || true until the runner discovers its suites, CR-288 IMPROVE)"},
+{"complexity":39,"ignores":1,"instrument":3,"max_fn_lines":133,"path":"tests/run-tests.sh","reason":"CR-278: registers test-metrics-stamp.sh (one || true per suite until the runner discovers its suites, CR-288 IMPROVE)"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":5,"path":"tests/templates/test-templates.sh"}
 ]
