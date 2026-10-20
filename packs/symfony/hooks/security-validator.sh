@@ -7,8 +7,10 @@
 #   SEC001 - hardcoded secret (api key, token, password, private key) in source
 #   SEC002 - data executed as code (eval, assert on a variable, shell exec)
 #   SEC003 - SQL assembled by concatenation or interpolation instead of binding
-# Requires: add_violation(), line_has_ignore()
-#   These are provided by the orchestrator (post-write-check.sh, craftsman-ci.sh).
+# Requires: add_violation(), line_has_ignore(), secret_hits()
+#   The orchestrator provides the first two (post-write-check.sh,
+#   craftsman-ci.sh); secret_hits and the credential shapes come from
+#   hooks/lib/secret-patterns.sh, sourced by pack-loader.sh.
 #
 # NOTE: This file is source'd by pack-loader, NOT executed directly.
 #   Do NOT add set -euo pipefail - it would affect the sourcing script.
@@ -24,14 +26,8 @@ _SECURITY_PHP_SQL='(SELECT[[:space:]]+[^;]+[[:space:]]+FROM[[:space:]]|INSERT[[:
 # A database sink on the same line: a SQL string on its own injects nothing
 _SECURITY_PHP_SINK='(query|exec|execute|prepare|fetch|statement)[A-Za-z]*[[:space:]]*\('
 
-# Values that document a credential instead of being one
-_SECURITY_PHP_FAKE='(YOUR[_-]?|CHANGE[_-]?ME|EXAMPLE|PLACEHOLDER|DUMMY|SAMPLE|REDACTED|X{6,}|\.\.\.)'
-
 # Credentials resolved at runtime (environment, container parameters, vault)
 _SECURITY_PHP_RUNTIME='(getenv|\$_ENV|\$_SERVER|%env\(|->get\(|getParameter\(|resolve\()'
-
-# Secret-shaped assignments plus known provider key prefixes
-_SECURITY_PHP_SECRET='(api_?key|secret|password|passwd|token)["'"'"']?[[:space:]]*[:=][[:space:]]*["'"'"'][A-Za-z0-9_/+.=-]{12,}["'"'"']|(sk_live|ghp_|gho_|github_pat_|xox[bapr]-|AKIA|AIza)[A-Za-z0-9_-]{8,}|BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY'
 
 # Numbered source lines minus comment-only lines: prose about eval is not eval
 _security_php_code_lines() {
@@ -47,9 +43,7 @@ _security_php_report() {
 
 _security_php_check_secrets() {
     local hit
-    hit=$(_security_php_code_lines "$1" \
-        | grep -Ei "$_SECURITY_PHP_SECRET" \
-        | grep -viE "$_SECURITY_PHP_FAKE|$_SECURITY_PHP_RUNTIME" | head -1)
+    hit=$(_security_php_code_lines "$1" | secret_hits "$_SECURITY_PHP_RUNTIME" | head -1)
     _security_php_report "SEC001" "$hit" \
         "Hardcoded secret - read it from the environment or a secrets vault, then rotate the leaked value"
 }

@@ -204,11 +204,11 @@ The baseline lives in `.craftsman-baseline.json` at the repository root, is comm
 
 | Rule | Severity | Check | Blocking |
 |------|----------|-------|----------|
-| SEC001 | critical | Hardcoded secret (API key, token, password literal, private key block) | Yes |
+| SEC001 | critical | Hardcoded secret in TypeScript, JavaScript, PHP and Python: a literal assigned to a credential name (`apiKey`, `client_secret`, `API_TOKEN: str`, a `*_KEY` constant holding a 32-character key), an issuer prefix (Anthropic `sk-ant-`, OpenAI `sk-proj-` and `sk-`, Stripe `sk_live`/`rk_live`, GitHub `gh*_`, GitLab `glpat-`, npm `npm_`, Slack tokens and webhooks, AWS `AKIA`/`ASIA`, Google `AIza`), or a private key block. One list, `hooks/lib/secret-patterns.sh`, read by every pack | Yes |
 | SEC002 | critical | Dynamic eval/exec on non-literal input | Yes |
 | SEC003 | critical | SQL built by concatenation or template interpolation | Yes |
 
-Reads from the environment (`getenv`, `$_ENV`, `process.env`, `import.meta.env`) and parameterized queries are explicitly safe. Doctrine: [`knowledge/security/secure-by-design.md`](../../knowledge/security/secure-by-design.md).
+Reads from the environment (`getenv`, `$_ENV`, `process.env`, `import.meta.env`, `os.environ`) and parameterized queries are explicitly safe. An issuer prefix is not: `process.env.KEY ?? "sk-ant-..."` still ships the key. Doctrine: [`knowledge/security/secure-by-design.md`](../../knowledge/security/secure-by-design.md).
 
 Persistence validation ships with the symfony and react packs and runs through the same validators in hooks and CI. The reasoning behind each rule lives in [`knowledge/persistence/`](../../knowledge/persistence/): repository boundaries, migration discipline, storage choice, and read/write separation.
 
