@@ -15,8 +15,9 @@ the mod registers no tool the model could call. `r` refreshes.
 
 ## Install
 
-Requires the craftsman plugin and Claude Code 2.1.291 or later (function hooks
-are early access).
+Requires the craftsman plugin and Claude Code 2.1.291 or later. Tested on
+2.1.291 and 2.1.304; events and methods can change between builds, so the
+mod's tests run against the installed one.
 
 ```
 /plugin install craftsman-cockpit@ai-craftsman-superpowers

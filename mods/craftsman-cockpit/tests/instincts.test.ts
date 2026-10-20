@@ -34,7 +34,7 @@ type Call = { argv: readonly string[]; init?: ProcessRunInit }
 
 // The engine beneath the mod: a host where the craftsman hooks bound this
 // session, and a helper that answers the review queue and records each argv.
-function host(on: On, files: Record<string, string>): Call[] {
+function host(on: On, files: Record<string, string>, queue: typeof QUEUE = QUEUE): Call[] {
   const calls: Call[] = []
   on('env.get', ($, e) => ({ value: e.name === 'HOME' ? HOME : undefined }))
   on('session.id', () => ({ value: SESSION }))
@@ -45,7 +45,7 @@ function host(on: On, files: Record<string, string>): Call[] {
   on('process.run', ($, e) => {
     calls.push({ argv: e.argv, init: e.init })
     if (e.argv[0] !== HELPER) throw new Error('not found')
-    const stdout = e.argv[2] === 'review' ? JSON.stringify(QUEUE) : `${e.argv[2]}: #${e.argv[3]}`
+    const stdout = e.argv[2] === 'review' ? JSON.stringify(queue) : `${e.argv[2]}: #${e.argv[3]}`
     return { value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   return calls
@@ -128,4 +128,20 @@ test('with no helper anywhere, the pane names every place it tried', async ($, o
   expect(await ui.find({ type: 'Text', text: /repository layout/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /PATH/ })).toBeDefined()
   await ui.unmount()
+})
+
+// The pane scrolls as one block (mods reference, render sites), and
+// e.viewport.rows is the whole window, never the pane. No candidate is cut.
+test('every candidate is drawn with its buttons, whatever the viewport says', async ($, on) => {
+  const first = QUEUE.candidates[0]
+  host(on, BOUND, { ...QUEUE, candidates: [first, { ...first, id: 8, rule: 'PHP002' }, { ...first, id: 9, rule: 'PHP003' }] })
+  await $.command.run(OPEN)
+  for (const viewport of [undefined, { columns: 120, rows: 20, isFullscreen: false }]) {
+    const ui = await $.ui.mount({ ...PANE, surface: 'terminal', ...(viewport === undefined ? {} : { viewport }) })
+    expect(await ui.find({ key: 'approve-7' })).toBeDefined()
+    expect(await ui.find({ key: 'approve-8' })).toBeDefined()
+    expect(await ui.find({ key: 'approve-9' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /below the fold/ })).toBeUndefined()
+    await ui.unmount()
+  }
 })

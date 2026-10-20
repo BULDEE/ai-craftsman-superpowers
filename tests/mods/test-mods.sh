@@ -12,8 +12,8 @@
 # that cannot fail is caught here and not in review.
 #
 # The engine half (`claude plugin validate`, `claude plugin test`) runs when a
-# `claude` binary is on PATH and says so when it is not: the function-hook API
-# is early access, and a red mod test is how a breaking release shows up.
+# `claude` binary is on PATH and says so when it is not: events and methods
+# can change between builds, and a red mod test is how a breaking one shows up.
 # =============================================================================
 set -uo pipefail
 
