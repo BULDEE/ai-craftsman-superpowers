@@ -1,0 +1,25 @@
+{
+  "session_id": "8b51cb23-c543-447c-b9b9-5667857fecb9",
+  "transcript_path": "__HOME__/.claude/projects/__WORKSPACE_SLUG__/8b51cb23-c543-447c-b9b9-5667857fecb9.jsonl",
+  "cwd": "__WORKSPACE__",
+  "prompt_id": "9701353c-c4b1-4c5b-8202-6894e7f20fb5",
+  "permission_mode": "bypassPermissions",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "ls src/Domain",
+    "description": "List files in src/Domain"
+  },
+  "tool_response": {
+    "stdout": "Order.php",
+    "stderr": "",
+    "interrupted": false,
+    "isImage": false,
+    "noOutputExpected": false
+  },
+  "tool_use_id": "toolu_01Ar7sAAY4RVx2JxjiZVq73V",
+  "duration_ms": 1170
+}

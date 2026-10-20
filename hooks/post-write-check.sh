@@ -3,7 +3,8 @@
 # Post-Write/Edit Validation Hook for Claude Code
 # Validates written or edited files against craftsman coding standards.
 #
-# TRIGGERS: PostToolUse for Write and Edit tools
+# TRIGGERS: PostToolUse for Write and Edit tools, and for Bash when the host
+#           lists the files the command changed (tool_response.bashEditDiff)
 # EXIT CODES: 0 = pass (or warning), 2 = blocking violation
 # OUTPUT: JSON with hookSpecificOutput or systemMessage
 #
@@ -19,8 +20,23 @@ set -uo pipefail
 trap 'echo "WARNING: post-write-check.sh failed at line $LINENO" >&2; exit 0' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/lib/session-files.sh"
 INPUT=$(cat)
+
+# A shell command writes files too, and the host's write tools never see them
+# (docs/reference/hooks.md). Claude Code 2.1.269+ lists what a Bash command
+# changed in tool_response.bashEditDiff.changedFiles when recording is on
+# (bypass or auto mode, or `bashEditDiffEnabled`; captured on 2.1.304,
+# tests/fixtures/hosts/PROVENANCE.md). This hook runs after every Bash call,
+# so a command that changed nothing leaves here, before anything is loaded.
+# The host documents the list as best effort: it decides what is reviewed,
+# and the verdict goes back to Claude like a Write's.
+TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
+SHELL_WRITES=""
+if [[ "$TOOL_NAME" == "Bash" ]]; then
+    SHELL_WRITES=$(printf '%s' "$INPUT" | jq -r '.tool_response.bashEditDiff.changedFiles // [] | .[]' 2>/dev/null)
+    [[ -n "$SHELL_WRITES" ]] || exit 0
+fi
+source "${SCRIPT_DIR}/lib/session-files.sh"
 session_files_bind "$INPUT"
 
 # Load helpers
@@ -207,12 +223,15 @@ FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
 
 # A Codex apply_patch names its files inside `tool_input.command`, any number
 # of them, and has no `file_path`; reading that field alone validated nothing
-# after a patch landed (audit CR-117, C1). The files are on disk by now, so
-# each one is judged as the Write it amounts to: this script re-runs itself
-# once per written file with the same payload and the file named, and the
-# verdict is the strictest child's. The per-file logic below stays the one
-# path, and the metrics rows carry the same session and tool_use ids.
-if [[ -z "$FILE_PATH" && "$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)" == "apply_patch" ]]; then
+# after a patch landed (audit CR-117, C1). A shell command names none at all:
+# the host lists them (SHELL_WRITES above). Either way the files are on disk
+# by now, so each one is judged as the Write it amounts to: this script
+# re-runs itself once per written file with the same payload and the file
+# named, and the verdict is the strictest child's. The per-file logic below
+# stays the one path, and the metrics rows carry the same session and
+# tool_use ids. A listed file that is gone (a deletion) is skipped.
+PATCH_FILES=""
+if [[ -z "$FILE_PATH" && "$TOOL_NAME" == "apply_patch" ]]; then
     LISTING=$(printf '%s' "$INPUT" | python3 "${SCRIPT_DIR}/lib/write_mirror.py" --list 2>/dev/null); LISTING_RC=$?
     if [[ "$LISTING_RC" -ne 0 || "$LISTING" == UNREADABLE* ]]; then
         # The write has landed and cannot be undone here; what can be said is
@@ -222,22 +241,30 @@ if [[ -z "$FILE_PATH" && "$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/n
     fi
     PATCH_FILES=$(printf '%s' "$LISTING" | awk -F'\t' '$1 != "delete" {print (NF >= 3 ? $3 : $2)}')
     [[ -z "$PATCH_FILES" ]] && exit 0
+fi
+[[ -n "$SHELL_WRITES" ]] && PATCH_FILES="$SHELL_WRITES"
+if [[ -n "$PATCH_FILES" ]]; then
     CHILD_RC=0
     CHILD_OUT=""
+    # One command or patch can change several files, and a child's verdict
+    # does not name its file: each one is printed under its path.
+    CHILD_ERR=$(mktemp "${TMPDIR:-/tmp}/craftsman-child-err.XXXXXX")
     while IFS= read -r written; do
         [[ -z "$written" || ! -f "$written" ]] && continue
         rc=0
         out=$(printf '%s' "$INPUT" | jq --arg fp "$written" '.tool_name = "Write" | .tool_input = {file_path: $fp}' \
-            | bash "$0") || rc=$?
+            | bash "$0" 2>"$CHILD_ERR") || rc=$?
+        [[ -s "$CHILD_ERR" ]] && { echo "${written}:"; cat "$CHILD_ERR"; } >&2
         # 2 is a verdict; any other failure is a child that could not judge,
         # and no verdict is not a clean verdict (review F6).
         if [[ "$rc" -ne 0 && "$rc" -ne 2 ]]; then
-            echo "🚫 AI Craftsman could not validate ${written} after the patch landed (exit ${rc})." >&2
+            echo "🚫 AI Craftsman could not validate ${written} after the write landed (exit ${rc})." >&2
             CHILD_RC=2
         fi
         [[ "$rc" -eq 2 ]] && CHILD_RC=2
         [[ -n "$out" ]] && CHILD_OUT="${CHILD_OUT}${out}"$'\n'
     done <<< "$PATCH_FILES"
+    rm -f "$CHILD_ERR"
     if [[ "$CHILD_RC" -eq 2 ]]; then
         exit 2
     fi

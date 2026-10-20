@@ -1,0 +1,52 @@
+{
+  "session_id": "ff2045a3-43fc-4964-a914-78e17c8c4dfc",
+  "transcript_path": "__HOME__/.claude/projects/__WORKSPACE_SLUG__/ff2045a3-43fc-4964-a914-78e17c8c4dfc.jsonl",
+  "cwd": "__WORKSPACE__",
+  "prompt_id": "312f448d-2831-47f7-a8cf-d7fa5befb295",
+  "permission_mode": "bypassPermissions",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "mkdir -p src/Domain && printf \"<?php\\nclass Order\\n{\\n    public function setStatus(string \\$s): void {}\\n}\\n\" > src/Domain/Order.php",
+    "description": "Create src/Domain directory and write Order.php"
+  },
+  "tool_response": {
+    "stdout": "",
+    "stderr": "",
+    "interrupted": false,
+    "isImage": false,
+    "noOutputExpected": false,
+    "bashEditDiff": {
+      "files": [
+        {
+          "filePath": "__WORKSPACE__/src/Domain/Order.php",
+          "hunks": [
+            {
+              "oldStart": 0,
+              "oldLines": 0,
+              "newStart": 1,
+              "newLines": 5,
+              "lines": [
+                "+<?php",
+                "+class Order",
+                "+{",
+                "+    public function setStatus(string $s): void {}",
+                "+}"
+              ]
+            }
+          ],
+          "created": true
+        }
+      ],
+      "moreFiles": 0,
+      "changedFiles": [
+        "__WORKSPACE__/src/Domain/Order.php"
+      ]
+    }
+  },
+  "tool_use_id": "toolu_014qcmGrQruxDHXkCNQCpWrG",
+  "duration_ms": 1485
+}

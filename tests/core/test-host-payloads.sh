@@ -255,6 +255,79 @@ else
 fi
 rm -f "$WORK/src/Domain/Order.php" "$WORK/src/Domain/Good.php"
 
+# --- post-write on a shell write: the files Claude Code lists are judged -----
+# Claude Code 2.1.269+ lists the files a Bash command changed in
+# tool_response.bashEditDiff when recording is on (bypass or auto mode, or
+# `bashEditDiffEnabled`; captured on 2.1.304, PROVENANCE.md). The file the
+# capture wrote, as it was on disk after the command: no strict_types, no
+# final, a setter, in src/Domain.
+SHELL_ORDER='<?php
+class Order
+{
+    public function setStatus(string $s): void {}
+}'
+_shell_post() { host_fixture claude-code 2.1.304 "post-tool-use.bash.edit-diff-$1" "$WORK"; }
+printf '%s\n' "$SHELL_ORDER" > "$WORK/src/Domain/Order.php"
+R=$(_run post-write-check.sh "$(_shell_post created)")
+if [[ "${R%%|*}" == "2" ]] && [[ "${R#*|}" == *PHP001* ]] && [[ "${R#*|}" == *Order.php* ]]; then
+    log_pass "a file a shell command created is judged like a Write, and its violations go back to Claude"
+else
+    log_fail "post-write on a shell-created file" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-200)"
+fi
+printf '%s\n' "$SHELL_ORDER" | sed 's/class Order/class Invoice/' > "$WORK/src/Domain/Order.php"
+R=$(_run post-write-check.sh "$(_shell_post modified)")
+if [[ "${R%%|*}" == "2" ]] && [[ "${R#*|}" == *PHP001* ]]; then
+    log_pass "a file a shell command edited in place (sed -i) is judged too"
+else
+    log_fail "post-write on a shell-edited file" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-200)"
+fi
+printf '%s\n' "$GOOD_PHP" > "$WORK/src/Domain/Order.php"
+R=$(_run post-write-check.sh "$(_shell_post created)")
+if [[ "${R%%|*}" == "0" ]]; then
+    log_pass "a clean file written by the shell passes"
+else
+    log_fail "post-write on a clean shell write" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-200)"
+fi
+rm -f "$WORK/src/Domain/Order.php"
+# A deleted file is listed in changedFiles with `deleted: true`: there is
+# nothing on disk to judge. A read-only command carries no bashEditDiff.
+R1=$(_run post-write-check.sh "$(_shell_post deleted)")
+R2=$(_run post-write-check.sh "$(_shell_post read-only)")
+if [[ "${R1%%|*}" == "0" && -z "${R1#*|}" && "${R2%%|*}" == "0" && -z "${R2#*|}" ]]; then
+    log_pass "a deletion and a read-only command judge nothing and say nothing"
+else
+    log_fail "deleted or read-only shell command" "deleted rc=${R1%%|*} out=${R1#*|} / read-only rc=${R2%%|*} out=${R2#*|}"
+fi
+# This hook now runs after every Bash call. A command that changed nothing
+# must leave before the engine loads: a witness python3 on PATH records every
+# start, and the shell write above is the control that it records at all.
+WITNESS="$WORK/witness-bin"
+mkdir -p "$WITNESS"
+printf '#!/bin/sh\necho start >> "%s/python3.log"\nexec "%s" "$@"\n' "$WITNESS" "$(command -v python3)" > "$WITNESS/python3"
+chmod +x "$WITNESS/python3"
+printf '%s\n' "$SHELL_ORDER" > "$WORK/src/Domain/Order.php"
+: > "$WITNESS/python3.log"
+_shell_post created | PATH="$WITNESS:$PATH" bash "$ROOT_DIR/hooks/post-write-check.sh" >/dev/null 2>&1
+CONTROL_STARTS=$(wc -l < "$WITNESS/python3.log" | tr -d ' ')
+: > "$WITNESS/python3.log"
+_shell_post read-only | PATH="$WITNESS:$PATH" bash "$ROOT_DIR/hooks/post-write-check.sh" >/dev/null 2>&1
+IDLE_STARTS=$(wc -l < "$WITNESS/python3.log" | tr -d ' ')
+rm -f "$WORK/src/Domain/Order.php"
+if [[ "$CONTROL_STARTS" -gt 0 && "$IDLE_STARTS" -eq 0 ]]; then
+    log_pass "a Bash call that changed nothing starts no python3 (the write starts $CONTROL_STARTS)"
+else
+    log_fail "Bash call without changes stays cheap" "python3 starts: shell write $CONTROL_STARTS, read-only command $IDLE_STARTS"
+fi
+
+# The host only runs what hooks.json wires: a check above that the real
+# Claude Code never calls would be a test of dead code.
+if jq -e '[.hooks.PostToolUse[] | select(.matcher | split("|") | index("Bash")) | .hooks[] | select(.async != true) | .command | test("post-write-check[.]sh")] | any' \
+        "$ROOT_DIR/hooks/hooks.json" >/dev/null 2>&1; then
+    log_pass "hooks.json runs post-write-check.sh synchronously after every Bash call"
+else
+    log_fail "post-write-check.sh wired on Bash" "no synchronous PostToolUse hook for Bash runs post-write-check.sh"
+fi
+
 # --- the real capture itself, unmodified, is read as two files ------------
 # The file the captured hunk edits, as it was when the capture was made.
 printf '<?php\n\nnamespace App\\Domain;\n\nfinal class Existing\n{\n}\n' > "$WORK/Existing.php"

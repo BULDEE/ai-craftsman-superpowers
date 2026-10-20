@@ -92,6 +92,32 @@ Nothing else is edited. `hook-env.*.json` lists variable NAMES only.
     capture shows that record and the hook's `prompt` are the same text.
   - The output file ends with `[exited with code N]`; not read by any hook.
 
+## claude-code/2.1.304
+
+- Date: 2026-10-20. `claude --version`: `2.1.304 (Claude Code)`. Headless:
+  `claude -p --dangerously-skip-permissions --model haiku --setting-sources project
+  --settings '{"bashEditDiffEnabled": true}' --output-format json "<prompt>"` in a
+  throwaway git repository, with a project hook `cat >> <file>.jsonl` on
+  `PostToolUse` for `Bash`. Raw sha256 (first 16): writes `3ddac04cd193b2e7`,
+  read-only and delete `147b295e05d00538`. Redactions as above, plus the
+  transcript slug.
+- Why: `tool_response.bashEditDiff` (documented from 2.1.269 on
+  https://code.claude.com/docs/en/hooks) lists the files a Bash command
+  changed, which the write gate never saw (CR-256).
+- Observed, and load-bearing for the hooks:
+  - The same run without `--settings` sent no `bashEditDiff` at all, in
+    bypass mode: the documented "only when Claude Code directs Claude to edit
+    files through Bash" did not hold for a prompt that asked for Bash.
+  - `post-tool-use.bash.edit-diff-created.json` (`printf ... > src/Domain/Order.php`):
+    `changedFiles` holds the absolute path; `files[0]` carries the hunks and
+    `created: true`; `moreFiles: 0`.
+  - `post-tool-use.bash.edit-diff-modified.json` (`sed -i`): same shape, no
+    `created`.
+  - `post-tool-use.bash.edit-diff-deleted.json` (`rm`): the deleted file is
+    still in `changedFiles`, with `deleted: true` in `files[0]`; a hook must
+    check the file exists before judging it.
+  - `post-tool-use.bash.edit-diff-read-only.json` (`ls`): no `bashEditDiff` key.
+
 ## codex/0.154.0
 
 - Date: 2026-09-15. `codex --version`: `codex-cli 0.154.0`. Model reported in
