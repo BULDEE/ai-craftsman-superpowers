@@ -34,6 +34,13 @@
         "hooks": [
           {
             "type": "command",
+            "if": "Bash(git *)",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/git-bypass-guard.sh\"",
+            "statusMessage": "Craftsman: checking the git command keeps the project's hooks on",
+            "onFailure": "block"
+          },
+          {
+            "type": "command",
             "if": "Bash(git push*)",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-push-verify.sh\"",
             "statusMessage": "Craftsman: checking verification evidence before the push"

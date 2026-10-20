@@ -47,6 +47,17 @@ def _segments(tokens: list[str]) -> tuple[list[str], list[str]]:
     return rendered, separators
 
 
+def token_segments(command: str) -> list[list[str]]:
+    """The command's simple commands, each as its list of tokens."""
+    segments: list[list[str]] = [[]]
+    for token in _tokens(command):
+        if token in _SEPARATORS:
+            segments.append([])
+            continue
+        segments[-1].append(token)
+    return [segment for segment in segments if segment]
+
+
 def parse(command: str) -> CommandGrammar:
     tokens = _tokens(command)
     rendered, separators = _segments(tokens)
