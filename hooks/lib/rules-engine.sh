@@ -77,9 +77,8 @@ _rules_set() {
         echo "[rules-engine] rejected unsafe rule key: ${key}" >&2
         return 0
     }
-    local dir
-    dir="$(_rules_store_dir "$namespace")"
-    mkdir -p "$dir"
+    local dir="$_RULES_STORE/$namespace"
+    [[ -d "$dir" ]] || mkdir -p "$dir"
     printf '%s' "$value" > "$dir/$key"
 }
 
@@ -162,12 +161,57 @@ _rules_yaml_parser_path() {
 # ---------------------------------------------------------------------------
 # Parse .craft-config.yml via Python yaml-parser.py → populate stores from JSON
 # ---------------------------------------------------------------------------
+# Every field of the config in one jq: five per rule made a three-rule config
+# cost fifteen processes on every hook (CR-278). NUL-separated, so a pattern or
+# a message may hold any character. Per rule: id, severity, pattern, message,
+# whether `languages` is an array, and the array joined with commas. A rule
+# that is not a mapping yields empty fields, as the per-field reads did.
+_RULES_CONFIG_JQ='def s: if . == null or . == false then "" elif type == "string" then . else tojson end;
+(.strictness | s), "\u0000",
+((.rules // {}) as $r | ($r | if type == "object" then keys[] else empty end) as $k | $r[$k] as $v
+ | ($v | type == "object") as $o
+ | $k, "\u0000",
+   (if $o then ($v.severity | s) else "" end), "\u0000",
+   (if $o then ($v.pattern | s) else "" end), "\u0000",
+   (if $o then ($v.message | s) else "" end), "\u0000",
+   (if $o and ($v.languages | type) == "array" then "array" else "none" end), "\u0000",
+   (if $o and ($v.languages | type) == "array" then ($v.languages | map(s) | join(",")) else "" end), "\u0000")'
+
+# Reads one rule's six fields into the caller's variables of those names.
+_rules_read_record() {
+    local _rrr_field
+    for _rrr_field in rule_id severity pattern message languages_mode languages; do
+        IFS= read -r -d '' "$_rrr_field" || return 1
+    done
+}
+
 _rules_apply_parsed_config() {
     local json_output="$1"
     local source_label="$2"
+    local val rule_id severity pattern message languages_mode languages
+    {
+        IFS= read -r -d '' val || return 0
+        _rules_apply_strictness "$val" "$source_label"
+        while _rules_read_record; do
+            _rules_id_is_safe "$rule_id" || continue
+            # Where a severity came from is stored beside it: a global line is
+            # a preference across the machine, a project line a statement about
+            # this repository, and only the second may outrank a baseline.
+            if [[ -n "$severity" ]]; then
+                _rules_set "severity" "$rule_id" "$severity"
+                _rules_set "severity_source" "$rule_id" "$source_label"
+            fi
+            [[ -n "$pattern" ]] && _rules_set "pattern" "$rule_id" "$pattern"
+            [[ -n "$message" ]] && _rules_set "message" "$rule_id" "$message"
+            # An EMPTY array says "no language", which is not "undeclared".
+            [[ "$languages_mode" == "array" ]] && _rules_set "languages" "$rule_id" "$languages"
+        done
+    } < <(printf '%s' "$json_output" | jq -j "$_RULES_CONFIG_JQ" 2>/dev/null)
+    return 0
+}
 
-    local val
-    val=$(printf '%s' "$json_output" | jq -r '.strictness // empty' 2>/dev/null)
+_rules_apply_strictness() {
+    local val="$1" source_label="$2"
     if [[ -n "$val" ]]; then
         if [[ "${_RULES_STRICTNESS_IS_DEFAULT:-false}" == true ]] \
             || [[ "$source_label" == "project" ]] \
@@ -177,15 +221,6 @@ _rules_apply_parsed_config() {
             _RULES_STRICTNESS_IS_DEFAULT=false
         fi
     fi
-
-    local rule_ids
-    rule_ids=$(printf '%s' "$json_output" | jq -r '.rules // {} | keys[]' 2>/dev/null)
-
-    local rule_id
-    for rule_id in $rule_ids; do
-        _rules_id_is_safe "$rule_id" || continue
-        _rules_store_rule_fields "$json_output" "$rule_id" "$source_label"
-    done
 }
 
 _rules_parse_config() {
@@ -212,56 +247,6 @@ _rules_parse_config() {
     fi
 
     _rules_apply_parsed_config "$json_output" "$source_label"
-}
-
-# Where a declared severity came from, stored beside it.
-#
-# "The user named this rule" is not one question. A `PHP001: block` in
-# ~/.claude/.craft-config.yml is a preference across every repository on the
-# machine; the same line in a project's own file is a statement about this
-# repository. Only the second may outrank a baseline, or one global line would
-# silently turn the mark off everywhere.
-_rules_store_severity() {
-    local json_output="$1" rule_id="$2" source_label="$3"
-    local severity
-    severity=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"].severity // empty" 2>/dev/null)
-    [[ -z "$severity" ]] && return 0
-    _rules_set "severity" "$rule_id" "$severity"
-    _rules_set "severity_source" "$rule_id" "$source_label"
-}
-
-# `languages` is an array in the config and a comma-joined string in the store,
-# and an EMPTY array is meaningful: it says "this rule applies to no language",
-# which is not the same as never having been declared.
-_rules_store_languages() {
-    local json_output="$1" rule_id="$2"
-    local languages
-    languages=$(printf '%s' "$json_output" | jq -r '.rules["'"$rule_id"'"].languages // empty | if type == "array" then join(",") else empty end' 2>/dev/null)
-    if [[ -n "$languages" ]]; then
-        _rules_set "languages" "$rule_id" "$languages"
-        return 0
-    fi
-    local languages_type
-    languages_type=$(printf '%s' "$json_output" | jq -r '.rules["'"$rule_id"'"].languages | type' 2>/dev/null)
-    [[ "$languages_type" == "array" ]] && _rules_set "languages" "$rule_id" ""
-    return 0
-}
-
-# Store all fields (severity, pattern, message, languages) for a single rule from JSON
-_rules_store_rule_fields() {
-    local json_output="$1"
-    local rule_id="$2"
-    local source_label="${3:-project}"
-
-    _rules_store_severity "$json_output" "$rule_id" "$source_label"
-
-    local field value
-    for field in pattern message; do
-        value=$(printf '%s' "$json_output" | jq -r ".rules[\"$rule_id\"].${field} // empty" 2>/dev/null)
-        [[ -n "$value" ]] && _rules_set "$field" "$rule_id" "$value"
-    done
-
-    _rules_store_languages "$json_output" "$rule_id"
 }
 
 # ---------------------------------------------------------------------------
