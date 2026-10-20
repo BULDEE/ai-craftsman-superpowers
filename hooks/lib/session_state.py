@@ -328,6 +328,22 @@ def _resolve_session_state_path() -> str:
     return runtime_paths.state_path()
 
 
+# Only a passing test run (the hook, which names the path it resolved from
+# the payload) clears these. A skill asking without a path cannot restore
+# evidence a failing run revoked (review of 4.12.0, CR-204 F7), nor turn a run
+# that exited 0 having tested nothing into evidence (CR-255).
+SKILL_REFUSALS = (
+    ('last_test_failed', 'refused: a test run failed in this session after the last pass; '
+                         're-run the suite green to restore the verification evidence'),
+    ('last_test_empty', 'refused: the last test run in this session ran no test (a script that only echoes, '
+                        'every test skipped, or no assertion); run the real suite to record the verification evidence'),
+)
+
+
+def _skill_refusal(state: dict) -> str:
+    return next((message for flag, message in SKILL_REFUSALS if state.get(flag)), '')
+
+
 def handle_set_verified(arguments: list[str]) -> None:
     """Set verified=true in session state.
 
@@ -340,14 +356,12 @@ def handle_set_verified(arguments: list[str]) -> None:
 
     state_path = arguments[0] if arguments else _resolve_session_state_path()
     state = read_state(state_path)
-    # Only a passing test run (the hook, which names the path it resolved from
-    # the payload) clears a failure. A skill asking without a path cannot
-    # restore evidence a failing run revoked (review of 4.12.0, CR-204 F7).
-    if not arguments and state.get('last_test_failed'):
-        print('refused: a test run failed in this session after the last pass; '
-              're-run the suite green to restore the verification evidence', file=sys.stderr)
+    refusal = '' if arguments else _skill_refusal(state)
+    if refusal:
+        print(refusal, file=sys.stderr)
         sys.exit(1)
     state['last_test_failed'] = False
+    state['last_test_empty'] = False
     state['verified'] = True
     state['verified_at'] = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     write_state_atomically(state_path, state)

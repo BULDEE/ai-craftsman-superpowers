@@ -160,6 +160,121 @@ else
     log_fail "monitors.json" "invalid or missing monitor entry"
 fi
 
+echo ""
+echo "=== A green run that ran no test grants no evidence (CR-255) ==="
+
+# Each capture is what a real runner printed (tests/fixtures/test-runs,
+# PROVENANCE.md): a script that only echoes, a suite whose every test is
+# skipped, PHPUnit counting zero assertions. All of them exit 0, and before
+# CR-255 every one of them set `verified`, which then let a task close and a
+# push go through on a suite that tested nothing.
+RUNS="$ROOT_DIR/tests/fixtures/test-runs"
+PROOF_HOME="$FAKE_HOME/proof"
+PROOF_DATA="$PROOF_HOME/data"
+mkdir -p "$PROOF_HOME/.claude" "$PROOF_DATA"
+PROOF_STATE="$PROOF_DATA/session-state-proof.json"
+
+# The command each capture came from.
+run_command() {
+    case "$1" in
+        npm-*)     echo "npm test" ;;
+        pnpm-*)    echo "pnpm test" ;;
+        jest-*)    echo "jest" ;;
+        vitest-*)  echo "vitest run" ;;
+        mocha-*)   echo "mocha" ;;
+        pytest-*)  echo "pytest" ;;
+        phpunit-*) echo "vendor/bin/phpunit" ;;
+    esac
+}
+
+# feed <capture>: the capture as Claude Code sends a passing Bash run
+# (tests/fixtures/hosts/claude-code/2.1.272/post-tool-use.bash.python-tests-passed.json),
+# stdout and stderr apart: jest writes its summary to stderr.
+feed() {
+    local name="$1" out="" err=""
+    [[ -f "$RUNS/$name.stdout" ]] && out=$(cat "$RUNS/$name.stdout")
+    [[ -f "$RUNS/$name.stderr" ]] && err=$(cat "$RUNS/$name.stderr")
+    jq -n --arg c "$(run_command "$name")" --arg o "$out" --arg e "$err" \
+        '{session_id: "proof", hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: {command: $c},
+          tool_response: {stdout: $o, stderr: $e, interrupted: false, isImage: false, noOutputExpected: false}}' \
+        | env -u CLAUDE_CODE_SESSION_ID -u CRAFTSMAN_SESSION_ID HOME="$PROOF_HOME" CRAFTSMAN_RUNTIME_HOME="$PROOF_HOME" \
+            CLAUDE_PLUGIN_DATA="$PROOF_DATA" bash "$ROOT_DIR/hooks/post-bash-test-verify.sh" 2>&1
+}
+
+replay() {
+    echo '{"verified": false}' > "$PROOF_STATE"
+    feed "$1"
+}
+
+granted() { [[ "$(jq -r '.verified // false' "$PROOF_STATE" 2>/dev/null)" == "true" ]]; }
+
+# Control: a real suite run through `npm test` grants. If it does not, the
+# instrument is broken and every "grants nothing" below would pass for nothing.
+replay npm-script-runs-jest >/dev/null
+if granted; then
+    log_pass "control: npm test running a real jest suite grants the evidence"
+
+    for capture in npm-echo-ok npm-true pnpm-exit-0 jest-no-tests jest-all-skipped \
+                   vitest-no-tests vitest-all-skipped mocha-all-skipped pytest-all-skipped \
+                   pytest-all-skipped-quiet phpunit-no-tests phpunit-all-skipped phpunit-no-assertions; do
+        OUTPUT=$(replay "$capture")
+        if ! granted && [[ "$OUTPUT" == *"no test ran"* ]]; then
+            log_pass "$capture: exits 0, ran no test, grants nothing and says why"
+        else
+            log_fail "$capture grants no evidence" "verified=$(jq -c . "$PROOF_STATE") output=$OUTPUT"
+        fi
+    done
+
+    # A run that executed tests still counts when some were skipped. A focused
+    # run (`test.only`) prints the same shape as a partial skip: it is not
+    # visible in the output, so it is a write-time rule's job, not this one's.
+    for capture in jest-passed-and-skipped jest-focused vitest-passed-and-skipped \
+                   mocha-ten-passing pytest-passed-and-skipped phpunit-passed-and-skipped; do
+        replay "$capture" >/dev/null
+        if granted; then
+            log_pass "$capture: tests ran, the evidence is granted"
+        else
+            log_fail "$capture grants the evidence" "verified=$(jq -c . "$PROOF_STATE")"
+        fi
+    done
+
+    # The skill's set-verified (no path argument) cannot grant what an empty
+    # run just refused, the same way it cannot after a failure (CR-204 F7).
+    skill_set_verified() {
+        env -u CRAFTSMAN_SESSION_ID HOME="$PROOF_HOME" CRAFTSMAN_RUNTIME_HOME="$PROOF_HOME" \
+            CLAUDE_PLUGIN_DATA="$PROOF_DATA" CLAUDE_CODE_SESSION_ID=proof \
+            python3 "$ROOT_DIR/hooks/lib/session_state.py" set-verified 2>&1
+    }
+    replay npm-echo-ok >/dev/null
+    EXIT_CODE=0
+    OUTPUT=$(skill_set_verified) || EXIT_CODE=$?
+    if [[ $EXIT_CODE -ne 0 ]] && ! granted; then
+        log_pass "after a run that ran no test, the skill's set-verified is refused"
+    else
+        log_fail "set-verified after an empty run" "exit=$EXIT_CODE verified=$(jq -c . "$PROOF_STATE") output=$OUTPUT"
+    fi
+    feed npm-script-runs-jest >/dev/null
+    echo '{"verified": false}' > "$PROOF_STATE.tmp" && jq '.verified = false' "$PROOF_STATE" > "$PROOF_STATE.tmp" && mv "$PROOF_STATE.tmp" "$PROOF_STATE"
+    EXIT_CODE=0
+    OUTPUT=$(skill_set_verified) || EXIT_CODE=$?
+    if [[ $EXIT_CODE -eq 0 ]] && granted; then
+        log_pass "a real run afterwards lifts the refusal"
+    else
+        log_fail "set-verified after a real run" "exit=$EXIT_CODE verified=$(jq -c . "$PROOF_STATE") output=$OUTPUT"
+    fi
+else
+    log_fail "control: npm test running a real jest suite" \
+        "granted nothing: verified=$(jq -c . "$PROOF_STATE" 2>/dev/null); the assertions on empty runs are undetermined"
+fi
+
+# Which wording means "no test ran" is each runner's, so each pack's: the hook
+# names none of it (CLAUDE.md, the engine holds no list of languages).
+if grep -qE 'No tests (found|executed)|Assertions: 0|[0-9]+ skipped|0 passing' "$ROOT_DIR/hooks/post-bash-test-verify.sh"; then
+    log_fail "the hook holds no runner's wording" "a runner's output literal is in hooks/post-bash-test-verify.sh"
+else
+    log_pass "the hook holds no runner's wording: the packs declare it"
+fi
+
 rm -rf "$FAKE_HOME"
 
 test_summary

@@ -29,6 +29,12 @@ languages:
     protected_configs: ["mypy.ini", ".flake8"]
     validators: ["hooks/python-validator.sh", "hooks/layer-validator.sh"]
     test_commands: ["pytest", "python -m pytest", "tox"]
+    # A pytest run that exits 0 with every test skipped, deselected or
+    # xfailed tested nothing and grants no verification evidence (CR-255).
+    # Captured in tests/fixtures/test-runs; "no tests ran" exits 5, so it is a
+    # failure already and needs no marker.
+    empty_run_markers:
+      - '^(=+ )?[0-9]+ (skipped|deselected|xfailed)(, [0-9]+ (skipped|deselected|xfailed|warnings?))* in [0-9.]+s'
     lsp: "pyright-langserver"
     # No metrics_dialect: the engine extracts structural metrics from
     # brace-delimited sources only (c-like, php-like). Measuring an

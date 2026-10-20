@@ -51,6 +51,8 @@ languages:                             # REQUIRED for a language pack
     protected_configs: [".mylint.yml"] # files that exist only to configure a gate
     validators: ["hooks/my-validator.sh"]
     test_commands: ["my-lang test"]
+    empty_run_markers:                 # OPTIONAL: a passing run that printed one of
+      - '^0 tests run'                 # these (POSIX ERE, per line) tested nothing
     lsp: "my-lang-langserver"
     metrics_dialect: c-like            # OPTIONAL, and only c-like or php-like
 

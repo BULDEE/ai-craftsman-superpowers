@@ -1,0 +1,22 @@
+PHPUnit 12.5.40 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.5.9
+
+RR                                                                  2 / 2 (100%)
+
+Time: 00:00, Memory: 16.00 MB
+
+There were 2 risky tests:
+
+1) T\NoAssertTest::testA
+This test did not perform any assertions
+
+/work/php/tests/NoAssertTest.php:5
+
+2) T\NoAssertTest::testB
+This test did not perform any assertions
+
+/work/php/tests/NoAssertTest.php:6
+
+OK, but there were issues!
+Tests: 2, Assertions: 0, Risky: 2.

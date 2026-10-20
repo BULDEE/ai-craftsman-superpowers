@@ -17,8 +17,8 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
 - CI adapters follow the `adapter_detect/run/annotate/comment/exit` interface.
 - The engine holds no list of languages. A pack declares its own in `pack.yml`
   under `languages:` (`extensions`, `validators`, `static_analysis`,
-  `test_commands`, `entry_markers`, `protected_configs`, `lsp`,
-  `metrics_dialect`, `supersedes`), and `hooks/lib/lang-registry.sh` compiles those manifests
+  `test_commands`, `empty_run_markers`, `entry_markers`, `protected_configs`,
+  `lsp`, `metrics_dialect`, `supersedes`), and `hooks/lib/lang-registry.sh` compiles those manifests
   into the registry every hook and `ci/craftsman-ci.sh` reads. Never add a
   `case "$EXT"` or an extension literal to a hook, to the pipeline or to a
   Python helper: use `lang_for_file`, `lang_capability` or `pack_dispatch_file`.
