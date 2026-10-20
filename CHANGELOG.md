@@ -35,7 +35,32 @@ SEC001 is never ignorable: move the value to the environment and rotate it.
   in user or managed settings, and documents it as best effort: the pre-write
   gate remains the only refusal before the disk (CR-256).
 
+### Changed
+
+- The structural ratchet records function-level debt only: worst-function
+  complexity, longest function and suppression count. A file that grew with a
+  feature failed the ratchet until someone raised its budget: on this
+  repository 270 of 473 raises moved `file_lines` alone, while LOC001, the
+  rule that owns file length, is advisory. `file_lines` and `fan_out` are
+  still printed by `ratchet.py measure` and dropped from an older row on its
+  next update. A raise keeps one reason, the newest (git keeps the history),
+  and `ratchet.py check --tight` refuses a mark looser than its file or a
+  touched file with no row, so a pipeline can require the tightened mark to
+  be committed. ADR-0025 amended (CR-288).
+
 ### Fixed
+
+- The structural ratchet measured every PSR-12 method (opening brace on its
+  own line) as complexity 0 over one line, and a multi-line signature as its
+  signature only: it closed the function on the brace. It now finds the body
+  after the header, so PHP methods and functions with long parameter lists are
+  measured. The ruler changed (instrument 3): a mark taken by the previous
+  one is re-taken on the next touch, without failing an untouched file
+  (CR-288).
+- Re-taking a mark after an instrument change erased the row's reason and the
+  rule baseline's counts stored with it, so inherited rule findings would have
+  blocked again after an upgrade. Only the measured numbers are re-taken now
+  (CR-288).
 
 - A test command that exits 0 no longer grants verification evidence when it
   tested nothing: an npm script that only echoes, a suite with every test

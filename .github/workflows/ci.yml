@@ -707,7 +707,7 @@ jobs:
           while IFS= read -r file; do
             [[ -z "$file" ]] && continue
             [[ -f "$file" ]] || continue
-            OUT=$(python3 hooks/lib/ratchet.py check "$file" \
+            OUT=$(python3 hooks/lib/ratchet.py check "$file" --tight \
               --baseline .craftsman-baseline.json 2>/dev/null) || {
               echo "✗ $file"
               echo "$OUT" | sed 's/^/    /'
@@ -717,13 +717,14 @@ jobs:
 
           if [[ $FAILED -eq 1 ]]; then
             echo ""
-            echo "A touched file loosened its structural budget."
-            echo "Either bring it back under its baseline, or raise the budget"
-            echo "on purpose in this same pull request:"
-            echo "  python3 hooks/lib/ratchet.py init <file>"
-            echo "That writes the new numbers into .craftsman-baseline.json,"
-            echo "where a reviewer sees them in the diff. Loosening stays"
-            echo "possible; it stops being silent."
+            echo "A touched file does not match its committed mark."
+            echo "RATCHET001: a function grew. Bring it back under its budget,"
+            echo "or raise the budget on purpose in this same pull request:"
+            echo "  python3 hooks/lib/ratchet.py init <file> --reason \"...\""
+            echo "The reason replaces the previous one; git keeps the history."
+            echo "slack or unmarked: the file improved or is new, and the mark"
+            echo "never heard of it. Run the command printed above and commit"
+            echo ".craftsman-baseline.json, so the file cannot grow back unseen."
             exit 1
           fi
 

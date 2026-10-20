@@ -116,3 +116,44 @@ rewrite of the decision.
   duplication metric.
 - The row schema grew `reason`, `rules` (the rule baseline shares the row,
   ADR-0025 and `rule_baseline.py`) and `instrument`.
+
+## Amendment (2026-10-20): the mark records function-level debt only (CR-288)
+
+Measured on this repository the day of the review: `.craftsman-baseline.json`
+held 87 KB for 277 files, 55% of it reasons concatenated row after row; 473
+budget raises in 116 commits, 270 of them on `file_lines` alone and 15% on a
+function-level metric of production code; 13 marks looser than their file,
+one by 212 lines. The per-file, committed, one-way mark stands (ESLint's bulk
+suppressions, 2025, settled on the same shape: a committed file of counts per
+file, pruned to tighten). Three details change.
+
+- **The mark records `complexity`, `max_fn_lines` and `ignores`.** A file that
+  grows with a feature is not debt, and LOC001, the rule that owns file
+  length, is advisory permanently. `file_lines` and `fan_out` are still
+  measured by `ratchet.py measure`; no mark records them, and `update` or
+  `init` drops them from an older row.
+- **One reason per row.** A raise replaces the reason (`init <file> --reason`
+  always did); the history is the commit that wrote it. Rows were rewritten
+  with the reason of the newest commit that changed each one, read from git.
+- **Tightening is deterministic in CI.** It happened only in the local hook,
+  after a Write or Edit; a file improved any other way kept its old budget.
+  `check --tight` also fails on a mark looser than the file (`slack`) and on a
+  touched file with no committed row (`unmarked`), and the repository's own
+  Structural Ratchet job runs it. `ci/craftsman-ci.sh` and the hooks keep
+  plain `check`, so hook and pipeline still agree for every user project.
+
+Two defects surfaced while making the change, both fixed with it.
+
+- **Instrument 3.** The span finder looked for `{` on the header only, fell
+  back to indentation, and closed a function on a brace that opens on its own
+  line: every PSR-12 method measured complexity 0 over one line, so with
+  `file_lines` gone the ratchet would have guarded nothing in PHP. The body now
+  opens on the header, after a signature whose parentheses span several lines,
+  or on the next line when it starts with `{`; an indentation-delimited body is
+  scanned from the signature's last line. The ruler changed, so marks taken by
+  instrument 2 are re-taken on the next touch.
+- **A re-take keeps the row.** Re-taking a mark from an older instrument
+  replaced the whole row with a fresh measure, dropping its reason and the
+  rule baseline's `rules` counts: the bump would have made every inherited rule
+  finding block again. Only the ratcheted numbers are re-taken now.
+

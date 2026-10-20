@@ -176,12 +176,13 @@ $ python3 hooks/lib/ratchet.py measure pricing.py
 `complexity 4 → 1`, worst function `21 → 15` lines. The rescue is not a matter
 of opinion: it is two numbers that moved.
 
-The file also grew, 48 lines to 70, and `file_lines` **is** a ratcheted metric:
-adding lines to this file after the mark below is taken produces
-`RATCHET001 file_lines 70 -> ...` and exit 1. What makes the growth acceptable
-is that the mark is taken *after* it, with a reason. The ratchet forbids
-loosening past a mark you have earned; it has nothing to say about how you got
-there.
+The file also grew, 48 lines to 70, and the mark does not mind: it records the
+worst function's complexity, the longest function and the suppression count,
+not the file's length (`measure` still prints `file_lines` and `fan_out`;
+LOC001 reports a long file as advice). A file that grows with what it does is
+not debt. A function that grows is. The mark is taken *after* the rescue, with
+a reason: the ratchet forbids loosening past a mark you have earned; it has
+nothing to say about how you got there.
 
 ```
 $ python3 hooks/lib/ratchet.py init pricing.py \
