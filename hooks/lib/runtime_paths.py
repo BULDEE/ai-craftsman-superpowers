@@ -97,6 +97,24 @@ def bound_data(runtime: str, identity: str) -> str:
     return binding['data']
 
 
+def bound_root(runtime: str, identity: str) -> str:
+    # The root the binding names, '' when no binding answers for this session.
+    # Read by every hook through `context`, so a root the hooks no longer run
+    # from is seen without a second process.
+    if not identity:
+        return ''
+    target = binding_path(runtime, identity)
+    if not target.is_file():
+        return ''
+    try:
+        binding = json.loads(target.read_text())
+    except (ValueError, OSError):
+        return ''
+    if not isinstance(binding, dict) or binding.get('host') != runtime or binding.get('session_id') != identity:
+        return ''
+    return str(binding.get('root') or '')
+
+
 def data_dir() -> str:
     runtime, identity = host(), session_id()
     bound = bound_data(runtime, identity)
@@ -150,7 +168,7 @@ def emit_context() -> None:
     except (RuntimeError, ValueError, OSError, KeyError):
         data = ''
     cache = data or cache_dir()
-    sys.stdout.write('\0'.join((session_id(), data, cache)) + '\0')
+    sys.stdout.write('\0'.join((session_id(), data, cache, bound_root(host(), session_id()))) + '\0')
 
 
 def sweep(days: str = '7') -> None:

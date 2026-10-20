@@ -55,15 +55,43 @@ _session_files_id() {
     printf '%s' "${id:0:64}"
 }
 
-session_files_bind() {
-    CRAFTSMAN_SESSION_HOST=$(host_detect "${1:-}")
-    export CRAFTSMAN_SESSION_HOST
+# The plugin root these hooks run from: what the binding records as `root`,
+# and what the cockpit mod reads first to find bin/craftsman-helper.
+_session_files_root() {
+    local lib="${SESSION_FILES_LIB_DIR%/}"
+    lib="${lib%/*}"
+    printf '%s' "${lib%/*}"
+}
+
+# The four fields `runtime_paths.py context` answers for a hook payload: the
+# session id, its data directory, its cache directory, and the plugin root the
+# binding names ('' when no binding answers for this session).
+_session_files_read_context() {
     {
         IFS= read -r -d '' CRAFTSMAN_SESSION_ID || true
         IFS= read -r -d '' _CRAFTSMAN_SESSION_DATA_DIR || true
         IFS= read -r -d '' _CRAFTSMAN_CACHE_DIR || true
+        IFS= read -r -d '' _CRAFTSMAN_BOUND_ROOT || true
     } < <(printf '%s' "${1:-}" | python3 "${SESSION_FILES_LIB_DIR}/runtime_paths.py" context 2>/dev/null)
+}
+
+# A plugin update inside a session: SessionStart bound the root that ran then,
+# and these hooks now run from another one. The cockpit mod trusts the binding
+# before anything else, and a stale root is a helper that does not speak its
+# protocol (`instincts review` on 4.12.3, measured 2026-10-20). Only drift
+# re-registers: with no binding, SessionStart owns the first one.
+_session_files_follow_root() {
+    [[ -n "${_CRAFTSMAN_BOUND_ROOT:-}" ]] || return 0
+    [[ "$_CRAFTSMAN_BOUND_ROOT" != "$(_session_files_root)" ]] || return 0
+    session_files_register
+}
+
+session_files_bind() {
+    CRAFTSMAN_SESSION_HOST=$(host_detect "${1:-}")
+    export CRAFTSMAN_SESSION_HOST
+    _session_files_read_context "${1:-}"
     export CRAFTSMAN_SESSION_ID
+    _session_files_follow_root
     return 0
 }
 
@@ -73,7 +101,7 @@ session_files_register() {
     [[ -n "$directory" ]] || return 0
     python3 "${SESSION_FILES_LIB_DIR}/runtime_paths.py" bind \
         "${CRAFTSMAN_SESSION_HOST:-unknown}" "$(_session_files_id)" \
-        "$(dirname "$(dirname "$SESSION_FILES_LIB_DIR")")" "$directory" 2>/dev/null || true
+        "$(_session_files_root)" "$directory" 2>/dev/null || true
 }
 
 session_cache_dir() {
