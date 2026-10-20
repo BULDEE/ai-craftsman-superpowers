@@ -98,9 +98,7 @@ def bound_data(runtime: str, identity: str) -> str:
 
 
 def bound_root(runtime: str, identity: str) -> str:
-    # The root the binding names, '' when no binding answers for this session.
-    # Read by every hook through `context`, so a root the hooks no longer run
-    # from is seen without a second process.
+    # The root the binding names, '' when none answers: read by every hook via `context`.
     if not identity:
         return ''
     target = binding_path(runtime, identity)

@@ -88,8 +88,6 @@ function toView(answer: Answer, notice: string): CockpitView {
   if ('missing' in answer) return { kind: 'missing', tried: answer.missing }
   const { exitCode, stdout, stderr } = answer.ran
   const queue = exitCode === 0 ? parseQueue(stdout) : undefined
-  // The helper is named: a stale session binding runs one that does not
-  // speak this protocol, and its path is what says so.
   return queue === undefined
     ? { kind: 'failed', message: `${answer.argv0}: ${firstLine(stderr) || `instincts review exited ${exitCode}`}` }
     : { kind: 'ready', queue, notice }
