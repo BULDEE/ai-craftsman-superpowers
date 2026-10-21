@@ -254,6 +254,18 @@ if grep -q '^v2$' "$SYMLINK_ROOT/skills/my-command/SKILL.md"; then
 else
     log_fail "Skill refresh" "copy still holds the old content"
 fi
+# A sync with nothing to change leaves the copy where it is. It used to delete
+# every pack skill and copy it back on each SessionStart, and Claude Code
+# discovers skills while those hooks run: a session looking in between found
+# the skill missing. Same inode means the file was never replaced.
+_inode() { ls -id "$1" 2>/dev/null | awk '{print $1}'; }
+INODE_BEFORE=$(_inode "$SYMLINK_ROOT/skills/my-command/SKILL.md")
+CLAUDE_PLUGIN_ROOT="$SYMLINK_ROOT" pack_sync_symlinks
+if [[ -n "$INODE_BEFORE" && "$INODE_BEFORE" == "$(_inode "$SYMLINK_ROOT/skills/my-command/SKILL.md")" ]]; then
+    log_pass "a sync with nothing to change keeps the pack skill in place (same file)"
+else
+    log_fail "Skill churn" "the copy was replaced by a sync that had nothing to change"
+fi
 rm -f "$SYMLINK_ROOT/skills/my-command/SKILL.md"
 ln -sf "../../../$(basename "$TEST_PACKS_DIR")/test-symlink/commands/my-command.md" "$SYMLINK_ROOT/skills/my-command/SKILL.md"
 CLAUDE_PLUGIN_ROOT="$SYMLINK_ROOT" pack_sync_symlinks

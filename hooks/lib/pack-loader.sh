@@ -546,12 +546,13 @@ pack_loaded() {
 
 # Portable relative path: GNU realpath --relative-to is absent on BSD/macOS
 # (it fails and yields an empty string, producing empty-target symlinks).
-# Fallback chain: GNU realpath -> python3 os.path.relpath -> absolute path.
+# Fallback chain: GNU realpath -> lexical -> python3 os.path.relpath -> absolute path.
 _pack_relpath() {
     local target_dir="$1"
     local src_file="$2"
     local rel
     rel=$(realpath --relative-to="$target_dir" "$src_file" 2>/dev/null)
+    [[ -z "$rel" ]] && rel=$(_pack_relpath_lexical "$target_dir" "$src_file")
     if [[ -z "$rel" ]]; then
         rel=$(python3 -c 'import os, sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "$src_file" "$target_dir" 2>/dev/null)
     fi
@@ -559,6 +560,23 @@ _pack_relpath() {
         rel="$src_file"
     fi
     printf '%s' "$rel"
+}
+
+# os.path.relpath without the python3 start, which was a third of a macOS
+# session start: one per pack file, every session. For two absolute paths free
+# of `.`, `..` and `//`, a file outside the directory it is measured from,
+# relpath is a pure prefix computation; anything else returns 1 and goes on
+# down the chain.
+_pack_relpath_lexical() {
+    local from="$1" to="$2" common up=""
+    [[ "$from" == /* && "$to" == /* && "$from/" != "$to"/* ]] || return 1
+    case "$from/ $to/" in *//*|*/./*|*/../*) return 1 ;; esac
+    common="$from"
+    while [[ "$to" != "$common"/* ]]; do
+        common="${common%/*}"
+        up="../$up"
+    done
+    printf '%s%s' "$up" "${to#"$common"/}"
 }
 
 _sync_symlink_type() {
@@ -569,7 +587,7 @@ _sync_symlink_type() {
     for src_file in "$pack_dir/$type_dir/"*.md; do
         [[ ! -f "$src_file" ]] && continue
         local basename rel_path
-        basename=$(basename "$src_file")
+        basename="${src_file##*/}"
         # Shipped agent copies are built and checked before installation.
         # Keep regular files intact; only runtime-owned links are refreshed.
         [[ -f "$target_dir/$basename" && ! -L "$target_dir/$basename" ]] && continue
@@ -595,7 +613,8 @@ _sync_pack_skills() {
     for src_file in "$pack_dir/commands/"*.md; do
         [[ ! -f "$src_file" ]] && continue
         local name rel_path target
-        name=$(basename "$src_file" .md)
+        name="${src_file##*/}"
+        name="${name%.md}"
         target="$skills_root/$name/SKILL.md"
         mkdir -p "$skills_root/$name"
         rel_path=$(_pack_relpath "$skills_root/$name" "$src_file")
@@ -604,18 +623,44 @@ _sync_pack_skills() {
         if ! cmp -s -- "$src_file" "$target" 2>/dev/null; then
             cp -- "$src_file" "$target.tmp.$$" && mv -f -- "$target.tmp.$$" "$target"
         fi
-        printf '%s\n' "$rel_path" > "$skills_root/$name/$PACK_SKILL_SOURCE_FILE"
+        _pack_write_sidecar "$skills_root/$name/$PACK_SKILL_SOURCE_FILE" "$rel_path"
     done
+}
+
+# Rewritten only when it would change: the plugin directory is shared by every
+# session on the machine, and a write per session per skill buys nothing.
+_pack_write_sidecar() {
+    local sidecar="$1" rel_path="$2" current=""
+    { IFS= read -r current < "$sidecar"; } 2>/dev/null
+    [[ "$current" == "$rel_path" ]] || printf '%s\n' "$rel_path" > "$sidecar"
+}
+
+# The skill names the loaded packs serve, one per line between newlines, so a
+# name is tested whole: `*$'\n'name$'\n'*`.
+_pack_served_skills() {
+    local packs_dir="$1" pack_name src names=$'\n'
+    while IFS= read -r pack_name; do
+        [[ -z "$pack_name" ]] && continue
+        for src in "$packs_dir/$pack_name/commands/"*.md; do
+            [[ -f "$src" ]] || continue
+            src="${src##*/}"
+            names="${names}${src%.md}"$'\n'
+        done
+    done <<< "$(pack_loaded)"
+    printf '%s' "$names"
 }
 
 # Does this skill directory hold a pack's copy (sidecar naming a source under
 # packs/), or the symlink an older version left? Either is the pack's to sweep.
 _pack_owns_skill() {
-    local skill_md="$1" packs_dir="$2" sidecar source
+    local skill_md="$1" packs_dir="$2" sidecar source rel=""
     _pack_owns_symlink "$skill_md" "$packs_dir" && return 0
-    sidecar="$(dirname "$skill_md")/$PACK_SKILL_SOURCE_FILE"
+    sidecar="${skill_md%/*}/$PACK_SKILL_SOURCE_FILE"
     [[ -f "$sidecar" ]] || return 1
-    source=$(cd "$(dirname "$skill_md")" 2>/dev/null && cd "$(dirname "$(cat "$sidecar")")" 2>/dev/null && pwd) || return 0
+    { IFS= read -r rel < "$sidecar"; } 2>/dev/null
+    # dirname, in-shell: a name with no slash is in `.`.
+    [[ "$rel" == */* ]] && rel="${rel%/*}" || rel=.
+    source=$(cd "${skill_md%/*}" 2>/dev/null && cd "$rel" 2>/dev/null && pwd) || return 0
     [[ "$source" == "$packs_dir"/* ]]
 }
 
@@ -634,6 +679,23 @@ _pack_owns_symlink() {
     [[ "$target" == "$packs_dir"/* ]]
 }
 
+# Removes the skill copies a pack owns and no loaded pack serves any more. A
+# skill a loaded pack still serves is refreshed in place by _sync_pack_skills,
+# never removed and copied back: Claude Code discovers skills while
+# SessionStart hooks run, and a session that looked in between found it missing.
+_pack_sweep_skills() {
+    local root="$1" packs_dir="$2" served skill_dir
+    served="$(_pack_served_skills "$packs_dir")"$'\n'
+    for skill_dir in "$root/skills/"*/SKILL.md; do
+        _pack_owns_skill "$skill_dir" "$packs_dir" || continue
+        skill_dir="${skill_dir%/SKILL.md}"
+        [[ "$served" == *$'\n'"${skill_dir##*/}"$'\n'* ]] && continue
+        rm -f -- "$skill_dir/SKILL.md" "$skill_dir/$PACK_SKILL_SOURCE_FILE"
+        # Only the directory this loop just emptied, never a core skill's.
+        rmdir "$skill_dir" 2>/dev/null || true
+    done
+}
+
 pack_sync_symlinks() {
     local root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
     local packs_dir="${_PACKS_DIR:-$root/packs}"
@@ -642,12 +704,7 @@ pack_sync_symlinks() {
     for f in "$root/agents/"*.md; do
         _pack_owns_symlink "$f" "$packs_dir" && rm -- "$f"
     done
-    for f in "$root/skills/"*/SKILL.md; do
-        _pack_owns_skill "$f" "$packs_dir" || continue
-        rm -f -- "$f" "$(dirname "$f")/$PACK_SKILL_SOURCE_FILE"
-        # Only the directory this loop just emptied, never a core skill's.
-        rmdir "$(dirname "$f")" 2>/dev/null || true
-    done
+    _pack_sweep_skills "$root" "$packs_dir"
 
     local pack_name
     while IFS= read -r pack_name; do
