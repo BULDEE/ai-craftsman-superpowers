@@ -82,6 +82,7 @@
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":7,"path":"hooks/lib/secret-patterns.sh"},
 {"complexity":4,"ignores":0,"instrument":3,"max_fn_lines":14,"path":"hooks/lib/session-files.sh","reason":"CR-279: the binding follows the plugin root the hooks run from (re-registered on drift after an in-session update); bind split into read_context, follow_root and root helpers, longest function unchanged at 14 lines"},
 {"complexity":6,"ignores":0,"instrument":3,"max_fn_lines":28,"path":"hooks/lib/session_state.py","reason":"CR-255: a run that tested nothing refuses the skill's set-verified like a failure does; the refusals moved to SKILL_REFUSALS so set-verified stays short"},
+{"complexity":2,"ignores":0,"instrument":3,"max_fn_lines":8,"path":"hooks/lib/skill-frontmatter.sh"},
 {"complexity":5,"ignores":0,"instrument":3,"max_fn_lines":17,"path":"hooks/lib/static-analysis.sh","reason":"CR-174: a crash or a stopped run is reported as ANALYSER001 (sa_declare_incomplete), with its witnesses"},
 {"complexity":7,"ignores":1,"instrument":3,"max_fn_lines":16,"path":"hooks/lib/structural.sh","reason":"the dialect is read over the known registry, which autoinits in a validator-only harness (CR-108)"},
 {"complexity":15,"ignores":1,"instrument":3,"max_fn_lines":36,"path":"hooks/lib/structural_metrics.py","reason":"the engine holds no list of languages (CR-108): registry consumers replace the literals"},

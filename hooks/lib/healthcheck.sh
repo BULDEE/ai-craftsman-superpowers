@@ -16,6 +16,7 @@
 # "load status unknown" about itself (measured 2026-09-20).
 _HC_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 type host_detect >/dev/null 2>&1 || source "${_HC_LIB_DIR}/host.sh"
+type skill_locked_files >/dev/null 2>&1 || source "${_HC_LIB_DIR}/skill-frontmatter.sh"
 
 declare -a _HC_NAMES=()
 declare -a _HC_STATUSES=()
@@ -493,20 +494,19 @@ hc_check_lsp() {
 # reach seven. Read from the frontmatter, the same authority the routing table
 # reads, so the two numbers cannot disagree.
 hc_check_skills() {
-    local root skill total=0 invocable=0
+    local root skill locked=0 skills=()
     root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
     for skill in "$root"/skills/*/SKILL.md; do
-        [[ -f "$skill" ]] || continue
-        total=$((total + 1))
-        awk 'NR==1 && $0=="---"{inside=1;next} inside && $0=="---"{exit} inside' "$skill" \
-            | grep -q '^disable-model-invocation:[[:space:]]*true' && continue
-        invocable=$((invocable + 1))
+        [[ -f "$skill" ]] && skills+=("$skill")
     done
-    if [[ "$total" -eq 0 ]]; then
+    if [[ ${#skills[@]} -eq 0 ]]; then
         _hc_record "skills" "warn" "none found"
         return
     fi
-    _hc_record "skills" "ok" "${invocable} of ${total} model-invocable, $((total - invocable)) user-typed"
+    while IFS= read -r skill; do
+        locked=$((locked + 1))
+    done < <(skill_locked_files "${skills[@]}")
+    _hc_record "skills" "ok" "$(( ${#skills[@]} - locked )) of ${#skills[@]} model-invocable, ${locked} user-typed"
 }
 
 hc_run_all() {

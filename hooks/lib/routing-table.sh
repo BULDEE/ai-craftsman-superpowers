@@ -10,6 +10,9 @@
 #   routing_table   # Returns the routing block string
 # =============================================================================
 
+_ROUTE_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+type skill_locked_files >/dev/null 2>&1 || source "${_ROUTE_LIB_DIR}/skill-frontmatter.sh"
+
 _register_core_routes() {
     echo "
 - Bug, error, crash, test failure, unexpected behavior → /craftsman:debug
@@ -115,12 +118,23 @@ _route_skill_file() {
     return 1
 }
 
+# Every candidate's lock, read once per table (skill-frontmatter.sh), framed by
+# newlines so a path is tested whole. _route_is_model_invocable reads it.
+_ROUTE_LOCKED=""
+_route_load_locks() {
+    local root file files=()
+    root="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+    for file in "$root"/skills/*/SKILL.md "$root"/packs/*/commands/*.md; do
+        [[ -f "$file" ]] && files+=("$file")
+    done
+    _ROUTE_LOCKED=$'\n'"$(skill_locked_files ${files[@]+"${files[@]}"})"$'\n'
+}
+
 _route_is_model_invocable() {
     local file
     # No skill file at all: not something the model can call.
     file=$(_route_skill_file "$1") || return 1
-    ! awk 'NR==1 && $0=="---"{inside=1;next} inside && $0=="---"{exit} inside' "$file" \
-        | grep -q '^disable-model-invocation:[[:space:]]*true'
+    [[ "$_ROUTE_LOCKED" != *$'\n'"$file"$'\n'* ]]
 }
 
 _route_command_name() {
@@ -147,10 +161,10 @@ _route_display_line() {
 routing_table() {
     local packs
     packs=$(pack_loaded 2>/dev/null || echo "")
-    local routes=""
-    routes="${routes}$(_register_core_routes)"
-    routes="${routes}$(_register_pack_routes "$packs")"
+    local routes
+    routes="$(_register_core_routes)$(_register_pack_routes "$packs")"
     local invocable="" typed="" line name
+    _route_load_locks
     while IFS= read -r line; do
         [[ "$line" == "- "* ]] || continue
         name=$(_route_command_name "$line")
