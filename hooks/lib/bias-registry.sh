@@ -23,6 +23,11 @@
 # =============================================================================
 
 BIAS_REGISTERED_LANGS=()
+# The variable suffix of each registered tag, index for index, derived once by
+# the audit. bias_combined_pattern runs on every prompt and at every Stop, and
+# deriving 13 suffixes inside it cost 13 subshells per call: 221 of them per
+# prompt, half of the bias detector's time.
+_BIAS_REGISTERED_SUFFIXES=()
 
 # Language tags are BCP 47 (RFC 5646): "fr", and equally "fr-CA", "pt-BR",
 # "zh-Hant". A bare language subtag is a valid tag on its own, so the shipped
@@ -43,6 +48,7 @@ BIAS_REGISTERED_LANGS=()
 # Bash 3.2 has no ${x^^}, so the table is spelled out. Only [a-z] is mapped;
 # anything else is passed through, which keeps a glob character in a tag from
 # being read as a pattern by the prefix trick below.
+# The result lands in _BIAS_SUFFIX, not on stdout: `$(...)` is a subshell too.
 _BIAS_LOWER="abcdefghijklmnopqrstuvwxyz"
 _BIAS_UPPER="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -66,7 +72,7 @@ _bias_var_suffix() {
             fi
         fi
     done
-    printf '%s' "$out"
+    _BIAS_SUFFIX="$out"
 }
 
 # A registered tag whose MODE never landed means its conf declared variables
@@ -74,15 +80,17 @@ _bias_var_suffix() {
 # stderr the way lang-registry.sh reports a missing python3, and drop the tag
 # so no caller reads a half-registered language as a working one.
 _bias_registry_audit() {
-    local lang suffix mode_variable kept=()
+    local lang mode_variable kept=()
+    _BIAS_REGISTERED_SUFFIXES=()
     for lang in ${BIAS_REGISTERED_LANGS[@]+"${BIAS_REGISTERED_LANGS[@]}"}; do
-        suffix=$(_bias_var_suffix "$lang")
-        mode_variable="BIAS_${suffix}_MODE"
+        _bias_var_suffix "$lang"
+        mode_variable="BIAS_${_BIAS_SUFFIX}_MODE"
         if [[ -n "${!mode_variable:-}" ]]; then
             kept+=("$lang")
+            _BIAS_REGISTERED_SUFFIXES+=("$_BIAS_SUFFIX")
             continue
         fi
-        echo "craftsman: bias pattern file for '$lang' declared no BIAS_${suffix}_MODE, so that language is NOT loaded" >&2
+        echo "craftsman: bias pattern file for '$lang' declared no BIAS_${_BIAS_SUFFIX}_MODE, so that language is NOT loaded" >&2
     done
     BIAS_REGISTERED_LANGS=(${kept[@]+"${kept[@]}"})
     return 0
@@ -92,17 +100,16 @@ _bias_registry_audit() {
 # Re-init resets state: a second call with a different directory must not
 # serve the first directory's patterns.
 bias_registry_init() {
-    local directory="$1" pattern_file lang
-    # Unset every variable a previous init registered, then the list itself.
-    for lang in ${BIAS_REGISTERED_LANGS[@]+"${BIAS_REGISTERED_LANGS[@]}"}; do
-        local suffix
-        suffix=$(_bias_var_suffix "$lang")
+    local directory="$1" pattern_file suffix
+    # Unset every variable a previous init registered, then the lists.
+    for suffix in ${_BIAS_REGISTERED_SUFFIXES[@]+"${_BIAS_REGISTERED_SUFFIXES[@]}"}; do
         unset "BIAS_${suffix}_MODE" \
               "BIAS_${suffix}_ACCELERATION" "BIAS_${suffix}_SCOPE_CREEP" \
               "BIAS_${suffix}_OVER_OPT" "BIAS_${suffix}_DOMAIN_MODELING" \
               "BIAS_${suffix}_TEST_DISMISSAL" 2>/dev/null || true
     done
     BIAS_REGISTERED_LANGS=()
+    _BIAS_REGISTERED_SUFFIXES=()
 
     [[ -d "$directory" ]] || return 0
     for pattern_file in "$directory"/*.conf; do
@@ -121,9 +128,8 @@ bias_registry_init() {
 # checkable state and never an empty string.
 bias_combined_pattern() {
     local category="$1" mode="$2"
-    local lang suffix mode_variable pattern_variable pattern combined=""
-    for lang in ${BIAS_REGISTERED_LANGS[@]+"${BIAS_REGISTERED_LANGS[@]}"}; do
-        suffix=$(_bias_var_suffix "$lang")
+    local suffix mode_variable pattern_variable pattern combined=""
+    for suffix in ${_BIAS_REGISTERED_SUFFIXES[@]+"${_BIAS_REGISTERED_SUFFIXES[@]}"}; do
         mode_variable="BIAS_${suffix}_MODE"
         [[ "${!mode_variable:-}" == "$mode" ]] || continue
         pattern_variable="BIAS_${suffix}_${category}"

@@ -74,6 +74,17 @@ else
     log_fail "caller idiom" "grep ran against an unclaimed category"
 fi
 
+# Two languages of one mode on one category: both reach the alternation.
+assert_aggregates_every_language() {
+    local pattern
+    pattern=$(bias_combined_pattern ACCELERATION signal) || pattern=""
+    if [[ "$pattern" == *bb-schnell* && "$pattern" == *cc-vite* ]]; then
+        log_pass "every language of a mode contributes to the combined pattern"
+    else
+        log_fail "aggregation across languages" "got '$pattern'"
+    fi
+}
+
 echo ""
 echo "--- Add a language without touching code ---"
 
@@ -81,12 +92,14 @@ cat > "$FIXTURE_DIR/cc.conf" <<'EOF'
 BIAS_REGISTERED_LANGS+=("cc")
 BIAS_CC_MODE="signal"
 BIAS_CC_OVER_OPT="cc-generic"
+BIAS_CC_ACCELERATION="cc-vite"
 EOF
 
 bias_registry_init "$FIXTURE_DIR"
 pattern=$(bias_combined_pattern OVER_OPT signal) \
     && assert_contains "new conf file registers with zero code edits" "$pattern" "cc-generic" \
     || log_fail "cc.conf should register" "OVER_OPT signal returned non-zero"
+assert_aggregates_every_language
 
 echo ""
 echo "--- Re-init resets state (no leakage across pattern sets) ---"

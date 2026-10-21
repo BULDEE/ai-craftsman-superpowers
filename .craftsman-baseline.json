@@ -200,7 +200,7 @@
 {"complexity":1,"ignores":0,"instrument":3,"max_fn_lines":5,"path":"tests/core/test-background-test-runs.sh","reason":"CR-218: a background test run resolves on its task notification; killed and codeless notifications covered after the final review"},
 {"complexity":3,"ignores":0,"instrument":3,"max_fn_lines":15,"path":"tests/core/test-bias-detector.sh"},
 {"complexity":6,"ignores":0,"instrument":3,"max_fn_lines":41,"path":"tests/core/test-bias-recall.sh"},
-{"complexity":21,"ignores":0,"instrument":3,"max_fn_lines":169,"path":"tests/core/test-bias-registry.sh"},
+{"complexity":3,"ignores":0,"instrument":3,"max_fn_lines":9,"path":"tests/core/test-bias-registry.sh"},
 {"complexity":2,"ignores":1,"instrument":3,"max_fn_lines":13,"path":"tests/core/test-brace-scanner.sh","reason":"spy guard replaces the grep guard (#38 review 2)"},
 {"complexity":1,"ignores":0,"instrument":3,"max_fn_lines":8,"path":"tests/core/test-circuit-breaker.sh"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":4,"path":"tests/core/test-command-docs.sh"},
