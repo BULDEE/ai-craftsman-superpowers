@@ -344,6 +344,16 @@ def _skill_refusal(state: dict) -> str:
     return next((message for flag, message in SKILL_REFUSALS if state.get(flag)), '')
 
 
+def mark_verified(state: dict) -> None:
+    """Record the evidence and lift every refusal a passing run answers."""
+    import datetime
+
+    state['last_test_failed'] = False
+    state['last_test_empty'] = False
+    state['verified'] = True
+    state['verified_at'] = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+
 def handle_set_verified(arguments: list[str]) -> None:
     """Set verified=true in session state.
 
@@ -352,18 +362,13 @@ def handle_set_verified(arguments: list[str]) -> None:
     from the bridge file and the environment, for skills running in the Bash
     tool.
     """
-    import datetime
-
     state_path = arguments[0] if arguments else _resolve_session_state_path()
     state = read_state(state_path)
     refusal = '' if arguments else _skill_refusal(state)
     if refusal:
         print(refusal, file=sys.stderr)
         sys.exit(1)
-    state['last_test_failed'] = False
-    state['last_test_empty'] = False
-    state['verified'] = True
-    state['verified_at'] = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    mark_verified(state)
     write_state_atomically(state_path, state)
     print(f'verified=true at {state_path}')
 

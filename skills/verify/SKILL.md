@@ -292,6 +292,12 @@ Failed asserting that 'invalid' matches expected 'valid@email.com'.
 **Confirmation bias:** "One test failed but it's minor"
 → A failure is a failure. Fix it first.
 
+**Normalisation:** "It's flaky", "it passes alone", "it was already red", "unrelated to my change"
+→ A test red in the suite and green alone depends on shared state, order, time or the filesystem: find which. Running it alone does not restore the evidence the suite run revoked; only the suite green does. If the cause is not fixed in this session, open a ticket and name its identifier in the report.
+
+**Pre-existing warnings:** "N deprecations, pre-existing, not mine"
+→ Reported is not handled. Fix them, or ticket them with an identifier; never list them as the verdict's footnote.
+
 ## Session State
 
 The `set-verified` step is in the "MANDATORY: Mark Session Verified" section above.

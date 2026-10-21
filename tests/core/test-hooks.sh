@@ -796,18 +796,19 @@ else
     log_fail "dispatch-context doctrine" "doctrine section missing from output"
 fi
 
-# Test: Stop has 2 command hooks (sentry-context + final-review); the DDD
-# verifier lives on PostToolUse in v4 (ADR-0018)
+# Test: Stop has 3 command hooks (dismissal guard, sentry-context,
+# final-review); the DDD verifier lives on PostToolUse in v4 (ADR-0018)
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 hooks = d['hooks']['Stop'][0]['hooks']
-assert len(hooks) == 2, f'Expected 2 Stop hooks, got {len(hooks)}'
+assert len(hooks) == 3, f'Expected 3 Stop hooks, got {len(hooks)}'
 assert all(h['type'] == 'command' for h in hooks)
-assert 'agent-sentry-context.sh' in hooks[0]['command']
-assert 'agent-final-review.sh' in hooks[1]['command']
+names = [h['command'] for h in hooks]
+for script in ('test-dismissal-guard.sh', 'agent-sentry-context.sh', 'agent-final-review.sh'):
+    assert any(script in n for n in names), script
 " 2>/dev/null; then
-    log_pass "Stop: 2 command hooks (sentry, final-review)"
+    log_pass "Stop: 3 command hooks (dismissal guard, sentry, final-review)"
 else
     log_fail "Stop hook" "missing or invalid"
 fi
@@ -900,16 +901,22 @@ else
     log_fail "PreCompact hook" "missing or invalid"
 fi
 
-# Test: Stop hooks have async: true
+# Test: the agent Stop hooks are async (they call a model; the session end
+# must not wait on them). The dismissal guard is the one synchronous Stop
+# hook: an async hook cannot keep the turn open, and it reads only the
+# session state and the payload (CR-289).
 if python3 -c "
 import json
 d = json.load(open('$HOOKS_FILE'))
 hooks = d['hooks']['Stop'][0]['hooks']
-assert all(h.get('async') == True for h in hooks), 'All Stop hooks should be async'
+agents = [h for h in hooks if '/hooks/agent-' in h['command']]
+assert len(agents) == 2 and all(h.get('async') == True for h in agents), 'agent Stop hooks should be async'
+sync = [h for h in hooks if not h.get('async')]
+assert len(sync) == 1 and 'test-dismissal-guard.sh' in sync[0]['command'], 'only the dismissal guard is synchronous'
 " 2>/dev/null; then
-    log_pass "Stop hooks: all async (non-blocking session end)"
+    log_pass "Stop hooks: agent hooks async, the dismissal guard alone synchronous"
 else
-    log_fail "Stop hooks async" "expected all async: true"
+    log_fail "Stop hooks async" "expected the agent hooks async and only test-dismissal-guard.sh synchronous"
 fi
 
 # Test: PreToolUse Bash handler carries the conditional if field (handler level, where Claude Code reads it)

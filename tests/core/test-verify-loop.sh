@@ -275,6 +275,115 @@ else
     log_pass "the hook holds no runner's wording: the packs declare it"
 fi
 
+echo ""
+echo "=== A narrower green run does not restore a wider red one (CR-289) ==="
+
+# Reported from a real session: the suite failed on one test, the agent ran
+# that test alone, saw it pass, called it flaky and moved on. The hook granted
+# the evidence on the filtered run and erased the failure. A run that passes
+# with an argument the red run did not have may have run less (a filter, a
+# path, a test name); which flags narrow is each runner's business, so any
+# added argument counts as narrowing.
+SCOPE_STATE="$PROOF_DATA/session-state-scope.json"
+scope_run() {
+    local outcome="$1" command="$2" stdout="${3:-OK (120 tests, 340 assertions)}"
+    if [[ "$outcome" == pass ]]; then
+        jq -n --arg c "$command" --arg o "$stdout" \
+            '{session_id: "scope", hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: {command: $c},
+              tool_response: {stdout: $o, stderr: "", interrupted: false, isImage: false}}'
+    else
+        jq -n --arg c "$command" \
+            '{session_id: "scope", hook_event_name: "PostToolUseFailure", tool_name: "Bash", tool_input: {command: $c},
+              error: "Exit code 1\nFAILURES!\nTests: 120, Assertions: 339, Failures: 1.", is_interrupt: false}'
+    fi | env -u CLAUDE_CODE_SESSION_ID -u CRAFTSMAN_SESSION_ID HOME="$PROOF_HOME" CRAFTSMAN_RUNTIME_HOME="$PROOF_HOME" \
+        CLAUDE_PLUGIN_DATA="$PROOF_DATA" bash "$ROOT_DIR/hooks/post-bash-test-verify.sh" 2>&1
+}
+scope_flag() { jq -r ".$1 // false" "$SCOPE_STATE" 2>/dev/null; }
+fresh_scope() { echo '{"verified": false}' > "$SCOPE_STATE"; }
+
+# Control: a green suite on a fresh session grants. Without it, every "not
+# granted" below could be an instrument that grants nothing.
+fresh_scope
+scope_run pass "vendor/bin/phpunit" >/dev/null
+if [[ "$(scope_flag verified)" == "true" ]]; then
+    log_pass "control: a green suite grants the evidence"
+
+    fresh_scope
+    scope_run fail "vendor/bin/phpunit" >/dev/null
+    OUTPUT=$(scope_run pass "vendor/bin/phpunit --filter testOrderIsRateLimited" "OK (1 test, 2 assertions)")
+    if [[ "$(scope_flag verified)" == "false" && "$(scope_flag last_test_failed)" == "true" \
+          && "$OUTPUT" == *"'vendor/bin/phpunit'"* ]]; then
+        log_pass "the failing test alone, green, does not restore the suite's evidence and names the red run"
+    else
+        log_fail "a filtered green run after a red suite" "state=$(jq -c . "$SCOPE_STATE") output=$OUTPUT"
+    fi
+
+    scope_run pass "vendor/bin/phpunit" >/dev/null
+    if [[ "$(scope_flag verified)" == "true" && "$(scope_flag last_test_failed)" == "false" ]]; then
+        log_pass "the whole suite green afterwards restores it"
+    else
+        log_fail "the suite green after the filtered run" "state=$(jq -c . "$SCOPE_STATE")"
+    fi
+
+    fresh_scope
+    scope_run fail "vendor/bin/phpunit --filter testInvoiceTotal" >/dev/null
+    scope_run pass "vendor/bin/phpunit" >/dev/null
+    if [[ "$(scope_flag verified)" == "true" ]]; then
+        log_pass "a narrow red run is cleared by the whole suite green"
+    else
+        log_fail "the suite green after a narrow red run" "state=$(jq -c . "$SCOPE_STATE")"
+    fi
+
+    fresh_scope
+    scope_run fail "pytest" >/dev/null
+    scope_run pass "npm test" "12 passing (40ms)" >/dev/null
+    if [[ "$(scope_flag verified)" == "false" ]]; then
+        log_pass "another suite's green run does not clear this suite's failure"
+    else
+        log_fail "another suite green after a red pytest" "state=$(jq -c . "$SCOPE_STATE")"
+    fi
+    scope_run pass "pytest" "120 passed in 3.10s" >/dev/null
+    if [[ "$(scope_flag verified)" == "true" ]]; then
+        log_pass "both suites green: the evidence is granted"
+    else
+        log_fail "both suites green" "state=$(jq -c . "$SCOPE_STATE")"
+    fi
+
+    # The red phase of TDD on one test must not hide the suite that was red
+    # before it: every red run stays outstanding until a run as wide passes.
+    fresh_scope
+    scope_run fail "vendor/bin/phpunit" >/dev/null
+    scope_run fail "vendor/bin/phpunit --filter testOrderShips" >/dev/null
+    scope_run pass "vendor/bin/phpunit --filter testOrderShips" "OK (1 test, 3 assertions)" >/dev/null
+    if [[ "$(scope_flag verified)" == "false" ]]; then
+        log_pass "a test driven green on its own leaves the earlier red suite outstanding"
+    else
+        log_fail "TDD on one test after a red suite" "state=$(jq -c . "$SCOPE_STATE")"
+    fi
+
+    # The same suite started through a launcher or another path to the same
+    # runner is the same run, not a narrower one.
+    fresh_scope
+    scope_run fail "vendor/bin/phpunit" >/dev/null
+    scope_run pass "php vendor/bin/phpunit" >/dev/null
+    if [[ "$(scope_flag verified)" == "true" ]]; then
+        log_pass "the same suite behind a launcher clears the red run"
+    else
+        log_fail "the same suite behind a launcher" "state=$(jq -c . "$SCOPE_STATE")"
+    fi
+    fresh_scope
+    scope_run fail "vendor/bin/phpunit" >/dev/null
+    scope_run pass "./vendor/bin/phpunit" >/dev/null
+    if [[ "$(scope_flag verified)" == "true" ]]; then
+        log_pass "the same runner through another path clears the red run"
+    else
+        log_fail "the same runner through another path" "state=$(jq -c . "$SCOPE_STATE")"
+    fi
+else
+    log_fail "control: a green suite grants the evidence" \
+        "granted nothing: state=$(jq -c . "$SCOPE_STATE" 2>/dev/null); the scope assertions are undetermined"
+fi
+
 rm -rf "$FAKE_HOME"
 
 test_summary
