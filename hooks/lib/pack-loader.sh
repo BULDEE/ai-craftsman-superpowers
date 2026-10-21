@@ -153,7 +153,10 @@ _pack_yml_cache_key() {
 # pack developer's everyday loop, which the cache comment claimed to protect.
 _pack_yml_identity() {
     # The loop names a manifest packs/go//pack.yml, the list packs/go/pack.yml.
-    local path="${1//\/\//\/}" before
+    # A bare `/` replacement: bash 3.2 keeps the backslash of `\/` in the
+    # result, so packs/go\/pack.yml matched nothing and every manifest was
+    # stat'ed on its own anyway.
+    local path="${1//\/\///}" before
     if [[ "$_PACK_YML_IDENTITIES" == *$'\t'"$path"$'\n'* ]]; then
         before="${_PACK_YML_IDENTITIES%%$'\t'"$path"$'\n'*}"
         printf '%s' "${before##*$'\n'}"

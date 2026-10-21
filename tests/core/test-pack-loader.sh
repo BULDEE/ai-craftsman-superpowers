@@ -622,4 +622,24 @@ else
     log_fail "pack skill copies drift from their sources" "run pack_sync_symlinks:${DRIFT}"
 fi
 
+# The identity list answers for a manifest named the way the loop names it,
+# packs/go//pack.yml, without a stat. A fallback stat returns the same identity,
+# so no output can tell the two apart: a stat on PATH that records being called
+# is the witness. Under bash 3.2 the lookup missed every time and nobody saw it.
+check_identity_served_from_list() {
+    local stub
+    stub=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-stat-stub.XXXXXX")
+    printf '#!/bin/sh\necho called >> "%s/calls"\nexit 1\n' "$stub" > "$stub/stat"
+    chmod +x "$stub/stat"
+    _pack_yml_identities_load "$ROOT_DIR"/packs/*/pack.yml
+    PATH="$stub:$PATH" _pack_yml_identity "$ROOT_DIR/packs/go//pack.yml" >/dev/null
+    if [[ ! -f "$stub/calls" ]]; then
+        log_pass "a manifest named with the loop's // is answered from the identity list, no stat"
+    else
+        log_fail "identity list lookup" "stat ran for a manifest the list holds"
+    fi
+    rm -rf "$stub"
+}
+check_identity_served_from_list
+
 test_summary
