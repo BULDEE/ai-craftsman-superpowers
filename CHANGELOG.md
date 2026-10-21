@@ -63,6 +63,14 @@ SEC001 is never ignorable: move the value to the environment and rotate it.
 
 ### Fixed
 
+- A new interactive Claude Code session was taken for a Codex session: its
+  SessionStart carries `model` and no `prompt_id`, which the host detection
+  read as Codex. The session binding went under `~/.codex`, the startup
+  healthcheck talked about Codex, and the cockpit mod's `/instincts` pane
+  said "craftsman-helper not found". Found on 32 sessions of one machine
+  since 4.12.3. Claude Code's `scratchpad_dir` now names it, and `model`
+  means Codex on SessionStart only with Codex's `permission_mode`; the
+  interactive payload is captured as a fixture (CR-291).
 - The structural ratchet measured every PSR-12 method (opening brace on its
   own line) as complexity 0 over one line, and a multi-line signature as its
   signature only: it closed the function on the brace. It now finds the body

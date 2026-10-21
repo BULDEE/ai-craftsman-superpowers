@@ -103,6 +103,12 @@ for f in "$ROOT_DIR"/tests/fixtures/hosts/claude-code/*/*.json; do
     [[ "$f" == *hook-env* ]] && continue
     [[ "$(env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID PLUGIN_ROOT=/p bash -c "source '$ROOT_DIR/hooks/lib/host.sh'; host_detect \"\$(cat '$f')\"")" == claude-code ]] || H_MISS="$H_MISS claude:$(basename "$f")"
 done
+# Claude Code's interactive SessionStart without its scratchpad (the reference:
+# absent when the session has none) still carries `model` and no
+# `prompt_id`, which read as Codex until CR-291.
+NO_SCRATCH=$(jq -c 'del(.scratchpad_dir)' "$ROOT_DIR/tests/fixtures/hosts/claude-code/2.1.304/session-start.interactive.json")
+[[ "$(env -u CLAUDECODE -u CLAUDE_CODE_SESSION_ID bash -c "source '$ROOT_DIR/hooks/lib/host.sh'; host_detect '$NO_SCRATCH'")" == claude-code ]] \
+    || H_MISS="$H_MISS claude:session-start.interactive-without-scratchpad"
 if [[ "$H1" == codex && "$H2" == codex && "$H3" == claude-code && "$H4" == unknown && -z "$H_MISS" ]]; then
     log_pass "host_detect: every captured event names its host under the other host's environment; anonymous is unknown"
 else

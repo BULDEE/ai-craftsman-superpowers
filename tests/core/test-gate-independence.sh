@@ -113,10 +113,16 @@ done
 # config-protection.sh is the one legitimate reader (CR-204 F4): under
 # bypassPermissions an ask proceeds unseen, so it turns the gate's own config
 # from ask into deny. The matrix below pins that it only ever hardens.
+# hooks/lib/host.sh names the host by the key's PRESENCE (Codex's
+# SessionStart carries it, Claude Code's does not, CR-291) and never reads
+# its value: any other use there is a reader like the others.
 hits=$(grep -l 'permission_mode' "$ROOT_DIR"/hooks/*.sh "$ROOT_DIR"/hooks/lib/*.sh 2>/dev/null \
-    | grep -v '/hooks/config-protection.sh$' || true)
+    | grep -v '/hooks/config-protection.sh$' | grep -v '/hooks/lib/host.sh$' || true)
+host_value_reads=$(grep -n 'permission_mode' "$ROOT_DIR/hooks/lib/host.sh" \
+    | grep -v '^[0-9]*:[[:space:]]*#' | grep -v 'has("permission_mode")' || true)
+[[ -n "$host_value_reads" ]] && hits="$hits $ROOT_DIR/hooks/lib/host.sh:${host_value_reads}"
 if [[ -z "$hits" ]]; then
-    log_pass "no hook script other than config-protection.sh reads permission_mode"
+    log_pass "no hook script other than config-protection.sh reads permission_mode (host.sh tests its presence only)"
 else
     log_fail "hook reads permission_mode" "$hits"
 fi

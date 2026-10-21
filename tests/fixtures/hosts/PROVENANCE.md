@@ -117,6 +117,16 @@ Nothing else is edited. `hook-env.*.json` lists variable NAMES only.
     still in `changedFiles`, with `deleted: true` in `files[0]`; a hook must
     check the file exists before judging it.
   - `post-tool-use.bash.edit-diff-read-only.json` (`ls`): no `bashEditDiff` key.
+- `session-start.interactive.json`: the same version started INTERACTIVELY
+  (`claude --plugin-dir <capture plugin>` under a pseudo-terminal, killed
+  once the hook had fired), with a plugin hook `cat > <file>.json` on
+  `SessionStart`. Raw sha256 (first 16): `575a05a9780d0393`. Redactions as
+  above; `scratchpad_dir` becomes `__SESSION_TMP__/scratchpad`.
+  - It carries `model` (`claude-opus-5-5`) and `scratchpad_dir`, and neither
+    `prompt_id` nor `permission_mode`. The same version run headless (`-p`)
+    sent no `model`, which is why no earlier capture had one.
+  - `hooks/lib/host.sh` read `model` without `prompt_id` as Codex, so every
+    new interactive Claude Code session was filed as Codex (CR-291).
 
 ## codex/0.154.0
 
