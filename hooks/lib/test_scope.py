@@ -27,7 +27,8 @@ import shlex
 import sys
 from collections import Counter
 
-from session_state import mark_verified, read_state, write_state_atomically
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from session_state import mark_verified, read_state, write_state_atomically  # noqa: E402
 
 OUTSTANDING = 'failed_test_runs'
 
