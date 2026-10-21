@@ -17,6 +17,9 @@
 _PHP_NS_ROOT_CACHE=""
 _PHP_NS_ROOT_FOR=""
 
+# The walk up is in-shell: a dirname per level was a process per directory up
+# to /, twenty of them in a deep tree with no composer.json, and the callers'
+# $(...) keep no cache from one call to the next (CR-278).
 php_namespace_root() {
     local start_dir="${1:-$PWD}"
     if [[ "$_PHP_NS_ROOT_FOR" == "$start_dir" && -n "$_PHP_NS_ROOT_CACHE" ]]; then
@@ -31,7 +34,7 @@ php_namespace_root() {
             root=$(_php_psr4_root "$dir/composer.json")
             break
         fi
-        dir="$(dirname "$dir")"
+        dir="${dir%/*}"
     done
 
     [[ -n "$root" ]] || root="App"

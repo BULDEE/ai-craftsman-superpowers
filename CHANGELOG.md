@@ -69,7 +69,14 @@ SEC001 is never ignorable: move the value to the environment and rotate it.
   a pack manifest once instead of four times through subshells, a write
   reads the metrics schema stamp instead of running ten migration probes,
   and the craft config is read in one jq instead of five per custom rule
-  (CR-278).
+  (CR-278). A second pass, from a profile rather than a guess, took a
+  further 16 percent off a post-write and 15 off a pre-write (CPU time,
+  alternating runs against the previous code: 600 to 503 ms and 558 to
+  480 ms). The manifest memo of the first pass searched every pair for
+  each question, 2,200 loop turns per hook; it now jumps to the key. The
+  PHP root namespace lookup ran a process per directory up to `/`, the
+  project root behind every metrics row ran `git` four times, and each
+  pack manifest had its own `stat`; each is now done once or in-shell.
 - The structural ratchet records function-level debt only: worst-function
   complexity, longest function and suppression count. A file that grew with a
   feature failed the ratchet until someone raised its budget: on this
