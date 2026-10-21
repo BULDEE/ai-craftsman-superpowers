@@ -219,48 +219,82 @@ _pack_yml_nested_cache() {
     printf '%s' "$cache"
 }
 
-_pack_yml_nested_array() {
-    local parent="$1" child="$2" file="$3"
-    [[ -f "$file" ]] || return 0
-    local cache line key="${parent}.${child}"
+# The pairs of the last manifest read, kept in this process. pack_loader_init
+# asks four questions of each pack in a row, and every answer came back through
+# `$(...)`: a subshell that could keep nothing it read, so each question paid
+# for its own cache lookup, cache key and `stat`. Seven packs cost 430 ms of a
+# 1.3 s post-write (CR-278). The loader now asks in this shell, through
+# _pack_yml_nested_into, and reads each manifest once.
+# A here-string is a temporary file in bash 3.2, so the pairs and the answers
+# are walked by parameter expansion instead (_pack_lines_next).
+_PACK_YML_MEMO_FILE=""
+_PACK_YML_MEMO_PAIRS=""
 
+# _pack_lines_next <var>: pops the first line of _PACK_LINES into <var>;
+# returns 1 when none is left. _PACK_LINES ends with a newline.
+_pack_lines_next() {
+    [[ -n "$_PACK_LINES" ]] || return 1
+    printf -v "$1" '%s' "${_PACK_LINES%%$'\n'*}"
+    _PACK_LINES="${_PACK_LINES#*$'\n'}"
+}
+
+_pack_yml_nested_load() {
+    local file="$1" cache line pairs=""
+    [[ "$file" == "$_PACK_YML_MEMO_FILE" ]] && return 0
     cache="$(_pack_yml_nested_cache "$file")"
-    if [[ -z "$cache" || ! -f "$cache" ]]; then
+    if [[ -n "$cache" && -f "$cache" ]]; then
+        { IFS= read -r line; while IFS= read -r line || [[ -n "$line" ]]; do pairs="${pairs}${line}"$'\n'; done; } < "$cache"
+    else
         # No cache available. Parse the manifest directly rather than answer
         # "this pack declares nothing", which is what a returning-empty
         # optimisation would have said on a read-only data directory.
-        _pack_yml_nested_compile "$file" | while IFS= read -r line; do
-            case "$line" in
-                "${key}"$'\t'*) printf '%s\n' "${line#*$'\t'}" ;;
-            esac
-        done
-        return 0
+        pairs="$(_pack_yml_nested_compile "$file")"$'\n'
     fi
+    _PACK_YML_MEMO_FILE="$file"
+    _PACK_YML_MEMO_PAIRS="$pairs"
+}
 
-    while IFS= read -r line; do
-        case "$line" in
-            "${key}"$'\t'*) printf '%s\n' "${line#*$'\t'}" ;;
+# _pack_yml_nested_into <var> <parent> <child> <file>: the values, one per line,
+# assigned to <var> in the caller's shell.
+# Its locals carry a prefix: printf -v assigns the innermost variable of that
+# name, so a caller asking for `values` was answered into this function's own.
+_pack_yml_nested_into() {
+    local _pny_into="$1" _pny_key="${2}.${3}" _pny_file="$4" _pny_line _pny_values=""
+    printf -v "$_pny_into" '%s' ""
+    [[ -f "$_pny_file" ]] || return 0
+    _pack_yml_nested_load "$_pny_file"
+    local _PACK_LINES="$_PACK_YML_MEMO_PAIRS"
+    while _pack_lines_next _pny_line; do
+        case "$_pny_line" in
+            "${_pny_key}"$'\t'*) _pny_values="${_pny_values}${_pny_line#*$'\t'}"$'\n' ;;
         esac
-    done < "$cache"
-    return 0
+    done
+    printf -v "$_pny_into" '%s' "$_pny_values"
+}
+
+_pack_yml_nested_array() {
+    local values
+    _pack_yml_nested_into values "$1" "$2" "$3"
+    printf '%s' "$values"
 }
 
 # Return 0 if the pack at pack_dir is compatible with the current stack.
 _pack_stack_compatible() {
     local pack_dir="$1"
     local manifest="$pack_dir/pack.yml"
-    local current_stack
-    current_stack=$(config_stack 2>/dev/null || echo "fullstack")
+    local current_stack="${_PACK_CURRENT_STACK:-}"
+    [[ -n "$current_stack" ]] || current_stack=$(config_stack 2>/dev/null || echo "fullstack")
 
     local compat_stacks
-    compat_stacks=$(_pack_yml_nested_array "compatibility" "stack" "$manifest")
+    _pack_yml_nested_into compat_stacks "compatibility" "stack" "$manifest"
     [[ -z "$compat_stacks" ]] && return 1
 
-    while IFS= read -r s; do
+    local s _PACK_LINES="$compat_stacks"
+    while _pack_lines_next s; do
         [[ -z "$s" ]] && continue
         [[ "$s" == "*" ]] && return 0
         [[ "$s" == "$current_stack" ]] && return 0
-    done <<< "$compat_stacks"
+    done
 
     return 1
 }
@@ -268,8 +302,9 @@ _pack_stack_compatible() {
 _register_pack_validators() {
     local pack_dir="$1"
     local validators
-    validators=$(_pack_yml_nested_array "hooks" "validators" "$pack_dir/pack.yml")
-    while IFS= read -r v; do
+    _pack_yml_nested_into validators "hooks" "validators" "$pack_dir/pack.yml"
+    local v _PACK_LINES="$validators"
+    while _pack_lines_next v; do
         [[ -z "$v" ]] && continue
         local vpath="$pack_dir/$v"
         if [[ -f "$vpath" ]]; then
@@ -277,14 +312,15 @@ _register_pack_validators() {
             source "$vpath"
             _PACK_VALIDATORS="${_PACK_VALIDATORS}${vpath}\n"
         fi
-    done <<< "$validators"
+    done
 }
 
 _register_pack_sa_tools() {
     local pack_dir="$1"
     local sa_tools
-    sa_tools=$(_pack_yml_nested_array "static_analysis" "tools" "$pack_dir/pack.yml")
-    while IFS= read -r tool_entry; do
+    _pack_yml_nested_into sa_tools "static_analysis" "tools" "$pack_dir/pack.yml"
+    local tool_entry _PACK_LINES="$sa_tools"
+    while _pack_lines_next tool_entry; do
         [[ -z "$tool_entry" ]] && continue
         local tpath="$pack_dir/$tool_entry"
         if [[ -f "$tpath" ]]; then
@@ -292,18 +328,19 @@ _register_pack_sa_tools() {
             source "$tpath"
             _PACK_SA_TOOLS="${_PACK_SA_TOOLS}${tpath}\n"
         fi
-    done <<< "$sa_tools"
+    done
 }
 
 _register_pack_scaffolds() {
     local pack_dir="$1"
     local pack_name="$2"
     local scaffold_types
-    scaffold_types=$(_pack_yml_nested_array "commands" "scaffold_types" "$pack_dir/pack.yml")
-    while IFS= read -r scaffold_type; do
+    _pack_yml_nested_into scaffold_types "commands" "scaffold_types" "$pack_dir/pack.yml"
+    local scaffold_type _PACK_LINES="$scaffold_types"
+    while _pack_lines_next scaffold_type; do
         [[ -z "$scaffold_type" ]] && continue
         _PACK_SCAFFOLD_TYPES="${_PACK_SCAFFOLD_TYPES}${pack_name}:${scaffold_type}\n"
-    done <<< "$scaffold_types"
+    done
 }
 
 _register_pack_components() {
@@ -386,6 +423,9 @@ pack_loader_init() {
     local _CRAFTSMAN_CACHE_DIR="$cache_directory"
     local packs_dir="${1:-$(_pack_default_packs_dir)}"
     _PACKS_DIR="$packs_dir"
+    # One answer for every pack: config_stack resolves three config layers.
+    local _PACK_CURRENT_STACK
+    _PACK_CURRENT_STACK=$(config_stack 2>/dev/null || echo "fullstack")
 
     _pack_load_internal "$packs_dir"
     _pack_load_external

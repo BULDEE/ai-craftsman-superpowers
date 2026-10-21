@@ -77,7 +77,7 @@
 {"complexity":8,"ignores":1,"instrument":3,"max_fn_lines":20,"path":"hooks/lib/rule-registry.sh","reason":"CR-230: rule_marker_advice offers the marker only to the rules that honour it; its sentence quotes the marker, which counts as an ignore"},
 {"complexity":8,"ignores":0,"instrument":3,"max_fn_lines":32,"path":"hooks/lib/rule_baseline.py","reason":"tighten: a green pass moves the rule counts down to what it observed (#94)"},
 {"complexity":7,"ignores":0,"instrument":3,"max_fn_lines":23,"path":"hooks/lib/rule_registry.py","reason":"the engine holds no list of languages (CR-108): registry consumers replace the literals"},
-{"complexity":8,"ignores":0,"instrument":3,"max_fn_lines":25,"path":"hooks/lib/rules-engine.sh","reason":"CR-171: custom rules run before the write, one engine pass (rules_check_custom) for pre-write, post-write and CI, with the three-front-end parity witness for block, warn and ignore"},
+{"complexity":7,"ignores":0,"instrument":3,"max_fn_lines":25,"path":"hooks/lib/rules-engine.sh","reason":"CR-171: custom rules run before the write, one engine pass (rules_check_custom) for pre-write, post-write and CI, with the three-front-end parity witness for block, warn and ignore"},
 {"complexity":7,"ignores":0,"instrument":3,"max_fn_lines":25,"path":"hooks/lib/runtime_paths.py","reason":"CR-279: bound_root reads the root a session binding names, so every hook sees an in-session plugin update through the existing context call"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":7,"path":"hooks/lib/secret-patterns.sh"},
 {"complexity":4,"ignores":0,"instrument":3,"max_fn_lines":14,"path":"hooks/lib/session-files.sh","reason":"CR-279: the binding follows the plugin root the hooks run from (re-registered on drift after an in-session update); bind split into read_context, follow_root and root helpers, longest function unchanged at 14 lines"},
@@ -232,6 +232,7 @@
 {"complexity":20,"ignores":0,"instrument":3,"max_fn_lines":113,"path":"tests/core/test-legacy-command.sh","reason":"ratchet inert without a mark and anchored on the file; routing asked of the consumer (architecture review)"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":4,"path":"tests/core/test-legacy-example.sh"},
 {"complexity":7,"ignores":0,"instrument":3,"max_fn_lines":44,"path":"tests/core/test-lsp-policy.sh"},
+{"complexity":1,"ignores":0,"instrument":3,"max_fn_lines":2,"path":"tests/core/test-metrics-stamp.sh"},
 {"complexity":4,"ignores":0,"instrument":3,"max_fn_lines":51,"path":"tests/core/test-no-language-literals.sh","reason":"new file (CR-108)"},
 {"complexity":15,"ignores":0,"instrument":3,"max_fn_lines":129,"path":"tests/core/test-observation.sh"},
 {"complexity":16,"ignores":0,"instrument":3,"max_fn_lines":104,"path":"tests/core/test-okf-knowledge.sh"},
@@ -283,6 +284,6 @@
 {"complexity":3,"ignores":0,"instrument":3,"max_fn_lines":10,"path":"tests/packs/test-structural.sh"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":1,"path":"tests/packs/test-symfony.sh"},
 {"complexity":2,"ignores":0,"instrument":3,"max_fn_lines":23,"path":"tests/perf/test-hook-latency.sh","reason":"CR-179: Darwin ceilings set from thirty macOS runner readings, guarded against masking a 50 percent regression"},
-{"complexity":38,"ignores":1,"instrument":3,"max_fn_lines":133,"path":"tests/run-tests.sh","reason":"CR-258: registers test-git-bypass-guard.sh (each suite is one || true until the runner discovers its suites, CR-288 IMPROVE)"},
+{"complexity":39,"ignores":1,"instrument":3,"max_fn_lines":133,"path":"tests/run-tests.sh","reason":"CR-278: registers test-metrics-stamp.sh (one || true per suite until the runner discovers its suites, CR-288 IMPROVE)"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":5,"path":"tests/templates/test-templates.sh"}
 ]

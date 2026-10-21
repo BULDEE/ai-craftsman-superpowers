@@ -203,8 +203,9 @@ _correction_outcome() {
     fi
 }
 
-# Init metrics DB (creates tables if needed, idempotent)
-metrics_init 2>/dev/null || true
+# Init metrics DB (creates tables if needed, idempotent): one read when
+# SessionStart already migrated it (schema stamp, CR-278).
+metrics_init_once 2>/dev/null || true
 
 # Every finding on this write is inserted in ONE interpreter start, on exit,
 # whichever of the three exits below is taken (the ERR trap ends in `exit 0`,
