@@ -27,6 +27,7 @@ source "${SCRIPT_DIR}/lib/pack-loader.sh"
 source "${SCRIPT_DIR}/lib/healthcheck.sh"
 source "${SCRIPT_DIR}/lib/routing-table.sh"
 source "${SCRIPT_DIR}/lib/hook-events.sh"
+lang_registry_warm_known
 
 _init_packs() {
     pack_loader_init
