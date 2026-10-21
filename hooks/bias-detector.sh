@@ -144,12 +144,17 @@ _bias_reported_pattern() {
 _bias_is_reported() {
     local pattern
     pattern=$(_bias_reported_pattern) || return 1
-    printf '%s' "$PROMPT" | grep -iEq "$pattern"
+    grep -iEq "$pattern" <<< "$PROMPT"
 }
 
+# The prompt does not change during a run, so neither does the answer: asked
+# once here, not once per category (four greps and twelve subshells).
+BIAS_REPORTED=false
+_bias_is_reported && BIAS_REPORTED=true
+
 _bias_matches() {
-    _bias_is_reported && return 1
-    printf '%s' "$PROMPT" | grep -iEq "$1"
+    [[ "$BIAS_REPORTED" == true ]] && return 1
+    grep -iEq "$1" <<< "$PROMPT"
 }
 
 # Check each curated category. bias_combined_pattern returns non-zero when no
@@ -166,7 +171,7 @@ if pat=$(bias_combined_pattern OVER_OPT curated); then
 fi
 
 # Workflow enforcement: warn if domain modeling without /craftsman:design
-if pat=$(bias_combined_pattern DOMAIN_MODELING curated) && echo "$PROMPT" | grep -iEq "$pat"; then
+if pat=$(bias_combined_pattern DOMAIN_MODELING curated) && grep -iEq "$pat" <<< "$PROMPT"; then
     _design_was_used || warn_missing_design
 fi
 
@@ -178,13 +183,16 @@ fi
 # alone, so English was protected and the twelve signal languages were not:
 # "le ticket dit qu'on saute les tests, c'est raisonnable ?" still produced a
 # note, which is the same false positive in another language.
-if [[ -z "$WARNINGS" ]] && ! _bias_is_reported; then
+if [[ -z "$WARNINGS" && "$BIAS_REPORTED" != true ]]; then
     for _cat_pair in "ACCELERATION acceleration" "SCOPE_CREEP scope_creep" \
                      "OVER_OPT over_optimization" "DOMAIN_MODELING domain_modeling"; do
         _cat="${_cat_pair%% *}"
         _slug="${_cat_pair##* }"
         pat=$(bias_combined_pattern "$_cat" signal) || continue
-        _match=$(echo "$PROMPT" | grep -oE "$pat" 2>/dev/null | head -1) || true
+        # First match of the first matching line, as `| head -1` had it,
+        # without the two extra processes per category.
+        _match=$(grep -m 1 -oE "$pat" <<< "$PROMPT" 2>/dev/null) || true
+        _match="${_match%%$'\n'*}"
         [[ -z "$_match" ]] && continue
         if [[ "$_slug" == "domain_modeling" ]] && _design_was_used; then
             continue
@@ -198,7 +206,9 @@ fi
 # model here, once, and cleared.
 PENDING_CONTEXT=""
 if [[ -f "$SESSION_STATE" ]]; then
-    PENDING_CONTEXT=$(python3 "${SCRIPT_DIR}/lib/session_state.py" read "$SESSION_STATE" pending_context "" 2>/dev/null || true)
+    # Always a JSON string (agent-sentry-context.sh writes it through jq --arg),
+    # so jq reads it for a tenth of a Python start, on every prompt.
+    PENDING_CONTEXT=$(jq -r '.pending_context // empty' "$SESSION_STATE" 2>/dev/null || true)
 fi
 [[ -n "$PENDING_CONTEXT" ]] && python3 "${SCRIPT_DIR}/lib/session_state.py" merge "$SESSION_STATE" pending_context '""' >/dev/null 2>&1 || true
 
