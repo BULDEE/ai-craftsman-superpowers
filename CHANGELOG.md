@@ -77,6 +77,16 @@ SEC001 is never ignorable: move the value to the environment and rotate it.
   PHP root namespace lookup ran a process per directory up to `/`, the
   project root behind every metrics row ran `git` four times, and each
   pack manifest had its own `stat`; each is now done once or in-shell.
+- A prompt waits less before the model sees it: the bias detector, which
+  runs on every prompt, takes about 70 percent less CPU (alternating runs
+  against the previous code under the same load: 478 to 144 ms on a prompt
+  with no bias, 496 to 149 ms on a signal hit), and the latency suite reads
+  it at 0.50x its baseline instead of 1.60x. The pattern registry derived
+  each language's variable suffix in a subshell, thirteen times for every
+  pattern it was asked for: 221 subshells per prompt. It now derives them
+  once, when it loads. The reported-speech check ran once per category
+  instead of once per prompt, and the pending Sentry request was read by a
+  Python start where jq does (CR-278).
 - The structural ratchet records function-level debt only: worst-function
   complexity, longest function and suppression count. A file that grew with a
   feature failed the ratchet until someone raised its budget: on this
