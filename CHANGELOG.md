@@ -87,6 +87,18 @@ SEC001 is never ignorable: move the value to the environment and rotate it.
   once, when it loads. The reported-speech check ran once per category
   instead of once per prompt, and the pending Sentry request was read by a
   Python start where jq does (CR-278).
+- A session starts in about half the time: SessionStart, which Claude
+  Code waits for before its first response, went from 1630 to 900 ms at
+  startup and from 1680 to 950 ms after a compaction (alternating runs
+  against the previous code, on a copy of a 26,000-violation metrics
+  database), same banner. On macOS each pack skill cost a python3 start to
+  compute a relative path; the known-language registry was rebuilt by each
+  of eight subshells; the healthcheck and the routing table ran an awk and
+  a grep per skill; and the metrics database ran its fourteen migration
+  probes although it carried this version's schema stamp. Each is now done
+  once or in-shell. The cost: SessionStart no longer re-runs the migrations
+  over a database damaged by hand whose stamp still matches, the same trade
+  the write hooks already made (CR-290).
 - The structural ratchet records function-level debt only: worst-function
   complexity, longest function and suppression count. A file that grew with a
   feature failed the ratchet until someone raised its budget: on this
@@ -100,6 +112,17 @@ SEC001 is never ignorable: move the value to the environment and rotate it.
 
 ### Fixed
 
+- Pack skills no longer disappear while a session starts. SessionStart
+  deleted every pack skill and copied it back, and Claude Code's hooks
+  reference says skill discovery runs before SessionStart hooks finish, so a
+  session that looked in between could start without them (deduced from
+  that timing, never observed). A skill a loaded pack still serves is now
+  refreshed in place (CR-290).
+- The pack manifest identity list from the second CR-278 pass never
+  answered under bash 3.2, the macOS shell: `${path//\/\//\/}` keeps the
+  backslash there, so no lookup matched and every manifest was stat'ed on
+  its own. Answers were right, the saving was not there. A test now fails
+  when a manifest the list holds is stat'ed (CR-290).
 - A new interactive Claude Code session was taken for a Codex session: its
   SessionStart carries `model` and no `prompt_id`, which the host detection
   read as Codex. The session binding went under `~/.codex`, the startup
