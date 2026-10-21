@@ -407,7 +407,11 @@ metrics_content_hash() {
 # history into several and truncating every trend built on it.
 _METRICS_PROJECT_ROOT=""
 _METRICS_PROJECT_ROOT_FOR=""
-_metrics_project_root() {
+# metrics_project_resolve: resolves the root in THIS shell. Every reader asks
+# through $(...), a subshell that keeps nothing it computes, so the git call
+# ran four times per write (CR-278). A hook calls this once; the subshells
+# inherit the answer.
+metrics_project_resolve() {
     # Keyed on $PWD rather than computed once: a hook is one process and would
     # not notice, but a long-lived shell that changes directory would keep
     # answering for the project it started in.
@@ -415,6 +419,10 @@ _metrics_project_root() {
         _METRICS_PROJECT_ROOT_FOR="$PWD"
         _METRICS_PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")
     fi
+}
+
+_metrics_project_root() {
+    metrics_project_resolve
     printf '%s' "$_METRICS_PROJECT_ROOT"
 }
 
