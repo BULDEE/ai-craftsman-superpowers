@@ -152,7 +152,24 @@ _pack_yml_cache_key() {
 # BACKWARDS and froze the cache on the newer content indefinitely. That is the
 # pack developer's everyday loop, which the cache comment claimed to protect.
 _pack_yml_identity() {
+    # The loop names a manifest packs/go//pack.yml, the list packs/go/pack.yml.
+    local path="${1//\/\//\/}" before
+    if [[ "$_PACK_YML_IDENTITIES" == *$'\t'"$path"$'\n'* ]]; then
+        before="${_PACK_YML_IDENTITIES%%$'\t'"$path"$'\n'*}"
+        printf '%s' "${before##*$'\n'}"
+        return 0
+    fi
     stat -f '%m %z' "$1" 2>/dev/null || stat -c '%Y %s' "$1" 2>/dev/null || printf 'unknown'
+}
+
+# _pack_yml_identities_load <manifest>...: every identity in one `stat`, as
+# lines of "<identity><TAB><path>". One process per manifest was seven per
+# hook, 30 ms of a post-write (CR-278); a path missing from the list is
+# stat'ed on its own, so the list can only save work, never change an answer.
+_PACK_YML_IDENTITIES=""
+_pack_yml_identities_load() {
+    [[ $# -gt 0 ]] || return 0
+    _PACK_YML_IDENTITIES=$'\n'"$(stat -f '%m %z%t%N' "$@" 2>/dev/null || stat --printf='%Y %s\t%n\n' "$@" 2>/dev/null)"$'\n'
 }
 
 # The compile itself. Kept as a function because it is also the FALLBACK: a
@@ -182,8 +199,8 @@ _pack_yml_nested_compile() {
 
 _pack_yml_nested_cache() {
     local file="$1"
-    local cache_dir
-    cache_dir=$(session_cache_dir)
+    # The directory pack_loader_init resolved, without a subshell per manifest.
+    local cache_dir="${_CRAFTSMAN_CACHE_DIR:-$(session_cache_dir)}"
     [[ -n "$cache_dir" ]] || return 1
     cache_dir="${cache_dir}/cache/pack-yml"
     local cache="${cache_dir}/v${_PACK_YML_CACHE_VERSION}-$(_pack_yml_cache_key "$file")"
@@ -225,8 +242,8 @@ _pack_yml_nested_cache() {
 # for its own cache lookup, cache key and `stat`. Seven packs cost 430 ms of a
 # 1.3 s post-write (CR-278). The loader now asks in this shell, through
 # _pack_yml_nested_into, and reads each manifest once.
-# A here-string is a temporary file in bash 3.2, so the pairs and the answers
-# are walked by parameter expansion instead (_pack_lines_next).
+# A here-string is a temporary file in bash 3.2, so the answers are walked by
+# parameter expansion instead (_pack_lines_next), and the pairs searched by it.
 _PACK_YML_MEMO_FILE=""
 _PACK_YML_MEMO_PAIRS=""
 
@@ -239,11 +256,14 @@ _pack_lines_next() {
 }
 
 _pack_yml_nested_load() {
-    local file="$1" cache line pairs=""
+    local file="$1" cache pairs=""
     [[ "$file" == "$_PACK_YML_MEMO_FILE" ]] && return 0
     cache="$(_pack_yml_nested_cache "$file")"
     if [[ -n "$cache" && -f "$cache" ]]; then
-        { IFS= read -r line; while IFS= read -r line || [[ -n "$line" ]]; do pairs="${pairs}${line}"$'\n'; done; } < "$cache"
+        # One read for the whole file: line by line, the seven manifests cost
+        # 587 reads per hook. Its first line, the identity, stays: a search
+        # needs a newline, a key and a tab, which that line never holds.
+        IFS= read -r -d '' pairs < "$cache"
     else
         # No cache available. Parse the manifest directly rather than answer
         # "this pack declares nothing", which is what a returning-empty
@@ -259,15 +279,19 @@ _pack_yml_nested_load() {
 # Its locals carry a prefix: printf -v assigns the innermost variable of that
 # name, so a caller asking for `values` was answered into this function's own.
 _pack_yml_nested_into() {
-    local _pny_into="$1" _pny_key="${2}.${3}" _pny_file="$4" _pny_line _pny_values=""
+    local _pny_into="$1" _pny_needle=$'\n'"${2}.${3}"$'\t' _pny_file="$4" _pny_rest _pny_value _pny_values=""
     printf -v "$_pny_into" '%s' ""
     [[ -f "$_pny_file" ]] || return 0
     _pack_yml_nested_load "$_pny_file"
-    local _PACK_LINES="$_PACK_YML_MEMO_PAIRS"
-    while _pack_lines_next _pny_line; do
-        case "$_pny_line" in
-            "${_pny_key}"$'\t'*) _pny_values="${_pny_values}${_pny_line#*$'\t'}"$'\n' ;;
-        esac
+    # Jump from one matching line to the next: walking every pair cost four
+    # questions times seven manifests times each manifest's lines, 2,200 turns
+    # of the loop per hook.
+    _pny_rest=$'\n'"$_PACK_YML_MEMO_PAIRS"
+    while [[ "$_pny_rest" == *"$_pny_needle"* ]]; do
+        _pny_rest="${_pny_rest#*"$_pny_needle"}"
+        _pny_value="${_pny_rest%%$'\n'*}"
+        _pny_values="${_pny_values}${_pny_value}"$'\n'
+        _pny_rest="${_pny_rest#"$_pny_value"}"
     done
     printf -v "$_pny_into" '%s' "$_pny_values"
 }
@@ -371,6 +395,7 @@ _pack_load_internal() {
     local packs_dir="$1"
     [[ ! -d "$packs_dir" ]] && return 0
     local pack_dir
+    _pack_yml_identities_load "$packs_dir"/*/pack.yml
     for pack_dir in "$packs_dir"/*/; do
         [[ ! -f "$pack_dir/pack.yml" ]] && continue
         _PACK_MANIFESTS_ALL="${_PACK_MANIFESTS_ALL}${pack_dir}/pack.yml\n"
