@@ -214,6 +214,24 @@ else
 fi
 rm -rf "$WRAP_HOME"
 
+# Test: an event Claude Code does not have, declared in hooks.json, is named in
+# the banner, sorted and comma-joined; the shipped hooks.json names none. The
+# hook reads hooks.json beside itself, so it runs here from a directory of
+# links to the real hooks with one altered hooks.json.
+check_unknown_hook_events() {
+    local schema_root out
+    schema_root=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-schema-root.XXXXXX")
+    mkdir -p "$schema_root/hooks"
+    ln -s "$ROOT_DIR"/hooks/* "$schema_root/hooks/"
+    rm -f "$schema_root/hooks/hooks.json"
+    jq '.hooks.ZetaEvent = [] | .hooks.AlphaEvent = []' "$ROOT_DIR/hooks/hooks.json" > "$schema_root/hooks/hooks.json"
+    out=$(echo '{}' | HOME="$START_HOME" bash "$schema_root/hooks/session-start.sh" 2>/dev/null | jq -r '.systemMessage')
+    rm -rf "$schema_root"
+    assert_contains "unknown hook events are named, sorted" "$out" "unsupported events: AlphaEvent,ZetaEvent."
+    assert_not_contains "the shipped hooks.json declares no unknown event" "$result" "SCHEMA WARNING"
+}
+check_unknown_hook_events
+
 rm -rf "$CLAUDE_PLUGIN_DATA" "/tmp/craftsman-fake-home-$$" "${START_HOME:-}"
 
 echo ""

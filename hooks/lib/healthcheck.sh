@@ -109,13 +109,14 @@ hc_check_packs() {
 }
 
 hc_check_metrics_db() {
-    local db_path
-    db_path=$(python3 "${_HC_LIB_DIR}/runtime_paths.py" metrics 2>/dev/null) || { _hc_record "metrics" "warn" "native session data binding unavailable"; return; }
+    local db_path counts
+    # The data directory session-files.sh already bound in this shell, which is
+    # where metrics-db.sh puts the database; a python3 start only without one.
+    db_path="${_CRAFTSMAN_SESSION_DATA_DIR:+${_CRAFTSMAN_SESSION_DATA_DIR}/metrics.db}"
+    [[ -n "$db_path" ]] || db_path=$(python3 "${_HC_LIB_DIR}/runtime_paths.py" metrics 2>/dev/null) || { _hc_record "metrics" "warn" "native session data binding unavailable"; return; }
     if [[ -f "$db_path" ]]; then
-        local sessions violations
-        sessions=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM sessions;" 2>/dev/null || echo "0")
-        violations=$(sqlite3 "$db_path" "SELECT COUNT(*) FROM violations;" 2>/dev/null || echo "0")
-        _hc_record "metrics" "ok" "${sessions} sessions, ${violations} violations (${db_path})"
+        counts=$(sqlite3 -separator ' ' "$db_path" "SELECT (SELECT COUNT(*) FROM sessions), (SELECT COUNT(*) FROM violations);" 2>/dev/null) || counts="0 0"
+        _hc_record "metrics" "ok" "${counts%% *} sessions, ${counts##* } violations (${db_path})"
     else
         _hc_record "metrics" "warn" "DB not found"
     fi
@@ -269,9 +270,13 @@ hc_check_host() {
 # a plugin's hooks/hooks.json and runs none of it. The write gate is live
 # there only when a project or global hooks file actually calls
 # pre-write-check.sh. The gate path is the row's gate_file.
+# host_hooks.py --gate-rel answers the same lookup; this runs on every
+# SessionStart, where its python3 start was the healthcheck's largest cost to
+# learn that Claude Code and Codex declare no gate file.
 _hc_gate_relpath() {
     local root="$1" host="$2"
-    python3 "$root/ci/host_hooks.py" --gate-rel "$root" "$host" 2>/dev/null
+    jq -r --arg host "$host" '.hosts[$host].gate_file // empty | strings' \
+        "$root/hooks/host-capabilities.json" 2>/dev/null
 }
 
 _hc_host_gate_file() {
