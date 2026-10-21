@@ -146,9 +146,14 @@ if [[ "$BACKGROUND" == true ]]; then
     echo "craftsman: '${COMMAND}' runs in the background; its exit status is the shell's, not the test runner's, so verification evidence is unchanged." >&2
     exit 0
 fi
-RUNNER_LAST=false; RUNNER_ALONE=false
-if [[ "$HAS_OR" != true ]] && printf '%s' "$LAST" | grep -qE "$(_test_command_pattern)"; then
+RUNNER_LAST=false; RUNNER_ALONE=false; INVOCATION=""
+TEST_COMMAND_PATTERN=$(_test_command_pattern)
+if [[ "$HAS_OR" != true && "$LAST" =~ $TEST_COMMAND_PATTERN ]]; then
     RUNNER_LAST=true
+    # The run's own arguments, without the launcher that started it: what
+    # lib/test_scope.py compares a passing run against a red one.
+    INVOCATION="${LAST#"${LAST%%[![:space:]]*}"}"
+    INVOCATION="${INVOCATION#"${BASH_REMATCH[1]}"}"
     SEPARATOR_COUNT=$(printf '%s' "$GRAMMAR" | jq -r '.separators | length')
     [[ "$SEPARATOR_COUNT" -eq 0 ]] && RUNNER_ALONE=true
 fi
@@ -208,10 +213,10 @@ if [[ "$STATE" == "failed" ]]; then
     printf '%s test failure: %s (exit %s)\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$COMMAND" "${EXIT_CODE:-?}" \
         >> "${DATA_DIR}/test-failures.log" 2>/dev/null || true
     # Remembered even when nothing was verified yet: a skill's set-verified is
-    # refused until a passing run clears it (CR-204 F7).
-    python3 "$LIB_DIR/session_state.py" merge "$SESSION_STATE" last_test_failed true 2>/dev/null || true
+    # refused until a passing run clears it (CR-204 F7), and only a run at
+    # least as wide as this one does (lib/test_scope.py, CR-289).
+    python3 "$LIB_DIR/test_scope.py" fail "$SESSION_STATE" "$LAST" "$INVOCATION" 2>/dev/null || true
     if [[ "$CURRENT" == "true" ]]; then
-        python3 "$LIB_DIR/session_state.py" merge "$SESSION_STATE" verified false 2>/dev/null || true
         # The wake is for a failure this layer can attribute to the runner.
         if [[ "$RUNNER_ALONE" != true ]]; then
             echo "craftsman: '${COMMAND}' exited ${EXIT_CODE:-non-zero} and ends on a test runner; which command failed is not knowable from here, so the verification evidence is revoked. Run the runner alone to grant it again." >&2
@@ -223,8 +228,16 @@ if [[ "$STATE" == "failed" ]]; then
     exit 0
 fi
 
-# Passing test run: set verified (skip if already set)
+# Passing test run: grant the evidence, unless a red run it does not cover is
+# still outstanding. The failing test passing alone is the case this exists
+# for: it was read as "flaky" and erased the suite's failure (CR-289).
 [[ "$CURRENT" == "true" ]] && exit 0
-python3 "$LIB_DIR/session_state.py" set-verified "$SESSION_STATE" 2>/dev/null
+OUTSTANDING=$(python3 "$LIB_DIR/test_scope.py" pass "$SESSION_STATE" "$INVOCATION" 2>/dev/null) || exit 0
+[[ -z "$OUTSTANDING" ]] && exit 0
+RED=""
+while IFS= read -r red_run; do
+    RED="${RED:+${RED}, }'${red_run}'"
+done <<< "$OUTSTANDING"
+echo "craftsman: '${COMMAND}' passed, but it adds arguments to, or is another suite than, a run that failed in this session (${RED}); a narrower green run is not evidence for a wider red one, so the verification evidence stays revoked. A test that fails in the suite and passes alone depends on shared state, order, time or the filesystem: find that cause, then run ${RED} green." >&2
 
 exit 0

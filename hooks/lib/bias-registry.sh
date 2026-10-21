@@ -10,6 +10,8 @@
 #   BIAS_REGISTERED_LANGS+=("de")
 #   BIAS_DE_MODE="curated"        # or "signal"
 #   BIAS_DE_ACCELERATION="..."    # zero or more of the four categories
+#   BIAS_DE_TEST_DISMISSAL="..."  # the agent's own excuse for a red test,
+#                                 # read by test-dismissal-guard.sh (CR-289)
 #
 # curated: context-aware regex, precision earned, warns directly (systemMessage).
 # signal:  recall-oriented lexeme alternation; a hit produces an adjudication
@@ -97,7 +99,8 @@ bias_registry_init() {
         suffix=$(_bias_var_suffix "$lang")
         unset "BIAS_${suffix}_MODE" \
               "BIAS_${suffix}_ACCELERATION" "BIAS_${suffix}_SCOPE_CREEP" \
-              "BIAS_${suffix}_OVER_OPT" "BIAS_${suffix}_DOMAIN_MODELING" 2>/dev/null || true
+              "BIAS_${suffix}_OVER_OPT" "BIAS_${suffix}_DOMAIN_MODELING" \
+              "BIAS_${suffix}_TEST_DISMISSAL" 2>/dev/null || true
     done
     BIAS_REGISTERED_LANGS=()
 

@@ -166,6 +166,8 @@ If you catch yourself thinking:
 | "Just try changing X" | That's guessing, not debugging. |
 | "It's probably X" | Probably ≠ Confirmed. Investigate. |
 | "I don't fully understand but..." | Then you can't fix it safely. |
+| "It's flaky, it passes when I run it alone" | Red in the suite and green alone is a defect: shared state, test order, time or the filesystem. A run of that test alone is evidence of the dependency, not of a pass. |
+| "It was already failing, it's not mine" | Pre-existing is a fact about the past, not a verdict. Fix it, or open a ticket and name its identifier in the report. |
 
 **→ STOP. Return to Phase 1.**
 

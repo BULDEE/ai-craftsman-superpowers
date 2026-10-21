@@ -33,7 +33,7 @@ than inheriting the full tool pool:
 - ✅ Follow domain-specific best practices
 - ✅ Operate within Claude Code's permission system
 
-### Hooks (18 scripts, 12 events)
+### Hooks (19 scripts, 12 events)
 
 Every hook is a `command` hook: a shell script this repository ships. There
 are no native `agent` or `prompt` hooks (see
@@ -58,6 +58,7 @@ whose names start with `agent-` are shell scripts that shell out to a headless
 | `subagent-quality-gate.sh` | SubagentStop | Validates the subagent's written files through the pack validators | Session state, Metrics DB |
 | `pre-compact-save.sh` | PreCompact | Saves state before compaction | Session state |
 | `post-compact-verify.sh` | PostCompact | Restores state after compaction | Session state |
+| `test-dismissal-guard.sh` | Stop | Sends the turn back when a red test run is still outstanding and the last message waves it away (flaky, passes alone, pre-existing) without a ticket | None |
 | `agent-sentry-context.sh` | Stop | Error context from Sentry MCP | None |
 | `agent-final-review.sh` | Stop | Architecture validation (strict mode) | None |
 | `session-metrics.sh` | SessionEnd | Records the session summary | Metrics DB |

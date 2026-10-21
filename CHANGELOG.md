@@ -27,6 +27,18 @@ SEC001 is never ignorable: move the value to the environment and rotate it.
   keys stay silent. An env read on the line no longer hides an issued key:
   `process.env.KEY ?? "sk-ant-..."` ships the key. This reverses the CR-231
   choice to leave secrets out of JavaScript (CR-257).
+- A turn no longer ends on a red test waved away. A new synchronous Stop
+  hook, `test-dismissal-guard.sh`, sends the turn back when a test run that
+  failed in the session is still outstanding and the last message calls it
+  flaky, intermittent, known, pre-existing, unrelated, or green alone, with
+  no ticket named (`ORD-42`, `#123`, an issue URL). A test red in the suite
+  and green alone depends on shared state, order, time or the filesystem: a
+  defect, not noise. Blocks in strict, warns in moderate, silent in relaxed;
+  a second stop on the same excuse is shown to the user, never looped. The
+  words are data, a `TEST_DISMISSAL` category of the bias patterns (English
+  and French). `/craftsman:debug` and `/craftsman:verify` name the excuse
+  among their red flags, with pre-existing deprecations reported instead of
+  fixed (CR-289).
 - The agent can no longer switch the project's git hooks off. A new
   PreToolUse hook, `git-bypass-guard.sh`, refuses `--no-verify` on any git
   subcommand, `git commit -n`, `-c core.hooksPath=...`, `git config
@@ -79,6 +91,16 @@ SEC001 is never ignorable: move the value to the environment and rotate it.
   since 4.12.3. Claude Code's `scratchpad_dir` now names it, and `model`
   means Codex on SessionStart only with Codex's `permission_mode`; the
   interactive payload is captured as a fixture (CR-291).
+- A test run that failed no longer has its failure erased by a narrower run
+  that passes. The suite went red on one test, the agent ran that test alone,
+  it passed, and `post-bash-test-verify.sh` granted the verification evidence
+  and cleared the failure: the plugin endorsed "flaky, passes alone" instead
+  of refusing it. Each red run now stays outstanding until a run that adds no
+  argument to it passes (`hooks/lib/test_scope.py`): a filter, a path or a
+  test name may narrow the run, and which flags narrow is each runner's
+  business, so any added argument counts. Another suite going green does not
+  answer this one either. The cost of that doubt is one re-run of the red
+  command (CR-289).
 - The structural ratchet measured every PSR-12 method (opening brace on its
   own line) as complexity 0 over one line, and a multi-line signature as its
   signature only: it closed the function on the brace. It now finds the body

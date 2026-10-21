@@ -85,6 +85,7 @@
 {"complexity":5,"ignores":0,"instrument":3,"max_fn_lines":17,"path":"hooks/lib/static-analysis.sh","reason":"CR-174: a crash or a stopped run is reported as ANALYSER001 (sa_declare_incomplete), with its witnesses"},
 {"complexity":7,"ignores":1,"instrument":3,"max_fn_lines":16,"path":"hooks/lib/structural.sh","reason":"the dialect is read over the known registry, which autoinits in a validator-only harness (CR-108)"},
 {"complexity":15,"ignores":1,"instrument":3,"max_fn_lines":36,"path":"hooks/lib/structural_metrics.py","reason":"the engine holds no list of languages (CR-108): registry consumers replace the literals"},
+{"complexity":4,"ignores":0,"instrument":3,"max_fn_lines":14,"path":"hooks/lib/test_scope.py"},
 {"complexity":6,"ignores":0,"instrument":3,"max_fn_lines":18,"path":"hooks/lib/tool_result.py","reason":"CR-255: the decoder carries what the command printed, read for what a runner says about the tests it ran"},
 {"complexity":7,"ignores":0,"instrument":3,"max_fn_lines":22,"path":"hooks/lib/tooling_detect.py"},
 {"complexity":7,"ignores":0,"instrument":3,"max_fn_lines":23,"path":"hooks/lib/v4a_patch.py","reason":"challenge review of e2acf22 (F1 to F9): symlinks resolved before the gate decides, the patch's own root files win in the mirror, anchors scope the hunk under them, quoted runners are not invocations, the innermost host names a skill's session, the DDD verifier fans out over a patch, roles resolve the plugin root and include the packs' agents"},
@@ -100,6 +101,7 @@
 {"complexity":5,"ignores":0,"instrument":3,"max_fn_lines":14,"path":"hooks/session-start.sh","reason":"Native host session binding, native manifest synchronization and regression coverage; adds one shared runtime path dependency and two suite groups, preserving Grok 205717c"},
 {"complexity":3,"ignores":2,"instrument":3,"max_fn_lines":11,"path":"hooks/subagent-quality-gate.sh","reason":"CR-230: a never-ignorable rule ignores the marker, as in the write gates"},
 {"complexity":11,"ignores":0,"instrument":3,"max_fn_lines":72,"path":"hooks/task-completed-verify.sh","reason":"session-state keys have writers (#91), mark re-taken after rebase on #89"},
+{"complexity":3,"ignores":0,"instrument":3,"max_fn_lines":9,"path":"hooks/test-dismissal-guard.sh"},
 {"complexity":6,"ignores":0,"instrument":3,"max_fn_lines":41,"path":"hooks/tool-failure-tracker.sh","reason":"host interoperability campaign (PR #99): every hook binds its session from the payload (session_files_bind, 3 lines each), the mirror and the host library gain the Codex patch and the Grok tool table, the healthcheck reads the host matrix, and the suites gain the per-host fixtures and witnesses (test-doctrine-export covers the delimited AGENTS.md block, test-healthcheck the host rows, test-lang-registry the cache invariants)"},
 {"complexity":7,"ignores":1,"instrument":3,"max_fn_lines":197,"path":"mods/craftsman-cockpit/hooks/register.tsx","reason":"CR-246: first budgets for the cockpit mod and its repository checks; the pane no longer cuts the candidate list on the window height"},
 {"complexity":3,"ignores":1,"instrument":3,"max_fn_lines":16,"path":"mods/craftsman-cockpit/tests/instincts.test.ts","reason":"CR-279: a failed review names the helper that was run (stale binding seen in the pane)"},
@@ -256,6 +258,7 @@
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":12,"path":"tests/core/test-suite-isolation.sh","reason":"4.12.0 security review CR-204: canonical case-insensitive paths, bypassPermissions denies own config, plugin data protected, registry fails closed, set-verified refused after a failing run, nested sessions by newest binding, test harness refuses writes in the repository"},
 {"complexity":8,"ignores":0,"instrument":3,"max_fn_lines":48,"path":"tests/core/test-task-tool-fallback.sh"},
 {"complexity":16,"ignores":0,"instrument":3,"max_fn_lines":84,"path":"tests/core/test-team-templates.sh"},
+{"complexity":1,"ignores":0,"instrument":3,"max_fn_lines":6,"path":"tests/core/test-test-dismissal-guard.sh"},
 {"complexity":13,"ignores":0,"instrument":3,"max_fn_lines":118,"path":"tests/core/test-tooling-detect.sh"},
 {"complexity":2,"ignores":0,"instrument":3,"max_fn_lines":7,"path":"tests/core/test-turn-budget.sh","reason":"CR-176 (M9): an agent whose description reviews or audits never isolates into a worktree, whatever its tools"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":27,"path":"tests/core/test-validate-pack.sh"},
@@ -284,6 +287,6 @@
 {"complexity":3,"ignores":0,"instrument":3,"max_fn_lines":10,"path":"tests/packs/test-structural.sh"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":1,"path":"tests/packs/test-symfony.sh"},
 {"complexity":2,"ignores":0,"instrument":3,"max_fn_lines":23,"path":"tests/perf/test-hook-latency.sh","reason":"CR-179: Darwin ceilings set from thirty macOS runner readings, guarded against masking a 50 percent regression"},
-{"complexity":39,"ignores":1,"instrument":3,"max_fn_lines":133,"path":"tests/run-tests.sh","reason":"CR-278: registers test-metrics-stamp.sh (one || true per suite until the runner discovers its suites, CR-288 IMPROVE)"},
+{"complexity":40,"ignores":1,"instrument":3,"max_fn_lines":133,"path":"tests/run-tests.sh","reason":"CR-289: registers test-test-dismissal-guard.sh after CR-278's test-metrics-stamp.sh (one || true per suite until the runner discovers its suites, CR-288 IMPROVE)"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":5,"path":"tests/templates/test-templates.sh"}
 ]

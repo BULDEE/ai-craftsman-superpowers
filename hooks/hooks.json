@@ -190,6 +190,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/test-dismissal-guard.sh\"",
+            "statusMessage": "Craftsman: checking the report against the session's red test runs"
+          },
+          {
+            "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-sentry-context.sh\"",
             "async": true,
             "statusMessage": "Craftsman: asking for Sentry context on the files written"
