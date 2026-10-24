@@ -4,12 +4,16 @@ import argparse
 import json
 from pathlib import Path
 
+# Claude Code only: plugin options, and the cockpit module's state types
+# (ADR-0031). No other host loads a hooks module.
+CLAUDE_ONLY = ('userConfig', 'types')
+
 
 def manifests(root: Path) -> dict:
     source = json.loads((root / '.claude-plugin/plugin.json').read_text())
-    codex = {key: value for key, value in source.items() if key != 'userConfig'}
+    codex = {key: value for key, value in source.items() if key not in CLAUDE_ONLY}
     codex.update(skills='./skills', hooks='./hooks/hooks.json')
-    grok = {key: value for key, value in source.items() if key != 'userConfig'}
+    grok = {key: value for key, value in source.items() if key not in CLAUDE_ONLY}
     grok['hooks'] = './hooks/hooks.json'
     marketplace = json.loads((root / '.claude-plugin/marketplace.json').read_text())
     marketplace['plugins'] = [dict(entry, source={'type': 'local', 'path': './'}) for entry in marketplace['plugins']

@@ -30,6 +30,6 @@
     "sentry",
     "channels"
   ],
-  "skills": "./skills",
-  "hooks": "./hooks/hooks.json"
+  "hooks": "./hooks/hooks.json",
+  "skills": "./skills"
 }

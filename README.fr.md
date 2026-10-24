@@ -289,11 +289,14 @@ natives.
 correction qui revient 3 fois sur 3 fichiers devient un instinct candidat que
 vous validez dans `/craftsman:metrics`, puis un skill projet avec provenance.
 La détection est automatique, la codification reste sous contrôle humain.
-Sur Claude Code 2.1.291 ou plus récent, le mod optionnel `craftsman-cockpit`
-les présente dans un panneau : `/plugin install craftsman-cockpit@ai-craftsman-superpowers`,
-puis `/instincts` affiche pour chaque candidat la règle, combien de fois elle a
-été acceptée ou refusée, où elle a été corrigée, et le skill exact qu'Approve
-écrirait. Vous appuyez sur Approve ou Reject ; le mod ne décide rien lui-même
+Sur Claude Code 2.1.291 ou plus récent, le cockpit du plugin les présente dans
+un panneau : `/instincts` affiche pour chaque candidat la règle, combien de fois
+elle a été acceptée ou refusée, où elle a été corrigée, et le skill exact
+qu'Approve écrirait. Vous appuyez sur Approve ou Reject ; le cockpit ne décide
+rien lui-même. Il garde aussi une ligne au-dessus du prompt (écritures, blocages
+encore ouverts, avertissements, état des tests) dès que la session a quelque
+chose à signaler, et en ajoute une sous chaque réponse qui l'a changé (testé
+sur 2.1.310). Ctrl+X puis Ctrl+A replie la ligne
 ([ADR-0031](docs/adr/0031-function-hook-mods-as-companion-surface.md)).
 
 **Il prouve.** « Terminé » exige des preuves. Une tâche ne peut pas être

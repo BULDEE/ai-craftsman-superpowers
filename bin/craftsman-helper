@@ -29,5 +29,13 @@ case "$COMMAND" in
                 exec python3 "$ROOT/hooks/lib/instincts.py" "$ACTION" "$DATA/metrics.db" "$@" ;;
             *) exec python3 "$ROOT/hooks/lib/instincts.py" "$ACTION" "$DATA/metrics.db" "$(metrics_project_hash)" "$@" ;;
         esac ;;
-    *) echo 'Usage: craftsman-helper set-verified|conventions|codemap|knowledge|dashboard|instincts' >&2; exit 2 ;;
+    session)
+        # This session's quality state as JSON, for the cockpit mod's band and
+        # turn receipt (ADR-0031); the data directory is already resolved.
+        [[ "${1:-}" == status ]] || { echo 'Usage: craftsman-helper session status' >&2; exit 2; }
+        _CRAFTSMAN_SESSION_DATA_DIR="$DATA"
+        source "$ROOT/hooks/lib/session-files.sh"
+        exec python3 "$ROOT/hooks/lib/session_status.py" "$(session_file session-state.json)" \
+            "$(session_file session-writes)" "$(session_file session-violations)" "$(session_file session-start-ts)" ;;
+    *) echo 'Usage: craftsman-helper set-verified|conventions|codemap|knowledge|dashboard|instincts|session' >&2; exit 2 ;;
 esac

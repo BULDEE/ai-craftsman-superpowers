@@ -282,7 +282,7 @@ bash "$(craftsman-path bin/craftsman-helper)" instincts review
 
 It prints JSON: `candidates` awaiting a decision and `approved` instincts. Give no directory: the helper previews and writes in the skills directory of the host running this session, as `hooks/host-capabilities.json` declares it (`.claude/skills` on Claude Code, `.agents/skills` on Codex, `.grok/skills` on Grok). A directory you choose yourself is a file that host may never load.
 
-On Claude Code with the `craftsman-cockpit` mod installed, the user can review in a pane instead: tell them to type `/instincts` (ADR-0031). The pane reads the same queue and runs the same `approve` and `reject` below, on their keypress only.
+On Claude Code 2.1.291 or later, the user can review in a pane instead: tell them to type `/instincts` (ADR-0031). The pane reads the same queue and runs the same `approve` and `reject` below, on their keypress only.
 
 For each candidate, present to the user, from the JSON fields and nothing else:
 
