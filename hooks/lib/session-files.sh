@@ -25,7 +25,8 @@
 #                                      (session-state.json, session-start-ts,
 #                                      session-writes, session-violations)
 #   session_files_sweep [max_age_days] drop files of sessions that ended
-#                                      without a SessionEnd (a crash, a kill)
+#                                      without a SessionEnd (a crash, a kill),
+#                                      at most once a day
 # =============================================================================
 
 [[ "${_CRAFTSMAN_SESSION_FILES_LOADED:-}" == 1 ]] && return 0
@@ -127,10 +128,19 @@ session_file() {
     esac
 }
 
+# Once a day: what the sweep takes is a week old, and it cost every
+# SessionStart a find and a Python start (CR-290 profile, 32 ms).
+_session_files_sweep_due() {
+    local dir="$1" stamp="$1/.sweep-stamp"
+    [[ -d "$dir" ]] || return 1
+    [[ -z "$(find "$stamp" -mtime -1 2>/dev/null)" ]] || return 1
+    touch "$stamp" 2>/dev/null || true
+}
+
 session_files_sweep() {
     local days="${1:-7}" dir
     dir=$(_session_files_dir)
-    [[ -d "$dir" ]] || return 0
+    _session_files_sweep_due "$dir" || return 0
     find "$dir" -maxdepth 1 -type f \
         \( -name 'session-state-*.json' -o -name 'session-start-ts-*' \
            -o -name 'session-writes-*' -o -name 'session-violations-*' \) \

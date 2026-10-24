@@ -265,6 +265,47 @@ check_compaction_keeps_session_tallies() {
 }
 check_compaction_keeps_session_tallies
 
+# Test: SessionStart sweeps the files of sessions that ended without a
+# SessionEnd, a week old, and nothing else; and it sweeps once a day, since a
+# file a week old does not need a find and a Python start on every session.
+check_sweep_takes_ended_sessions_only() {
+    local sweep_data="$START_HOME/sweep-data" bindings="$START_HOME/.claude/craftsman/sessions"
+    mkdir -p "$sweep_data" "$bindings"
+    _sweep_fixture() {
+        printf 'x\n' > "$sweep_data/session-writes-ended"
+        printf 'x\n' > "$sweep_data/session-writes-live"
+        printf 'x\n' > "$sweep_data/metrics.db"
+        printf '{}' > "$bindings/ended.json"
+        printf '{}' > "$bindings/live.json"
+        touch -t 202001010000 "$sweep_data/session-writes-ended" "$sweep_data/metrics.db" "$bindings/ended.json"
+    }
+    _sweep_start() {
+        echo '{"session_id":"sweeper","source":"startup"}' | HOME="$START_HOME" CRAFTSMAN_RUNTIME_HOME="$START_HOME" CLAUDE_PLUGIN_DATA="$sweep_data" \
+            bash "$ROOT_DIR/hooks/session-start.sh" >/dev/null 2>&1
+    }
+    _sweep_fixture
+    _sweep_start
+    local left
+    left=$(cd "$sweep_data" && ls metrics.db session-writes-* 2>/dev/null | tr '\n' ' ')
+    left="$left$(cd "$bindings" && ls ended.json live.json 2>/dev/null | tr '\n' ' ')"
+    assert_contains "the sweep takes a week-old session file and binding" "left=$left." "left=metrics.db session-writes-live live.json ."
+    _sweep_fixture
+    _sweep_start
+    if [[ -e "$sweep_data/session-writes-ended" ]]; then
+        log_pass "a second start the same day does not sweep again"
+    else
+        log_fail "a second start the same day does not sweep again" "session-writes-ended was swept"
+    fi
+    touch -t 202001010000 "$sweep_data/.sweep-stamp"
+    _sweep_start
+    if [[ -e "$sweep_data/session-writes-ended" ]]; then
+        log_fail "a start a day after the last sweep sweeps again" "session-writes-ended survived"
+    else
+        log_pass "a start a day after the last sweep sweeps again"
+    fi
+}
+check_sweep_takes_ended_sessions_only
+
 rm -rf "$CLAUDE_PLUGIN_DATA" "/tmp/craftsman-fake-home-$$" "${START_HOME:-}"
 
 echo ""
