@@ -264,6 +264,14 @@ _lang_known_ready() {
     [[ -n "$_LANG_REGISTRY_KNOWN_FILE" && -f "$_LANG_REGISTRY_KNOWN_FILE" ]]
 }
 
+# Builds the known registry in the CALLER's shell. Built lazily, it is built
+# again by every subshell that asks, since a subshell's variables die with it:
+# eight times per SessionStart (pack detection, the healthcheck's checks, the
+# routing table). Warmed once, every subshell inherits it.
+lang_registry_warm_known() {
+    _lang_known_ready || return 0
+}
+
 # lang_known_for_file <path> → the language some installed pack claims for
 # the extension, stack filter or not. A validator running on the file already
 # means its language is enabled; what it asks here is a property of the

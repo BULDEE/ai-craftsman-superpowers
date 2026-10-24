@@ -164,6 +164,36 @@ else
     log_fail "the count is about something" "locked=${expected_locked} total=${expected_total}"
 fi
 
+# Test: hc_check_metrics_db counts the database of the data directory, known
+# either way: bound in this shell by session-files.sh (every hook), or resolved
+# by runtime_paths.py when nothing bound it (bin/craftsman-healthcheck).
+_hc_metrics_fixture() {
+    sqlite3 "$1/metrics.db" "CREATE TABLE sessions(id); CREATE TABLE violations(id);
+        INSERT INTO sessions VALUES (1), (2); INSERT INTO violations VALUES (1), (2), (3);"
+}
+_hc_metrics_row() {
+    _HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
+    hc_check_metrics_db
+    printf '%s|%s' "${_HC_STATUSES[0]}" "${_HC_MESSAGES[0]}"
+}
+HC_BOUND=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-hc-bound.XXXXXX")
+_hc_metrics_fixture "$HC_BOUND"
+_hc_metrics_fixture "$CLAUDE_PLUGIN_DATA"
+sqlite3 "$CLAUDE_PLUGIN_DATA/metrics.db" "INSERT INTO violations VALUES (4);"
+got=$(_CRAFTSMAN_SESSION_DATA_DIR="$HC_BOUND" _hc_metrics_row)
+if [[ "$got" == "ok|2 sessions, 3 violations (${HC_BOUND}/metrics.db)" ]]; then
+    log_pass "metrics row counts the database of the directory this shell bound"
+else
+    log_fail "metrics row, bound directory" "got '$got'"
+fi
+got=$(unset _CRAFTSMAN_SESSION_DATA_DIR; _hc_metrics_row)
+if [[ "$got" == "ok|2 sessions, 4 violations (${CLAUDE_PLUGIN_DATA}/metrics.db)" ]]; then
+    log_pass "metrics row resolves the data directory when nothing bound it"
+else
+    log_fail "metrics row, resolved directory" "got '$got'"
+fi
+rm -rf "$HC_BOUND"
+
 # The host row says what this host can observe, per capability, instead of
 # hiding it in one score (research CR-131, R11). The facts are the captured
 # ones: Codex sends no shell exit code and ignores `ask`.

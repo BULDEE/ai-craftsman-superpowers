@@ -254,6 +254,18 @@ if grep -q '^v2$' "$SYMLINK_ROOT/skills/my-command/SKILL.md"; then
 else
     log_fail "Skill refresh" "copy still holds the old content"
 fi
+# A sync with nothing to change leaves the copy where it is. It used to delete
+# every pack skill and copy it back on each SessionStart, and Claude Code
+# discovers skills while those hooks run: a session looking in between found
+# the skill missing. Same inode means the file was never replaced.
+_inode() { ls -id "$1" 2>/dev/null | awk '{print $1}'; }
+INODE_BEFORE=$(_inode "$SYMLINK_ROOT/skills/my-command/SKILL.md")
+CLAUDE_PLUGIN_ROOT="$SYMLINK_ROOT" pack_sync_symlinks
+if [[ -n "$INODE_BEFORE" && "$INODE_BEFORE" == "$(_inode "$SYMLINK_ROOT/skills/my-command/SKILL.md")" ]]; then
+    log_pass "a sync with nothing to change keeps the pack skill in place (same file)"
+else
+    log_fail "Skill churn" "the copy was replaced by a sync that had nothing to change"
+fi
 rm -f "$SYMLINK_ROOT/skills/my-command/SKILL.md"
 ln -sf "../../../$(basename "$TEST_PACKS_DIR")/test-symlink/commands/my-command.md" "$SYMLINK_ROOT/skills/my-command/SKILL.md"
 CLAUDE_PLUGIN_ROOT="$SYMLINK_ROOT" pack_sync_symlinks
@@ -621,5 +633,25 @@ if [[ -z "$DRIFT" ]]; then
 else
     log_fail "pack skill copies drift from their sources" "run pack_sync_symlinks:${DRIFT}"
 fi
+
+# The identity list answers for a manifest named the way the loop names it,
+# packs/go//pack.yml, without a stat. A fallback stat returns the same identity,
+# so no output can tell the two apart: a stat on PATH that records being called
+# is the witness. Under bash 3.2 the lookup missed every time and nobody saw it.
+check_identity_served_from_list() {
+    local stub
+    stub=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-stat-stub.XXXXXX")
+    printf '#!/bin/sh\necho called >> "%s/calls"\nexit 1\n' "$stub" > "$stub/stat"
+    chmod +x "$stub/stat"
+    _pack_yml_identities_load "$ROOT_DIR"/packs/*/pack.yml
+    PATH="$stub:$PATH" _pack_yml_identity "$ROOT_DIR/packs/go//pack.yml" >/dev/null
+    if [[ ! -f "$stub/calls" ]]; then
+        log_pass "a manifest named with the loop's // is answered from the identity list, no stat"
+    else
+        log_fail "identity list lookup" "stat ran for a manifest the list holds"
+    fi
+    rm -rf "$stub"
+}
+check_identity_served_from_list
 
 test_summary

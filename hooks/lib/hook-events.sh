@@ -40,17 +40,17 @@ hook_events_comma_separated() {
     echo "${VALID_HOOK_EVENTS[@]}" | tr ' ' ','
 }
 
-# Get all valid hook events as a Python set literal (for Python validation)
-hook_events_python_set() {
-    local events_str=""
-    for event in "${VALID_HOOK_EVENTS[@]}"; do
-        if [[ -z "$events_str" ]]; then
-            events_str="'$event'"
-        else
-            events_str="${events_str},'$event'"
-        fi
-    done
-    echo "{${events_str}}"
+# hook_events_unsupported <hooks.json> → the events the file declares that are
+# not in VALID_HOOK_EVENTS, sorted and comma-joined; nothing when every event
+# is valid or the file has no hooks object. One jq, where SessionStart started
+# a python3 on every session to answer it.
+hook_events_unsupported() {
+    local event unsupported=""
+    while IFS= read -r event; do
+        is_valid_hook_event "$event" && continue
+        unsupported="${unsupported:+${unsupported},}${event}"
+    done < <(jq -r '.hooks | objects | keys[]' "$1" 2>/dev/null)
+    printf '%s' "$unsupported"
 }
 
 # Check if a given hook event is valid

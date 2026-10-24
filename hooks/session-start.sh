@@ -27,6 +27,7 @@ source "${SCRIPT_DIR}/lib/pack-loader.sh"
 source "${SCRIPT_DIR}/lib/healthcheck.sh"
 source "${SCRIPT_DIR}/lib/routing-table.sh"
 source "${SCRIPT_DIR}/lib/hook-events.sh"
+lang_registry_warm_known
 
 _init_packs() {
     pack_loader_init
@@ -47,9 +48,12 @@ _init_packs() {
 HAS_PYTHON3=true
 command -v python3 >/dev/null 2>&1 || HAS_PYTHON3=false
 
-# Init metrics DB (idempotent, non-blocking)
+# Init metrics DB (idempotent, non-blocking). Through the schema stamp, as a
+# write does (CR-278): fourteen probes per session start found nothing to
+# migrate once the database carried this library's stamp, and the first start
+# after an upgrade still runs them all.
 if $HAS_PYTHON3; then
-    metrics_init 2>/dev/null || echo "WARNING: Metrics DB init failed" >&2
+    metrics_init_once 2>/dev/null || echo "WARNING: Metrics DB init failed" >&2
 fi
 
 # Write the canonical session-state path to a stable bridge file so that
@@ -254,19 +258,7 @@ WARNINGS=""
 # Validate hooks.json schema - catch unsupported events early
 HOOKS_FILE="${SCRIPT_DIR}/hooks.json"
 if [[ -f "$HOOKS_FILE" ]]; then
-    SUPPORTED_EVENTS=$(hook_events_python_set)
-    _unsupported=$(python3 -c "
-import json, sys
-supported = ${SUPPORTED_EVENTS}
-try:
-    data = json.load(open(sys.argv[1]))
-    actual = set(data.get('hooks', {}).keys())
-    bad = actual - supported
-    if bad:
-        print(','.join(sorted(bad)))
-except Exception:
-    pass
-" "$HOOKS_FILE" 2>/dev/null)
+    _unsupported=$(hook_events_unsupported "$HOOKS_FILE")
     if [[ -n "$_unsupported" ]]; then
         WARNINGS="${WARNINGS} | SCHEMA WARNING: hooks.json contains unsupported events: ${_unsupported}. Remove them to avoid CI failures."
     fi
