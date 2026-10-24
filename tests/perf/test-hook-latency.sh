@@ -314,10 +314,18 @@ DIRTY_PAYLOAD="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s"},"c
 # macOS runner's noise: four readings of the same code on macos-latest gave
 # 3.09x, 3.73x, 3.55x and 2.79x (ubuntu: 7.11x, 6.90x against 9.0x). 5.0x is
 # 1.35x over the worst of them and under twice the fastest (2 x 2.64x).
+#
+# Lowered on 2026-10-24, after the CR-278 passes halved the hooks: the old
+# rows sat at twice what the hooks now read, so a doubling passed. Four runs
+# of ci.yml after the last hook pass (40099848955, 40101280055, 40102681461,
+# 40102799045), same rule as above. Darwin quiet reading 2.55x, 2.73x, 0.70x, dirty 7.5x; worst
+# 2.95x, 3.39x, 0.81x, 10.36x, and this laptop under load read up to 3.05x
+# post-write, so the post-write row takes 1.15 x 3.05. Linux quiet reading
+# 3.65x, 3.43x, 0.88x, dirty 7.6x; worst 3.90x, 3.69x, 0.95x, 8.05x.
 _PERF_ENV="$(uname -s)"
 case "$_PERF_ENV" in
-    Linux)  C_POST=11.4; C_PRE=11.1; C_BIAS=3.25; C_DIRTY=16.6; QUIET_READINGS="8.42 7.89 2.40" ;;
-    *)      C_POST=6.5;  C_PRE=5.0;  C_BIAS=2.05; C_DIRTY=13.5; QUIET_READINGS="4.85 3.39 1.37" ;;
+    Linux)  C_POST=4.9;  C_PRE=4.65; C_BIAS=1.2; C_DIRTY=10.3; QUIET_READINGS="3.65 3.43 0.88" ;;
+    *)      C_POST=3.55; C_PRE=3.9;  C_BIAS=1.0; C_DIRTY=11.9; QUIET_READINGS="2.55 2.73 0.70" ;;
 esac
 echo "ceilings for ${_PERF_ENV}: post-write ${C_POST}x, pre-write ${C_PRE}x, bias ${C_BIAS}x, dirty ${C_DIRTY}x"
 # A ceiling raised to absorb noise must still catch a 50 percent regression of
