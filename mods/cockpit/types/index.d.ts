@@ -36,8 +36,23 @@ export type CockpitView =
   | { kind: 'failed'; message: string }
   | { kind: 'ready'; queue: CockpitQueue; notice: string }
 
+// What `craftsman-helper session status` prints: the session's quality state
+// the hooks keep (hooks/lib/session_status.py).
+export type CockpitTests = { verdict: 'red' | 'verified' | 'empty' | 'unverified' | 'not-run'; red_runs: string[] }
+
+export type CockpitPulse = {
+  since: number | null
+  writes: number
+  files: number
+  blocked: number
+  warned: number
+  open: { file: string; rules: string[] }[]
+  tests: CockpitTests
+  compactions: number
+}
+
 declare module 'claude-code' {
   interface PluginState {
-    'craftsman-cockpit': { view: CockpitView; preview: number }
+    craftsman: { view: CockpitView; preview: number; pulse: CockpitPulse | null; turnStart: CockpitPulse | null }
   }
 }

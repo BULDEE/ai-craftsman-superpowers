@@ -71,5 +71,7 @@
       "description": "Sentry auth token (stored securely in keychain)",
       "sensitive": true
     }
-  }
+  },
+  "hooks": "./hooks/claude-code.json",
+  "types": "./mods/cockpit/types/index.d.ts"
 }
