@@ -12,8 +12,24 @@ a `.js`, `.jsx`, `.mjs`, `.cjs` or `.py` file, and a key with a recent issuer
 prefix (`sk-ant-`, `sk-proj-`, `glpat-`, `npm_`) in any covered language.
 SEC001 is never ignorable: move the value to the environment and rotate it.
 
+The cockpit now ships in the craftsman plugin. If you installed the separate
+`craftsman-cockpit` plugin, uninstall it: its 4.14.0 is empty, so updating it
+also removes the old module.
+
 ### Added
 
+- On Claude Code, a line above the prompt says where the session stands: the
+  writes the gate judged, the blocks still open with their rule and file, the
+  warnings, and what the tests say (red with the run that failed, verified, a
+  run that tested nothing, not run). It appears once the session has
+  something to report and is redrawn after every write the hooks judge;
+  Ctrl+X then Ctrl+A folds it. Each answer that changed it gets one line
+  under it, as in `craftsman: 3 writes, 1 blocked, 0 warnings · 1 open:
+  LAYER001 Order.php · tests not run`; a turn that only read or talked gets
+  none. Both read `craftsman-helper session status`, a JSON view of what the
+  hooks keep for the session, and decide nothing (ADR-0031). Measured in a
+  headless Claude Code 2.1.310 session on a synthetic project: the receipt
+  line came from the real hooks through the real helper.
 - SEC001 covers JavaScript and Python, and knows today's key shapes. An
   Anthropic or OpenAI project key was written to a `.ts` file with no
   finding while the repository's own secrets scanner knew both prefixes, and
@@ -62,6 +78,14 @@ SEC001 is never ignorable: move the value to the environment and rotate it.
 
 ### Changed
 
+- The cockpit moved into the craftsman plugin: one install, and `/instincts`
+  finds the core at the plugin's own root instead of through the session
+  binding, the repository layout and `PATH`, the lookup two field failures
+  came from (CR-279, CR-291). Codex and Grok never see the module: it is
+  declared by `hooks/claude-code.json`, which only Claude Code's manifest
+  names, while `hooks/hooks.json` holds none. Measured: a module that fails to
+  load leaves the command hooks running on 2.1.310, and Claude Code 2.1.218,
+  the minimum, ignores the module file and runs the hooks (ADR-0031 amended).
 - Every write costs less: a post-write about half, a pre-write about a
   third less (median of seven alternating runs against the previous code,
   2043 to 1030 ms and 1421 to 905 ms on a loaded machine). Claude Code had
