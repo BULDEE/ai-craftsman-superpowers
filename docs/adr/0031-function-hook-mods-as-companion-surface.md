@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted (amended 2026-10-20: the API left early access, see Amendment).
+Accepted (amended 2026-10-20: the API left early access; amended 2026-10-24:
+the module moves into the craftsman plugin. See the Amendments).
 
 ## Date
 
@@ -172,6 +173,67 @@ What that changes:
   not 2.1.287, the build the documentation names: `$.state` and the
   `atom`/`read`/`update` helpers this mod relies on were not checked on
   anything older.
+
+## Amendment (2026-10-24): the module moves into the craftsman plugin
+
+Decision 1 kept the module out of the craftsman plugin for two reasons: other
+hosts read `hooks/hooks.json`, and a module that fails to load must not take
+the enforcement plugin down with it. Both were measured, and neither holds.
+
+- **Other hosts never see it.** The plugins reference says a manifest's
+  `hooks` key *merges* with the default file: "The default file loads first,
+  and what the manifest declares merges into it". So `.claude-plugin/plugin.json`
+  names `hooks/claude-code.json`, which holds the module and nothing else,
+  while `hooks/hooks.json` stays the one file every host reads, with no module.
+  Codex and Grok read `hooks/hooks.json` from their own manifests
+  (`scripts/native-manifests.py`), Hermes reads neither.
+- **A module that fails leaves the gate running.** Measured on Claude Code
+  2.1.310 with a throwaway plugin: a module that throws at import, and one that
+  does not parse, both print `hooks module did not load`, and the plugin's own
+  SessionStart command hook still ran; the same when the module sits in
+  `hooks/hooks.json` beside the command hooks. The mods documentation says the
+  same of a running module: "Command, HTTP, prompt, and agent hooks in
+  settings files and in plugins' hooks/hooks.json run as before, alongside
+  mods", and "A hook that fails doesn't break the session".
+- **Older builds ignore it.** Claude Code 2.1.218, the minimum this plugin
+  declares, loads the plugin, runs its SessionStart and UserPromptSubmit
+  hooks and passes `claude plugin validate`, with the module file ignored
+  silently. 2.1.286, where function hooks were still switched off by rollout,
+  prints `hooks module not loaded: hooks modules are turned off ...` once per
+  session and runs the command hooks.
+
+The separation had a measured cost. The cockpit found the core through the
+session binding, the repository layout, then `PATH` (decision 4), and two
+field failures came from that lookup alone (CR-279, a binding naming the
+plugin root of the previous version; CR-291, a Claude Code session taken for a
+Codex one, so no binding at all). Inside the plugin, `$.plugin.root` is the
+core.
+
+What changes:
+
+- **Decision 1** becomes: the module ships in the craftsman plugin
+  (`mods/cockpit/`), declared by `hooks/claude-code.json`, which only Claude
+  Code's manifest names; `hooks/hooks.json` holds no module.
+  `tests/mods/test-mods.sh` checks both, and that no other host's manifest
+  names the module file. The former `craftsman-cockpit` plugin stays in the
+  marketplace for one release as an empty plugin, so that updating it removes
+  the old module instead of registering `/instincts` twice.
+- **Decision 4** becomes: the helper is `$.plugin.root/bin/craftsman-helper`.
+  The session binding only supplies the data directory the hooks bound for the
+  session; a binding for another session supplies nothing.
+- **Decisions 2, 3 and 5 stand.** The new surfaces read a machine-readable
+  subcommand with its own test, `craftsman-helper session status`
+  (`hooks/lib/session_status.py`): a line above the prompt with the session's
+  writes, open blocks, warnings and test verdict, redrawn after each write the
+  hooks judge, and a line under each answer that changed them. Neither decides
+  anything. The module still registers no tool.
+
+One opening this ADR listed is closed instead: replacing the
+`craftsman-test-failures` monitor with a toast. The monitor's output "reaches
+Claude as notifications" (plugins components reference): its reader is the
+model, which reacts to a red background run. A toast would move that
+information from the model to the person, and the person already reads red
+tests in the band.
 
 ## References
 
