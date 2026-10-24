@@ -99,6 +99,10 @@ SEC001 is never ignorable: move the value to the environment and rotate it.
   once or in-shell. The cost: SessionStart no longer re-runs the migrations
   over a database damaged by hand whose stamp still matches, the same trade
   the write hooks already made (CR-290).
+- SessionStart sweeps the files of sessions that ended without a SessionEnd
+  once a day instead of on every start: what it takes is a week old, and it
+  cost each start a find and a Python start (32 ms). The sweep had no test;
+  it has three now.
 - The structural ratchet records function-level debt only: worst-function
   complexity, longest function and suppression count. A file that grew with a
   feature failed the ratchet until someone raised its budget: on this
@@ -112,6 +116,18 @@ SEC001 is never ignorable: move the value to the environment and rotate it.
 
 ### Fixed
 
+- A compaction no longer restarts the session's metrics. SessionStart fires
+  again after a compaction, with the same session id, and it rewrote the
+  session's start time and deleted its write and violation tallies: a
+  session that ran five days and compacted five times was measured from its
+  last compaction, with every earlier write gone. After a compaction the
+  session now keeps both; a session that starts, resumes, forks or clears
+  restarts them as before (CR-296).
+- `craftsman-ci` scans a file once however it is spelled on macOS. The key
+  that deduplicates the scan folds `//`, and under bash 3.2 that fold kept a
+  backslash, so `src//Order.php` and `src/Order.php` were two files and
+  their findings counted twice. Linux runners, on bash 5, were not affected
+  (CR-297).
 - Pack skills no longer disappear while a session starts. SessionStart
   deleted every pack skill and copied it back, and Claude Code's hooks
   reference says skill discovery runs before SessionStart hooks finish, so a

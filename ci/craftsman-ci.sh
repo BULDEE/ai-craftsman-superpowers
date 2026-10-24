@@ -832,7 +832,9 @@ _ci_normalise_key() {
     local key="$1"
     key="${key#"$PWD"/}"
     while [[ "$key" == ./* ]]; do key="${key#./}"; done
-    while [[ "$key" == *//* ]]; do key="${key//\/\//\/}"; done
+    # `${key//\/\///}`, never `${key//\/\//\/}`: bash 3.2 keeps that escape in
+    # the replacement, and `a//b` became `a\/b` (CR-297).
+    while [[ "$key" == *//* ]]; do key="${key//\/\///}"; done
     key="${key%/}"
     printf '%s' "$key"
 }

@@ -794,6 +794,19 @@ else
     log_pass "no standalone config path: strictness has one authority"
 fi
 
+# One file named three ways is one file. The scan deduplicates on a key that
+# folds `//`, and under bash 3.2, macOS's /bin/bash, the fold kept a
+# backslash: `src//Order.php` became a second file and its findings counted
+# twice (CR-297). /bin/bash runs it where it exists, as on a Mac.
+_spelled_bash=bash
+[[ -x /bin/bash ]] && _spelled_bash=/bin/bash
+mkdir -p "$ENGINE_COPY/spellings/src"
+printf '<?php\nclass Order { public function setN($v) { $this->n = $v; } }\n' \
+    > "$ENGINE_COPY/spellings/src/Order.php"
+spelled_out=$(cd "$ENGINE_COPY/spellings" \
+    && "$_spelled_bash" "$CLI" src/Order.php src//Order.php ./src/Order.php 2>&1)
+assert_contains "one file spelled three ways is scanned once" "$spelled_out" "in 1 file(s)"
+
 rm -rf "$ENGINE_COPY"
 
 # =============================================================================

@@ -232,6 +232,80 @@ check_unknown_hook_events() {
 }
 check_unknown_hook_events
 
+# Test: SessionStart also fires after a compaction, with the same session id.
+# The session goes on, so its start time and its write and violation tallies
+# survive; a session that starts restarts them (CR-296).
+check_compaction_keeps_session_tallies() {
+    local id=compact-keeps-tallies started writes violations
+    _session_start_as() {
+        printf '{"session_id":"%s","source":"%s"}' "$id" "$1" \
+            | HOME="$START_HOME" bash "$ROOT_DIR/hooks/session-start.sh" >/dev/null 2>&1
+    }
+    _session_start_as startup
+    printf '1000' > "$CLAUDE_PLUGIN_DATA/session-start-ts-$id"
+    printf 'a.php\nb.php\n' > "$CLAUDE_PLUGIN_DATA/session-writes-$id"
+    printf 'blocked\n' > "$CLAUDE_PLUGIN_DATA/session-violations-$id"
+    # Older than the sweep's age limit: a session that lives a week keeps it.
+    touch -t 202001010000 "$CLAUDE_PLUGIN_DATA/session-start-ts-$id"
+    _session_start_as compact
+    started=$(cat "$CLAUDE_PLUGIN_DATA/session-start-ts-$id" 2>/dev/null)
+    writes=$(wc -l < "$CLAUDE_PLUGIN_DATA/session-writes-$id" 2>/dev/null | tr -d ' ')
+    violations=$(cat "$CLAUDE_PLUGIN_DATA/session-violations-$id" 2>/dev/null)
+    assert_contains "a compaction keeps the session start time" "start=$started" "start=1000"
+    assert_contains "a compaction keeps the session writes" "writes=$writes" "writes=2"
+    assert_contains "a compaction keeps the session violations" "violations=$violations" "violations=blocked"
+    _session_start_as startup
+    started=$(cat "$CLAUDE_PLUGIN_DATA/session-start-ts-$id" 2>/dev/null)
+    assert_not_contains "a new start restarts the session clock" "start=$started" "start=1000"
+    if [[ -e "$CLAUDE_PLUGIN_DATA/session-writes-$id" ]]; then
+        log_fail "a new start restarts the session tallies" "session-writes-$id still present"
+    else
+        log_pass "a new start restarts the session tallies"
+    fi
+}
+check_compaction_keeps_session_tallies
+
+# Test: SessionStart sweeps the files of sessions that ended without a
+# SessionEnd, a week old, and nothing else; and it sweeps once a day, since a
+# file a week old does not need a find and a Python start on every session.
+check_sweep_takes_ended_sessions_only() {
+    local sweep_data="$START_HOME/sweep-data" bindings="$START_HOME/.claude/craftsman/sessions"
+    mkdir -p "$sweep_data" "$bindings"
+    _sweep_fixture() {
+        printf 'x\n' > "$sweep_data/session-writes-ended"
+        printf 'x\n' > "$sweep_data/session-writes-live"
+        printf 'x\n' > "$sweep_data/metrics.db"
+        printf '{}' > "$bindings/ended.json"
+        printf '{}' > "$bindings/live.json"
+        touch -t 202001010000 "$sweep_data/session-writes-ended" "$sweep_data/metrics.db" "$bindings/ended.json"
+    }
+    _sweep_start() {
+        echo '{"session_id":"sweeper","source":"startup"}' | HOME="$START_HOME" CRAFTSMAN_RUNTIME_HOME="$START_HOME" CLAUDE_PLUGIN_DATA="$sweep_data" \
+            bash "$ROOT_DIR/hooks/session-start.sh" >/dev/null 2>&1
+    }
+    _sweep_fixture
+    _sweep_start
+    local left
+    left=$(cd "$sweep_data" && ls metrics.db session-writes-* 2>/dev/null | tr '\n' ' ')
+    left="$left$(cd "$bindings" && ls ended.json live.json 2>/dev/null | tr '\n' ' ')"
+    assert_contains "the sweep takes a week-old session file and binding" "left=$left." "left=metrics.db session-writes-live live.json ."
+    _sweep_fixture
+    _sweep_start
+    if [[ -e "$sweep_data/session-writes-ended" ]]; then
+        log_pass "a second start the same day does not sweep again"
+    else
+        log_fail "a second start the same day does not sweep again" "session-writes-ended was swept"
+    fi
+    touch -t 202001010000 "$sweep_data/.sweep-stamp"
+    _sweep_start
+    if [[ -e "$sweep_data/session-writes-ended" ]]; then
+        log_fail "a start a day after the last sweep sweeps again" "session-writes-ended survived"
+    else
+        log_pass "a start a day after the last sweep sweeps again"
+    fi
+}
+check_sweep_takes_ended_sessions_only
+
 rm -rf "$CLAUDE_PLUGIN_DATA" "/tmp/craftsman-fake-home-$$" "${START_HOME:-}"
 
 echo ""
