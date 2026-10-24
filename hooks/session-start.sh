@@ -81,8 +81,20 @@ _writes_claude_bridge && { printf '%s' "$METRICS_DB_PATH" > "${HOME}/.claude/cra
 # Record session start epoch. SessionEnd input has no duration field
 # (only session_id/transcript_path/cwd/reason), so session-metrics.sh
 # derives duration and its violation-count window from this marker.
+# SessionStart fires again after a compaction, with the same session id: that
+# session goes on, so it keeps its start time and its tallies below. Rewriting
+# them measured a five-day session from its last compaction, with the writes
+# made before it gone (CR-296). The touch keeps the marker younger than the
+# sweep's age limit while the session lives.
 _start_marker=$(session_file session-start-ts)
-[[ -n "$_start_marker" ]] && { printf '%s' "$(date +%s)" > "$_start_marker" 2>/dev/null || true; }
+_session_source=$(jq -r '.source // empty | strings' <<< "$INPUT" 2>/dev/null) || _session_source=""
+_session_goes_on=false
+[[ "$_session_source" == compact && -s "$_start_marker" ]] && _session_goes_on=true
+if $_session_goes_on; then
+    touch "$_start_marker" 2>/dev/null || true
+else
+    [[ -n "$_start_marker" ]] && { printf '%s' "$(date +%s)" > "$_start_marker" 2>/dev/null || true; }
+fi
 # Sessions that ended without a SessionEnd (a crash, a kill) leave their files
 # behind; a week later nobody will resume them.
 session_files_sweep 7
@@ -92,7 +104,7 @@ session_files_sweep 7
 # the next session counted this one's violations as its own: two writes then
 # one produced three. The duration is already measured from this line, so
 # counting over any other window was incoherent regardless of the crash.
-rm -f "$(session_file session-violations)" "$(session_file session-writes)" 2>/dev/null || true
+$_session_goes_on || rm -f "$(session_file session-violations)" "$(session_file session-writes)" 2>/dev/null || true
 
 # Generate a self-contained verify wrapper at a well-known path.
 # Skills run via the Bash tool without CLAUDE_PLUGIN_ROOT, so they cannot

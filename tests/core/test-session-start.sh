@@ -232,6 +232,39 @@ check_unknown_hook_events() {
 }
 check_unknown_hook_events
 
+# Test: SessionStart also fires after a compaction, with the same session id.
+# The session goes on, so its start time and its write and violation tallies
+# survive; a session that starts restarts them (CR-296).
+check_compaction_keeps_session_tallies() {
+    local id=compact-keeps-tallies started writes violations
+    _session_start_as() {
+        printf '{"session_id":"%s","source":"%s"}' "$id" "$1" \
+            | HOME="$START_HOME" bash "$ROOT_DIR/hooks/session-start.sh" >/dev/null 2>&1
+    }
+    _session_start_as startup
+    printf '1000' > "$CLAUDE_PLUGIN_DATA/session-start-ts-$id"
+    printf 'a.php\nb.php\n' > "$CLAUDE_PLUGIN_DATA/session-writes-$id"
+    printf 'blocked\n' > "$CLAUDE_PLUGIN_DATA/session-violations-$id"
+    # Older than the sweep's age limit: a session that lives a week keeps it.
+    touch -t 202001010000 "$CLAUDE_PLUGIN_DATA/session-start-ts-$id"
+    _session_start_as compact
+    started=$(cat "$CLAUDE_PLUGIN_DATA/session-start-ts-$id" 2>/dev/null)
+    writes=$(wc -l < "$CLAUDE_PLUGIN_DATA/session-writes-$id" 2>/dev/null | tr -d ' ')
+    violations=$(cat "$CLAUDE_PLUGIN_DATA/session-violations-$id" 2>/dev/null)
+    assert_contains "a compaction keeps the session start time" "start=$started" "start=1000"
+    assert_contains "a compaction keeps the session writes" "writes=$writes" "writes=2"
+    assert_contains "a compaction keeps the session violations" "violations=$violations" "violations=blocked"
+    _session_start_as startup
+    started=$(cat "$CLAUDE_PLUGIN_DATA/session-start-ts-$id" 2>/dev/null)
+    assert_not_contains "a new start restarts the session clock" "start=$started" "start=1000"
+    if [[ -e "$CLAUDE_PLUGIN_DATA/session-writes-$id" ]]; then
+        log_fail "a new start restarts the session tallies" "session-writes-$id still present"
+    else
+        log_pass "a new start restarts the session tallies"
+    fi
+}
+check_compaction_keeps_session_tallies
+
 rm -rf "$CLAUDE_PLUGIN_DATA" "/tmp/craftsman-fake-home-$$" "${START_HOME:-}"
 
 echo ""
