@@ -1,6 +1,6 @@
 {
   "name": "ai-craftsman-superpowers",
-  "version": "4.13.1",
+  "version": "4.14.0",
   "owner": {
     "name": "Alexandre Mallet",
     "email": "contact@buldee.com"
@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "craftsman",
-      "version": "4.13.1",
+      "version": "4.14.0",
       "description": "A pre-write hook that refuses edits breaking your layer boundaries, plus a structural ratchet so inherited legacy never turns the repository red on day one.",
       "author": {
         "name": "Alexandre Mallet",
@@ -23,7 +23,7 @@
     },
     {
       "name": "craftsman-cockpit",
-      "version": "4.13.1",
+      "version": "4.14.0",
       "description": "Merged into the craftsman plugin in 4.14.0: the instinct pane, the quality band and the turn receipt now ship with it. Uninstall this plugin.",
       "author": {
         "name": "Alexandre Mallet",
