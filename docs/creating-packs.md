@@ -145,8 +145,9 @@ Pack agents are Markdown files with YAML frontmatter:
 ```markdown
 ---
 name: my-craftsman
+description: Senior {language} craftsman for reviews and refactoring.
 model: sonnet
-allowedTools: [Read, Glob, Grep, Bash, Agent]
+tools: Read, Glob, Grep, Bash, Agent
 ---
 
 # My Pack Craftsman
@@ -154,7 +155,10 @@ allowedTools: [Read, Glob, Grep, Bash, Agent]
 You are a senior {language} craftsman...
 ```
 
-**Required:** Always define `allowedTools` to restrict agent permissions.
+**Required:** always define `tools` to restrict agent permissions: it is the
+frontmatter key Claude Code reads. An agent that declares `maxTurns` also needs
+a `## Turn Budget` section, and `tests/core/test-turn-budget.sh` checks both on
+the shipped agents.
 
 ## External Packs
 

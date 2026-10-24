@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.14.0] - 2026-10-24
+
+Two guards, a faster gate, and a cockpit you see without opening it. A git
+command that switches the project's hooks off is refused (CR-258), and a red
+test waved away as flaky without a ticket sends the turn back (CR-289).
+SEC001 covers JavaScript and Python with today's key shapes (CR-257), files a
+Bash command changed are reviewed (CR-256), and a test run that tested
+nothing grants no evidence (CR-255). A write costs about half of what it did,
+a prompt a third, and a session start half (CR-278, CR-290). On Claude Code
+the cockpit now ships in the plugin: a line above the prompt says where the
+session stands, and each answer that changed it gets a receipt.
+
 Upgrading can refuse a file that 4.13.1 let through: a credential literal in
 a `.js`, `.jsx`, `.mjs`, `.cjs` or `.py` file, and a key with a recent issuer
 prefix (`sk-ant-`, `sk-proj-`, `glpat-`, `npm_`) in any covered language.
@@ -78,6 +90,11 @@ also removes the old module.
 
 ### Changed
 
+- The latency suite's ceilings follow the hooks down: post-write from 6.5 to
+  3.55 times the calibration baseline on macOS and from 11.4 to 4.9 on Linux,
+  the other rows alike, from four CI runs on the final code and a
+  maintainer's laptop under load. Left where they were, they sat at twice
+  what the hooks now cost, so a doubling would have passed.
 - The cockpit moved into the craftsman plugin: one install, and `/instincts`
   finds the core at the plugin's own root instead of through the session
   binding, the repository layout and `PATH`, the lookup two field failures
@@ -204,6 +221,14 @@ also removes the old module.
   (`/instincts` printed a usage line in its pane). The binding now follows
   the root the hooks run from, and the pane names the helper it ran when it
   fails (CR-279).
+
+### Removed
+
+- `config/default-config.yml`. It said it was copied to
+  `~/.claude/.craft-config.yml` on first run; no code has read it since the v4
+  configuration format, and it described that file in the pre-v4 one
+  (`version: "2.1"`, a `packs:` mapping). The configuration follows
+  `schemas/craft-config.schema.json` and `/craftsman:setup`.
 
 ## [4.13.1] - 2026-10-20
 

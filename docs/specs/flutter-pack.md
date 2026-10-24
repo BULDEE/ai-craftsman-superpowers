@@ -287,7 +287,7 @@ C'est le même défaut de fond que le `case "$EXT"` : une décision qui devrait 
 
 Point annexe : `pack-loader.sh:30-79` fait du `grep|sed` maison alors que `hooks/lib/yaml-parser.py` existe et sert au rules engine. Le parseur shell ne lit que les tableaux inline `[a, b]`, pas les séquences en bloc. Un contributeur qui écrit du YAML idiomatique obtient un pack silencieusement vide. **P0-1 impose des structures imbriquées : ce parseur doit être remplacé par `yaml-parser.py`, ce n'est pas optionnel.**
 
-Note sur `config/default-config.yml` (lignes 14-17) : son bloc `packs:` ne liste que `core`, `symfony`, `react`. Il est périmé et n'est lu par aucun code du runtime (`pack_loader_init` découvre par le système de fichiers). Ne pas y ajouter `flutter` en croyant activer quoi que ce soit.
+Note sur `config/default-config.yml` : son bloc `packs:` ne listait que `core`, `symfony`, `react`. Il était périmé, n'était lu par aucun code du runtime (`pack_loader_init` découvre par le système de fichiers) et a été retiré en 4.14.0. La configuration suit `schemas/craft-config.schema.json` et `/craftsman:setup`.
 
 ---
 
