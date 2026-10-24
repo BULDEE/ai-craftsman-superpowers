@@ -301,7 +301,11 @@ sur 2.1.310). Ctrl+X puis Ctrl+A replie la ligne
 
 **Il prouve.** « Terminé » exige des preuves. Une tâche ne peut pas être
 marquée complète sans trace de vérification, et un test qui échoue révoque une
-trace existante.
+trace existante. Un run vert plus étroit n'efface pas un run rouge plus large,
+et en mode strict un tour qui écarte un test rouge comme « flaky » sans citer
+de ticket est renvoyé au modèle. Sur Claude Code, une commande git qui coupe
+les hooks du projet (`--no-verify`, `core.hooksPath`, `HUSKY=0`) est refusée
+avant de s'exécuter.
 
 Et sur Claude Code, chaque travail tourne sur le modèle le moins cher qui en
 est capable : formater un commit sur Haiku en effort faible, une revue

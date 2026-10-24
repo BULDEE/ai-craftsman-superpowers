@@ -285,7 +285,11 @@ it (tested on 2.1.310). Ctrl+X then Ctrl+A folds the line away
 
 **It proves.** "Done" requires evidence. A task cannot be marked complete
 without a verification record, and a failing test run revokes one that already
-exists.
+exists. A narrower green run does not clear a wider red one, and in strict mode
+a turn that waves a red test away as flaky without naming a ticket is sent back
+to the model. On Claude Code, a git command that switches the project's own
+hooks off (`--no-verify`, `core.hooksPath`, `HUSKY=0`) is refused before it
+runs.
 
 And on Claude Code it runs each job on the cheapest model that can do it:
 formatting a commit on Haiku at low effort, an architecture review on Opus at
