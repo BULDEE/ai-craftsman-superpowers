@@ -169,6 +169,18 @@ else
     log_fail "signal hit should emit adjudication note" "exit=$exit_code output=$output"
 fi
 
+# The note names ONE lexeme: the first match of the first matching line. A
+# line with two hits must not leak the second one into the note, line break
+# included.
+result=$(run_bias_dir "a calm first line\\nthen xx-hurry, and Xx-hurry again")
+exit_code="${result%%|*}"; output="${result#*|}"
+if [[ "$exit_code" == "0" ]] && echo "$output" | grep -q 'lexeme "xx-hurry" suggests' \
+    && ! echo "$output" | grep -q 'Xx-hurry'; then
+    log_pass "signal note names only the first lexeme of the first matching line"
+else
+    log_fail "signal note should name one lexeme" "exit=$exit_code output=$output"
+fi
+
 result=$(run_bias_dir "just do it and also xx-hurry")
 exit_code="${result%%|*}"; output="${result#*|}"
 if [[ "$exit_code" == "0" ]] && echo "$output" | jq -e .systemMessage >/dev/null 2>&1 \
