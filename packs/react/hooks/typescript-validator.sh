@@ -12,14 +12,14 @@
 _check_ts001() {
     local file="$1"
     local line
+    # One grep per file, not one per line (see _check_php003 in the symfony pack).
     while IFS= read -r line; do
-        echo "$line" | grep -qE ": any[^a-zA-Z]|<any>|: any$" 2>/dev/null || continue
         if ! line_has_ignore "$line" "no-any"; then
             add_violation "TS001" "'any' type found - use proper types or 'unknown'"
         else
             metrics_record_violation "TS001" "$FILE_PATTERN" "critical" 0 1 2>/dev/null || true
         fi
-    done < "$file"
+    done < <(grep -E ": any[^a-zA-Z]|<any>|: any$" "$file" 2>/dev/null)
 }
 
 # Next.js, Remix, Storybook and every tool that loads a config by path require
@@ -64,13 +64,12 @@ _check_ts003() {
     local line suppressed=0
     # No non-null assertion (!) - exclude !=, !==, !., logical NOT (!expr), and end-of-line
     while IFS= read -r line; do
-        echo "$line" | grep -qE "[a-zA-Z0-9_\)]\!([^=\.!(]|$)" 2>/dev/null || continue
         if ! line_has_ignore "$line" "TS003"; then
             add_violation "TS003" "Non-null assertion (!) found - handle null explicitly"
             return 0
         fi
         suppressed=1
-    done < "$file"
+    done < <(grep -E "[a-zA-Z0-9_\)]\!([^=\.!(]|$)" "$file" 2>/dev/null)
     [[ $suppressed -eq 1 ]] \
         && { metrics_record_violation "TS003" "$FILE_PATTERN" "warning" 0 1 2>/dev/null || true; }
     return 0
