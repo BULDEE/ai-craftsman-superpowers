@@ -225,6 +225,28 @@ else
     log_fail "TypeScript any should block" "exit=$exit_code"
 fi
 
+# Test: a public setter is reported (PHP003). The scan pre-filters the file with
+# one grep, so this is the witness that the filter still matches. The rule's
+# severity is the manifest's call, so only the report is asserted, not the exit.
+result=$(run_post_hook "$FIXTURES_DIR/invalid-setter.php")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if echo "$output" | grep -q "PHP003"; then
+    log_pass "Public setter is reported to Claude (PHP003)"
+else
+    log_fail "Public setter should be reported" "exit=$exit_code"
+fi
+
+# Test: a non-null assertion is reported (TS003), same pre-filter witness.
+result=$(run_post_hook "$FIXTURES_DIR/invalid-non-null.ts")
+exit_code="${result%%|*}"
+output="${result#*|}"
+if echo "$output" | grep -q "TS003"; then
+    log_pass "Non-null assertion is reported to Claude (TS003)"
+else
+    log_fail "Non-null assertion should be reported" "exit=$exit_code"
+fi
+
 # Test: Valid TypeScript should pass
 result=$(run_post_hook "$FIXTURES_DIR/valid-component.tsx")
 exit_code="${result%%|*}"

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A write to a long PHP or TypeScript file no longer costs seconds. PHP003
+  (public setter), TS001 (`any`) and TS003 (non-null assertion) spawned one
+  `grep` per line of the file, so the post-write on a 2000-line file took
+  6.4 s in PHP and 11.5 s in TypeScript. Each rule now runs one `grep` over
+  the file and loops only over the lines it returns: 0.8 s and 0.6 s on the
+  same files (best of three runs against the previous code, macOS, bash
+  3.2). Two new fixtures witness that PHP003 and TS003 still report.
+
 ## [4.14.0] - 2026-10-24
 
 Two guards, a faster gate, and a cockpit you see without opening it. A git
