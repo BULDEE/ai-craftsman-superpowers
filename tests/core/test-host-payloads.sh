@@ -1028,6 +1028,15 @@ else
 fi
 R=$(_run pre-write-check.sh "$(_grok_pre_write "$WORK/src/Domain/Order.php" "$WORK/good.php.txt")")
 [[ "${R%%|*}" == "0" ]] && log_pass "control: the Grok write of a valid Domain class passes" || log_fail "control grok valid write" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
+# CR-311: Grok cuts the long strings of a tool input over 128 KiB and says so in
+# toolInputTruncated. The gate would judge the cut text and wave through what
+# sat in the missing end, so the valid write above is refused once truncated.
+R=$(_run pre-write-check.sh "$(_grok_pre_write "$WORK/src/Domain/Order.php" "$WORK/good.php.txt" | jq '.toolInputTruncated = true')")
+if [[ "${R%%|*}" == "2" && "${R#*|}" == *truncated* && "${R#*|}" == *'"deny"'* ]]; then
+    log_pass "CR-311: a write the host truncated is refused, not judged on the part that arrived"
+else
+    log_fail "CR-311 truncated write refused" "rc=${R%%|*} out=$(printf '%s' "${R#*|}" | tr '\n' ' ' | cut -c1-160)"
+fi
 L=$(_grok_pre_write "$WORK/src/Domain/Order.php" "$WORK/bad.php.txt" | python3 "$ROOT_DIR/hooks/lib/write_mirror.py" --list 2>/dev/null)
 [[ "$L" == *"src/Domain/Order.php"* ]] && log_pass "CR-146: write_mirror --list names the file a Grok write creates" || log_fail "CR-146 --list on grok write" "list=$L"
 

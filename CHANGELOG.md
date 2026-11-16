@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "BLOCKED" after it. The file on disk is only judged on the way to a
   refusal, so a clean write costs nothing more.
 
+### Fixed
+
+- A write the host truncated is refused instead of judged on the part that
+  arrived (CR-311). Grok cuts the long strings of a tool input over 128 KiB
+  and sets `toolInputTruncated`; nothing read it, so a violation in the cut
+  end of a large write passed the gate. The refusal says why and asks for
+  smaller edits. Other hosts' payloads pay no extra process for the check.
+
 ## [4.15.0] - 2026-11-16
 
 The gate reports what it does, and long files stop costing seconds. A PHP or

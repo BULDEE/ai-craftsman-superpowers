@@ -81,6 +81,17 @@ VIOLATION_COUNT=0
 # a write. The metrics are recorded once the verdict is in, for a refusal only
 # (see "A refusal is a finding" below).
 # =============================================================================
+# Grok cuts the long strings of a tool input over 128 KiB and sets
+# toolInputTruncated (CR-311). Judging the cut text would wave through whatever
+# sat in the missing end, so the write is refused with the reason: an unread
+# mutation is not a pass, the same stance as an UNJUDGED hunk below.
+# A bash match first, so the payloads of every other host pay no extra process.
+if [[ "$INPUT" =~ \"toolInputTruncated\"[[:space:]]*:[[:space:]]*true ]] \
+    && [[ "$(printf '%s' "$INPUT" | jq -r '.toolInputTruncated // false' 2>/dev/null)" == "true" ]]; then
+    echo "🚫 BLOCKED by AI Craftsman - the host truncated this write's content (toolInputTruncated), so the gate cannot judge all of it. Split the file or write it in smaller edits." >&2
+    jq -n '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: "the host truncated this write (toolInputTruncated), so the gate cannot judge all of it: split it into smaller edits"}}'
+    exit 2
+fi
 MIRROR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-pre-write.XXXXXX")
 trap 'rm -rf "$MIRROR"' EXIT
 # A relative file_path is relative to the session's working directory, which
