@@ -113,6 +113,27 @@ def handle_read_json(arguments: list[str]) -> None:
     json.dump(state, sys.stdout)
 
 
+# The pre-write gate held a finding back because the file already held it on
+# disk (CR-306). The next post-write of that file takes the counts once, so the
+# two hooks agree on what blocks and a stale count never outlives one write.
+def handle_hold(arguments: list[str]) -> None:
+    state_path, file_key, counts = arguments[0], arguments[1], json.loads(arguments[2])
+    state = read_state(state_path)
+    state.setdefault('held_findings', {})[file_key] = counts
+    write_state_atomically(state_path, state)
+
+
+def handle_take_held(arguments: list[str]) -> None:
+    state_path, file_key = arguments[0], arguments[1]
+    state = read_state(state_path)
+    counts = state.get('held_findings', {}).pop(file_key, None)
+    if counts is None:
+        return
+    write_state_atomically(state_path, state)
+    for rule, count in counts.items():
+        print(f"{rule}\t{count}")
+
+
 def handle_write(arguments: list[str]) -> None:
     state_path, data = arguments[0], json.loads(arguments[1])
     write_state_atomically(state_path, data)
@@ -394,6 +415,8 @@ def handle_set_verified(arguments: list[str]) -> None:
 COMMAND_HANDLERS = {
     'read': handle_read,
     'read-json': handle_read_json,
+    'hold': handle_hold,
+    'take-held': handle_take_held,
     'write': handle_write,
     'merge': handle_merge,
     'append': handle_append,

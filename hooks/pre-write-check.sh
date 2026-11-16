@@ -123,6 +123,105 @@ file_has_ignore() {
     _rule_marker_honoured "$1" || return 1
     grep -qE "craftsman-ignore:\s*[^#]*\b${1}\b" "$MIRROR_FILE" 2>/dev/null
 }
+# =============================================================================
+# The file on disk is an implicit mark (CR-306)
+#
+# This gate judges the whole would-be file, so a one-line edit to a file that
+# already held a blocking finding was refused for code the edit did not touch:
+# the adoption wall the rule baseline removes, back for every project that had
+# not marked its debt. Before refusing, the file as it stands is judged the
+# same way, and the Nth occurrence of a rule is held back (reported, not
+# blocking) when the file already held N. What the edit brings still blocks, a
+# new file holds nothing, the rules the baseline never holds (SEC*, RATCHET001)
+# and a severity the user set by name still block. Ordinal and blind to
+# content, like the mark it stands in for. Judged only on the way to a refusal,
+# so a clean write pays nothing.
+# =============================================================================
+_SEEN_FINDINGS=""
+_DISK_FINDINGS=""
+_DISK_JUDGED=""
+_TARGETS=""
+_TARGETS_READ=false
+# Every helper below sets globals instead of printing: called as $(...), a
+# cache filled inside the subshell vanished with it (the CR-301 defect), and
+# the counts handed to post-write came back empty.
+DISK_TARGET=""
+_disk_target() { # <mirror rel>: sets DISK_TARGET to the real file, if it exists
+    if [[ "$_TARGETS_READ" == false ]]; then
+        _TARGETS=$(printf '%s' "$INPUT" | jq --arg cwd "$PWD" '. + {cwd: (.cwd // $cwd)}' 2>/dev/null \
+            | python3 "${SCRIPT_DIR}/lib/write_mirror.py" --targets "$MIRROR" 2>/dev/null)
+        _TARGETS_READ=true
+    fi
+    DISK_TARGET=$(printf '%s\n' "$_TARGETS" | awk -F'\t' -v mirror="$1" '$1 == mirror {print $2; exit}')
+    [[ -f "$DISK_TARGET" ]] || DISK_TARGET=""
+}
+# One rule per occurrence the file HELD, through _pre_emit's own filters: a
+# finding silenced by a marker or an `ignore` severity was suppressed, not held,
+# and deleting the marker exposes it (tests/core/test-host-payloads.sh, F2).
+_disk_findings() { # <real file>
+    local lang
+    lang=$(lang_for_file "$1")
+    [[ -n "$lang" ]] || return 0
+    (
+        _disk_held() {
+            [[ "$(rules_severity_for_file "$MIRROR_FILE" "$1")" == "ignore" ]] && return 0
+            file_has_ignore "$1" || printf '%s\n' "$1" >&3
+        }
+        add_violation() { _disk_held "$1"; }
+        add_warning() { _disk_held "$1"; }
+        MIRROR_FILE="$1"; FILE_PATH="$1"
+        pack_dispatch_file "$1"
+        rules_check_custom "$1" "$lang"
+    ) 3>&1 >/dev/null 2>&1
+}
+_judge_disk() { # judges MIRROR_REL's file as it stands on disk, once
+    grep -qxF "$MIRROR_REL" <<< "$_DISK_JUDGED" && return 0
+    _DISK_JUDGED+="${MIRROR_REL}"$'\n'
+    _disk_target "$MIRROR_REL"
+    [[ -n "$DISK_TARGET" ]] || return 0
+    _DISK_FINDINGS+=$(_disk_findings "$DISK_TARGET" | sed "s|^|${MIRROR_REL}"$'\t'"|")$'\n'
+}
+_held_by_disk() { # <rule> <severity>
+    [[ "$2" == "block" ]] || return 1
+    _rule_baseline_never_holds "$1" && return 1
+    rules_severity_is_explicit "$MIRROR_FILE" "$1" && return 1
+    _judge_disk
+    local key="${MIRROR_REL}"$'\t'"$1"
+    [[ "$(grep -cxF "$key" <<< "$_SEEN_FINDINGS")" -le "$(grep -cxF "$key" <<< "$_DISK_FINDINGS")" ]]
+}
+# Sets HELD to why a blocking finding is held back, or empty. A global, not
+# $(...): the disk judgement it may trigger is cached for the next finding.
+HELD=""
+_hold_reason() { # <rule> <severity>
+    HELD=""
+    if rules_baseline_holds "$MIRROR_FILE" "$1" "$2"; then
+        HELD="already present at the baseline"
+    elif _held_by_disk "$1" "$2"; then
+        HELD="already in the file before this edit"
+        _HELD_BY_DISK+="${MIRROR_REL}"$'\t'"$1"$'\n'
+    fi
+}
+_HELD_BY_DISK=""
+# The post-write of the same file must agree, or the model reads "allowed"
+# before the write and "BLOCKED" after it for the one finding. The disk count of
+# every rule held here goes to the session state under the key post-write uses,
+# and post-write takes it once (session_state.py hold / take-held).
+_hand_held_to_post_write() {
+    [[ -n "$_HELD_BY_DISK" ]] || return 0
+    local rel target counts
+    while IFS= read -r rel; do
+        [[ -n "$rel" ]] || continue
+        _disk_target "$rel"
+        target="$DISK_TARGET"
+        counts=$(awk -F'\t' -v rel="$rel" 'NR == FNR {if ($1 == rel) held[$2] = 1; next}
+            $1 == rel && ($2 in held) {count[$2]++} END {for (r in count) print r "\t" count[r]}' \
+            <(printf '%s' "$_HELD_BY_DISK") <(printf '%s' "$_DISK_FINDINGS") \
+            | jq -Rn '[inputs | split("\t") | {(.[0]): (.[1] | tonumber)}] | add // {}')
+        python3 "${SCRIPT_DIR}/lib/session_state.py" hold "$(session_file session-state.json)" \
+            "$(session_pending_key "$target")" "$counts" 2>/dev/null || true
+    done <<< "$(cut -f1 <<< "$_HELD_BY_DISK" | sort -u)"
+}
+
 BLOCKING_RULES=""
 REFUSED_FINDINGS=""
 # A blocking finding, kept with the file it names: one line per refusal to record.
@@ -136,9 +235,9 @@ _pre_emit() {
     severity=$(rules_severity_for_file "$MIRROR_FILE" "$rule")
     [[ "$severity" == "ignore" ]] && return 0
     file_has_ignore "$rule" && return 0
-    if rules_baseline_holds "$MIRROR_FILE" "$rule" "$severity"; then
-        severity="warn"; message="${message} (already present at the baseline, not blocking)"
-    fi
+    _SEEN_FINDINGS+="${MIRROR_REL}"$'\t'"${rule}"$'\n'
+    _hold_reason "$rule" "$severity"
+    [[ -n "$HELD" ]] && { severity="warn"; message="${message} (${HELD}, not blocking)"; }
     case " $BLOCKING_RULES " in *" ${MIRROR_REL}:${rule} "*) return 0 ;; esac
     [[ "$severity" == "block" ]] && _hold_blocking "$rule"
     # A patch names several files: the finding says which one.
@@ -161,6 +260,7 @@ while IFS= read -r MIRROR_REL; do
     rules_check_custom "$MIRROR_FILE" "$LANG_ID"
 done <<< "$MIRROR_FILES"
 FILE_PATH="$FILE_PATH_REAL"
+_hand_held_to_post_write
 
 local_should_block=false
 [[ -n "$BLOCKING_RULES" ]] && local_should_block=true

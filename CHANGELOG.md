@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- An edit is refused for what it brings, not for what the file already held
+  (CR-306). The pre-write gate judged the whole would-be file, so a one-line
+  edit to a file that already carried a blocking finding was refused for code
+  it did not touch, in every project that had not marked its debt first. The
+  file as it stands on disk is now an implicit mark: the Nth occurrence of a
+  rule is reported but held back when the file already held N. What the edit
+  brings still blocks, a new file holds nothing, and secrets (SEC*), the
+  structural ratchet and any severity set by name in `.craft-rules.yml` still
+  block. The post-write of the same file agrees: the gate hands it the counts
+  it held, so the model no longer reads "allowed" before a write and
+  "BLOCKED" after it. The file on disk is only judged on the way to a
+  refusal, so a clean write costs nothing more.
+
 ## [4.15.0] - 2026-11-16
 
 The gate reports what it does, and long files stop costing seconds. A PHP or

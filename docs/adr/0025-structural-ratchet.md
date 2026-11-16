@@ -157,3 +157,34 @@ Two defects surfaced while making the change, both fixed with it.
   rule baseline's `rules` counts: the bump would have made every inherited rule
   finding block again. Only the ratcheted numbers are re-taken now.
 
+
+## Amendment (2026-11-16): the file on disk is an implicit mark (CR-306)
+
+The rule baseline held back a finding only in a project that had marked its
+debt. Everywhere else, since the pre-write gate judges the whole would-be file,
+a one-line edit to a file that already carried a blocking finding was refused
+for code the edit did not touch. Measured in this repository the day it was
+fixed: an edit adding one assertion to `tests/core/test-session-start.sh` was
+refused for SH002 on a 36-line function three hundred lines away.
+
+Decision: on the way to a refusal, the gate judges the target as it stands on
+disk with the same validators, and the Nth occurrence of a rule is held back
+(reported, not blocking) when the file already held N. The comparison is the
+mark's: ordinal and blind to content, with its limits stated above. The same
+exclusions apply. SEC* and RATCHET001 are never held, and a severity the user
+set by name outranks the implicit mark as it outranks the committed one. A
+file that does not exist yet holds nothing.
+
+The post-write of the same file must give the same verdict, or the model reads
+"allowed" before the write and "BLOCKED" after it. It cannot judge the old
+content, which is gone, so the gate hands it the count of every rule it held,
+in the session state under the key both hooks share (CR-300), and post-write
+takes it once. A count left behind by a refused write still describes the file
+on disk, which the refusal did not change.
+
+Cost: nothing on a clean write. A refusal pays one more validator pass over
+the old file.
+
+What this does not do: it does not mark the file. The committed mark stays
+the way to adopt a codebase and to tighten it over time. The implicit mark only
+stops the gate from refusing an edit for what it did not bring.

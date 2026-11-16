@@ -62,17 +62,17 @@ SESSION_STATE=""
 # in the pending set, so one fix wrote two verdicts and every count built on
 # corrections was inflated by the line count.
 _blocked_rules_json() {
-    local rules_json="[" first=true line r seen=""
+    local rules_json="[" first=true line rule_id seen=""
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
-        r="${line%%:*}"
-        case " $seen " in *" $r "*) continue ;; esac
-        seen="$seen $r"
+        rule_id="${line%%:*}"
+        case " $seen " in *" $rule_id "*) continue ;; esac
+        seen="$seen $rule_id"
         if [[ "$first" == true ]]; then
-            rules_json="${rules_json}\"${r}\""
+            rules_json="${rules_json}\"${rule_id}\""
             first=false
         else
-            rules_json="${rules_json},\"${r}\""
+            rules_json="${rules_json},\"${rule_id}\""
         fi
     done <<< "$(echo -e "$CRITICAL_VIOLATIONS")"
     printf '%s]' "$rules_json"
@@ -254,17 +254,17 @@ if [[ -n "$PATCH_FILES" ]]; then
     CHILD_ERR=$(mktemp "${TMPDIR:-/tmp}/craftsman-child-err.XXXXXX")
     while IFS= read -r written; do
         [[ -z "$written" || ! -f "$written" ]] && continue
-        rc=0
+        child_exit=0
         out=$(printf '%s' "$INPUT" | jq --arg fp "$written" '.tool_name = "Write" | .tool_input = {file_path: $fp}' \
-            | bash "$0" 2>"$CHILD_ERR") || rc=$?
+            | bash "$0" 2>"$CHILD_ERR") || child_exit=$?
         [[ -s "$CHILD_ERR" ]] && { echo "${written}:"; cat "$CHILD_ERR"; } >&2
         # 2 is a verdict; any other failure is a child that could not judge,
         # and no verdict is not a clean verdict (review F6).
-        if [[ "$rc" -ne 0 && "$rc" -ne 2 ]]; then
-            echo "🚫 AI Craftsman could not validate ${written} after the write landed (exit ${rc})." >&2
+        if [[ "$child_exit" -ne 0 && "$child_exit" -ne 2 ]]; then
+            echo "🚫 AI Craftsman could not validate ${written} after the write landed (exit ${child_exit})." >&2
             CHILD_RC=2
         fi
-        [[ "$rc" -eq 2 ]] && CHILD_RC=2
+        [[ "$child_exit" -eq 2 ]] && CHILD_RC=2
         [[ -n "$out" ]] && CHILD_OUT="${CHILD_OUT}${out}"$'\n'
     done <<< "$PATCH_FILES"
     rm -f "$CHILD_ERR"
@@ -437,6 +437,34 @@ _record_violation_metric() {
 # pass, to tighten the file's rule counts to what the pass saw.
 RULES_OBSERVED=""
 
+# Why a blocking finding is held back, in HELD, or empty: the mark recorded it,
+# or the pre-write gate held it as already in the file before this edit and
+# handed the count over (CR-306). Read once per run, taken from the state so it
+# never outlives this write.
+HELD=""
+_HELD_BY_GATE=""
+_HELD_BY_GATE_READ=false
+_post_hold_reason() { # <rule> <severity> <file>
+    HELD=""
+    if rules_baseline_holds "$3" "$1" "$2"; then
+        HELD="already present at the baseline"
+        BASELINE_HELD="${BASELINE_HELD}${1}"$'\n'
+    elif _held_by_gate "$1" "$2" "$3"; then
+        HELD="already in the file before this edit"
+    fi
+}
+_held_by_gate() { # <rule> <severity> <file>
+    [[ "$2" == "block" && "$3" == "$FILE_PATH" ]] || return 1
+    if [[ "$_HELD_BY_GATE_READ" == false ]]; then
+        _HELD_BY_GATE=$(python3 "${SCRIPT_DIR}/lib/session_state.py" take-held "$SESSION_STATE" \
+            "$(session_pending_key "$FILE_PATH")" 2>/dev/null)
+        _HELD_BY_GATE_READ=true
+    fi
+    local before
+    before=$(awk -F'\t' -v rule="$1" '$1 == rule {print $2; exit}' <<< "$_HELD_BY_GATE")
+    [[ "$(grep -cxF "$1" <<< "$RULES_OBSERVED")" -le "${before:-0}" ]]
+}
+
 add_violation() {
     local rule="$1"
     local message="$2"
@@ -456,10 +484,8 @@ add_violation() {
 
     file_has_ignore "$rule" && ignored=1
 
-    if rules_baseline_holds "$file_path" "$rule" "$severity"; then
-        severity="warn"; message="${message} (already present at the baseline, not blocking)"
-        BASELINE_HELD="${BASELINE_HELD}${rule}"$'\n'
-    fi
+    _post_hold_reason "$rule" "$severity" "$file_path"
+    [[ -n "$HELD" ]] && { severity="warn"; message="${message} (${HELD}, not blocking)"; }
     if [[ $ignored -eq 0 ]]; then
         _record_violation_output "$rule" "$message" "$severity"
     fi

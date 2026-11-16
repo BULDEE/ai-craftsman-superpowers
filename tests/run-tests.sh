@@ -488,6 +488,7 @@ test_ratchet() {
 
     run_subtest "Structural ratchet tests pass" "$SCRIPT_DIR/core/test-ratchet.sh" || true
     run_subtest "Rule baseline tests pass" "$SCRIPT_DIR/core/test-rule-baseline.sh" || true
+    run_subtest "Findings the file already held are held back" "$SCRIPT_DIR/core/test-preexisting-findings.sh" || true
 }
 
 # Last, and after everything that writes to CLAUDE_PLUGIN_DATA: this one
