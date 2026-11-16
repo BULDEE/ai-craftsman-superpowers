@@ -1047,4 +1047,24 @@ else
     log_fail "the repository's mark" "$MARK_CHECK"
 fi
 
+echo ""
+echo "=== CR-280: check judges every file it is given ==="
+# `check a b` measured `a` and exited 0, whatever `b` held: a caller that
+# passed two files believed both were judged. Both orders, so a fix that only
+# reads the last argument is caught too.
+MULTI=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-ratchet-multi.XXXXXX")
+( cd "$MULTI" && git init -q )
+printf 'x() {\n  if a; then b; fi\n}\n' > "$MULTI/clean.sh"
+printf 'y() {\n  if a; then b; fi\n}\n' > "$MULTI/grown.sh"
+( cd "$MULTI" && python3 "$RATCHET" init >/dev/null 2>&1 )
+printf 'y() {\n  if a; then b; fi\n  if c; then d; fi\n  if e; then f; fi\n}\n' > "$MULTI/grown.sh"
+for order in "clean.sh grown.sh" "grown.sh clean.sh"; do
+    multi_code=0
+    # shellcheck disable=SC2086
+    multi_out=$( cd "$MULTI" && python3 "$RATCHET" check $order 2>&1 ) || multi_code=$?
+    assert_exit_code "check $order fails on the grown file" 1 "$multi_code"
+    assert_contains "check $order names the grown file" "$multi_out" "grown.sh"
+done
+rm -rf "$MULTI"
+
 test_summary

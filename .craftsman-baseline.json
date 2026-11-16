@@ -71,7 +71,7 @@
 {"complexity":9,"ignores":0,"instrument":3,"max_fn_lines":38,"path":"hooks/lib/pack-loader.sh","reason":"CR-257: sources secret-patterns.sh, the one list of credential shapes every pack reads"},
 {"complexity":2,"ignores":0,"instrument":3,"max_fn_lines":19,"path":"hooks/lib/portable-timeout.sh"},
 {"complexity":6,"ignores":0,"instrument":3,"max_fn_lines":27,"path":"hooks/lib/precedence.sh","reason":"CR-172: analyser coverage travels as a record in the result, errcheck under sa_timeout, witnesses in the Go, Rust and precedence suites"},
-{"complexity":11,"ignores":1,"instrument":3,"max_fn_lines":31,"path":"hooks/lib/ratchet.py","reason":"a renamed file keeps its mark; the mark lookup of check is its own function (#94)"},
+{"complexity":11,"ignores":1,"instrument":3,"max_fn_lines":30,"path":"hooks/lib/ratchet.py","reason":"a renamed file keeps its mark; the mark lookup of check is its own function (#94)"},
 {"complexity":7,"ignores":0,"instrument":3,"max_fn_lines":29,"path":"hooks/lib/routing-table.sh","reason":"Grok session table prints /name, and keeps /craftsman:plan, /craftsman:loop and /craftsman:workflow because those bare names are Grok commands"},
 {"complexity":10,"ignores":1,"instrument":3,"max_fn_lines":26,"path":"hooks/lib/rule-baseline.sh"},
 {"complexity":8,"ignores":1,"instrument":3,"max_fn_lines":20,"path":"hooks/lib/rule-registry.sh","reason":"CR-230: rule_marker_advice offers the marker only to the rules that honour it; its sentence quotes the marker, which counts as an ignore"},
