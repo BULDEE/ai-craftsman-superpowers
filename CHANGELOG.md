@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.15.0] - 2026-11-16
+
+The gate reports what it does, and long files stop costing seconds. A PHP or
+TypeScript file of 2000 lines is checked in a fraction of the time it took.
+The session banner no longer says no pack is loaded while every pack refuses
+writes (CR-301), `ratchet.py check` judges every file a pipeline hands it
+(CR-280), and in this repository's CI the Python 3.9 floor gates merges again
+(CR-305).
+
 ### Changed
 
 - A write to a long PHP or TypeScript file no longer costs seconds. PHP003
@@ -19,6 +28,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The session banner no longer says `packs: none loaded` while every pack is
+  loaded and refusing writes (CR-301). The packs loaded inside a command
+  substitution, so they vanished with the subshell before the healthcheck ran
+  in the hook's own shell: the same banner read `PACKS:ai-ml,...,symfony` and
+  `packs: none loaded`, and the false half is the one a debugging session
+  trusts. `tests/core/test-session-start.sh` now holds the two halves to agree.
+- `ratchet.py check` judges every file it is given (CR-280). `check a b`
+  measured `a` and exited 0 whatever `b` held, so a caller passing several
+  files believed all of them were checked. With one file the output is
+  unchanged, which is what the hooks and `craftsman-ci` parse. With several,
+  each line names its file. A call with no file prints the usage and exits 2.
 - The Python 3.9 floor runs again and gates merges (CR-305). `ubuntu-latest`
   moves to 26.04, where setup-python publishes no 3.9, so the job went red on
   every run from 2026-11-02. Nobody saw it: `CI Summary`, the one check branch
@@ -26,17 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The job is pinned to `ubuntu-24.04`, the summary fails over every job in its
   `needs` (a cancelled one included), and `tests/meta/test-ci-gate.sh` holds
   every job of `ci.yml` in those `needs`.
-- `ratchet.py check` judges every file it is given (CR-280). `check a b`
-  measured `a` and exited 0 whatever `b` held, so a caller passing several
-  files believed all of them were checked. With one file the output is
-  unchanged, which is what the hooks and `craftsman-ci` parse. With several,
-  each line names its file. A call with no file prints the usage and exits 2.
-- The session banner no longer says `packs: none loaded` while every pack is
-  loaded and refusing writes (CR-301). The packs loaded inside a command
-  substitution, so they vanished with the subshell before the healthcheck ran
-  in the hook's own shell: the same banner read `PACKS:ai-ml,...,symfony` and
-  `packs: none loaded`, and the false half is the one a debugging session
-  trusts. `tests/core/test-session-start.sh` now holds the two halves to agree.
 
 ## [4.14.1] - 2026-11-16
 
