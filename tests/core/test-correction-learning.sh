@@ -599,4 +599,150 @@ else
 fi
 rm -rf "$SESS_B"
 
+# =============================================================================
+# A refusal before the write is a finding the next accepted write answers
+# =============================================================================
+#
+# Since the pre-write gate judges every pack rule on a mirror (a9b0f51), a
+# blocking finding is refused before the file lands. Post-write never saw it,
+# so the loop recorded neither the violation nor its correction: 176 fixes in
+# August, 3 in November on a production database under daily use. Every case
+# above feeds post-write a file the gate would have refused, a sequence no
+# host produces any more. These run both hooks in the order a host calls them,
+# once per host write shape.
+echo ""
+echo "--- Refused before the write, answered by the next write ---"
+GATE_DIR="/tmp/craftsman-correction-gate-$$"
+mkdir -p "$GATE_DIR/src/Domain"; ( cd "$GATE_DIR" && git init -q ) >/dev/null 2>&1
+
+_php_class() { # <class name> <modifier>
+    printf '<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\Domain;\n\n%sclass %s\n{\n}\n' "$2" "$1"
+}
+_gate_hook() { # <hook script> <payload>; prints the exit code
+    ( cd "$GATE_DIR" && printf '%s' "$2" | bash "$ROOT_DIR/hooks/$1" >/dev/null 2>&1 )
+    echo $?
+}
+_gate_count() { # <table> <relative file> [<action>]
+    local where="rule='PHP002' AND file_path='$2'"
+    [[ "$1" == "violations" ]] && where="$where AND blocked=1"
+    [[ -n "${3:-}" ]] && where="$where AND action='$3'"
+    python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$CLAUDE_PLUGIN_DATA/metrics.db" \
+        "SELECT COUNT(*) FROM $1 WHERE $where" 2>/dev/null
+}
+_assert_count() { # <expected> <label> <table> <relative file> [<action>]
+    local got
+    got=$(_gate_count "$3" "$4" "${5:-}")
+    [[ "$got" == "$1" ]] && log_pass "$2" || log_fail "$2" "rows: $got"
+}
+_assert_answered() { # <host label> <relative file> <refused exit>
+    [[ "$3" == "2" ]] && log_pass "$1: the non-final class is refused before the write" \
+        || log_fail "$1: the non-final class is refused before the write" "pre-write exit $3"
+    _assert_count 1 "$1: the refusal is recorded as one blocking PHP002 finding" violations "$2"
+    _assert_count 1 "$1: the next accepted write records PHP002 fixed, once" corrections "$2" fixed
+}
+
+# Claude Code, Write of a new file.
+F="$GATE_DIR/src/Domain/WriteGate.php"
+_claude_write() { jq -n --arg f "$F" --arg c "$1" --arg e "$2" \
+    '{session_id:"gate-claude", hook_event_name:$e, tool_name:"Write", tool_input:{file_path:$f, content:$c}}'; }
+refused=$(_gate_hook pre-write-check.sh "$(_claude_write "$(_php_class WriteGate '')" PreToolUse)")
+_gate_hook pre-write-check.sh "$(_claude_write "$(_php_class WriteGate 'final ')" PreToolUse)" >/dev/null
+_php_class WriteGate 'final ' > "$F"
+_gate_hook post-write-check.sh "$(_claude_write "$(_php_class WriteGate 'final ')" PostToolUse)" >/dev/null
+_assert_answered "Claude Code Write" "src/Domain/WriteGate.php" "$refused"
+
+# Claude Code, Edit of a file on disk.
+F="$GATE_DIR/src/Domain/EditGate.php"
+_php_class EditGate 'final ' > "$F"
+_claude_edit() { jq -n --arg f "$F" --arg o "$1" --arg n "$2" --arg e "$3" \
+    '{session_id:"gate-claude", hook_event_name:$e, tool_name:"Edit", tool_input:{file_path:$f, old_string:$o, new_string:$n}}'; }
+refused=$(_gate_hook pre-write-check.sh "$(_claude_edit 'final class EditGate' 'class EditGate' PreToolUse)")
+_gate_hook pre-write-check.sh "$(_claude_edit '{' '{ // edited' PreToolUse)" >/dev/null
+printf '%s' "$(_php_class EditGate 'final ' | sed 's|^{$|{ // edited|')" > "$F"
+_gate_hook post-write-check.sh "$(_claude_edit '{' '{ // edited' PostToolUse)" >/dev/null
+_assert_answered "Claude Code Edit" "src/Domain/EditGate.php" "$refused"
+
+# Codex, apply_patch adding a file (no file_path, the file is named in the patch).
+F="$GATE_DIR/src/Domain/PatchGate.php"
+_codex_patch() { # <modifier> <event>
+    local patch
+    patch=$(printf '*** Begin Patch\n*** Add File: %s\n%s\n*** End Patch' "$F" "$(_php_class PatchGate "$1" | sed 's/^/+/')")
+    jq -n --arg p "$patch" --arg c "$GATE_DIR" --arg e "$2" \
+        '{session_id:"gate-codex", hook_event_name:$e, tool_name:"apply_patch", tool_input:{command:$p}, cwd:$c}'
+}
+refused=$(_gate_hook pre-write-check.sh "$(_codex_patch '' PreToolUse)")
+_gate_hook pre-write-check.sh "$(_codex_patch 'final ' PreToolUse)" >/dev/null
+_php_class PatchGate 'final ' > "$F"
+_gate_hook post-write-check.sh "$(_codex_patch 'final ' PostToolUse)" >/dev/null
+_assert_answered "Codex apply_patch" "src/Domain/PatchGate.php" "$refused"
+
+# Grok, search_replace on a path relative to the session's directory.
+F="$GATE_DIR/src/Domain/GrokGate.php"
+_php_class GrokGate 'final ' > "$F"
+_grok_replace() { jq -n --arg o "$1" --arg n "$2" --arg c "$GATE_DIR" --arg e "$3" \
+    '{session_id:"gate-grok", hook_event_name:$e, tool_name:"search_replace", tool_input:{file_path:"src/Domain/GrokGate.php", old_string:$o, new_string:$n}, cwd:$c}'; }
+refused=$(_gate_hook pre-write-check.sh "$(_grok_replace 'final class GrokGate' 'class GrokGate' PreToolUse)")
+_gate_hook pre-write-check.sh "$(_grok_replace '{' '{ // edited' PreToolUse)" >/dev/null
+printf '%s' "$(_php_class GrokGate 'final ' | sed 's|^{$|{ // edited|')" > "$F"
+_gate_hook post-write-check.sh "$(_grok_replace '{' '{ // edited' PostToolUse)" >/dev/null
+_assert_answered "Grok search_replace" "src/Domain/GrokGate.php" "$refused"
+
+# Refused twice and never answered: two findings, no verdict.
+F="$GATE_DIR/src/Domain/NeverGate.php"
+_claude_write "$(_php_class NeverGate '')" PreToolUse >/dev/null
+for _ in 1 2; do _gate_hook pre-write-check.sh "$(_claude_write "$(_php_class NeverGate '')" PreToolUse)" >/dev/null; done
+if [[ "$(_gate_count violations src/Domain/NeverGate.php)" == "2" && "$(_gate_count corrections src/Domain/NeverGate.php)" == "0" ]]; then
+    log_pass "a refusal never followed by an accepted write records findings and no verdict"
+else
+    log_fail "a refusal never followed by an accepted write records findings and no verdict" \
+        "violations $(_gate_count violations src/Domain/NeverGate.php), corrections $(_gate_count corrections src/Domain/NeverGate.php)"
+fi
+# Cross review of the fix (Codex, 2026-11-16): three ways the first version
+# recorded on the wrong file or lost a finding.
+_rows() { # <where clause>
+    python3 "$ROOT_DIR/hooks/lib/metrics-query.py" --raw "$CLAUDE_PLUGIN_DATA/metrics.db" "SELECT COUNT(*) FROM $1" 2>/dev/null
+}
+_assert_rows() { # <expected> <label> <from and where>
+    local got
+    got=$(_rows "$3")
+    [[ "$got" == "$1" ]] && log_pass "$2" || log_fail "$2" "rows: $got"
+}
+
+# Two workspaces of one patch hold the same relative path: the finding goes to
+# the package that carries it, not to the first suffix match.
+mkdir -p "$GATE_DIR/pkgA/src/Domain" "$GATE_DIR/pkgB/src/Domain"
+echo '{}' > "$GATE_DIR/pkgA/composer.json"; echo '{}' > "$GATE_DIR/pkgB/composer.json"
+_two_packages() { # <modifier for B>
+    printf '*** Begin Patch\n*** Add File: %s\n%s\n*** Add File: %s\n%s\n*** End Patch' \
+        "$GATE_DIR/pkgA/src/Domain/Same.php" "$(_php_class Same 'final ' | sed 's/^/+/')" \
+        "$GATE_DIR/pkgB/src/Domain/Same.php" "$(_php_class Same "$1" | sed 's/^/+/')"
+}
+_gate_hook pre-write-check.sh "$(jq -n --arg p "$(_two_packages '')" --arg c "$GATE_DIR" \
+    '{session_id:"gate-ws", tool_name:"apply_patch", tool_input:{command:$p}, cwd:$c}')" >/dev/null
+_assert_rows 1 "a two-package patch records the finding on the package that carries it" \
+    "violations WHERE rule='PHP002' AND blocked=1 AND file_path='pkgB/src/Domain/Same.php'"
+_assert_rows 0 "the other package with the same relative path receives nothing" \
+    "violations WHERE rule='PHP002' AND file_path='pkgA/src/Domain/Same.php'"
+
+# A relative path resolves against the payload's cwd, as the mirror judged it.
+mkdir -p "$GATE_DIR/sub/src/Domain"
+_gate_hook pre-write-check.sh "$(jq -n --arg c "$GATE_DIR/sub" --arg body "$(_php_class CwdGate '')" \
+    '{session_id:"gate-cwd", tool_name:"Write", tool_input:{file_path:"src/Domain/CwdGate.php", content:$body}, cwd:$c}')" >/dev/null
+_assert_rows 1 "a relative path is recorded where the payload's cwd puts it" \
+    "violations WHERE rule='PHP002' AND file_path='sub/src/Domain/CwdGate.php'"
+
+# A second refusal that drops one rule keeps it owed: the accepted write
+# answers both.
+F="$GATE_DIR/src/Domain/TwiceGate.php"
+_dated() { # <modifier> <clock line>
+    printf '<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\Domain;\n\n%sclass TwiceGate\n{\n    public function at(): string\n    {\n        return %s;\n    }\n}\n' "$1" "$2"
+}
+_gate_hook pre-write-check.sh "$(_claude_write "$(_dated '' '(new \DateTime())->format("c")')" PreToolUse)" >/dev/null
+_gate_hook pre-write-check.sh "$(_claude_write "$(_dated 'final ' '(new \DateTime())->format("c")')" PreToolUse)" >/dev/null
+_dated 'final ' "'now'" > "$F"
+_gate_hook post-write-check.sh "$(_claude_write "$(_dated 'final ' "'now'")" PostToolUse)" >/dev/null
+_assert_rows 2 "a rule dropped by a second refusal stays owed: both are answered fixed" \
+    "corrections WHERE action='fixed' AND file_path='src/Domain/TwiceGate.php' AND rule IN ('PHP002','PHP004')"
+rm -rf "$GATE_DIR"
+
 test_summary

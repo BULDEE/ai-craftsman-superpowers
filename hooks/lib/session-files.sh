@@ -147,3 +147,21 @@ session_files_sweep() {
         -mtime +"$days" -delete 2>/dev/null || true
     python3 "${SESSION_FILES_LIB_DIR}/runtime_paths.py" sweep "$days" 2>/dev/null || true
 }
+
+# The key a file's pending verdicts sit under, the same before and after the
+# write. The pre-write gate records a refused finding on a file that may not
+# exist yet, in a directory that may not exist either: the nearest directory
+# that does is resolved and the rest appended, so the key it writes is the one
+# post-write reads once the file lands (/tmp and /private/tmp are one key).
+session_pending_key() {
+    local file="$1" dir rest resolved
+    [[ "$file" == /* ]] || file="$PWD/$file"
+    dir=$(dirname "$file")
+    rest=$(basename "$file")
+    while [[ ! -d "$dir" ]]; do
+        rest="$(basename "$dir")/$rest"
+        dir=$(dirname "$dir")
+    done
+    resolved=$(cd "$dir" 2>/dev/null && pwd -P) || resolved="$dir"
+    printf '%s/%s' "${resolved%/}" "$rest"
+}

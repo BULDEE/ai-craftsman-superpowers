@@ -394,21 +394,45 @@ def _mirror_roots(mirror: str, resolved: list) -> dict:
     return {workspace: os.path.join(mirror, f"ws{number}") for number, workspace in enumerate(workspaces)}
 
 
-def _placement(payload: dict, mirror: str) -> str:
-    """The lines the shell half reads, or "" for a call this gate does not judge."""
+def _resolved_changes(payload: dict) -> tuple:
+    """(resolved, "") or ([], <line to print>): each change with its target, workspace and relative path."""
     args = _arguments(payload)
     tool = _tool_of(payload, args)
     if not tool_kind(tool):
-        return ""
+        return [], ""
     hint = str(payload.get("cwd") or "")
     changes, line = _changes_or_line(payload, tool, args, hint)
     if line or not changes:
-        return line
+        return [], line
     resolved = []
     for change in changes:
         if not os.path.isabs(change.destination) and not hint:
-            return UNJUDGED_RELATIVE
+            return [], UNJUDGED_RELATIVE
         resolved.append((change,) + _resolve(change.destination, hint))
+    return resolved, ""
+
+
+def _targets(payload: dict, mirror: str) -> str:
+    """`<mirror path>\t<real file>` for each file the gate judged.
+
+    A finding names a mirror path. The pre-write gate records a refused one
+    against the real file, and a suffix match picked the wrong package when
+    two workspaces of one patch held the same relative path (review CR-300).
+    The same resolution as the placement, so the two never disagree.
+    """
+    resolved, _ = _resolved_changes(payload)
+    roots = _mirror_roots(mirror, resolved)
+    return "\n".join(
+        os.path.relpath(os.path.join(roots[workspace], relative), mirror) + "\t" + target
+        for change, target, workspace, relative in resolved
+        if change.content is not None and not _touches_gate(relative))
+
+
+def _placement(payload: dict, mirror: str) -> str:
+    """The lines the shell half reads, or "" for a call this gate does not judge."""
+    resolved, line = _resolved_changes(payload)
+    if line or not resolved:
+        return line
     roots = _mirror_roots(mirror, resolved)
     lines = []
     for change, target, workspace, relative in resolved:
@@ -441,6 +465,8 @@ def _listing(payload: dict) -> str:
 def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] == "--list":
         line = _listing(_payload())
+    elif len(sys.argv) > 2 and sys.argv[1] == "--targets":
+        line = _targets(_payload(), sys.argv[2])
     else:
         line = _placement(_payload(), sys.argv[1])
     if line:

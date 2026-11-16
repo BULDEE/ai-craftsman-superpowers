@@ -175,6 +175,26 @@ def handle_check_flag(arguments: list[str]) -> None:
     print('true' if state.get(flag_key, False) else 'false')
 
 
+def _owed_rules(owed: list, violated_rules: list, keep: bool) -> list:
+    """The rules a file still owes after this record, the new ones replacing the old.
+
+    With `keep`, a refusal adds to what the file owes instead. A rule the next
+    proposal dropped was not answered by a write that landed, so it stays
+    pending until one does (review CR-300).
+    """
+    if not keep:
+        return violated_rules
+    return list(dict.fromkeys(owed + violated_rules))
+
+
+def _set_pending(pending: dict, file_path: str, rules: list) -> None:
+    """An empty list clears the key, so a settled file leaves nothing behind."""
+    if rules:
+        pending[file_path] = rules
+        return
+    pending.pop(file_path, None)
+
+
 def handle_record_violation(arguments: list[str]) -> None:
     """Record, and with `--detect` also print the cross-file patterns.
 
@@ -191,10 +211,8 @@ def handle_record_violation(arguments: list[str]) -> None:
     # this call, once, and must not be answered again on the next write. An
     # empty list clears the key, so a settled file leaves nothing behind.
     pending = state.setdefault('blocked_violations', {})
-    if violated_rules:
-        pending[file_path] = violated_rules
-    else:
-        pending.pop(file_path, None)
+    owed = _owed_rules(pending.get(file_path, []), violated_rules, '--keep' in arguments[4:])
+    _set_pending(pending, file_path, owed)
     violation_patterns = state.setdefault('patterns', {})
     _track_violation_patterns(violation_patterns, violated_rules, directory, file_path)
     write_state_atomically(state_path, state)
