@@ -167,10 +167,12 @@ local_should_block=false
 
 # =============================================================================
 # Auto-fix (ADR-0018): a Write missing only strict_types is corrected in
-# place via updatedInput instead of blocking. The violation is still
-# surfaced as additionalContext so the correction learning loop keeps its
-# signal. Only when PHP001 would have blocked: a directory that demoted the
-# rule asked not to be policed on it, and a fix nobody asked for is policing.
+# place via updatedInput instead of blocking. The model is told through
+# additionalContext. Nothing reaches metrics.db: this branch exits before the
+# refusal is recorded, so the correction learning loop never sees an
+# auto-fixed PHP001 (CR-304). Only when PHP001 would have blocked: a directory
+# that demoted the rule asked not to be policed on it, and a fix nobody asked
+# for is policing.
 # =============================================================================
 
 # A call that carries the whole file is a write, whatever the host names it
