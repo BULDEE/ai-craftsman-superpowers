@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   files believed all of them were checked. With one file the output is
   unchanged, which is what the hooks and `craftsman-ci` parse. With several,
   each line names its file. A call with no file prints the usage and exits 2.
+- The session banner no longer says `packs: none loaded` while every pack is
+  loaded and refusing writes (CR-301). The packs loaded inside a command
+  substitution, so they vanished with the subshell before the healthcheck ran
+  in the hook's own shell: the same banner read `PACKS:ai-ml,...,symfony` and
+  `packs: none loaded`, and the false half is the one a debugging session
+  trusts. `tests/core/test-session-start.sh` now holds the two halves to agree.
 
 ## [4.14.1] - 2026-11-16
 
