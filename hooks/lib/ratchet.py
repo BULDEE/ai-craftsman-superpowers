@@ -795,9 +795,11 @@ def _retaken(previous, current: dict) -> dict:
 # Every path given is judged. `check a b` used to measure `a` and exit 0
 # whatever `b` held, so a caller passing two files believed both were checked
 # (CR-280). One file keeps its output as the hooks parse it; with several, each
-# line names its file.
+# line names its file. Not _flag_operands: it drops an operand spelled like the
+# mark, and the pipeline checks every changed file, the mark included.
 def _cmd_check(args) -> int:
-    paths = _flag_operands(args, _baseline_path(args))
+    values = {args.index("--baseline") + 1} if "--baseline" in args else set()
+    paths = [arg for position, arg in enumerate(args) if not arg.startswith("--") and position not in values]
     if not paths:
         print(__doc__, file=sys.stderr)
         return 2

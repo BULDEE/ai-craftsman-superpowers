@@ -1065,6 +1065,12 @@ for order in "clean.sh grown.sh" "grown.sh clean.sh"; do
     assert_exit_code "check $order fails on the grown file" 1 "$multi_code"
     assert_contains "check $order names the grown file" "$multi_out" "grown.sh"
 done
+# The pipeline loops over every changed file, the mark included, with the mark
+# also named by --baseline. That operand is a file to check (skipped: not a
+# source), not the flag's value: dropping it left no file and exited 2.
+mark_code=0
+( cd "$MULTI" && python3 "$RATCHET" check .craftsman-baseline.json --tight --baseline .craftsman-baseline.json >/dev/null 2>&1 ) || mark_code=$?
+assert_exit_code "check on the mark itself, as the pipeline runs it, passes" 0 "$mark_code"
 rm -rf "$MULTI"
 
 test_summary
