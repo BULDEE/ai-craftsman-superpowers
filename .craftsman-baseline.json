@@ -188,6 +188,8 @@
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":4,"path":"tests/core/fixtures/invalid-layer-violation.php"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":3,"path":"tests/core/fixtures/invalid-no-final.php"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":3,"path":"tests/core/fixtures/invalid-no-strict.php"},
+{"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":4,"path":"tests/core/fixtures/invalid-non-null.ts","reason":"fixture (CC-31): witnesses that the one-grep pre-filter still reports PHP003 and TS003"},
+{"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":4,"path":"tests/core/fixtures/invalid-setter.php","reason":"fixture (CC-31): witnesses that the one-grep pre-filter still reports PHP003 and TS003"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":8,"path":"tests/core/fixtures/unsafe.sh"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":16,"path":"tests/core/fixtures/valid-component.tsx"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":5,"path":"tests/core/fixtures/valid-entity.php"},
