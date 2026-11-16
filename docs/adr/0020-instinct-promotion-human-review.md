@@ -117,3 +117,52 @@ rule approved in two or more independent projects becomes a user-level skill
 under `~/.claude/skills/learned-global-<slug>/`) shipped without a home in
 this ADR. It is part of this decision: approval stays per project, and only
 agreement across projects earns a skill that follows the user.
+
+## Amendment (2026-11-16): a refusal before the write is a finding
+
+The loop learns from a blocking finding that a later write no longer carries.
+Post-write was the only place a blocking finding was recorded and left
+pending. Since 4.10.2 (a9b0f51, ADR-0029's single gate for every front-end)
+the pre-write gate judges every pack rule on a mirror and refuses the write,
+so a blocking finding almost never lands. The gate dropped its findings, on
+the reading that metrics belonged after the write. Post-write then saw no
+blocking finding to answer, and the loop starved without an error. On one
+production database, under daily use, blocking findings fell from 2,928 in
+July to 8 in November and `fixed` corrections from 176 in August to 3. The
+ratio of corrections to recorded blocking findings stayed between 5 and 52
+percent: the writer worked, its input was gone. The suite could not see it,
+because every case fed post-write a file the gate would have refused, a
+sequence no host produces any more.
+
+Decision: a refused finding is recorded as blocking (`violations`,
+`blocked=1`) and left pending on its file in the session state, the shape
+post-write gives a blocked write. The next accepted write answers it through
+`_check_corrections`, unchanged. Four details hold this honest:
+
+- The real file comes from the mirror's own resolution (`write_mirror.py
+  --targets`): the payload's cwd, the workspace of each file of a patch. A
+  suffix match gave one package's finding to another that held the same
+  relative path.
+- The key is `session_pending_key`, shared by both hooks, so a file refused in
+  a directory that does not exist yet keys as it will once it lands.
+- A refusal adds to what the file owes (`record-violation --keep`). A rule a
+  second proposal dropped was not answered by a write that landed, and
+  replacing the list lost it.
+- Warnings stay post-write's: their file lands, and recording them before the
+  write as well would count them twice.
+
+A recording that fails says so on the refusal's stderr and never costs the
+refusal. The rows go through the metrics queue, one insert per refusal. The
+cost is paid on the refusal path only, about 170 ms on one file, measured.
+
+A rejected proposal followed by an accepted write that no longer carries the
+rule records `fixed`, even when the accepted write is a different change. This
+is the meaning post-write always gave the word: the finding is no longer in
+what landed. A cross review asked for provenance to tell a withdrawn proposal
+from a repaired file. It is not recorded yet.
+
+`tests/core/test-correction-learning.sh` now runs both hooks in host order for
+each write shape (Claude Code `Write` and `Edit`, Codex `apply_patch`, Grok
+`search_replace` on a relative path), plus a two-package patch, a payload cwd
+apart from the hook's, and a second refusal that drops a rule. It fails on the
+code before this amendment and when the recording is removed again.

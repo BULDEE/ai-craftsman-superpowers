@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Correction learning records again (CR-300). Since 4.10.2 the pre-write
+  gate refuses a blocking finding before the file lands, and it dropped the
+  finding: post-write had nothing pending to answer, so the loop recorded
+  almost no correction (176 in August, 3 in November on one machine under
+  daily use). A refusal is now recorded as a blocking finding and left
+  pending on its file, and the next accepted write records `fixed` through
+  the existing check. Covered for Claude Code `Write` and `Edit`, Codex
+  `apply_patch` and Grok `search_replace`. A refusal costs about 170 ms more,
+  a clean write nothing. ADR-0020 amended.
+  A cross review (Codex) found three ways the first version recorded on
+  the wrong file or lost a finding, fixed before release: two packages of
+  one patch with the same relative path, a payload cwd apart from the
+  hook's, a second refusal dropping a rule.
+
 ## [4.14.0] - 2026-10-24
 
 Two guards, a faster gate, and a cockpit you see without opening it. A git
