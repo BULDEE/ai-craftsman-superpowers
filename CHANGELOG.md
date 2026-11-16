@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.14.1] - 2026-11-16
+
+Correction learning records again. Since 4.10.2 a write refused before it
+reached disk left nothing for the next write to answer, so the loop that turns
+your fixes into instincts went quiet on Claude Code, Codex and Grok alike. A
+refusal is now a finding the next accepted write settles (CR-300).
+
 ### Fixed
 
 - Correction learning records again (CR-300). Since 4.10.2 the pre-write
