@@ -81,7 +81,7 @@
 {"complexity":7,"ignores":0,"instrument":3,"max_fn_lines":25,"path":"hooks/lib/runtime_paths.py","reason":"CR-279: bound_root reads the root a session binding names, so every hook sees an in-session plugin update through the existing context call"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":7,"path":"hooks/lib/secret-patterns.sh"},
 {"complexity":4,"ignores":0,"instrument":3,"max_fn_lines":14,"path":"hooks/lib/session-files.sh","reason":"CR-279: the binding follows the plugin root the hooks run from (re-registered on drift after an in-session update); bind split into read_context, follow_root and root helpers, longest function unchanged at 14 lines"},
-{"complexity":6,"ignores":0,"instrument":3,"max_fn_lines":28,"path":"hooks/lib/session_state.py","reason":"CR-255: a run that tested nothing refuses the skill's set-verified like a failure does; the refusals moved to SKILL_REFUSALS so set-verified stays short"},
+{"complexity":6,"ignores":0,"instrument":3,"max_fn_lines":26,"path":"hooks/lib/session_state.py","reason":"CR-255: a run that tested nothing refuses the skill's set-verified like a failure does; the refusals moved to SKILL_REFUSALS so set-verified stays short"},
 {"complexity":5,"ignores":0,"instrument":3,"max_fn_lines":14,"path":"hooks/lib/session_status.py"},
 {"complexity":2,"ignores":0,"instrument":3,"max_fn_lines":8,"path":"hooks/lib/skill-frontmatter.sh"},
 {"complexity":5,"ignores":0,"instrument":3,"max_fn_lines":17,"path":"hooks/lib/static-analysis.sh","reason":"CR-174: a crash or a stopped run is reported as ANALYSER001 (sa_declare_incomplete), with its witnesses"},

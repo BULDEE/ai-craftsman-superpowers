@@ -77,8 +77,9 @@ VIOLATION_COUNT=0
 # the namespace roots and the baseline mark the engine reads for it, and the
 # same pack validators post-write and CI run are run on the mirror. One set
 # of detectors; the shims below are post-write's emit contract without the
-# metrics, the precedence hold and the Level 2/3 analysers, none of which
-# belong before a write.
+# precedence hold and the Level 2/3 analysers, neither of which belongs before
+# a write. The metrics are recorded once the verdict is in, for a refusal only
+# (see "A refusal is a finding" below).
 # =============================================================================
 MIRROR=$(mktemp -d "${TMPDIR:-/tmp}/craftsman-pre-write.XXXXXX")
 trap 'rm -rf "$MIRROR"' EXIT
@@ -123,6 +124,13 @@ file_has_ignore() {
     grep -qE "craftsman-ignore:\s*[^#]*\b${1}\b" "$MIRROR_FILE" 2>/dev/null
 }
 BLOCKING_RULES=""
+REFUSED_FINDINGS=""
+# A blocking finding, kept with the file it names: one line per refusal to record.
+_hold_blocking() {
+    local rule="$1"
+    BLOCKING_RULES="$BLOCKING_RULES ${MIRROR_REL}:${rule}"
+    REFUSED_FINDINGS+="${MIRROR_REL}"$'\t'"${rule}"$'\n'
+}
 _pre_emit() {
     local rule="$1" message="$2" severity
     severity=$(rules_severity_for_file "$MIRROR_FILE" "$rule")
@@ -132,7 +140,7 @@ _pre_emit() {
         severity="warn"; message="${message} (already present at the baseline, not blocking)"
     fi
     case " $BLOCKING_RULES " in *" ${MIRROR_REL}:${rule} "*) return 0 ;; esac
-    [[ "$severity" == "block" ]] && BLOCKING_RULES="$BLOCKING_RULES ${MIRROR_REL}:${rule}"
+    [[ "$severity" == "block" ]] && _hold_blocking "$rule"
     # A patch names several files: the finding says which one.
     [[ "$MIRROR_FILE_COUNT" -gt 1 ]] && message="${message} [${MIRROR_REL#ws[0-9]*/}]"
     VIOLATIONS="${VIOLATIONS}${rule}: ${message}\n"
@@ -186,11 +194,74 @@ if [[ $VIOLATION_COUNT -eq 1 && -n "$FILE_CONTENT" && "$LANG_ID" == "php" && "$l
 fi
 
 # =============================================================================
+# A refusal is a finding (CR-300)
+#
+# This gate used to drop its findings, metrics being post-write's. Since every
+# pack rule is judged here (a9b0f51), a blocking finding almost never lands, so
+# post-write never saw one and the correction learning starved: 176 fixes
+# recorded in August, 3 in November, under daily use. A refused finding is now
+# recorded as blocking and left pending on its file, the shape post-write gives
+# a blocked write, so the next accepted write answers it through
+# _check_corrections like any other. Warnings stay post-write's: their file
+# lands, and recording them here as well would count them twice.
+# =============================================================================
+REFUSED_MAP=""
+# The real file a mirror path stands for, from the mirror's own resolution:
+# the payload's cwd, the workspace of each file of a patch.
+_refused_target() {
+    printf '%s\n' "$REFUSED_MAP" | awk -F'\t' -v mirror="$1" '$1 == mirror {print $2; exit}'
+}
+_record_refused_file() {
+    local target rules
+    target=$(_refused_target "$1")
+    [[ -n "$target" ]] || return 0
+    rules=$(printf '%s' "$REFUSED_FINDINGS" | awk -F'\t' -v mirror="$1" '$1 == mirror {print $2}')
+    _record_refused_metrics "$target" "$rules"
+    _leave_refusal_pending "$target" "$rules"
+}
+_record_refused_metrics() {
+    local rule
+    for rule in $2; do
+        metrics_record_violation "$rule" "$(metrics_file_pattern "$1")" critical 1 0 "$1"
+    done
+}
+# Pending on the file exactly as post-write leaves a blocked write.
+_leave_refusal_pending() {
+    local state
+    state=$(session_file session-state.json)
+    mkdir -p "$(dirname "$state")"
+    python3 "${SCRIPT_DIR}/lib/session_state.py" record-violation "$state" \
+        "$(session_pending_key "$1")" "$(dirname "$1" | sed -E "s|${PWD}/||")" \
+        "$(printf '%s\n' "$2" | jq -Rnc '[inputs | select(length > 0)]')" --keep
+}
+_record_refusals() {
+    source "${SCRIPT_DIR}/lib/metrics-db.sh"
+    metrics_init_once
+    metrics_project_resolve
+    REFUSED_MAP=$(printf '%s' "$INPUT" | jq --arg cwd "$PWD" '. + {cwd: (.cwd // $cwd)}' \
+        | python3 "${SCRIPT_DIR}/lib/write_mirror.py" --targets "$MIRROR")
+    metrics_violations_queue_open
+    local mirror_rel
+    while IFS= read -r mirror_rel; do
+        [[ -n "$mirror_rel" ]] && _record_refused_file "$mirror_rel"
+    done <<< "$(printf '%s' "$REFUSED_FINDINGS" | cut -f1 | sort -u)"
+    metrics_violations_queue_flush
+}
+# Recorded in a subshell: a recording that fails costs the learning one
+# finding and says so, it never costs the refusal.
+_record_refusals_or_say() {
+    local errors
+    errors=$( { _record_refusals >/dev/null; } 2>&1 ) || true
+    [[ -z "$errors" ]] || echo "craftsman: this refusal was not recorded for correction learning: ${errors%%$'\n'*}" >&2
+}
+
+# =============================================================================
 # Output Decision
 # =============================================================================
 
 if [[ $VIOLATION_COUNT -gt 0 ]]; then
     if [[ "$local_should_block" == true ]]; then
+        _record_refusals_or_say
         # Human-readable message on stderr (shown in Claude Code UI)
         echo "🚫 BLOCKED by AI Craftsman - ${VIOLATION_COUNT} violation(s) detected before write:" >&2
         while IFS= read -r vline; do

@@ -85,10 +85,9 @@ _blocked_rules_json() {
 # a production database, PHP002 carried 106 `ignored` rows from one pattern
 # against 56 blocking findings, and 5 of 10 rules had more outcomes than
 # findings (#68). One finding, at most one verdict.
+# The pre-write gate keys a refused finding the same way (session-files.sh).
 _pending_key() {
-    local file="$1" resolved
-    resolved=$(cd "$(dirname "$file")" 2>/dev/null && pwd -P) || resolved="$(dirname "$file")"
-    printf '%s/%s' "$resolved" "$(basename "$file")"
+    session_pending_key "$1"
 }
 
 # Replace the file's pending verdicts with what THIS write still violates,
