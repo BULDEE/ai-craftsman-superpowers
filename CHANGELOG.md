@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The job is pinned to `ubuntu-24.04`, the summary fails over every job in its
   `needs` (a cancelled one included), and `tests/meta/test-ci-gate.sh` holds
   every job of `ci.yml` in those `needs`.
+- `ratchet.py check` judges every file it is given (CR-280). `check a b`
+  measured `a` and exited 0 whatever `b` held, so a caller passing several
+  files believed all of them were checked. With one file the output is
+  unchanged, which is what the hooks and `craftsman-ci` parse. With several,
+  each line names its file. A call with no file prints the usage and exits 2.
 
 ## [4.14.1] - 2026-11-16
 

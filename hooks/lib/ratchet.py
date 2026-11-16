@@ -3,7 +3,7 @@
 
 Usage:
   ratchet.py measure <file>
-  ratchet.py check <file> [--baseline FILE] [--tight]
+  ratchet.py check <file>... [--baseline FILE] [--tight]
   ratchet.py update <file> [--baseline FILE]
   ratchet.py init [paths...] [--baseline FILE]
 
@@ -792,8 +792,22 @@ def _retaken(previous, current: dict) -> dict:
     return {**kept, **current}
 
 
+# Every path given is judged. `check a b` used to measure `a` and exit 0
+# whatever `b` held, so a caller passing two files believed both were checked
+# (CR-280). One file keeps its output as the hooks parse it; with several, each
+# line names its file. Not _flag_operands: it drops an operand spelled like the
+# mark, and the pipeline checks every changed file, the mark included.
 def _cmd_check(args) -> int:
-    file_path = Path(args[0])
+    values = {args.index("--baseline") + 1} if "--baseline" in args else set()
+    paths = [arg for position, arg in enumerate(args) if not arg.startswith("--") and position not in values]
+    if not paths:
+        print(__doc__, file=sys.stderr)
+        return 2
+    prefix = len(paths) > 1
+    return max(_check_file(Path(path), args, f"{path}: " if prefix else "") for path in paths)
+
+
+def _check_file(file_path: Path, args, label: str) -> int:
     if _skipped(file_path):
         return 0
     baseline_file = _baseline_path(args)
@@ -806,16 +820,20 @@ def _cmd_check(args) -> int:
     known = _mark_to_check_against(entries, current, baseline_file)
     if known is None:
         return _unmarked(current["path"]) if "--tight" in args else 0
+    return _report_check(known, current, args, label)
+
+
+def _report_check(known: dict, current: dict, args, label: str) -> int:
     regressions = [
         (name, known[name], current[name])
         for name in RATCHETED_METRICS
         if current[name] > known.get(name, current[name])
     ]
     for name, mark, value in regressions:
-        print(f"RATCHET001 {name} {mark} -> {value}")
+        print(f"{label}RATCHET001 {name} {mark} -> {value}")
     slack = _slack(known, current) if "--tight" in args else []
     for name, mark, value in slack:
-        print(f"slack {name} {mark} -> {value}: run python3 hooks/lib/ratchet.py update {current['path']}")
+        print(f"{label}slack {name} {mark} -> {value}: run python3 hooks/lib/ratchet.py update {current['path']}")
     return 1 if regressions or slack else 0
 
 
