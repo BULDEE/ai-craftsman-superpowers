@@ -33,14 +33,15 @@ _check_php002() {
 _check_php003() {
     local file="$1"
     local line
+    # One grep per file, not one per line: spawning grep for each of a
+    # 2000-line file's lines cost 5 s on every Write or Edit of that file.
     while IFS= read -r line; do
-        echo "$line" | grep -qE "public function set[A-Z]" 2>/dev/null || continue
         if ! line_has_ignore "$line" "no-setter"; then
             add_violation "PHP003" "Public setter found - use behavioral methods"
         else
             metrics_record_violation "PHP003" "$FILE_PATTERN" "critical" 0 1 2>/dev/null || true
         fi
-    done < "$file"
+    done < <(grep -E "public function set[A-Z]" "$file" 2>/dev/null)
 }
 
 _check_php004() {
