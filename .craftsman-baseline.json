@@ -271,6 +271,7 @@
 {"complexity":1,"ignores":0,"instrument":3,"max_fn_lines":13,"path":"tests/lib/host-fixtures.sh"},
 {"complexity":8,"ignores":0,"instrument":3,"max_fn_lines":26,"path":"tests/lib/language_literals.py","reason":"new file (CR-108)"},
 {"complexity":3,"ignores":0,"instrument":3,"max_fn_lines":15,"path":"tests/lib/test-helpers.sh","reason":"4.13.0: assertions read a here-string, never a pipe, with the reason stated"},
+{"complexity":12,"ignores":0,"instrument":3,"max_fn_lines":30,"path":"tests/meta/test-ci-gate.sh","reason":"new file (CR-305): the CI summary gates every job of ci.yml"},
 {"complexity":3,"ignores":0,"instrument":3,"max_fn_lines":1,"path":"tests/meta/test-fresh-install.sh","reason":"Ship native pack agents before host discovery and enforce ordinary-copy integrity with RED/GREEN regressions"},
 {"complexity":6,"ignores":0,"instrument":3,"max_fn_lines":85,"path":"tests/meta/test-native-manifests.sh","reason":"4.12.0: host facts read from hooks/host-capabilities.json (gate_file, gate_export), codex-hooks refused, symlinked gates refused, first write honours the umask, Grok installer reads grok plugin list --json"},
 {"complexity":8,"ignores":0,"instrument":3,"max_fn_lines":29,"path":"tests/meta/test-release.sh","reason":"4.12.0: the release guard is proven to refuse a drifted native manifest"},
@@ -291,6 +292,6 @@
 {"complexity":3,"ignores":0,"instrument":3,"max_fn_lines":10,"path":"tests/packs/test-structural.sh"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":1,"path":"tests/packs/test-symfony.sh"},
 {"complexity":2,"ignores":0,"instrument":3,"max_fn_lines":23,"path":"tests/perf/test-hook-latency.sh","reason":"CR-179: Darwin ceilings set from thirty macOS runner readings, guarded against masking a 50 percent regression"},
-{"complexity":40,"ignores":1,"instrument":3,"max_fn_lines":133,"path":"tests/run-tests.sh","reason":"CR-289: registers test-test-dismissal-guard.sh after CR-278's test-metrics-stamp.sh (one || true per suite until the runner discovers its suites, CR-288 IMPROVE)"},
+{"complexity":41,"ignores":1,"instrument":3,"max_fn_lines":133,"path":"tests/run-tests.sh","reason":"CR-305: registers test-ci-gate.sh after CR-289's test-test-dismissal-guard.sh (one || true per suite until the runner discovers its suites, CR-288 IMPROVE)"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":5,"path":"tests/templates/test-templates.sh"}
 ]

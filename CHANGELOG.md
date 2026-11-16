@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The Python 3.9 floor runs again and gates merges (CR-305). `ubuntu-latest`
+  moves to 26.04, where setup-python publishes no 3.9, so the job went red on
+  every run from 2026-11-02. Nobody saw it: `CI Summary`, the one check branch
+  protection reads, listed twelve of thirteen jobs by hand and not this one.
+  The job is pinned to `ubuntu-24.04`, the summary fails over every job in its
+  `needs` (a cancelled one included), and `tests/meta/test-ci-gate.sh` holds
+  every job of `ci.yml` in those `needs`.
+
 ## [4.14.1] - 2026-11-16
 
 Correction learning records again. Since 4.10.2 a write refused before it

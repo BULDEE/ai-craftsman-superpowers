@@ -528,7 +528,11 @@ jobs:
 
   python-floor:
     name: Python Floor (3.9)
-    runs-on: ubuntu-latest
+    # Not ubuntu-latest. That label moves to 26.04 from 2026-10-19, and
+    # setup-python publishes 3.9 for 22.04 and 24.04 only, so the job went red
+    # wherever a run landed on 26.04. When 24.04 is retired this fails again,
+    # by name: then the floor is a decision, not a runner default.
+    runs-on: ubuntu-24.04
     needs: [secrets-scan]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -781,7 +785,7 @@ jobs:
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [secrets-scan, validate-json, validate-hooks-schema, validate-plugin-manifest, validate-shell-scripts, validate-skills, validate-knowledge-base, lint-python, run-tests, check-agents, structural-ratchet, hermes-adapter-image]
+    needs: [secrets-scan, validate-json, validate-hooks-schema, validate-plugin-manifest, validate-shell-scripts, validate-skills, validate-knowledge-base, lint-python, python-floor, run-tests, check-agents, structural-ratchet, hermes-adapter-image]
     if: always()
     steps:
       - name: Check all jobs status
@@ -801,27 +805,24 @@ jobs:
           echo "  - Skills structure: ${{ needs.validate-skills.result }}"
           echo "  - Knowledge base: ${{ needs.validate-knowledge-base.result }}"
           echo "  - Python lint: ${{ needs.lint-python.result }}"
+          echo "  - Python floor: ${{ needs.python-floor.result }}"
           echo "  - Test suite: ${{ needs.run-tests.result }}"
           echo "  - Agent definitions: ${{ needs.check-agents.result }}"
           echo "  - Structural ratchet: ${{ needs.structural-ratchet.result }}"
           echo "  - Hermes adapter image: ${{ needs.hermes-adapter-image.result }}"
           echo ""
 
-          # Fail if any job failed
-          if [[ "${{ needs.secrets-scan.result }}" == "failure" ]] || \
-             [[ "${{ needs.validate-json.result }}" == "failure" ]] || \
-             [[ "${{ needs.validate-hooks-schema.result }}" == "failure" ]] || \
-             [[ "${{ needs.validate-plugin-manifest.result }}" == "failure" ]] || \
-             [[ "${{ needs.validate-shell-scripts.result }}" == "failure" ]] || \
-             [[ "${{ needs.validate-skills.result }}" == "failure" ]] || \
-             [[ "${{ needs.validate-knowledge-base.result }}" == "failure" ]] || \
-             [[ "${{ needs.lint-python.result }}" == "failure" ]] || \
-             [[ "${{ needs.run-tests.result }}" == "failure" ]] || \
-             [[ "${{ needs.check-agents.result }}" == "failure" ]] || \
-             [[ "${{ needs.structural-ratchet.result }}" == "failure" ]] || \
-             [[ "${{ needs.hermes-adapter-image.result }}" == "failure" ]]; then
-            echo "FAILED: One or more validation jobs failed"
-            exit 1
-          fi
+      # Over every job in `needs`, not a hand-written list: the list named
+      # twelve of thirteen jobs, so Python Floor went red on every run from
+      # 2026-11-02 behind a green summary, the one check branch protection
+      # reads. A cancelled job never ran its checks, so it fails the gate too.
+      # tests/meta/test-ci-gate.sh holds every job of this file in `needs`.
+      - name: Fail when a gated job did not pass
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "FAILED: One or more validation jobs failed or were cancelled"
+          exit 1
 
+      - name: Report success
+        run: |
           echo "SUCCESS: All validations passed!"
