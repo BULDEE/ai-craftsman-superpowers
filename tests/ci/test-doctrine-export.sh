@@ -395,6 +395,20 @@ if [[ "$HH_EVENTS" != *TaskCompleted* && "$HH_EVENTS" != *FileChanged* && "$HH_E
 else
     log_fail "grok-hooks export" "events=$HH_EVENTS if=$HH_IF match=$HH_MATCH cmd=$(printf '%s' "$HH_CMD" | cut -c1-120)"
 fi
+# Grok fails a hook open on timeout or crash unless the handler says
+# "failClosed": true (changelog 1.0.71). The export carries it on exactly the
+# handlers hooks/hooks.json declares onFailure: block, the write gates, and on
+# none other: a prompt or session hook failing closed would block the session
+# on any crash. Measured on 1.0.62, 2026-11-16: an older Grok loads a handler
+# carrying the field instead of skipping it, as it skips one carrying `if`.
+HH_CLOSED=$(jq -r '[.hooks[][] | .hooks[] | select(.failClosed == true)] | length' "$HH_FILE" 2>/dev/null)
+HH_EXPECTED=$(jq -r '[.hooks.PreToolUse[] | .hooks[] | select(.onFailure == "block")] | length' "$ROOT_DIR/hooks/hooks.json")
+HH_OPEN_PROMPT=$(jq -r '[(.hooks.UserPromptSubmit // [])[], (.hooks.SessionStart // [])[] | .hooks[] | select(.failClosed == true)] | length' "$HH_FILE" 2>/dev/null)
+if [[ "$HH_EXPECTED" -gt 0 && "$HH_CLOSED" == "$HH_EXPECTED" && "$HH_OPEN_PROMPT" == "0" ]]; then
+    log_pass "grok-hooks marks failClosed on the $HH_EXPECTED write gates hooks.json declares onFailure: block, and on no prompt or session hook"
+else
+    log_fail "grok-hooks failClosed" "closed=$HH_CLOSED expected=$HH_EXPECTED prompt_or_session=$HH_OPEN_PROMPT"
+fi
 # Codex runs the plugin's hooks/hooks.json natively and reads user or project
 # hooks only from hooks.json or config.toml next to a config layer, never from
 # .codex/hooks/*.json: an exported Codex gate was a file nothing read.

@@ -95,6 +95,8 @@
       "gate_file": ".grok/hooks/craftsman.json",
       "gate_export": {
         "timeout": 15,
+        "fail_closed_field": "failClosed",
+        "fail_closed_note": "Grok fails a hook open on timeout or crash unless the handler sets failClosed: true (changelog 1.0.71, 2026-10-26). The export sets it on the handlers hooks/hooks.json declares onFailure: block. Measured 2026-11-16 on 1.0.62: a handler carrying the field is loaded, not skipped, where one carrying `if` is skipped.",
         "native_env": {
           "root": "GROK_PLUGIN_ROOT",
           "data": "GROK_PLUGIN_DATA"
@@ -115,7 +117,7 @@
         "conditional_handlers": "keep_without_if",
         "data_dir": ".grok/plugins/data/craftsman",
         "installer": "bin/craftsman-grok-install",
-        "project_note": "Trust the folder before these run: 'grok --trust', or /hooks-trust in the session. Untrusted, project hooks are skipped in silence (measured on 1.0.30). A gate under ~/.grok/hooks is global and needs no trust.",
+        "project_note": "Trust the folder before these run: 'grok --trust', or /hooks-trust in the session. Untrusted, project hooks are skipped in silence (measured on 1.0.30). Since 1.0.64 (changelog, not measured here) an interactive session in an untrusted folder skips the user gate under ~/.grok/hooks too; a headless session still runs it.",
         "source": "Grok defaults a hook to 5s and fails open, so the export sets 15. The create tool is `write` and the edit tool `search_replace` (hooks guide 1.0.34: Write -> search_replace), the shell tool `run_terminal_command` in hook payloads. A handler with `if:` is kept without it: pre-push-verify.sh exits 0 unless the command is git push."
       }
     }

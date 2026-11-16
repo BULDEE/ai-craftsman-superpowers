@@ -22,6 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "BLOCKED" after it. The file on disk is only judged on the way to a
   refusal, so a clean write costs nothing more.
 
+- On Grok 1.0.71 and later the write gates fail closed (CR-310). Grok fails
+  a hook open on timeout or crash unless the handler sets `failClosed`, so a
+  gate that crashed let the write through. The Grok export now sets it on the
+  handlers `hooks/hooks.json` already declares `onFailure: block`, and on no
+  prompt or session hook. An older Grok loads the field without effect
+  (measured on 1.0.62), so re-running `craftsman-grok-install` is safe on any
+  version.
 ### Fixed
 
 - A write the host truncated is refused instead of judged on the part that

@@ -105,6 +105,12 @@ def _handler(entry: dict, root: str, data: str, facts: dict) -> dict | None:
     timeout = entry.get("timeout") or facts.get("timeout")
     if timeout:
         out["timeout"] = timeout
+    # A gate the manifest declares fail-closed stays fail-closed on a host
+    # that spells it differently (Grok: failClosed). Only those: a prompt or
+    # session hook failing closed would block the session on any crash.
+    closed_field = facts.get("fail_closed_field")
+    if closed_field and entry.get("onFailure") == "block":
+        out[closed_field] = True
     return out
 
 
