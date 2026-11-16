@@ -47,6 +47,13 @@ else
     log_fail "systemMessage should contain 'Craftsman active'" "got: $msg"
 fi
 
+# Test: the healthcheck in the banner agrees with the packs the same banner
+# says it loaded (CR-301). The packs loaded inside a command substitution, so
+# the healthcheck that ran afterwards in the parent shell found none and the
+# banner read "PACKS:ai-ml,...,symfony" and "packs: none loaded" side by side.
+assert_contains "the banner names the packs it loaded" "$msg" "PACKS:[a-z-]*,"
+assert_not_contains "the healthcheck sees the packs the banner loaded" "$msg" "packs: none loaded"
+
 # Test: Dependency check - all deps present means no warning
 if command -v python3 >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && command -v sqlite3 >/dev/null 2>&1; then
     if [[ "$msg" != *"MISSING"* ]]; then
@@ -289,20 +296,18 @@ check_sweep_takes_ended_sessions_only() {
     left=$(cd "$sweep_data" && ls metrics.db session-writes-* 2>/dev/null | tr '\n' ' ')
     left="$left$(cd "$bindings" && ls ended.json live.json 2>/dev/null | tr '\n' ' ')"
     assert_contains "the sweep takes a week-old session file and binding" "left=$left." "left=metrics.db session-writes-live live.json ."
+    _check_sweep_cadence
+}
+
+# Once a day: the stamp holds a second sweep back until it is a day old. Reads
+# sweep_data and the two helpers from check_sweep_takes_ended_sessions_only.
+_check_sweep_cadence() {
     _sweep_fixture
     _sweep_start
-    if [[ -e "$sweep_data/session-writes-ended" ]]; then
-        log_pass "a second start the same day does not sweep again"
-    else
-        log_fail "a second start the same day does not sweep again" "session-writes-ended was swept"
-    fi
+    assert_contains "a second start the same day does not sweep again" "$(ls "$sweep_data")" "session-writes-ended"
     touch -t 202001010000 "$sweep_data/.sweep-stamp"
     _sweep_start
-    if [[ -e "$sweep_data/session-writes-ended" ]]; then
-        log_fail "a start a day after the last sweep sweeps again" "session-writes-ended survived"
-    else
-        log_pass "a start a day after the last sweep sweeps again"
-    fi
+    assert_not_contains "a start a day after the last sweep sweeps again" "$(ls "$sweep_data")" "session-writes-ended"
 }
 check_sweep_takes_ended_sessions_only
 

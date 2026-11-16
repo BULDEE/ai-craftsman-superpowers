@@ -29,19 +29,18 @@ source "${SCRIPT_DIR}/lib/routing-table.sh"
 source "${SCRIPT_DIR}/lib/hook-events.sh"
 lang_registry_warm_known
 
+# Sets PACK_STATUS instead of printing it. Called as `$(_init_packs)`, the packs
+# loaded in a subshell and vanished with it, so the healthcheck that ran next in
+# this shell reported "packs: none loaded" beside a banner listing seven (CR-301).
 _init_packs() {
     pack_loader_init
     pack_sync_symlinks
 
     local loaded
     loaded=$(pack_loaded)
-    if [[ -n "$loaded" ]]; then
-        local pack_list
-        pack_list=$(echo "$loaded" | tr '\n' ', ' | sed 's/,$//')
-        echo "PACKS:${pack_list}"
-    else
-        echo "PACKS:none"
-    fi
+    PACK_STATUS="PACKS:none"
+    [[ -n "$loaded" ]] || return 0
+    PACK_STATUS="PACKS:$(echo "$loaded" | tr '\n' ', ' | sed 's/,$//')"
 }
 
 # Python3 availability check - skip python-dependent features if missing
@@ -226,7 +225,8 @@ STACK=$(config_stack)
 # Build message. No "PHP rules: ON/OFF" beside the stack any more: since #35 a
 # language pack validates its files whatever the stack says, and the banner
 # printed OFF for a language whose files were being refused.
-PACK_STATUS=$(_init_packs 2>/dev/null || echo "PACKS:error")
+PACK_STATUS="PACKS:error"
+_init_packs >/dev/null 2>&1 || PACK_STATUS="PACKS:error"
 DETECTED_PACKS=$(detect_project_packs 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
 MSG="Craftsman active | Stack: ${STACK}"
 [[ -n "$DETECTED_PACKS" ]] && MSG="${MSG} | Detected: ${DETECTED_PACKS// /,}"
