@@ -19,6 +19,7 @@
 # EXIT CODES: 0 always; the decision is the JSON on stdout.
 # =============================================================================
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/exported-gate.sh" # one gate per write on Grok (CR-310)
 
 trap 'exit 0' ERR
 

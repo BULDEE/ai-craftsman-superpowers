@@ -7,6 +7,7 @@
 # EXIT CODES: 0 always (non-blocking, informational)
 # =============================================================================
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/exported-gate.sh" # one gate per write on Grok (CR-310)
 
 # The Haiku verification subprocess (haiku-verify.sh, `claude -p`) is a
 # session to Claude Code and fires this hook. Without this line every

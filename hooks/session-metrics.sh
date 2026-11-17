@@ -6,6 +6,7 @@
 # TRIGGERS: SessionEnd
 # =============================================================================
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/exported-gate.sh" # one gate per write on Grok (CR-310)
 
 # A SessionEnd fired by the Haiku verification subprocess is not the end of
 # a session: it used to delete the real session's state, with the pending

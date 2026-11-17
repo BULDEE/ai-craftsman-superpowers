@@ -8,6 +8,7 @@
 # EXIT CODES: 0 = allow, 2 = block with reason
 # =============================================================================
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/exported-gate.sh" # one gate per write on Grok (CR-310)
 
 # A gate that cannot run is not a clean verdict (ADR-0029): refused, with the
 # line and the retry advice. Malformed input names no file and is let through

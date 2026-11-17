@@ -30,8 +30,12 @@ fi
 # Grok 1.0.40 does not execute plugin-bundled hooks, whether hooks.json is a
 # path or the handlers are inlined in the manifest (a fresh grok -p wrote the
 # file and an inline PreToolUse marker never ran). The gate that runs is this
-# global file. --native and --compat-hooks both write it; the flag remains so
-# older instructions still work. Global hooks need no extra trust.
+# global file. Grok 1.0.62 runs plugin hooks (this plugin's, and the one
+# Claude Code installed): they step aside for this file when it is live
+# (hooks/lib/exported-gate.sh, CR-310), so each write is judged once and the
+# git guards the plugin path skips still run. --native and --compat-hooks
+# both write it; the flag remains so older instructions still work. Global
+# hooks need no extra trust.
 bash "$ROOT/ci/craftsman-ci.sh" export --target grok-hooks --into "${HOME}/.grok/hooks"
 echo "Write gate: ${HOME}/.grok/hooks/craftsman.json"
-echo "Grok 1.0.40 does not run plugin-bundled hooks. This file is the gate."
+echo "This file is the gate. Plugin hooks Grok also runs step aside for it."

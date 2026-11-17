@@ -6,6 +6,7 @@
 # (exit 2) when a real violation is found.
 # =============================================================================
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/exported-gate.sh" # one gate per write on Grok (CR-310)
 
 # Recursion guard: never verify from inside a verification subprocess
 [[ -n "${CRAFTSMAN_HEADLESS_VERIFY:-}" ]] && exit 0

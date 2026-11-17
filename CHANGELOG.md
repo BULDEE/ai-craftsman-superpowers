@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- On Grok each write is judged once (CR-310). Grok 1.0.62 discovers the plugin
+  Claude Code installed and runs its hooks, and runs the exported gate in
+  `~/.grok/hooks` too: every hook ran twice (measured with `grok -p` and its
+  debug log). The plugin path also skips the git guards, which carry `if`. A
+  hook Grok runs from a plugin path now steps aside when a live exported gate
+  is there (`hooks/lib/exported-gate.sh`), and the export marks its own
+  handlers so they never do. A Claude Code session started from a Grok shell
+  keeps its gate, and an exported gate whose checkout is gone is not stepped
+  aside for.
+- On Grok the agent hooks no longer hold every write for seconds (CR-315).
+  Grok has no `async`, so the DDD verifier, a `claude -p` call, ran in line:
+  8.3 to 9.3 s per write, and the final review overran the session-end
+  budget. The Grok export turns the agent hooks off with the switch they
+  already honour (`CLAUDE_PLUGIN_OPTION_AGENT_HOOKS=false`). The cheap async
+  handlers, the test-run reader among them, stay.
+
 ## [4.17.0] - 2026-11-17
 
 A turn no longer ends with a blocking finding left on disk (CR-259): the

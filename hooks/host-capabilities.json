@@ -118,7 +118,12 @@
         "data_dir": ".grok/plugins/data/craftsman",
         "installer": "bin/craftsman-grok-install",
         "project_note": "Trust the folder before these run: 'grok --trust', or /hooks-trust in the session. Untrusted, project hooks are skipped in silence (measured on 1.0.30). Since 1.0.64 (changelog, not measured here) an interactive session in an untrusted folder skips the user gate under ~/.grok/hooks too; a headless session still runs it.",
-        "source": "Grok defaults a hook to 5s and fails open, so the export sets 15. The create tool is `write` and the edit tool `search_replace` (hooks guide 1.0.34: Write -> search_replace), the shell tool `run_terminal_command` in hook payloads. A handler with `if:` is kept without it: pre-push-verify.sh exits 0 unless the command is git push."
+        "source": "Grok defaults a hook to 5s and fails open, so the export sets 15. The create tool is `write` and the edit tool `search_replace` (hooks guide 1.0.34: Write -> search_replace), the shell tool `run_terminal_command` in hook payloads. A handler with `if:` is kept without it: pre-push-verify.sh exits 0 unless the command is git push.",
+        "env": {
+          "CLAUDE_PLUGIN_OPTION_AGENT_HOOKS": "false"
+        },
+        "env_note": "Grok has no `async`: a handler declared async runs in line. Measured 2026-11-17 on 1.0.62: agent-ddd-verifier (a claude -p call) held each write 8.3 to 9.3 s, and the Stop final review overran the session-end budget. The export turns the agent hooks off with the switch they already honour; the other async handlers are cheap and stay.",
+        "plugin_path_note": "Grok 1.0.62 also discovers the plugin Claude Code installed (~/.claude/plugins) and runs its hooks: with the export, every hook ran twice (measured 2026-11-17). Every hook script steps aside through hooks/lib/exported-gate.sh when Grok runs it from a plugin path (GROK_PLUGIN_ROOT set, CRAFTSMAN_EXPORTED_GATE unset) and a live exported gate exists."
       }
     }
   },

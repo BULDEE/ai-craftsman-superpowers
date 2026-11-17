@@ -15,6 +15,7 @@
 # craftsman-ignore: SH001
 # =============================================================================
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/exported-gate.sh" # one gate per write on Grok (CR-310)
 
 # Fail-open trap: if hook crashes, pass instead of blocking all writes
 trap 'echo "WARNING: post-write-check.sh failed at line $LINENO" >&2; exit 0' ERR

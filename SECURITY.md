@@ -101,6 +101,7 @@ whose names start with `agent-` are shell scripts that shell out to a headless
 | `CRAFTSMAN_BIAS_PATTERNS_DIR` | Where the bias detector reads its lexicons |
 | `CRAFTSMAN_DATA_DIR` | Plugin data directory, when `CLAUDE_PLUGIN_DATA` is unset |
 | `CRAFTSMAN_DISABLED_HOOKS` | Hooks to skip, by script name |
+| `CRAFTSMAN_EXPORTED_GATE` | Set by an exported host gate (Grok's `~/.grok/hooks/craftsman.json`) on its own handlers, so a hook the host also runs from a plugin path steps aside for it and this one does not; never set by hand |
 | `CRAFTSMAN_GATE_OWN_PATHS` | Extra paths config-protection treats as the gate's own |
 | `CRAFTSMAN_GLOBAL_CONFIG_DIR` | The directory holding the global `.craft-config.yml` |
 | `CRAFTSMAN_HEADLESS_VERIFY` | Guard that stops a headless `claude -p` re-entering the hooks |

@@ -9,6 +9,7 @@
 # EXIT CODES: 0 always (a warning is additionalContext plus stderr)
 # =============================================================================
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/exported-gate.sh" # one gate per write on Grok (CR-310)
 
 # Fail-open trap: if hook crashes, allow the push
 trap 'echo "WARNING: pre-push-verify.sh failed at line $LINENO" >&2; exit 0' ERR

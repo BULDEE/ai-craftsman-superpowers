@@ -20,6 +20,7 @@
 # EXIT CODES: 0 = pass; 2 = a suite green earlier this session now fails
 # =============================================================================
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/exported-gate.sh" # one gate per write on Grok (CR-310)
 
 trap 'exit 0' ERR
 

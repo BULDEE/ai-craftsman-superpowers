@@ -5,6 +5,7 @@
 # When enabled, injects a Sentry lookup request as additionalContext.
 # =============================================================================
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib/exported-gate.sh" # one gate per write on Grok (CR-310)
 
 # Gate: skip entirely if agent hooks are disabled
 _agent_hooks_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

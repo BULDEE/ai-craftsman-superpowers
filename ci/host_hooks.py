@@ -63,7 +63,10 @@ def _env_prefix(facts: dict, root: str, data: str) -> str:
     # The engine scripts read CLAUDE_PLUGIN_ROOT and CLAUDE_PLUGIN_DATA on every
     # host; a host's own names are added only for that host.
     native = facts.get("native_env") or {}
-    pairs = [("CLAUDE_PLUGIN_ROOT", root), ("CLAUDE_PLUGIN_DATA", data)]
+    # CRAFTSMAN_EXPORTED_GATE tells a hook it runs from this file: run from a
+    # host's plugin path instead, it steps aside for it (hooks/lib/exported-gate.sh).
+    pairs = [("CLAUDE_PLUGIN_ROOT", root), ("CLAUDE_PLUGIN_DATA", data), ("CRAFTSMAN_EXPORTED_GATE", "1")]
+    pairs.extend((str(name), str(value)) for name, value in (facts.get("env") or {}).items())
     if native.get("root"):
         pairs.append((native["root"], root))
     if native.get("data"):
