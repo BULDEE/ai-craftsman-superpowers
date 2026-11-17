@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.17.0] - 2026-11-17
+
+A turn no longer ends with a blocking finding left on disk (CR-259): the
+model is sent back to the file it was told to fix, once, with each file and
+rule named. A violation a Bash command wrote during the session no longer
+passes later edits as if it were the file's past (CR-313).
+
 ### Added
 
 - A turn does not end with a blocking finding left on disk (CR-259). A
