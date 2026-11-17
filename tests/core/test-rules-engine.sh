@@ -584,8 +584,10 @@ YAML
 fallback_json=$(python3 -c "
 import sys
 sys.path.insert(0, '$ROOT_DIR/hooks/lib')
-from importlib.machinery import SourceFileLoader
-mod = SourceFileLoader('yaml_parser', '$PARSER_PATH').load_module()
+import importlib.util
+spec = importlib.util.spec_from_file_location('yaml_parser', '$PARSER_PATH')
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
 raw = mod.parse_line_by_line('$PROJECT_DIR/.craft-config.yml')
 output = mod.format_config(raw)
 import json
@@ -618,8 +620,10 @@ YAML
 fallback_rules_json=$(python3 -c "
 import sys
 sys.path.insert(0, '$ROOT_DIR/hooks/lib')
-from importlib.machinery import SourceFileLoader
-mod = SourceFileLoader('yaml_parser', '$PARSER_PATH').load_module()
+import importlib.util
+spec = importlib.util.spec_from_file_location('yaml_parser', '$PARSER_PATH')
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
 raw = mod.parse_line_by_line('$PROJECT_DIR/src/Legacy/.craft-rules.yml')
 output = mod.format_rules(raw)
 import json
