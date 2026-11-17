@@ -167,8 +167,22 @@ class RuntimePathsTest(unittest.TestCase):
                 'CLAUDE_PLUGIN_OPTION_STRICTNESS': 'strict',
                 'CRAFTSMAN_HEADLESS_VERIFY': '1'}
 
-    def test_unbound_native_gate_still_blocks_and_accepts_clean_control(self) -> None:
+    def run_write_hook(self, hook: str, runtime: str, content: str) -> subprocess.CompletedProcess:
+        # The gate runs before the write lands: a file already holding the
+        # content would be its own baseline (CR-306), every finding held. Only
+        # the post-write sees the written file.
+        target = self.root / 'Example.php'
+        target.unlink(missing_ok=True)
+        if hook == 'post-write-check.sh':
+            target.write_text(content)
+        payload = {'session_id': 'child', 'tool_name': 'Write',
+                   'tool_input': {'file_path': str(target), 'content': content}}
         plugin = Path(__file__).resolve().parents[2]
+        return subprocess.run(['bash', str(plugin / 'hooks' / hook)],
+                              input=json.dumps(payload), text=True, capture_output=True,
+                              cwd=self.root, env=self.hook_environment(runtime))
+
+    def test_unbound_native_gate_still_blocks_and_accepts_clean_control(self) -> None:
         foreign = self.root / '.claude/plugins/data/craftsman'
         foreign.mkdir(parents=True)
         sentinel = foreign / 'session-state-parent.json'
@@ -178,13 +192,7 @@ class RuntimePathsTest(unittest.TestCase):
         hooks = ('post-write-check.sh', 'pre-write-check.sh')
         for runtime, (content, expected), hook in product(('codex', 'grok'), contents, hooks):
             with self.subTest(runtime=runtime, expected=expected, hook=hook):
-                target = self.root / 'Example.php'
-                target.write_text(content)
-                payload = {'session_id': 'child', 'tool_name': 'Write',
-                           'tool_input': {'file_path': str(target), 'content': content}}
-                result = subprocess.run(['bash', str(plugin / 'hooks' / hook)],
-                                        input=json.dumps(payload), text=True, capture_output=True,
-                                        cwd=self.root, env=self.hook_environment(runtime))
+                result = self.run_write_hook(hook, runtime, content)
                 self.assert_gate_result(result, expected)
                 self.assertEqual(list(foreign.glob('session-*')), [sentinel])
                 self.assertEqual(sentinel.read_text(), '{"verified": true}')

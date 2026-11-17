@@ -444,6 +444,12 @@ RULES_OBSERVED=""
 HELD=""
 _HELD_BY_GATE=""
 _HELD_BY_GATE_READ=false
+# The occurrences of each rule this pass reported on the written file, counted
+# as the gate counts them (after `ignore` and suppression markers). Not
+# RULES_OBSERVED: that list skips the Level 2 and 3 findings, so an ESLint or
+# PHPStan finding counted 0 there and was held although the gate handed over
+# nothing for it.
+_GATE_SEEN=""
 _post_hold_reason() { # <rule> <severity> <file>
     HELD=""
     if rules_baseline_holds "$3" "$1" "$2"; then
@@ -462,7 +468,8 @@ _held_by_gate() { # <rule> <severity> <file>
     fi
     local before
     before=$(awk -F'\t' -v rule="$1" '$1 == rule {print $2; exit}' <<< "$_HELD_BY_GATE")
-    [[ "$(grep -cxF "$1" <<< "$RULES_OBSERVED")" -le "${before:-0}" ]]
+    [[ -n "$before" ]] || return 1
+    [[ "$(grep -cxF "$1" <<< "$_GATE_SEEN")" -le "$before" ]]
 }
 
 add_violation() {
@@ -483,7 +490,7 @@ add_violation() {
     [[ "$severity" == "ignore" ]] && return
 
     file_has_ignore "$rule" && ignored=1
-
+    [[ $ignored -eq 0 ]] && _GATE_SEEN+="${rule}"$'\n'
     _post_hold_reason "$rule" "$severity" "$file_path"
     [[ -n "$HELD" ]] && { severity="warn"; message="${message} (${HELD}, not blocking)"; }
     if [[ $ignored -eq 0 ]]; then
