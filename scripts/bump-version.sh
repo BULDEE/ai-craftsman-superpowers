@@ -190,8 +190,8 @@ if [[ "$CHECK_ONLY" == true ]]; then
 fi
 echo "Done. ${CHANGED} file(s) updated."
 echo ""
-echo "Next steps:"
+echo "Next steps (the merged work is already on main and its CI is green, CR-316):"
 echo "  1. Update CHANGELOG.md with new version entry"
-echo "  2. git add -A && git commit -m 'chore: bump version to ${NEW_VERSION}'"
-echo "  3. git push origin main"
+echo "  2. git add -A && git commit -m 'chore(release): ${NEW_VERSION}'"
+echo "  3. git push origin main, then wait for that CI run to pass"
 echo "  4. claude plugin tag --push   # writes both v${NEW_VERSION} and craftsman--v${NEW_VERSION}"

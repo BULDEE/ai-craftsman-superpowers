@@ -171,6 +171,16 @@ When bumping version, update ALL of these:
 - `README.md` → Version badge
 - `README.fr.md` → Version badge + sync any README.md content changes (French mirror, English is the source of truth)
 
+Push order (CR-316). An install updates when `version` changes on the default
+branch, not when a tag lands: the plugin source is `"./"`, so the bump
+commit reaches every auto-updating install as soon as it is pushed, before
+CI has judged it (measured 2026-11-17: installed at 20:19:39Z, CI of that
+commit from 20:18:31Z to 20:37:58Z). Push the merged work to `main` WITHOUT
+the bump first: commits that leave `version` alone reach nobody. Bump only
+once that run is green, push the bump commit, and tag after its run is
+green too. One more CI run per release buys a release no user receives
+unjudged.
+
 Then tag with `claude plugin tag --push`, which produces the
 `craftsman--v<version>` tag that plugin dependency resolution reads. A plain
 `v<version>` tag is kept alongside it for release continuity.
