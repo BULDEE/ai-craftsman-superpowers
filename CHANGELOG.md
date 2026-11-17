@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.16.0] - 2026-11-17
+
+The gate judges an edit by what it brings. A one-line change to a file that
+already carried a blocking finding goes through, with the finding reported
+as held, and the post-write gives the same verdict (CR-306). On Grok, a
+write the host truncated is refused instead of judged on the part that
+arrived (CR-311), and from Grok 1.0.71 the exported write gates fail closed
+(CR-310).
+
 ### Changed
 
 - An edit is refused for what it brings, not for what the file already held
@@ -29,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prompt or session hook. An older Grok loads the field without effect
   (measured on 1.0.62), so re-running `craftsman-grok-install` is safe on any
   version.
+
 ### Fixed
 
 - A write the host truncated is refused instead of judged on the part that
