@@ -16,10 +16,12 @@ Commands:
     append <state_path> <list_key> <json_item> [max_entries]       - Atomically append to list
     increment <state_path> <counter_key>                           - Atomically increment a counter
     check-flag <state_path> <key>                                  - Print 'true'/'false' for boolean key
-    record-violation <state_path> <file> <directory> <rules_json> [--detect]
+    record-violation <state_path> <file> <directory> <rules_json> [--detect] [--keep] [--landed]
                                                                    - Replace the file's pending verdicts (an
                                                                      empty list clears them) and track patterns;
-                                                                     --detect also prints the cross-file patterns
+                                                                     --detect also prints the cross-file patterns,
+                                                                     --keep adds a refusal to what the file owes,
+                                                                     --landed also replaces what is on disk
     detect-patterns <state_path>                                   - Detect cross-file patterns
     pre-compact <state_path>                                       - Save session context before compaction
     post-compact <state_path>                                      - Verify state recovery after compaction
@@ -216,6 +218,26 @@ def _set_pending(pending: dict, file_path: str, rules: list) -> None:
     pending.pop(file_path, None)
 
 
+def _record_verdicts(state: dict, arguments: list[str], violated_rules: list) -> None:
+    """The file's pending verdicts, and with `--landed` what is on its disk.
+
+    The pending verdicts are replaced on every write: a rule no longer in the
+    list was answered (fixed or ignored) by the hook before this call, once,
+    and must not be answered again on the next write. An empty list clears
+    the key, so a settled file leaves nothing behind.
+
+    A refusal the pre-write gate records (`--keep`) never landed. What a
+    write left on disk is kept apart, under `landed_violations`, and only a
+    post-write says `--landed`: the end-of-turn gate (CR-259) and the disk
+    mark (CR-313) read that, never the pending verdicts.
+    """
+    file_path, flags = arguments[1], arguments[4:]
+    pending = state.setdefault('blocked_violations', {})
+    _set_pending(pending, file_path, _owed_rules(pending.get(file_path, []), violated_rules, '--keep' in flags))
+    if '--landed' in flags:
+        _set_pending(state.setdefault('landed_violations', {}), file_path, violated_rules)
+
+
 def handle_record_violation(arguments: list[str]) -> None:
     """Record, and with `--detect` also print the cross-file patterns.
 
@@ -227,13 +249,7 @@ def handle_record_violation(arguments: list[str]) -> None:
     state_path, file_path, directory = arguments[0], arguments[1], arguments[2]
     violated_rules = json.loads(arguments[3])
     state = read_state(state_path)
-    # The pending verdicts for THIS file, replaced on every write: a rule no
-    # longer in the list was answered (fixed or ignored) by the hook before
-    # this call, once, and must not be answered again on the next write. An
-    # empty list clears the key, so a settled file leaves nothing behind.
-    pending = state.setdefault('blocked_violations', {})
-    owed = _owed_rules(pending.get(file_path, []), violated_rules, '--keep' in arguments[4:])
-    _set_pending(pending, file_path, owed)
+    _record_verdicts(state, arguments, violated_rules)
     violation_patterns = state.setdefault('patterns', {})
     _track_violation_patterns(violation_patterns, violated_rules, directory, file_path)
     write_state_atomically(state_path, state)

@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A turn does not end with a blocking finding left on disk (CR-259). A
+  post-write refusal comes after the write landed: the model read "BLOCKED"
+  and could still report the work done without coming back to the file. A
+  synchronous `Stop` hook, `end-of-turn-gate.sh`, now sends the turn back
+  with each file and rule named while a blocking finding a write of this
+  session left on disk is still there: strict blocks, moderate warns, relaxed
+  is silent, and a turn already sent back once is never looped. It reads the
+  session state alone (58 ms median when nothing is open, under the cheapest
+  hook already bounded). A refusal of the pre-write gate never landed, a file
+  deleted since and a finding the file held before the session never hold
+  the turn.
+
+### Fixed
+
+- A blocking finding a write of this session left on disk is no longer held
+  as the file's past (CR-313). Since 4.16.0 the file on disk is an implicit
+  mark, so a violation a Bash command wrote (read back by the post-write,
+  never refused) let every later edit of that file through. The rules a
+  post-write of this session reported blocking on a file are now left out of
+  its mark, and the next edit is refused for them.
+
 ## [4.16.0] - 2026-11-17
 
 The gate judges an edit by what it brings. A one-line change to a file that

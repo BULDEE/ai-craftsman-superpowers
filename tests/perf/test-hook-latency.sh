@@ -350,6 +350,16 @@ measure_hook "pre-write-check.sh" "$C_PRE" \
 measure_hook "bias-detector.sh" "$C_BIAS" \
     "cd '$PROJECT' && printf '%s' '$PROMPT_PAYLOAD' | bash '$ROOT_DIR/hooks/bias-detector.sh' >/dev/null 2>&1"
 
+# The end-of-turn gate (CR-259) runs at every Stop, and nothing open is the
+# common case: a session state without a landed finding. No CI reading has
+# set a ceiling of its own yet, so it may cost no more than the cheapest hook
+# already bounded (79ms against the bias detector's 178ms on a laptop,
+# 2026-11-17): a backstop, not a regression bound, until runs give it a row.
+printf '{"verified":false,"blocked_violations":{}}\n' > "$CLAUDE_PLUGIN_DATA/session-state-latency.json"
+STOP_PAYLOAD='{"session_id":"latency","hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"done"}'
+measure_hook "end-of-turn-gate.sh" "$C_BIAS" \
+    "cd '$PROJECT' && printf '%s' '$STOP_PAYLOAD' | bash '$ROOT_DIR/hooks/end-of-turn-gate.sh' >/dev/null 2>&1"
+
 # A file that violates nothing measures the floor, and the floor is not what a
 # user pays. Every recorded violation starts its own python3 for the metrics
 # insert, so the cost of a real write scales with the findings in it: this is

@@ -676,6 +676,7 @@ test_session_metrics() {
     run_subtest "The agent cannot switch git hooks off" "$SCRIPT_DIR/core/test-git-bypass-guard.sh" || true
     run_subtest "A write pays one schema read" "$SCRIPT_DIR/core/test-metrics-stamp.sh" || true
     run_subtest "A red test waved away does not end the turn" "$SCRIPT_DIR/core/test-test-dismissal-guard.sh" || true
+    run_subtest "A turn does not end with a blocking finding left on disk" "$SCRIPT_DIR/core/test-end-of-turn-gate.sh" || true
     run_subtest "Level precedence tests pass" "$SCRIPT_DIR/core/test-precedence.sh" || true
     run_subtest "Brace scanner tests pass" "$SCRIPT_DIR/core/test-brace-scanner.sh" || true
     run_subtest "Gate independence tests pass" "$SCRIPT_DIR/core/test-gate-independence.sh" || true

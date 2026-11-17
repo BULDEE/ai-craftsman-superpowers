@@ -108,7 +108,7 @@ _settle_session_state() {
     rules_json=$(_blocked_rules_json)
 
     RECORDED_PATTERNS=$(python3 "$SCRIPT_DIR/lib/session_state.py" record-violation \
-        "$SESSION_STATE" "$(_pending_key "$file")" "$dir_bucket" "$rules_json" --detect 2>&1) \
+        "$SESSION_STATE" "$(_pending_key "$file")" "$dir_bucket" "$rules_json" --detect --landed 2>&1) \
         && RECORDED_PATTERNS_FRESH=true \
         || { echo "WARNING: session state write failed" >&2; RECORDED_PATTERNS=""; }
 }

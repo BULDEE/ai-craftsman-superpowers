@@ -190,6 +190,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/end-of-turn-gate.sh\"",
+            "statusMessage": "Craftsman: checking that no blocking finding written this turn is left on disk"
+          },
+          {
+            "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/test-dismissal-guard.sh\"",
             "statusMessage": "Craftsman: checking the report against the session's red test runs"
           },

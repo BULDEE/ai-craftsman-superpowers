@@ -37,6 +37,7 @@
 {"complexity":4,"ignores":0,"instrument":3,"max_fn_lines":14,"path":"hooks/bias-detector.sh","reason":"CR-167 latency: avoid launching the state reader when the session file is absent; existing pending context remains delivered and cleared."},
 {"complexity":5,"ignores":3,"instrument":3,"max_fn_lines":16,"path":"hooks/config-protection.sh","reason":"4.12.0: self-validated rewrite of the CR-204 changes (multi-line helpers, registry rebuild extracted), and the permission_mode reader pinned to hardening only"},
 {"complexity":2,"ignores":0,"instrument":3,"max_fn_lines":8,"path":"hooks/design-panel.sh","reason":"host interoperability campaign (PR #99): every hook binds its session from the payload (session_files_bind, 3 lines each), the mirror and the host library gain the Codex patch and the Grok tool table, the healthcheck reads the host matrix, and the suites gain the per-host fixtures and witnesses (test-doctrine-export covers the delimited AGENTS.md block, test-healthcheck the host rows, test-lang-registry the cache invariants)"},
+{"complexity":3,"ignores":0,"instrument":3,"max_fn_lines":8,"path":"hooks/end-of-turn-gate.sh","reason":"new file (CR-259): the Stop gate reads landed_violations alone"},
 {"complexity":2,"ignores":0,"instrument":3,"max_fn_lines":7,"path":"hooks/file-changed.sh","reason":"CR-167: bind payload host and session before persistence; share the native store across lifecycle and caches; refuse foreign host aliases and empty cache roots. Consumer lifecycle tests and parent-store mutation witnesses cover isolation."},
 {"complexity":6,"ignores":0,"instrument":3,"max_fn_lines":41,"path":"hooks/git-bypass-guard.sh"},
 {"complexity":5,"ignores":1,"instrument":3,"max_fn_lines":28,"path":"hooks/lib/acceptance_report.py","reason":"verdicts table and its two human writers (#44, learning-loop review CR-7)"},
@@ -218,6 +219,7 @@
 {"complexity":2,"ignores":0,"instrument":3,"max_fn_lines":6,"path":"tests/core/test-doc-claims.sh","reason":"CR-242: check 10, framework-agnostic claims read against the pack manifests"},
 {"complexity":8,"ignores":1,"instrument":3,"max_fn_lines":17,"path":"tests/core/test-dogfood.sh","reason":"severity through the rules engine and the scope assertion: _dogfood_blocking is 17 lines, four helpers"},
 {"complexity":44,"ignores":0,"instrument":3,"max_fn_lines":149,"path":"tests/core/test-dynamic-context.sh","reason":"host interoperability campaign (PR #99): every hook binds its session from the payload (session_files_bind, 3 lines each), the mirror and the host library gain the Codex patch and the Grok tool table, the healthcheck reads the host matrix, and the suites gain the per-host fixtures and witnesses (test-doctrine-export covers the delimited AGENTS.md block, test-healthcheck the host rows, test-lang-registry the cache invariants)"},
+{"complexity":1,"ignores":0,"instrument":3,"max_fn_lines":5,"path":"tests/core/test-end-of-turn-gate.sh","reason":"new file (CR-259): a turn does not end with a blocking finding left on disk"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":1,"path":"tests/core/test-external-packs.sh"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":3,"path":"tests/core/test-gate-failure-mode.sh"},
 {"complexity":1,"ignores":0,"instrument":3,"max_fn_lines":15,"path":"tests/core/test-gate-independence.sh","reason":"4.12.0: self-validated rewrite of the CR-204 changes (multi-line helpers, registry rebuild extracted), and the permission_mode reader pinned to hardening only"},
@@ -295,6 +297,6 @@
 {"complexity":3,"ignores":0,"instrument":3,"max_fn_lines":10,"path":"tests/packs/test-structural.sh"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":1,"path":"tests/packs/test-symfony.sh"},
 {"complexity":2,"ignores":0,"instrument":3,"max_fn_lines":23,"path":"tests/perf/test-hook-latency.sh","reason":"CR-179: Darwin ceilings set from thirty macOS runner readings, guarded against masking a 50 percent regression"},
-{"complexity":41,"ignores":1,"instrument":3,"max_fn_lines":133,"path":"tests/run-tests.sh","reason":"CR-305: registers test-ci-gate.sh after CR-289's test-test-dismissal-guard.sh (one || true per suite until the runner discovers its suites, CR-288 IMPROVE)"},
+{"complexity":42,"ignores":1,"instrument":3,"max_fn_lines":133,"path":"tests/run-tests.sh","reason":"CR-259: registers test-end-of-turn-gate.sh after CR-305's test-ci-gate.sh (one || true per suite until the runner discovers its suites, CR-288 IMPROVE)"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":5,"path":"tests/templates/test-templates.sh"}
 ]

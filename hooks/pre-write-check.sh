@@ -185,12 +185,22 @@ _disk_findings() { # <real file>
         rules_check_custom "$1" "$lang"
     ) 3>&1 >/dev/null 2>&1
 }
+# The rules a write of this session left on the file, reported blocking by
+# its post-write (CR-313). They are not the file's past: held as such, one
+# Bash write that lands without the gate would let every later edit through.
+LANDED_RULES=""
+_session_landed() { # <real file>: sets LANDED_RULES, space-separated
+    LANDED_RULES=$(jq -r --arg key "$(session_pending_key "$1")" '.landed_violations[$key] // [] | join(" ")' \
+        "$(session_file session-state.json)" 2>/dev/null)
+}
 _judge_disk() { # judges MIRROR_REL's file as it stands on disk, once
     grep -qxF "$MIRROR_REL" <<< "$_DISK_JUDGED" && return 0
     _DISK_JUDGED+="${MIRROR_REL}"$'\n'
     _disk_target "$MIRROR_REL"
     [[ -n "$DISK_TARGET" ]] || return 0
-    _DISK_FINDINGS+=$(_disk_findings "$DISK_TARGET" | sed "s|^|${MIRROR_REL}"$'\t'"|")$'\n'
+    _session_landed "$DISK_TARGET"
+    _DISK_FINDINGS+=$(_disk_findings "$DISK_TARGET" | awk -v landed=" ${LANDED_RULES} " 'index(landed, " " $0 " ") == 0' \
+        | sed "s|^|${MIRROR_REL}"$'\t'"|")$'\n'
 }
 _held_by_disk() { # <rule> <severity>
     [[ "$2" == "block" ]] || return 1

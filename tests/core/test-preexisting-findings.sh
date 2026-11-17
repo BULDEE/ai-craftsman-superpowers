@@ -88,6 +88,19 @@ _php "$MARKED" "" "$MARKER"
 _gate "$(_edit "$MARKED" "$MARKER" '    // marker gone')"
 assert_exit_code "deleting a suppression marker exposes what it hid" 2 "$GATE_CODE"
 
+# A finding this session left on disk is not the file's past (CR-313). A
+# Bash write lands without the gate, the post-write that reads it back reports
+# it as blocking, and the next edit of the file must not hold it as "already
+# in the file": that would make one Bash write a way around the gate.
+DEPOSITED="$WORK/project/src/Domain/Deposited.php"
+_php "$DEPOSITED" "" "    // legacy"
+(cd "$WORK/project" && jq -n --arg f "$DEPOSITED" \
+    '{session_id:"preexisting", hook_event_name:"PostToolUse", tool_name:"Write", tool_input:{file_path:$f}}' \
+    | bash "$ROOT_DIR/hooks/post-write-check.sh" >/dev/null 2>&1)
+_gate "$(_edit "$DEPOSITED" '// legacy' '// legacy, touched')"
+assert_exit_code "a finding this session deposited is not held as the file's past" 2 "$GATE_CODE"
+assert_contains "for PHP002" "$GATE_OUT" "PHP002"
+
 SECRET="$WORK/project/src/Domain/Secret.php"
 _php "$SECRET" "final " '    private string $apiKey = "sk_live_abcdef1234567890abcdef"; // secrets-scan: allow'
 _gate "$(_edit "$SECRET" 'final class Secret' 'final class Secret // touched')"
