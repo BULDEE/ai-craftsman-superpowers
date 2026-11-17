@@ -13,16 +13,21 @@
 #
 # Live means the export's marker names a checkout that still holds the hooks:
 # a gate file whose checkout is gone runs nothing, and stepping aside for it
-# would leave the host with no gate at all.
+# would leave the host with no gate at all. And never this hook's own
+# checkout: the export sets GROK_PLUGIN_ROOT itself, so an export written
+# before CRAFTSMAN_EXPORTED_GATE existed would step aside for itself, the
+# session start that rewrites it included, and Grok would run no gate.
 # =============================================================================
 
 [[ -n "${GROK_PLUGIN_ROOT:-}" && -n "${GROK_HOOK_EVENT:-}" && -z "${CRAFTSMAN_EXPORTED_GATE:-}" ]] || return 0
 
+_exported_gate_own_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 _exported_gate_live() { # <gate file>
     [[ -f "$1" ]] || return 1
     local root
     root=$(jq -r '.craftsman.root // empty' "$1" 2>/dev/null)
-    [[ -n "$root" && -f "${root}/hooks/pre-write-check.sh" ]]
+    [[ -n "$root" && -f "${root}/hooks/pre-write-check.sh" ]] || return 1
+    [[ "$(cd "$root" && pwd -P)" != "$_exported_gate_own_root" ]]
 }
 
 _exported_gate_rel=$(jq -r '.hosts.grok.gate_file // empty' \
@@ -34,4 +39,4 @@ if [[ -n "$_exported_gate_rel" ]]; then
         exit 0
     done
 fi
-unset _exported_gate _exported_gate_rel
+unset _exported_gate _exported_gate_rel _exported_gate_own_root

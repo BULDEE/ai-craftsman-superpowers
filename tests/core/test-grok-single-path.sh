@@ -59,6 +59,15 @@ _equal "every exported handler says it is the exported gate" "$TOTAL" "$MARKED"
 AGENTS_OFF=$(jq '[.hooks[][].hooks[] | select(.command | test("CLAUDE_PLUGIN_OPTION_AGENT_HOOKS=false "))] | length' "$GATE")
 _equal "every exported handler carries agent hooks off (Grok runs async in line)" "$TOTAL" "$AGENTS_OFF"
 
+# On a real machine the plugin path and the exported gate are two checkouts
+# (the Claude Code cache, the developer's clone). The gate's root only has
+# to hold the hooks for the gate to count as live.
+mkdir -p "$WORK/gate-root/hooks" && touch "$WORK/gate-root/hooks/pre-write-check.sh"
+_point_gate() { # <root>
+    jq --arg r "$1" '.craftsman.root = $r' "$GATE" > "$GATE.tmp" && mv "$GATE.tmp" "$GATE"
+}
+_point_gate "$WORK/gate-root"
+
 echo "=== Grok's plugin path steps aside for a live exported gate ==="
 _pre_write "${PLUGIN_PATH[@]}"
 assert_exit_code "the plugin path lets the exported gate judge" 0 "$GATE_CODE"
@@ -77,6 +86,14 @@ _pre_write GROK_SESSION_ID=inherited
 assert_exit_code "a Claude Code session started from a Grok shell keeps its gate" 2 "$GATE_CODE"
 _pre_write
 assert_exit_code "Claude Code keeps its gate when an export sits in ~/.grok" 2 "$GATE_CODE"
+
+# An export written before the mark existed carries GROK_PLUGIN_ROOT (the
+# export sets it) and no CRAFTSMAN_EXPORTED_GATE. Its hooks, run from the
+# checkout it names, must not step aside for themselves: the gate would be
+# off, and its session start, which rewrites the export, with it.
+_point_gate "$ROOT_DIR"
+_pre_write "${PLUGIN_PATH[@]}"
+assert_exit_code "an exported gate never steps aside for itself, marked or not" 2 "$GATE_CODE"
 
 echo "=== Every hook script carries the step-aside guard ==="
 MISSING=""
