@@ -427,9 +427,18 @@ SMALLEST_CEILING="$(printf '%s' "$RESULTS" | LC_ALL=C awk -F'|' '
 
 if _is_measurement "$FLOOR_MS" && [[ "$FLOOR_MS" != "0" ]] && [[ "$SMALLEST_CEILING" != "0" ]]; then
     OVER_SECONDS="$(python3 -c "print('%.3f' % (1.15 * $SMALLEST_CEILING * $FLOOR_MS / 1000.0))")"
-    UNDER_SECONDS="$(python3 -c "print('%.3f' % (0.50 * $SMALLEST_CEILING * $FLOOR_MS / 1000.0))")"
+    # The run under the ceiling is half the calibration's own work, not a
+    # sleep. A hosted macOS runner wakes a short sleep late: `sleep 0.064`
+    # took 152ms against a 128ms baseline, 1.18x of a 1x ceiling, while every
+    # hook sat inside its budget (44410608889, and 43958660112, 40112201683
+    # before it). A late wake only lengthens a run, so the sleep stays for the
+    # run over the ceiling, where lengthening cannot turn the verdict. Forks
+    # and interpreter starts scale with the machine the way the baseline
+    # does. At least one of each: BSD `seq 1 0` counts down.
+    UNDER_WORK="$(python3 -c "print('%d %d' % (max(1, int(0.5 * $SMALLEST_CEILING * $CALIBRATION_FORKS)), max(1, int(0.5 * $SMALLEST_CEILING * $CALIBRATION_PYTHON_STARTS))))")"
+    UNDER_WORKLOAD="for _ in \$(seq 1 ${UNDER_WORK% *}); do /bin/echo x >/dev/null; done; for _ in \$(seq 1 ${UNDER_WORK#* }); do python3 -c pass; done"
     OVER_MS="$(_median_ms "sleep $OVER_SECONDS" 3)"
-    UNDER_MS="$(_median_ms "sleep $UNDER_SECONDS" 3)"
+    UNDER_MS="$(_median_ms "$UNDER_WORKLOAD" 3)"
     OVER_RATIO="$(python3 -c "print('%.2f' % ($OVER_MS / $FLOOR_MS))" 2>/dev/null || echo 0)"
     UNDER_RATIO="$(python3 -c "print('%.2f' % ($UNDER_MS / $FLOOR_MS))" 2>/dev/null || echo 0)"
     both=$(python3 -c "print(1 if $OVER_RATIO > $SMALLEST_CEILING and $UNDER_RATIO <= $SMALLEST_CEILING else 0)" 2>/dev/null || echo 0)
