@@ -17,9 +17,16 @@ _check_php001() {
     fi
 }
 
+# A class keyword that opens a declaration: at the start of a line, or
+# after the opening tag or a statement on the same line (`<?php class Bad
+# {}`, `namespace App; class Bad`). Anchored on the line start alone, the
+# rule missed a class sharing the opening line, and the PHP001 fix, which
+# moves that code below the declare, had the post-write refuse what the
+# pre-write let through (CR-314). `::class` and `new class` are not
+# declarations and stay out.
 _check_php002() {
     local file="$1"
-    grep -q "^class " "$file" 2>/dev/null || return 0
+    grep -qE '(^|<\?php[[:space:]]+|[;{}][[:space:]]*)class[[:space:]]+[A-Za-z_]' "$file" 2>/dev/null || return 0
     grep -q "final class" "$file" 2>/dev/null && return 0
     grep -qE "(interface |trait |abstract class )" "$file" 2>/dev/null && return 0
     # A Doctrine entity cannot be final while the ORM builds lazy-loading

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- One PHP write gets one verdict (CR-314). PHP002 only looked for `class` at
+  the start of a line, so `<?php class Bad {}` passed before the write. The
+  PHP001 auto-fix then moved that class below the declare, and the post-write
+  blocked what the pre-write had allowed. PHP002 now sees a class declared
+  after the opening tag or a statement on its line, and the pre-write judges
+  an auto-fixed write as it will land, so a project rule anchored on the line
+  start agrees with the post-write too.
+
 ## [4.18.0] - 2026-11-18
 
 On Grok each write is judged once, by the exported gate, which keeps the git

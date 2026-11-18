@@ -299,12 +299,25 @@ local_should_block=false
 
 # A call that carries the whole file is a write, whatever the host names it
 # (Write, write_file, Grok's `write`); the fix rewrites `content` in place.
+FIXED_CONTENT=""
 if [[ $VIOLATION_COUNT -eq 1 && -n "$FILE_CONTENT" && "$LANG_ID" == "php" && "$local_should_block" == true ]] \
    && [[ "$VIOLATIONS" == PHP001* ]] \
    && echo "$FILE_CONTENT" | head -1 | grep -qE '^<\?php([[:space:]]|$)' 2>/dev/null; then
     # PHP refuses a declare that is not the very first statement, so code
     # sharing the opening line moves below it (CR-226).
     FIXED_CONTENT=$(printf '%s\n' "$FILE_CONTENT" | awk 'NR==1 {rest = substr($0, 6); sub(/^[[:space:]]+/, "", rest); print "<?php"; print ""; print "declare(strict_types=1);"; if (rest != "") {print ""; print rest}; next} {print}')
+    # Judged as it lands (CR-314): the fix moves the code sharing the opening
+    # line below the declare, where a rule anchored on the line start sees it,
+    # and the post-write judges what landed. A finding there joins PHP001 and
+    # the write is refused with both, the verdict a finding beside PHP001 gets
+    # from the start.
+    printf '%s' "$FIXED_CONTENT" > "$MIRROR_FILE"
+    FILE_PATH="$MIRROR_FILE"
+    pack_dispatch_file "$MIRROR_FILE"
+    rules_check_custom "$MIRROR_FILE" "$LANG_ID"
+    FILE_PATH="$FILE_PATH_REAL"
+fi
+if [[ -n "${FIXED_CONTENT:-}" && $VIOLATION_COUNT -eq 1 ]]; then
     echo "$INPUT" | jq --arg content "$FIXED_CONTENT" \
     '{
         hookSpecificOutput: {

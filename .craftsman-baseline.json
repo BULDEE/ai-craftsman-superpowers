@@ -248,6 +248,7 @@
 {"complexity":15,"ignores":0,"instrument":3,"max_fn_lines":129,"path":"tests/core/test-observation.sh"},
 {"complexity":16,"ignores":0,"instrument":3,"max_fn_lines":104,"path":"tests/core/test-okf-knowledge.sh"},
 {"complexity":1,"ignores":1,"instrument":3,"max_fn_lines":31,"path":"tests/core/test-pack-loader.sh","reason":"Ship native pack agents before host discovery and enforce ordinary-copy integrity with RED/GREEN regressions"},
+{"complexity":2,"ignores":0,"instrument":3,"max_fn_lines":9,"path":"tests/core/test-php-one-verdict.sh","reason":"new file (CR-314): one PHP write, one verdict, the auto-fix judged as it lands"},
 {"complexity":4,"ignores":0,"instrument":3,"max_fn_lines":10,"path":"tests/core/test-php001-autofix.sh","reason":"CR-226: PHP001 auto-fix judged by php -l"},
 {"complexity":3,"ignores":0,"instrument":3,"max_fn_lines":11,"path":"tests/core/test-precedence.sh","reason":"CR-172: analyser coverage travels as a record in the result, errcheck under sa_timeout, witnesses in the Go, Rust and precedence suites"},
 {"complexity":2,"ignores":0,"instrument":3,"max_fn_lines":4,"path":"tests/core/test-preexisting-findings.sh","reason":"new file (CR-306): an edit is refused for what it brings, not for what the file already held"},
