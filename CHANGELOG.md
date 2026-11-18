@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.18.0] - 2026-11-18
+
+On Grok each write is judged once, by the exported gate, which keeps the git
+guards (CR-310), and no model call holds a write any more (CR-315). Claude
+Code and Codex are unchanged.
+
 ### Fixed
 
 - On Grok each write is judged once (CR-310). Grok 1.0.62 discovers the plugin
