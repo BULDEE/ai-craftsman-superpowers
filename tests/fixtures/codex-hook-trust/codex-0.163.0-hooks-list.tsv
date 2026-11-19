@@ -1,0 +1,22 @@
+# trustStatus and key per craftsman handler, as Codex 0.163.0 app-server
+# hooks/list returned them for hooks-v4.18.0.json under config.toml
+# (2026-11-19), the plugin prefix cut.
+modified	post_tool_use:1:0
+modified	pre_tool_use:1:0
+modified	stop:0:0
+modified	stop:0:1
+trusted	post_compact:0:0
+trusted	post_tool_use:0:0
+trusted	post_tool_use:0:1
+trusted	pre_compact:0:0
+trusted	pre_tool_use:0:0
+trusted	pre_tool_use:0:1
+trusted	session_end:0:0
+trusted	session_start:0:0
+trusted	subagent_stop:0:0
+trusted	user_prompt_submit:0:0
+untrusted	post_tool_use:2:0
+untrusted	pre_tool_use:1:1
+untrusted	stop:0:2
+untrusted	stop:0:3
+untrusted	user_prompt_submit:0:1

@@ -220,7 +220,7 @@ _HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
 CRAFTSMAN_SESSION_HOST=claude-code CLAUDE_PLUGIN_ROOT="$ROOT_DIR" hc_check_write_gate
 WG_CLAUDE="${_HC_STATUSES[0]}"
 _HC_NAMES=(); _HC_STATUSES=(); _HC_MESSAGES=(); _HC_PASS=0; _HC_TOTAL=0
-CRAFTSMAN_SESSION_HOST=codex CLAUDE_PLUGIN_ROOT="$ROOT_DIR" hc_check_write_gate
+CODEX_HOME="$CLAUDE_PLUGIN_DATA/no-codex" CRAFTSMAN_SESSION_HOST=codex CLAUDE_PLUGIN_ROOT="$ROOT_DIR" hc_check_write_gate
 WG_CODEX="${_HC_STATUSES[0]}|${_HC_MESSAGES[0]}"
 if [[ "$WG_CLAUDE" == "ok" && "$WG_CODEX" == warn\|*"/hooks"* ]]; then
     log_pass "write-gate is ok where plugin hooks run on install and warns, naming /hooks, where the host requires trust"

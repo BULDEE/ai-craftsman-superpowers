@@ -331,8 +331,9 @@ hc_check_hooks_declared() {
 }
 
 # A host whose matrix row records a trust step runs installed hooks only after
-# that step, which this process cannot observe: warn and name /hooks. A host
-# with no trust step runs them on install, so the row is ok.
+# that step. Codex writes that step down, so the row reads it there. Another
+# host's trust this process cannot observe: warn and name /hooks. A host with
+# no trust step runs them on install, so the row is ok.
 _hc_record_plugin_gate() {
     local trust
     trust=$(jq -r --arg h "$1" '.hosts[$h].trust // empty' "$2" 2>/dev/null)
@@ -340,7 +341,45 @@ _hc_record_plugin_gate() {
         _hc_record "write-gate" "ok" "${1}: plugin hooks run on install"
         return
     fi
+    if [[ "$1" == "codex" ]] && _hc_record_codex_trust "$3" "$2"; then
+        return
+    fi
     _hc_record "write-gate" "warn" "${1}: installing does not trust plugin hooks; trust is not measured here. Check the native /hooks view"
+}
+
+# Codex runs a plugin hook only once its exact definition is trusted, keyed
+# by its position in hooks.json (hooks/lib/codex_hook_trust.py). Measured on
+# Codex 0.163.0 (2026-11-19): handlers inserted at the head of three groups
+# since the approvals left the git guard, the end-of-turn gate, the dismissal
+# guard and the Bash write check "modified", and five more were never
+# approved, 9 of 19 skipped while this row said trust was not measured (CR-317).
+# Returns 1 when the record cannot be read, so the caller says so.
+_hc_record_codex_trust() {
+    local config events lines verdict key script total=0 skipped=0 off=""
+    config="${CODEX_HOME:-${HOME}/.codex}/config.toml"
+    events=$(jq -r '.hosts.codex.events_loaded | join(",")' "$2" 2>/dev/null) || return 1
+    lines=$(python3 "${_HC_LIB_DIR}/codex_hook_trust.py" "$1" "$config" "$events" 2>/dev/null) || return 1
+    while IFS=$'\t' read -r verdict key script; do
+        [[ -n "$verdict" ]] || continue
+        total=$((total + 1))
+        [[ "$verdict" == "trusted" ]] && continue
+        skipped=$((skipped + 1))
+        off="${off}${off:+; }${script} (${key}) $(_hc_codex_verdict_words "$verdict")"
+    done <<< "$lines"
+    if [[ $skipped -eq 0 ]]; then
+        _hc_record "write-gate" "ok" "codex: ${total} of ${total} plugin hooks trusted in ${config/#$HOME/~}"
+        return 0
+    fi
+    _hc_record "write-gate" "warn" "codex: ${skipped} of ${total} plugin hooks do not run until reviewed in /hooks: ${off}"
+    return 0
+}
+
+_hc_codex_verdict_words() {
+    case "$1" in
+        modified) echo "changed since approval" ;;
+        untrusted) echo "never approved" ;;
+        *) echo "$1" ;;
+    esac
 }
 
 # Plugin hooks listed is not plugin hooks executed. Grok 1.0.30 and 1.0.34
@@ -358,7 +397,7 @@ hc_check_write_gate() {
     fi
     plugin_run=$(_hc_plugin_hooks_run "$host" "$capabilities")
     if [[ "$plugin_run" != "false" && "$plugin_run" != "not observed"* ]]; then
-        _hc_record_plugin_gate "$host" "$capabilities"
+        _hc_record_plugin_gate "$host" "$capabilities" "$root"
         return
     fi
     gate=$(_hc_host_gate_file "$host" "$capabilities") || gate=""

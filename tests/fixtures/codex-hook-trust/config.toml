@@ -1,0 +1,51 @@
+# The craftsman entries of a real ~/.codex/config.toml, Codex 0.163.0,
+# 2026-11-19: approvals given on the 205717c manifest (2026-09-21), never
+# renewed. Other plugins and personal hook files left out.
+
+[plugins."craftsman@ai-craftsman-superpowers"]
+enabled = true
+
+[hooks.state]
+
+[hooks.state."craftsman@ai-craftsman-superpowers:hooks/hooks.json:stop:0:0"]
+trusted_hash = "sha256:a0f3d9f55debd4a7b2ff601c759b29c8c26bdee1b02e69260e8527c0f1780c97"
+
+[hooks.state."craftsman@ai-craftsman-superpowers:hooks/hooks.json:stop:0:1"]
+trusted_hash = "sha256:237266a05e4f30247a20b987dc39c5f31fc363ad79cce5c90a99476564cc7433"
+
+[hooks.state."craftsman@ai-craftsman-superpowers:hooks/hooks.json:subagent_stop:0:0"]
+trusted_hash = "sha256:8b92895fb45df95b7544a24518c485db548bf708bfa29319c3197e40e95e2726"
+
+[hooks.state."craftsman@ai-craftsman-superpowers:hooks/hooks.json:user_prompt_submit:0:0"]
+trusted_hash = "sha256:8aed9394510bdf089032c3a288929f6d21e3478aec7c25cda86a93f960906e42"
+
+[hooks.state."craftsman@ai-craftsman-superpowers:hooks/hooks.json:session_end:0:0"]
+trusted_hash = "sha256:0e944e32f615c5d287781a49e7c3ab3ccfd45c2b0cc9218bfa905e1ef8171334"
+
+[hooks.state."craftsman@ai-craftsman-superpowers:hooks/hooks.json:session_start:0:0"]
+trusted_hash = "sha256:06fc404f8c2ce8ac44f94b7d7802b1edb42dbcd40519fd80f0a502609a45d911"
+
+[hooks.state."craftsman@ai-craftsman-superpowers:hooks/hooks.json:post_compact:0:0"]
+trusted_hash = "sha256:1eb7883307eae4ad61fa49b02fd0b46350bf5c0e436a5b82d1085fee3f3ce3ea"
+
+[hooks.state."craftsman@ai-craftsman-superpowers:hooks/hooks.json:pre_compact:0:0"]
+trusted_hash = "sha256:23b36dae40b870f7d73495692d304f4124367b75e5d31a73df95391545e6de8d"
+
+[hooks.state."craftsman@ai-craftsman-superpowers:hooks/hooks.json:post_tool_use:1:0"]
+trusted_hash = "sha256:d0bd3f705c2ab74eaca4e00e6f8049228230256f95a3163b429d31ed4bc931f7"
+
+[hooks.state."craftsman@ai-craftsman-superpowers:hooks/hooks.json:post_tool_use:0:1"]
+trusted_hash = "sha256:8a08ac5abb6415c062796e939d9b4d237f9ba7144199f3d69e8aae0ae7fbfea6"
+
+[hooks.state."craftsman@ai-craftsman-superpowers:hooks/hooks.json:post_tool_use:0:0"]
+trusted_hash = "sha256:d1bdc8be33bffcf6c4909b5933c0bfe092fdad81e160b8657eec344b5606cacd"
+
+[hooks.state."craftsman@ai-craftsman-superpowers:hooks/hooks.json:pre_tool_use:1:0"]
+trusted_hash = "sha256:be5275d10ffdd75b0ed6fb475b8cb77e824885ad7f0ef11b67aed3d02833a830"
+
+[hooks.state."craftsman@ai-craftsman-superpowers:hooks/hooks.json:pre_tool_use:0:1"]
+trusted_hash = "sha256:b39ca458bfa9cdf8ba3a0c946631b36ac567ffc796670986e4053fa66d181eee"
+
+[hooks.state."craftsman@ai-craftsman-superpowers:hooks/hooks.json:pre_tool_use:0:0"]
+trusted_hash = "sha256:fb53cb3aff96ff446180c31e3ca09d0731b0a81498e73f72b82dd006aecf20fc"
+

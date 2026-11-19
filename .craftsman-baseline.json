@@ -47,6 +47,7 @@
 {"complexity":7,"ignores":0,"instrument":3,"max_fn_lines":27,"path":"hooks/lib/channels.sh"},
 {"complexity":4,"ignores":0,"instrument":3,"max_fn_lines":28,"path":"hooks/lib/circuit-breaker.sh","reason":"CR-167: bind payload host and session before persistence; share the native store across lifecycle and caches; refuse foreign host aliases and empty cache roots. Consumer lifecycle tests and parent-store mutation witnesses cover isolation."},
 {"complexity":7,"ignores":0,"instrument":3,"max_fn_lines":21,"path":"hooks/lib/codemap.py","reason":"the engine holds no list of languages (CR-108): registry consumers replace the literals"},
+{"complexity":5,"ignores":0,"instrument":3,"max_fn_lines":20,"path":"hooks/lib/codex_hook_trust.py","reason":"new file (CR-317): which plugin hooks Codex runs, read from its trust record"},
 {"complexity":4,"ignores":0,"instrument":3,"max_fn_lines":15,"path":"hooks/lib/command_grammar.py","reason":"4.12.0 release review: redirections and pipes in the test-evidence grammar, background runs, Grok review allowlist, write-gate row per host trust step, and their witnesses"},
 {"complexity":9,"ignores":0,"instrument":3,"max_fn_lines":41,"path":"hooks/lib/config.sh","reason":"CR-175 (M6): config_validate reads the schema with the resolver's own reader"},
 {"complexity":6,"ignores":0,"instrument":3,"max_fn_lines":22,"path":"hooks/lib/conventions.py","reason":"host interoperability campaign (PR #99): every hook binds its session from the payload (session_files_bind, 3 lines each), the mirror and the host library gain the Codex patch and the Grok tool table, the healthcheck reads the host matrix, and the suites gain the per-host fixtures and witnesses (test-doctrine-export covers the delimited AGENTS.md block, test-healthcheck the host rows, test-lang-registry the cache invariants)"},
@@ -210,6 +211,7 @@
 {"complexity":3,"ignores":0,"instrument":3,"max_fn_lines":9,"path":"tests/core/test-bias-registry.sh"},
 {"complexity":2,"ignores":1,"instrument":3,"max_fn_lines":13,"path":"tests/core/test-brace-scanner.sh","reason":"spy guard replaces the grep guard (#38 review 2)"},
 {"complexity":1,"ignores":0,"instrument":3,"max_fn_lines":8,"path":"tests/core/test-circuit-breaker.sh"},
+{"complexity":1,"ignores":0,"instrument":3,"max_fn_lines":9,"path":"tests/core/test-codex-hook-trust.sh","reason":"new file (CR-317): the healthcheck row against Codex's own hooks/list verdicts"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":4,"path":"tests/core/test-command-docs.sh"},
 {"complexity":1,"ignores":0,"instrument":3,"max_fn_lines":7,"path":"tests/core/test-config-protection.sh","reason":"4.12.0 security review CR-204: canonical case-insensitive paths, bypassPermissions denies own config, plugin data protected, registry fails closed, set-verified refused after a failing run, nested sessions by newest binding, test harness refuses writes in the repository"},
 {"complexity":5,"ignores":0,"instrument":3,"max_fn_lines":30,"path":"tests/core/test-config.sh","reason":"option spelling Claude Code exports, and the skill depth it reads (review CR-86)"},
@@ -300,6 +302,6 @@
 {"complexity":3,"ignores":0,"instrument":3,"max_fn_lines":10,"path":"tests/packs/test-structural.sh"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":1,"path":"tests/packs/test-symfony.sh"},
 {"complexity":2,"ignores":0,"instrument":3,"max_fn_lines":23,"path":"tests/perf/test-hook-latency.sh","reason":"CR-179: Darwin ceilings set from thirty macOS runner readings, guarded against masking a 50 percent regression"},
-{"complexity":43,"ignores":1,"instrument":3,"max_fn_lines":133,"path":"tests/run-tests.sh","reason":"CR-310: registers test-grok-single-path.sh after CR-259's test-end-of-turn-gate.sh (one || true per suite until the runner discovers its suites, CR-288 IMPROVE)"},
+{"complexity":44,"ignores":1,"instrument":3,"max_fn_lines":133,"path":"tests/run-tests.sh","reason":"CR-317: registers test-codex-hook-trust.sh (one || true per suite until the runner discovers its suites, CR-288 IMPROVE)"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":5,"path":"tests/templates/test-templates.sh"}
 ]

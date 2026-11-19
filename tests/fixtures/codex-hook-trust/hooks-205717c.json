@@ -1,0 +1,193 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\"",
+            "statusMessage": "Craftsman: loading packs, rules and session context"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|write|search_replace",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/config-protection.sh\"",
+            "statusMessage": "Craftsman: checking the write does not reconfigure the gate"
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-write-check.sh\"",
+            "statusMessage": "Craftsman: judging the would-be file before it lands"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|run_terminal_command",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git push*)",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-push-verify.sh\"",
+            "statusMessage": "Craftsman: checking verification evidence before the push"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|write|search_replace",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-write-check.sh\"",
+            "statusMessage": "Craftsman: validating the written file (rules, analysers, ratchet)"
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-ddd-verifier.sh\"",
+            "async": true,
+            "asyncRewake": true,
+            "statusMessage": "Craftsman: semantic DDD review of the written file"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|TaskOutput|run_terminal_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-bash-test-verify.sh\"",
+            "async": true,
+            "asyncRewake": true,
+            "statusMessage": "Craftsman: reading the test run's result"
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/task-completed-verify.sh\"",
+            "statusMessage": "Craftsman: evidence gate before the task is marked complete"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Write|Edit|Bash|write|search_replace|run_terminal_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/tool-failure-tracker.sh\"",
+            "async": true,
+            "statusMessage": "Craftsman: recording the failed tool call"
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-bash-test-verify.sh\"",
+            "async": true,
+            "asyncRewake": true,
+            "statusMessage": "Craftsman: reading the failed test run's result"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/bias-detector.sh\"",
+            "statusMessage": "Craftsman: scanning the prompt for cognitive bias signals"
+          }
+        ]
+      }
+    ],
+    "FileChanged": [
+      {
+        "matcher": "src/|app/|lib/|libs/|packages/|apps/",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/file-changed.sh\"",
+            "async": true,
+            "statusMessage": "Craftsman: tracking an external file change"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/subagent-quality-gate.sh\"",
+            "async": true,
+            "statusMessage": "Craftsman: judging the subagent's writes"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-compact-save.sh\"",
+            "statusMessage": "Craftsman: saving session state before compaction"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-verify.sh\"",
+            "statusMessage": "Craftsman: restoring session state after compaction"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-sentry-context.sh\"",
+            "async": true,
+            "statusMessage": "Craftsman: asking for Sentry context on the files written"
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/agent-final-review.sh\"",
+            "async": true,
+            "asyncRewake": true,
+            "statusMessage": "Craftsman: final semantic review of the session's changes"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-metrics.sh\"",
+            "statusMessage": "Craftsman: recording session metrics and cleaning up"
+          }
+        ]
+      }
+    ]
+  }
+}

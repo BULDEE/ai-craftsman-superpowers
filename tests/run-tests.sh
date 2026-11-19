@@ -683,6 +683,7 @@ test_session_metrics() {
     run_subtest "Brace scanner tests pass" "$SCRIPT_DIR/core/test-brace-scanner.sh" || true
     run_subtest "Gate independence tests pass" "$SCRIPT_DIR/core/test-gate-independence.sh" || true
     run_subtest "Healthcheck tests pass" "$SCRIPT_DIR/core/test-healthcheck.sh" || true
+    run_subtest "Which plugin hooks Codex runs" "$SCRIPT_DIR/core/test-codex-hook-trust.sh" || true
     run_subtest "LSP policy tests pass" "$SCRIPT_DIR/core/test-lsp-policy.sh" || true
     run_subtest "Pack loader tests pass" "$SCRIPT_DIR/core/test-pack-loader.sh" || true
     run_subtest "Routing table tests pass" "$SCRIPT_DIR/core/test-routing-table.sh" || true

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Under Codex, the healthcheck names the plugin hooks Codex skips (CR-317).
+  Codex runs a plugin hook only once its exact definition is trusted, and
+  keys that trust by the hook's position in `hooks/hooks.json`. A release that
+  inserts a handler ahead of others moves them onto keys trusted for another
+  definition, so they stop running until reviewed in `/hooks`, and the row
+  said "trust is not measured here". It now reads the record Codex keeps in
+  `config.toml` and lists each hook never approved, changed since approval or
+  disabled. Its verdicts match Codex 0.163.0's own `hooks/list` on all 19
+  handlers of 4.18.0. On a machine whose approvals dated from September, 9 of
+  19 were skipped, among them the git guard and the end-of-turn gate.
+
 ### Fixed
 - One PHP write gets one verdict (CR-314). PHP002 only looked for `class` at
   the start of a line, so `<?php class Bad {}` passed before the write. The
