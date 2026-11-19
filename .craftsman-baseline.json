@@ -161,6 +161,7 @@
 {"complexity":1,"ignores":0,"instrument":3,"max_fn_lines":12,"path":"packs/symfony/knowledge/canonical/php-value-object.php"},
 {"complexity":4,"ignores":0,"instrument":3,"max_fn_lines":16,"path":"packs/symfony/static-analysis/phpstan.sh","reason":"CR-212: PHPStan and deptrac report a run with no verdict; PHPStan never runs without its pinned config"},
 {"complexity":5,"ignores":0,"instrument":3,"max_fn_lines":29,"path":"scripts/bump-version.sh","reason":"Native host session binding, native manifest synchronization and regression coverage; adds one shared runtime path dependency and two suite groups, preserving Grok 205717c"},
+{"complexity":5,"ignores":0,"instrument":3,"max_fn_lines":22,"path":"scripts/codex-trust-drift.py","reason":"new file (CR-320): refuses a hooks.json position Codex trusted at the last tag whose definition changed unannounced"},
 {"complexity":5,"ignores":0,"instrument":3,"max_fn_lines":22,"path":"scripts/consolidate-metrics.sh"},
 {"complexity":9,"ignores":0,"instrument":3,"max_fn_lines":96,"path":"scripts/export-hermes-skills.sh","reason":"Preserve the Hermes skill export when native helpers introduce a quoted plugin path"},
 {"complexity":7,"ignores":0,"instrument":3,"max_fn_lines":25,"path":"scripts/native-manifests.py","reason":"Use the measured Codex native hook format and reject portable shadowing with RED/GREEN controls"},

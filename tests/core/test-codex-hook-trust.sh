@@ -101,4 +101,49 @@ else
     log_fail "unknown plugin id" "[$ROW_STATUS] $ROW"
 fi
 
+echo ""
+echo "=== What a release does to those approvals (CR-320) ==="
+# scripts/codex-trust-drift.py compares each position the last v<x.y.z> tag
+# published with the same position now. The repository below publishes the
+# 205717c manifest as v1.0.0, the one the approvals above were given on.
+DRIFT="$ROOT_DIR/scripts/codex-trust-drift.py"
+REPO="$WORK/repo"
+_git() { git -C "$REPO" -c commit.gpgsign=false -c tag.gpgsign=false "$@" >/dev/null 2>&1; }
+_plugin "$REPO" "$FIX/hooks-205717c.json"
+printf '# Changelog\n\n## [Unreleased]\n\n## [1.0.0] - 2026-09-21\n\n- First release.\n' > "$REPO/CHANGELOG.md"
+git -C "$REPO" init -q && _git add -A && _git commit -m "release 1.0.0"
+DRIFT_KEYS=""
+DRIFT_RC=""
+_drift() { # <changelog head>: the keys the guard refuses, and its exit code
+    local unreleased="$1"
+    printf '# Changelog\n\n## [Unreleased]\n\n%s\n\n## [1.0.0] - 2026-09-21\n\n- First release. stop:0:0\n' "$unreleased" > "$REPO/CHANGELOG.md"
+    DRIFT_KEYS=$(python3 "$DRIFT" "$REPO" 2>/dev/null | cut -f1 | sort | tr '\n' ' ')
+    DRIFT_RC=$(python3 "$DRIFT" "$REPO" >/dev/null 2>&1; echo $?)
+}
+
+_drift "- Nothing yet."
+_same "no published tag: the guard says it cannot compare" "3" "$DRIFT_RC"
+_git tag v1.0.0
+cp "$FIX/hooks-v4.18.0.json" "$REPO/hooks/hooks.json"
+_drift "- Nothing yet."
+_same "handlers inserted ahead of trusted ones: the four moved keys are refused" \
+    "1 post_tool_use:1:0 pre_tool_use:1:0 stop:0:0 stop:0:1 " "$DRIFT_RC $DRIFT_KEYS"
+_drift "- Codex users approve again pre_tool_use:1:0, post_tool_use:1:0, stop:0:0 and stop:0:1 in /hooks."
+_same "each moved key named since the release: accepted" "0 " "$DRIFT_RC $DRIFT_KEYS"
+_drift "- Codex users approve again pre_tool_use:1:0, post_tool_use:1:0 and stop:0:1 in /hooks."
+_same "a key named only under a published version does not announce this change" "1 stop:0:0 " "$DRIFT_RC $DRIFT_KEYS"
+
+jq '.hooks.Stop[0].hooks[0].timeout = 30' "$FIX/hooks-205717c.json" > "$REPO/hooks/hooks.json"
+_drift "- Nothing yet."
+_same "a trusted handler changed in place, same script: refused too" "1 stop:0:0 " "$DRIFT_RC $DRIFT_KEYS"
+
+jq '.hooks.Stop[0].hooks += [{"type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/appended.sh", "timeout": 5}]
+    | .hooks.PreToolUse += [{"matcher": "Bash", "hooks": [{"type": "command", "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/appended.sh"}]}]' \
+    "$FIX/hooks-205717c.json" > "$REPO/hooks/hooks.json"
+_drift "- Nothing yet."
+_same "a handler appended to its group and a group appended to its event move nothing" "0 " "$DRIFT_RC $DRIFT_KEYS"
+
+OWN=$(python3 "$DRIFT" "$ROOT_DIR" 2>&1)
+_same "this tree against its last published tag: no trusted position changes unannounced" "" "$OWN"
+
 test_summary

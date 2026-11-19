@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- A release no longer stops a hook under Codex without saying so (CR-320).
+  Codex trusts a plugin hook by its position in `hooks/hooks.json`, so a
+  handler inserted ahead of others made Codex skip them until reviewed in
+  `/hooks` (CR-317). The suite now compares every position the last tag
+  published with the same position now, and refuses one whose definition
+  changed unless this changelog names its key. New handlers go at the end of
+  their group. Measured on the 4.17.0 change that added the end-of-turn gate
+  at the head of `Stop`: it is refused, on the three positions it moved.
+
 ## [4.19.0] - 2026-11-19
 
 Under Codex the healthcheck names each plugin hook Codex skips until it is

@@ -11,6 +11,15 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
 
 - All hook scripts MUST use `exit 0` (pass) or `exit 2` (block). NEVER `exit 1`.
 - Hook command output MUST be valid JSON (`jq -n` pattern).
+- A new handler in `hooks/hooks.json` goes at the END of its group, or in a new
+  group at the end of its event, never ahead of an existing one. Codex keys each
+  plugin hook's trust by its position (`<event>:<group>:<handler>`) and skips a
+  position whose definition changed until the user approves it again in
+  `/hooks`: insertions at the head of groups stopped the git guard and the
+  end-of-turn gate under Codex without a word (CR-317). `scripts/codex-trust-drift.py`
+  refuses a trusted position that changes since the last `v<x.y.z>` tag unless
+  `CHANGELOG.md` names its key, so Codex users learn what to approve
+  (`tests/core/test-codex-hook-trust.sh`, CR-320).
 - Semantic verification runs in headless Haiku subprocesses via `hooks/lib/haiku-verify.sh` (never native agent/prompt hook types: no option gating, see ADR-0018). Always guard with `CRAFTSMAN_HEADLESS_VERIFY`.
 - The `metrics-query.py` helper MUST be used for all SQLite writes (parameterized queries). NEVER use string interpolation in SQL.
 - Session state is one file PER SESSION, `session-state-<id>.json`, resolved by `hooks/lib/session-files.sh`. The id is the payload's `session_id`, bound once per hook with `session_files_bind "$INPUT"` right after `INPUT=$(cat)`; `CLAUDE_CODE_SESSION_ID` is the fallback for skills in the Bash tool, which have no payload. Never the environment first: a hook process inherits its parent's environment whole, and a Codex session started from a Claude Code Bash tool carries that Claude session's id (`tests/fixtures/hosts/codex/*/hook-env.project-hooks.json`), so env-first naming filed Codex's writes under the Claude session. The shared `session-state.json` is the fallback with no id at all. Never hardcode the shared path: one shared file let a session's end delete another's pending findings and one project's patterns surface in another. All writes MUST use atomic writes (`tempfile.mkstemp() + os.rename()`). Known TOCTOU window between read and rename when multiple async hooks fire simultaneously - acceptable at current hook frequencies but do not add file-locking without benchmarking first.

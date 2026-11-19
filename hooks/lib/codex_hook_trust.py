@@ -123,15 +123,20 @@ def _verdict(state: Dict[str, str], current: str) -> str:
     return "trusted" if state["trusted_hash"] == current else "modified"
 
 
-def verdicts(manifest: dict, events_loaded: Set[str], states: States) -> Iterator[Tuple[str, str, str]]:
-    """(verdict, key, script) for each handler Codex lists, in manifest order."""
+def keyed_handlers(manifest: dict, events_loaded: Set[str]) -> Iterator[Tuple[str, str, str]]:
+    """(key, hash Codex trusts, script) for each handler Codex lists, in manifest order."""
     for event, groups in manifest.get("hooks", {}).items():
         if event not in events_loaded:
             continue
         for _, group_index, handler_index, matcher, handler in _event_handlers(event, groups):
             key = "%s:%d:%d" % (_snake(event), group_index, handler_index)
-            current = handler_hash(event, matcher, handler)
-            yield _verdict(states.get(key, {}), current), key, _script(handler["command"])
+            yield key, handler_hash(event, matcher, handler), _script(handler["command"])
+
+
+def verdicts(manifest: dict, events_loaded: Set[str], states: States) -> Iterator[Tuple[str, str, str]]:
+    """(verdict, key, script) for each handler Codex lists, in manifest order."""
+    for key, current, script in keyed_handlers(manifest, events_loaded):
+        yield _verdict(states.get(key, {}), current), key, script
 
 
 def main(argv: List[str]) -> int:
