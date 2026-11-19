@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.19.0] - 2026-11-19
+
+Under Codex the healthcheck names each plugin hook Codex skips until it is
+reviewed in `/hooks` (CR-317), and a PHP write no longer passes before the
+write to be blocked after it (CR-314).
+
 ### Added
 - Under Codex, the healthcheck names the plugin hooks Codex skips (CR-317).
   Codex runs a plugin hook only once its exact definition is trusted, and
