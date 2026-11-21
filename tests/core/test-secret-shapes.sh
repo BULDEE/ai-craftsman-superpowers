@@ -96,6 +96,28 @@ expect_no_shape "Slack's own example"       "url = \"https://hooks.sla""ck.com/s
 expect_no_shape "a named value beside a runtime read" "api_token = \"fallback1234567\" if DEBUG else os.environ[\"API_TOKEN\"]" 'os\.environ'
 
 echo ""
+echo "--- a route is not a credential (CR-321) ---"
+# Seen 2026-11-21: a routes file holding `FORGOT_PASSWORD: '/forgot-password'`
+# was refused on every write. Only a lowercase path value is excluded: an
+# uppercase letter, a `+` or a `=` keeps a value that opens on `/` a secret, a
+# secret beside a route still counts, a line that is not UTF-8 hides none of
+# the lines after it (the helper numbers line 1, line 2 carries its own), and
+# blanking a route never eats the line number.
+expect_no_shape "a route constant"                   "  FORGOT_PASSWORD: '/forgot-password',"
+expect_no_shape "a nested route"                     "RESET_PASSWORD = \"/reset-password/confirm\""
+expect_shape "kept: a quoted password"               "password: 'S3cretValue-123'"
+expect_shape "kept: a base64 secret that opens on /" "secret = '/aB3+xYz9QwErTy=='"
+expect_shape "kept: an uppercase letter after /"     "token = '/aB3xYz9QwErTyUi'"
+expect_shape "kept: a secret beside a route"         "{ password: 'S3cretValue-123', redirect: '/reset-password' }"
+expect_shape "kept: a secret after a line that is not UTF-8" "$(printf '# \351t\351\n2:password = "S3cretValue-123"')"
+OPENS_ON_ROUTE=$(_shape "  '/reset', { password: 'S3cretValue-123' }")
+if [[ "$OPENS_ON_ROUTE" == 1:* ]]; then
+    log_pass "shape: the line number survives a route that opens the line"
+else
+    log_fail "shape: the line number survives a route that opens the line" "got: $OPENS_ON_ROUTE"
+fi
+
+echo ""
 echo "--- one list: no pack keeps a copy of the issuer prefixes ---"
 COPIES=$(grep -lE 'sk_live|github_pat_|AKIA' "$ROOT_DIR"/packs/*/hooks/*.sh 2>/dev/null)
 if [[ -z "$COPIES" ]]; then
@@ -104,36 +126,33 @@ else
     log_fail "a pack keeps its own prefix list" "$(printf '%s' "$COPIES" | tr '\n' ' ')"
 fi
 
-GATE_RC=0
-GATE_OUT=""
-# Results travel back through GATE_RC and GATE_OUT, read by the expect_* helpers.
-# craftsman-ignore: WARN-SH001
 _gate() {
-    GATE_RC=0
-    GATE_OUT=$(python3 -c '
+    local path="$1" content="$2"
+    python3 -c '
 import json, sys
 print(json.dumps({"session_id": "s257", "hook_event_name": "PreToolUse", "tool_name": "Write", "cwd": sys.argv[3],
                   "tool_input": {"file_path": sys.argv[1], "content": sys.argv[2]}}))' \
-        "$WORK/$1" "$2" "$WORK" | bash "$ROOT_DIR/hooks/pre-write-check.sh" 2>&1) || GATE_RC=$?
+        "$WORK/$path" "$content" "$WORK" | bash "$ROOT_DIR/hooks/pre-write-check.sh" 2>&1
 }
 
 expect_block() {
-    local path="$1" content="$2"
-    _gate "$path" "$content"
-    if [[ "$GATE_RC" -eq 2 && "$GATE_OUT" == *SEC001* ]]; then
+    local path="$1" content="$2" out status
+    out=$(_gate "$path" "$content")
+    status=$?
+    if [[ "$status" -eq 2 && "$out" == *SEC001* ]]; then
         log_pass "SEC001 refuses $path"
     else
-        log_fail "SEC001 on $path" "rc=$GATE_RC out=$(printf '%s' "$GATE_OUT" | tr '\n' ' ' | cut -c1-160)"
+        log_fail "SEC001 on $path" "rc=$status out=$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-160)"
     fi
 }
 
 expect_absent() {
-    local path="$1" content="$2"
-    _gate "$path" "$content"
-    if [[ "$GATE_OUT" != *SEC001* ]]; then
+    local path="$1" content="$2" out
+    out=$(_gate "$path" "$content")
+    if [[ "$out" != *SEC001* ]]; then
         log_pass "control: no SEC001 on $path"
     else
-        log_fail "SEC001 fired on $path" "$(printf '%s' "$GATE_OUT" | tr '\n' ' ' | cut -c1-160)"
+        log_fail "SEC001 fired on $path" "$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-160)"
     fi
 }
 
@@ -153,6 +172,7 @@ expect_ci() {
 TS_LINE="export const client = \"$ANTHROPIC\";"
 PHP_FILE=$(printf '<?php\n\ndeclare(strict_types=1);\n\nfinal class Billing\n{\n    private const CLIENT = '"'"'%s'"'"';\n}\n' "$OPENAI_PROJECT")
 PY_LINE="client_value = \"$ANTHROPIC\""
+ROUTES_TS=$(printf "export const AUTH_ROUTES = {\n  FORGOT_PASSWORD: '/forgot-password',\n  RESET_PASSWORD: '/reset-password',\n} as const;\n")
 
 echo ""
 echo "--- every language, through the real gate ---"
@@ -165,6 +185,7 @@ expect_block "src/Infrastructure/Billing.php" "$PHP_FILE"
 expect_block "src/app/client.py" "$PY_LINE"
 expect_absent "src/app/settings.py" 'api_token = "fallback1234567" if DEBUG else os.environ["API_TOKEN"]'
 expect_absent "src/ui/settings.js" 'export const client = process.env.ANTHROPIC_API_KEY;'
+expect_absent "src/ui/routes.ts" "$ROUTES_TS"
 
 echo ""
 echo "--- hooks and CI agree ---"

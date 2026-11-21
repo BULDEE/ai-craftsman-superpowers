@@ -19,6 +19,12 @@
 _SECRET_SHAPES_ANNOTATION='([[:space:]]*:[[:space:]]*[A-Za-z_][][A-Za-z0-9_.|<> ]*)?'
 _SECRET_SHAPES_NAMED="((api|access|secret|private|auth|client|signing|encryption)[_-]?key|secret|password|passwd|token)[\"']?${_SECRET_SHAPES_ANNOTATION}[[:space:]]*[:=][[:space:]]*[\"'\`][A-Za-z0-9_/+.=-]{12,}[\"'\`]|key[\"']?${_SECRET_SHAPES_ANNOTATION}[[:space:]]*[:=][[:space:]]*[\"'\`][A-Za-z0-9]{32,}[\"'\`]"
 
+# A quoted lowercase URL path is a route, never a value of the name rule:
+# `RESET_PASSWORD: '/reset-password'` holds no password. Matched WITH case, so
+# a value that opens on `/` and holds an uppercase letter, a `+` or a `=` is
+# still a secret.
+_SECRET_SHAPES_ROUTE="[\"'\`]/[a-z0-9_-]+(/[a-z0-9_-]+)*/?[\"'\`]"
+
 # A credential its issuer made recognisable by a prefix. Matched WITH case
 # (`ASIA` opens an AWS key id, `Asia/` opens a time zone) and never inside a
 # longer word (`task-` ends in `sk-`).
@@ -26,6 +32,16 @@ _SECRET_SHAPES_ISSUED='(^|[^A-Za-z0-9])((sk|rk)_live[A-Za-z0-9_-]{8,}|gh[pousr]_
 
 # Values that document a credential instead of being one.
 _SECRET_SHAPES_FAKE='(YOUR[_-]?|CHANGE[_-]?ME|EXAMPLE|PLACEHOLDER|DUMMY|SAMPLE|REDACTED|X{6,}|\.\.\.)'
+
+# The name rule reads each line with the routes assigned in it blanked, the
+# separator kept: a secret beside a route on the same line still counts, the
+# `12:` prefix survives, and a line holding both comes back without its route.
+# sed runs in the C locale: in a UTF-8 one, BSD sed stops at the first line
+# that is not UTF-8 and the rule would read none of the lines after it.
+_secret_named_hits() {
+    env LC_ALL=C sed -E "s#([:=])[[:space:]]*${_SECRET_SHAPES_ROUTE}#\\1#g" \
+        | grep -Ei "$_SECRET_SHAPES_NAMED" | grep -viE "${_SECRET_SHAPES_FAKE}${1:+|$1}"
+}
 
 # secret_hits [runtime_re] - read numbered code lines (`12:code`) on stdin and
 # print, in line order, those that hold a credential, minus documentation
@@ -35,7 +51,7 @@ _SECRET_SHAPES_FAKE='(YOUR[_-]?|CHANGE[_-]?ME|EXAMPLE|PLACEHOLDER|DUMMY|SAMPLE|R
 secret_hits() {
     local runtime="${1:-}" lines
     lines=$(cat)
-    { grep -Ei "$_SECRET_SHAPES_NAMED" <<< "$lines" | grep -viE "${_SECRET_SHAPES_FAKE}${runtime:+|$runtime}"
+    { _secret_named_hits "$runtime" <<< "$lines"
       grep -E "$_SECRET_SHAPES_ISSUED" <<< "$lines" | grep -viE "$_SECRET_SHAPES_FAKE"; } \
         | sort -t: -k1,1n -u
 }

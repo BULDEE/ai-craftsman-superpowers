@@ -263,7 +263,7 @@
 {"complexity":1,"ignores":0,"instrument":3,"max_fn_lines":8,"path":"tests/core/test-rules-engine.sh","reason":"what a Codex session measured on this plugin (2026-09-20): model without prompt_id names Codex, CODEX_THREAD_ID names it in a shell, the bridge row is per host, the rules store honours TMPDIR, each with its witness"},
 {"complexity":11,"ignores":0,"instrument":3,"max_fn_lines":87,"path":"tests/core/test-runner-integrity.sh"},
 {"complexity":1,"ignores":0,"instrument":3,"max_fn_lines":6,"path":"tests/core/test-runtime-paths.sh","reason":"CR-167: execute native lifecycle consumer regressions after runtime resolver tests; propagate either suite failure."},
-{"complexity":2,"ignores":1,"instrument":3,"max_fn_lines":12,"path":"tests/core/test-secret-shapes.sh"},
+{"complexity":2,"ignores":0,"instrument":3,"max_fn_lines":12,"path":"tests/core/test-secret-shapes.sh"},
 {"complexity":1,"ignores":0,"instrument":3,"max_fn_lines":6,"path":"tests/core/test-security-invariants.sh"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":7,"path":"tests/core/test-session-metrics.sh","reason":"host interoperability campaign (PR #99): every hook binds its session from the payload (session_files_bind, 3 lines each), the mirror and the host library gain the Codex patch and the Grok tool table, the healthcheck reads the host matrix, and the suites gain the per-host fixtures and witnesses (test-doctrine-export covers the delimited AGENTS.md block, test-healthcheck the host rows, test-lang-registry the cache invariants)"},
 {"complexity":0,"ignores":0,"instrument":3,"max_fn_lines":12,"path":"tests/core/test-session-start.sh","reason":"CR-173: skills may name only correction outcomes the corrections schema accepts"},
