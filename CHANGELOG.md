@@ -17,6 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their group. Measured on the 4.17.0 change that added the end-of-turn gate
   at the head of `Stop`: it is refused, on the three positions it moved.
 
+### Fixed
+- A route constant is no longer read as a hardcoded password (CR-321). SEC001
+  took any literal of 12 characters or more assigned to a name ending in
+  `password`, `token` or `secret` for a credential, so
+  `FORGOT_PASSWORD: '/forgot-password'` refused every write of the routes file
+  that held it (seen 2026-11-21, where an agent then worked around the gate).
+  A lowercase URL path is now a route for the name rule, value by value: a
+  secret beside a route on the same line still counts, and a value that opens
+  on `/` with an uppercase letter, a `+` or a `=` is still a secret. Issuer
+  prefixes are caught wherever they sit, as before.
+
 ## [4.19.0] - 2026-11-19
 
 Under Codex the healthcheck names each plugin hook Codex skips until it is
