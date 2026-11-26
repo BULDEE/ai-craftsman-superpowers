@@ -65,6 +65,15 @@ Label an issue `factory`, then:
 /craftsman:factory page         the page of what waits on you
 ```
 
+The page is a board: one column per step (Intake, Spec, Build, Review, To
+review, Done) and one card per job, across every repository you initialised.
+A card that waits on you keeps the column it stopped in and is marked
+`question for you`, `blocked` or, in To review, by its review depth; the
+button at the top right keeps only those. Each card lists its build rounds,
+and for each what passed and what failed: the gate, then every reviewer.
+Click a card for the reasons, the commands to paste and the files the job
+wrote. The board is read-only: only the script moves a job.
+
 The page is one file, rewritten after every factory command, and it reloads
 itself: every 15 seconds while a job runs, every minute otherwise, and when
 you come back to its tab. Open it once and leave it open. It holds still while

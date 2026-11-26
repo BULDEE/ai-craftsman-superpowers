@@ -534,6 +534,50 @@ class PageAndLearningTest(SandboxCase):
         self.assertIn('\\u003c/script>', page)
         self.assertNotIn('innerHTML', page)
 
+    def cards(self) -> dict:
+        index = json.loads((self.box.repo / '.craftsman-factory' / 'index.json').read_text())
+        return {card['issue']: card for card in index['jobs']}
+
+    def test_a_card_that_waits_on_a_human_keeps_the_column_it_stopped_in(self) -> None:
+        self.box.add_issue('1')
+        self.box.add_issue('2')
+        self.box.configure({'concurrency': 2})
+        self.box.factory('create', '1')
+        self.box.factory('step', '1')
+        self.box.intake('1', 'NEEDS-INFO')
+        self.box.factory('step', '1')
+        self.box.to_review('2', {'src/Total.php': GOOD_PHP})
+        asked, reviewed = self.cards()['1'], self.cards()['2']
+        self.assertEqual((asked['column'], asked['attention']), ('intake', 'question'))
+        self.assertEqual((reviewed['column'], reviewed['attention']), ('review', ''))
+        job = self.box.job('2')
+        job['stage'] = 'needs-human'
+        job['history'].append({'at': 'now', 'stage': 'needs-human', 'note': 'review -> needs-human'})
+        (self.box.folder('2') / 'job.json').write_text(json.dumps(job))
+        self.box.factory('summary')
+        stopped = self.cards()['2']
+        self.assertEqual((stopped['column'], stopped['attention']), ('review', 'blocked'))
+
+    def test_a_card_tells_what_passed_and_failed_in_each_round(self) -> None:
+        self.box.add_issue('1')
+        self.box.to_review('1', {'src/Total.php': BAD_PHP})
+        first = self.cards()['1']['runs']
+        self.assertEqual([(run['number'], run['gate']) for run in first], [(1, False), (2, None)])
+        self.assertIn('blocking rule finding', ' '.join(first[0]['failures']))
+        self.box.build('1', {'src/Total.php': GOOD_PHP})
+        self.box.factory('step', '1')
+        self.box.review('1', self.box.job('1')['reviewers'][0]['name'], 'CHANGES high')
+        self.box.factory('summary')
+        second = self.cards()['1']['runs'][1]
+        self.assertEqual((second['number'], second['gate']), (2, True))
+        self.assertEqual([review['passed'] for review in second['reviews']], [False])
+
+    def test_the_board_names_one_column_per_step(self) -> None:
+        self.box.factory('queue')
+        page = (self.box.base / 'data' / 'factory' / 'index.html').read_text()
+        for title in ('Intake', 'Spec', 'Build', 'Review', 'To review', 'Done'):
+            self.assertIn(f'"{title}"', page)
+
     def test_the_open_page_reloads_itself_faster_while_a_job_runs(self) -> None:
         target = self.box.base / 'data' / 'factory' / 'index.html'
         self.box.factory('queue')
