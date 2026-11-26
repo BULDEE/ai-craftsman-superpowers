@@ -102,6 +102,11 @@ whose names start with `agent-` are shell scripts that shell out to a headless
 | `CRAFTSMAN_DATA_DIR` | Plugin data directory, when `CLAUDE_PLUGIN_DATA` is unset |
 | `CRAFTSMAN_DISABLED_HOOKS` | Hooks to skip, by script name |
 | `CRAFTSMAN_EXPORTED_GATE` | Set by an exported host gate (Grok's `~/.grok/hooks/craftsman.json`) on its own handlers, so a hook the host also runs from a plugin path steps aside for it and this one does not; never set by hand |
+| `CRAFTSMAN_FACTORY_DATA` | Where the factory pack keeps its machine-wide files (the index of repositories, the page); defaults to `factory/` under the plugin data directory |
+| `CRAFTSMAN_FACTORY_DB` | The SQLite database the factory records job outcomes in; defaults to the plugin's `metrics.db` |
+| `CRAFTSMAN_FACTORY_LINEAR_URL` | The GraphQL endpoint of the factory's Linear queue adapter; defaults to Linear's API, replaced by a local server in the tests |
+| `CRAFTSMAN_FACTORY_REPO` | The main checkout the factory works on, when it must not be derived from the working directory |
+| `CRAFTSMAN_FACTORY_TRANSCRIPTS` | Where the factory reads subagent transcripts to estimate a job's cost; defaults to `~/.claude/projects` |
 | `CRAFTSMAN_GATE_OWN_PATHS` | Extra paths config-protection treats as the gate's own |
 | `CRAFTSMAN_GLOBAL_CONFIG_DIR` | The directory holding the global `.craft-config.yml` |
 | `CRAFTSMAN_HEADLESS_VERIFY` | Guard that stops a headless `claude -p` re-entering the hooks |

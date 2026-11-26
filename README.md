@@ -221,7 +221,7 @@ surface is qualified yet, so it has no badge.
 
 ## Commands
 
-Fifteen commands start only when you type them; seven (`challenge`, `debug`,
+Sixteen commands start only when you type them; seven (`challenge`, `debug`,
 `test`, `team`, `rag`, `mlops`, `agent-design`) may be started by the model
 when the context matches. Every command has a worked example with its expected
 output: [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md).
@@ -233,11 +233,12 @@ output: [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md).
 | AI/ML engineering | `rag`, `mlops`, `agent-design` |
 | Utilities | `setup`, `healthcheck`, `metrics`, `team` |
 | CI/CD | `ci` |
+| Factory | `factory`: a queue of labelled issues turned into reviewed pull requests, never merged ([guide](docs/guides/factory.md)) |
 
 Agents that back these commands: `team-lead`, `architect` (no Write/Edit),
 `doc-writer`, `security-pentester`, `legacy-surgeon`, `ui-ux-director`, plus
-pack-specific reviewers for Symfony, React and AI/ML. The 12 agent missions
-ship as ordinary files. Full roster: [Agents Reference](docs/reference/agents.md).
+pack-specific reviewers for Symfony, React and AI/ML, and the five agents of
+the factory pack. The 17 agent missions ship as ordinary files. Full roster: [Agents Reference](docs/reference/agents.md).
 
 ## Against what you already have
 

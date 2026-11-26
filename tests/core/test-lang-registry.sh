@@ -369,6 +369,23 @@ else
         "got exit $php_cfg_code - the assertion below is undetermined"
 fi
 
+# test_skip_markers: what a skipped test looks like is the packs' knowledge.
+# Its consumer is the factory's gate (packs/factory), which reads the manifests
+# of the installed packs; the assertion runs that reader, and
+# tests/packs/factory_test.py checks that a skip a branch adds reaches the
+# gate's report and the review confidence.
+skip_languages=$(PYTHONPATH="$ROOT_DIR/packs/factory/scripts" python3 -c '
+from factorylib import gate
+print(" ".join(sorted(language for language, patterns in gate.skip_markers().items() if patterns)))' 2>/dev/null)
+declared_languages=$(python3 "$ROOT_DIR/hooks/lib/lang_registry.py" "$ROOT_DIR"/packs/*/pack.yml 2>/dev/null \
+    | awk -F'\t' '$2 == "test_skip_markers" {print $1}' | sort -u | tr '\n' ' ')
+if [[ -n "$declared_languages" && "$skip_languages " == "$declared_languages" ]]; then
+    log_pass "test_skip_markers declared by the packs reach the factory's gate (${skip_languages})"
+else
+    log_fail "test_skip_markers is consumed" \
+        "declared for '${declared_languages}', the gate compiled '${skip_languages}'"
+fi
+
 # =============================================================================
 # The manifest reader without PyYAML must agree with the one with it.
 #

@@ -127,4 +127,48 @@ _hook post-write-check.sh Edit "$LEGACY"
 _stop "$CLAUDE_STOP"
 _check "a finding the file held before the session does not hold the turn" _silent
 
+echo "=== A subagent's finding in another worktree is that worktree's business ==="
+# The factory's builders write in a worktree per job, as subagents of the
+# session that dispatches them. The dispatcher was held for what a builder left
+# there and told to "fix each one": code it must never touch. A finding is held
+# against a session for what its OWN checkout holds; the session's own agent is
+# held wherever it wrote, exactly as before.
+MAIN="$WORK/main"
+OTHER="$WORK/other-worktree"
+mkdir -p "$MAIN/src/Domain"
+printf '{}\n' > "$MAIN/composer.json"
+(cd "$MAIN" && git init -q && git add -A && git commit -q -m init && git worktree add -q "$OTHER" -b job 2>/dev/null)
+mkdir -p "$OTHER/src/Domain"
+_agent_landed() { # <file> <agent id, '' for the session's own agent> <cwd>
+    _php "$1" ""
+    jq -n --arg f "$1" --arg s "$SID" --arg a "$2" \
+        '{session_id: $s, tool_name: "Write", tool_input: {file_path: $f}} + (if $a == "" then {} else {agent_id: $a, agent_type: "builder"} end)' \
+        | (cd "$3" && bash "$ROOT_DIR/hooks/post-write-check.sh" >/dev/null 2>&1)
+}
+_stop_in() { # <cwd>
+    STOP_OUT=$(jq --arg cwd "$1" --arg s "$SID" '.session_id = $s | .stop_hook_active = false | .cwd = $cwd' "$CLAUDE_STOP" \
+        | (cd "$1" && bash "$GATE" 2>/dev/null))
+}
+if [[ ! -d "$OTHER/.git" && ! -f "$OTHER/.git" ]]; then
+    log_fail "the fixture" "the second worktree was not created, the cases below prove nothing"
+fi
+
+SID=s-agent-elsewhere
+_agent_landed "$OTHER/src/Domain/Elsewhere.php" "a1b2c3" "$OTHER"
+_stop_in "$MAIN"
+_check "a subagent's finding in another worktree does not hold the dispatcher" _silent
+_stop_in "$OTHER"
+_check "a session working IN that worktree is held for it" _blocked
+
+SID=s-agent-here
+_agent_landed "$MAIN/src/Domain/Here.php" "a1b2c3" "$MAIN"
+_stop_in "$MAIN"
+_check "a subagent's finding in the session's own checkout still holds the turn" _blocked
+
+SID=s-self-elsewhere
+_agent_landed "$OTHER/src/Domain/Mine.php" "" "$OTHER"
+_stop_in "$MAIN"
+_check "the session's own agent is held wherever it wrote" _blocked
+
+
 test_summary

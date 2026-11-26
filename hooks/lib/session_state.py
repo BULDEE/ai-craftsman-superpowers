@@ -16,7 +16,7 @@ Commands:
     append <state_path> <list_key> <json_item> [max_entries]       - Atomically append to list
     increment <state_path> <counter_key>                           - Atomically increment a counter
     check-flag <state_path> <key>                                  - Print 'true'/'false' for boolean key
-    record-violation <state_path> <file> <directory> <rules_json> [--detect] [--keep] [--landed]
+    record-violation <state_path> <file> <directory> <rules_json> [--detect] [--keep] [--landed] [--agent=<id>]
                                                                    - Replace the file's pending verdicts (an
                                                                      empty list clears them) and track patterns;
                                                                      --detect also prints the cross-file patterns,
@@ -218,6 +218,25 @@ def _set_pending(pending: dict, file_path: str, rules: list) -> None:
     pending.pop(file_path, None)
 
 
+def _landing_agent(flags: list[str]) -> str:
+    """The subagent a landed write came from (`--agent=<id>`), '' for the session's own agent."""
+    return next((flag.split('=', 1)[1] for flag in flags if flag.startswith('--agent=')), '')
+
+
+def _set_landing_agent(state: dict, file_path: str, agent: str) -> None:
+    """Who left a finding on disk: a subagent's id, or nothing for the session's own agent.
+
+    The end-of-turn gate holds a session for what its own checkout holds. A
+    finding a subagent left in ANOTHER worktree is owed to that worktree's
+    judge (the factory's gate, a CI run), not to the session that dispatched
+    the agent, which may have no right to touch that code at all.
+    """
+    owners = state.setdefault('landed_agents', {})
+    owners.pop(file_path, None)
+    if agent:
+        owners[file_path] = agent
+
+
 def _record_verdicts(state: dict, arguments: list[str], violated_rules: list) -> None:
     """The file's pending verdicts, and with `--landed` what is on its disk.
 
@@ -236,6 +255,7 @@ def _record_verdicts(state: dict, arguments: list[str], violated_rules: list) ->
     _set_pending(pending, file_path, _owed_rules(pending.get(file_path, []), violated_rules, '--keep' in flags))
     if '--landed' in flags:
         _set_pending(state.setdefault('landed_violations', {}), file_path, violated_rules)
+        _set_landing_agent(state, file_path, _landing_agent(flags) if violated_rules else '')
 
 
 def handle_record_violation(arguments: list[str]) -> None:

@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+"""A stand-in for the GitHub CLI, backed by one JSON file (FAKE_GH_STATE).
+
+It answers the handful of `gh` calls the factory makes, records every call
+under `calls`, and fails loudly on anything else: a factory change that starts
+calling a new `gh` command must teach this file, or its test cannot pass.
+"""
+import json
+import os
+import sys
+
+
+def load() -> dict:
+    with open(os.environ['FAKE_GH_STATE']) as handle:
+        return json.load(handle)
+
+
+def save(state: dict) -> None:
+    with open(os.environ['FAKE_GH_STATE'], 'w') as handle:
+        json.dump(state, handle, indent=1)
+
+
+def option(arguments: list, name: str) -> str:
+    return arguments[arguments.index(name) + 1] if name in arguments else ''
+
+
+def fields(row: dict, arguments: list) -> dict:
+    wanted = option(arguments, '--json').split(',')
+    return {key: row.get(key) for key in wanted if key}
+
+
+def issue_command(state: dict, arguments: list) -> int:
+    action = arguments[0]
+    if action == 'list':
+        label = option(arguments, '--label')
+        rows = [issue for issue in state['issues'].values()
+                if issue['state'] == 'OPEN' and label in [entry['name'] for entry in issue['labels']]]
+        print(json.dumps([fields(row, arguments) for row in rows]))
+        return 0
+    issue = state['issues'].get(arguments[1])
+    if issue is None:
+        print(f'issue {arguments[1]} not found', file=sys.stderr)
+        return 1
+    if action == 'view':
+        print(json.dumps(fields(issue, arguments)))
+    elif action == 'comment':
+        issue['comments'].append({'author': {'login': state['user']}, 'body': sys.stdin.read(),
+                                  'createdAt': state.get('clock', '2099-01-01T00:00:00Z')})
+    elif action == 'edit':
+        relabel(issue, arguments)
+    else:
+        return unknown(arguments)
+    return 0
+
+
+def relabel(row: dict, arguments: list) -> None:
+    added, removed = option(arguments, '--add-label'), option(arguments, '--remove-label')
+    names = [entry['name'] for entry in row['labels'] if entry['name'] != removed]
+    if added and added not in names:
+        names.append(added)
+    row['labels'] = [{'name': name} for name in names]
+
+
+def pull_request(state: dict, reference: str) -> dict | None:
+    for branch, row in state['prs'].items():
+        if reference in (branch, str(row['number'])):
+            return row
+    return None
+
+
+def pr_command(state: dict, arguments: list) -> int:
+    action = arguments[0]
+    if action == 'create':
+        head = option(arguments, '--head')
+        number = 100 + len(state['prs']) + 1
+        state['prs'][head] = {
+            'number': number, 'state': 'OPEN', 'isDraft': '--draft' in arguments,
+            'url': f'https://example.invalid/pull/{number}', 'headRefOid': '', 'mergedAt': None, 'closedAt': None,
+            'mergeStateStatus': 'CLEAN', 'title': option(arguments, '--title'), 'body': sys.stdin.read(),
+            'base': option(arguments, '--base'), 'labels': [], 'comments': [], 'commits': [], 'reviews': [],
+        }
+        print(state['prs'][head]['url'])
+        return 0
+    row = pull_request(state, arguments[1])
+    if row is None:
+        print('no pull requests found', file=sys.stderr)
+        return 1
+    if action == 'view':
+        print(json.dumps(fields(row, arguments)))
+    elif action == 'ready':
+        row['isDraft'] = False
+    elif action == 'comment':
+        row['comments'].append({'author': {'login': state['user']}, 'body': sys.stdin.read(), 'createdAt': ''})
+    elif action == 'edit':
+        relabel(row, arguments)
+    elif action == 'close':
+        row['state'] = 'CLOSED'
+    else:
+        return unknown(arguments)
+    return 0
+
+
+def api_command(state: dict, arguments: list) -> int:
+    if arguments[0] == 'user':
+        print(state['user'])
+        return 0
+    if '/pulls/' in arguments[0] and arguments[0].endswith('/comments'):
+        number = arguments[0].split('/pulls/')[1].split('/')[0]
+        row = pull_request(state, number) or {}
+        print(json.dumps(row.get('inline_comments', [])))
+        return 0
+    return unknown(arguments)
+
+
+def label_command(state: dict, arguments: list) -> int:
+    if arguments[0] != 'create':
+        return unknown(arguments)
+    if arguments[1] not in state['labels']:
+        state['labels'].append(arguments[1])
+    return 0
+
+
+def unknown(arguments: list) -> int:
+    print('fake gh: unsupported call: ' + ' '.join(arguments), file=sys.stderr)
+    return 64
+
+
+def main(arguments: list) -> int:
+    state = load()
+    state.setdefault('calls', []).append(arguments)
+    handlers = {'issue': issue_command, 'pr': pr_command, 'api': api_command, 'label': label_command}
+    handler = handlers.get(arguments[0]) if arguments else None
+    code = handler(state, arguments[1:]) if handler else unknown(arguments)
+    save(state)
+    return code
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

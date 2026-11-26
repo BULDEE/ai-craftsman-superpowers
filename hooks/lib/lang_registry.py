@@ -42,6 +42,11 @@ LIST_CAPABILITIES = (
     # zero assertions) keeps that run from granting verification evidence.
     # Read by hooks/post-bash-test-verify.sh (CR-255).
     "empty_run_markers",
+    # A regular expression matched against each line a branch adds: what a
+    # skipped test looks like in this language. Read by the factory's gate
+    # (packs/factory/scripts/factorylib/gate.py), which records the skip for
+    # the reviewer and lowers the review confidence.
+    "test_skip_markers",
     "supersedes",  # <tool>=<RULE>,... see precedence_defers in precedence.sh
 )
 

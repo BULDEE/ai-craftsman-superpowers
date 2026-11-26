@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Craftsman factory - the deterministic spine of packs/factory, exposed via plugin bin/
+# Invokable as bare command in the Bash tool while the plugin is enabled.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PYTHONPATH="$ROOT/packs/factory/scripts${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m factorylib.cli "$@"

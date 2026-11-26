@@ -29,6 +29,16 @@ languages:
     protected_configs: ["mypy.ini", ".flake8"]
     validators: ["hooks/python-validator.sh", "hooks/layer-validator.sh", "hooks/security-validator.sh"]
     test_commands: ["pytest", "python -m pytest", "tox"]
+    # What a skipped test looks like in this language, as a regular expression
+    # matched against each line a branch ADDS. Read by the factory's gate
+    # (packs/factory): a skip a branch adds is recorded for its reviewer and
+    # lowers the review confidence. It never fails a build on its own, because
+    # retiring a test is sometimes right and only a reader can tell.
+    test_skip_markers:
+      - '@pytest\.mark\.(skip|skipif|xfail)'
+      - 'pytest\.skip\s*\('
+      - '@unittest\.skip'
+      - '\.skipTest\s*\('
     # A pytest run that exits 0 with every test skipped, deselected or
     # xfailed tested nothing and grants no verification evidence (CR-255).
     # Captured in tests/fixtures/test-runs; "no tests ran" exits 5, so it is a

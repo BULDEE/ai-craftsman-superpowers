@@ -1,0 +1,14 @@
+{
+  "default": {"name": "code", "lens": "packs/factory/lenses/generic.md"},
+  "packs": {
+    "symfony": {"name": "symfony", "lens": "agents/symfony-reviewer.md"},
+    "react": {"name": "react", "lens": "agents/react-reviewer.md"},
+    "ai-ml": {"name": "ai", "lens": "agents/ai-engineer.md"}
+  },
+  "surfaces": {
+    "security": {"name": "security", "lens": "agents/security-pentester.md", "model": "opus"},
+    "domain": {"name": "architecture", "lens": "agents/architect.md"},
+    "ui": {"name": "ui", "lens": "agents/ui-ux-director.md"},
+    "api": {"name": "api", "lens": "agents/api-craftsman.md"}
+  }
+}

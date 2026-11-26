@@ -266,6 +266,33 @@ Check security, tests, and style.
 
 ---
 
+## Factory Pack
+
+### /craftsman:factory
+
+**Purpose**: Drain a queue of labelled GitHub or Linear issues into reviewed pull requests. Never merges.
+
+**Usage**:
+```
+> /craftsman:factory init
+> /craftsman:factory run
+> /craftsman:factory feedback 004-dark-mode: keep the old colour as a fallback
+```
+
+**Pipeline**: intake, design (domain changes only), spec, test-first build, a
+deterministic gate, routed review, then a pull request with a review-depth
+label (`review:skim`, `review:standard`, `review:deep`).
+
+**Key Features**:
+- A script owns every transition; the session only starts the agents it names
+- The gate is `craftsman-ci --changed-only` plus the repository's own checks
+- Issue text reaches agents as quoted data, never in a prompt
+- What humans do with the pull requests calibrates the confidence score
+
+Claude Code only. See [the factory guide](../guides/factory.md).
+
+---
+
 ## Quick Reference Table
 
 Every skill declares the cheapest model tier that can do its job, and how hard
@@ -310,6 +337,7 @@ than pretending to start a step it cannot. See
 | `/craftsman:rag` | AI | RAG pipeline design | `opus` | `xhigh` |
 | `/craftsman:mlops` | AI | MLOps production-readiness audit | `opus` | `xhigh` |
 | `/craftsman:agent-design` | AI | Agent design (3P pattern) | `opus` | `xhigh` |
+| `/craftsman:factory` | Factory | Issue queue to reviewed pull requests ([guide](../guides/factory.md)) | `sonnet` | `medium` |
 | `/craftsman:setup` | Utility | Interactive setup and onboarding | `sonnet` | `medium` |
 | `/craftsman:metrics` | Utility | Quality metrics and local dashboard | `haiku` | `low` |
 | `/craftsman:healthcheck` | Utility | Installation and runtime diagnostic | `haiku` | `low` |

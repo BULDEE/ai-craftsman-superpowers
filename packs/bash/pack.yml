@@ -19,6 +19,13 @@ languages:
     protected_configs: [".shellcheckrc"]
     validators: ["hooks/bash-validator.sh"]
     test_commands: ["bats", "shellspec"]
+    # What a skipped test looks like in this language, as a regular expression
+    # matched against each line a branch ADDS. Read by the factory's gate
+    # (packs/factory): a skip a branch adds is recorded for its reviewer and
+    # lowers the review confidence. It never fails a build on its own, because
+    # retiring a test is sometimes right and only a reader can tell.
+    test_skip_markers:
+      - '^\s*skip(\s|$)'
     # No metrics_dialect: see packs/python/pack.yml. Shell functions are
     # brace-delimited but its control flow is not (if/fi, do/done), so the
     # c-like extractor would under-report nesting rather than fail visibly.
