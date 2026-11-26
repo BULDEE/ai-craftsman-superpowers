@@ -27,7 +27,7 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
 - The engine holds no list of languages. A pack declares its own in `pack.yml`
   under `languages:` (`extensions`, `validators`, `static_analysis`,
   `test_commands`, `empty_run_markers`, `entry_markers`, `protected_configs`,
-  `lsp`, `metrics_dialect`, `supersedes`), and `hooks/lib/lang-registry.sh` compiles those manifests
+  `lsp`, `metrics_dialect`, `supersedes`, `test_skip_markers`), and `hooks/lib/lang-registry.sh` compiles those manifests
   into the registry every hook and `ci/craftsman-ci.sh` reads. Never add a
   `case "$EXT"` or an extension literal to a hook, to the pipeline or to a
   Python helper: use `lang_for_file`, `lang_capability` or `pack_dispatch_file`.
@@ -83,6 +83,29 @@ Claude Code plugin that transforms Claude into a disciplined Senior Software Cra
   each check can fail.
 - A skill with `disable-model-invocation: true` starts ONLY when the user types `/craftsman:<name>` first in a prompt; the Skill tool refuses it. So: an agent's `skills:` frontmatter may list only model-invocable skills and never one whose `agent:` binding points back at that agent; a skill body may write `**Invokes:** /craftsman:x` only when `x` is model-invocable, otherwise `**Hands off to:**` plus the command to paste. `tests/core/test-invocation-policy.sh` enforces both.
 
+- The factory (`packs/factory/`, ADR-0032) has ONE writer of job state:
+  `craftsman-factory` (`packs/factory/scripts/factorylib/`). `job.json` changes
+  only through `Jobs.move`, which refuses a move `TRANSITIONS` does not list,
+  and `Pipeline.step` decides what comes next: the orchestrating session is a
+  dispatcher that starts the agents the `SPAWN` lines name and never reads a
+  job file. Issue text is data: it goes to `issue.md` inside a quoted block
+  and never into a prompt. The gate is the plugin's own
+  (`ci/craftsman-ci.sh --changed-only`, the repository's checks,
+  `protected_configs`, `test_skip_markers`), and no verdict is not a clean
+  verdict. Nothing merges: a job ends as a pull request with a review-depth
+  label computed by `scoring.py`, which a reviewer may lower and nothing may
+  raise. No factory agent declares `isolation: worktree`. The pack adds no
+  handler to `hooks/hooks.json`. `tests/packs/factory_test.py` plays the
+  agents by writing their files, against a stand-in `gh`
+  (`tests/fixtures/factory/gh`) that fails on any call it was not taught.
+- The end-of-turn gate holds a session for what its OWN checkout holds.
+  `post-write-check.sh` records the subagent a landed finding came from
+  (`landed_agents` in the session state), and the gate skips a finding a
+  subagent left in another git worktree: it is owed to that worktree's judge.
+  The session's own agent is held wherever it wrote, and a subagent's finding
+  in the session's checkout still holds the turn
+  (`tests/core/test-end-of-turn-gate.sh`).
+
 ## Testing
 
 ```bash
@@ -133,11 +156,11 @@ SQLite-backed tracking of violations, corrections, and sessions. 7-day and 30-da
 hooks/              → Real-time validation (SessionStart → PostToolUse → Stop → SessionEnd)
 hooks/lib/          → Shared libraries (pack-loader, config, rules-engine, metrics, static-analysis)
 skills/             → Core workflows as skills/<name>/SKILL.md (ADR-0017); pack workflows symlinked in at runtime
-agents/             → Core agents (6) + 6 shipped pack copies (checked by scripts/native-manifests.py)
+agents/             → Core agents (6) + 11 shipped pack copies (checked by scripts/native-manifests.py)
 knowledge/          → Core methodology, language-agnostic (Clean Architecture, Hexagonal, DDD, TDD, testing strategy, Clean Code, Refactoring, legacy techniques, Design Patterns, principles, anti-patterns)
 knowledge/ddd/      → Agnostic DDD tactical/CQRS (Symfony specifics live in packs/symfony/knowledge/ddd-symfony-implementation.md)
 knowledge/legacy/, knowledge/refactoring/ → Legacy rescue and refactoring campaign methodology
-packs/              → Loadable language packs (7 packs)
+packs/              → Loadable packs (8 packs: 6 languages, AI/ML, and the factory)
   symfony/          → PHP/Symfony pack (validators, agents, knowledge, templates)
   react/            → React/TypeScript pack (validators, agents, knowledge, templates)
   python/           → Python pack (validators, knowledge, anti-patterns)
@@ -145,6 +168,7 @@ packs/              → Loadable language packs (7 packs)
   rust/             → Rust pack (validators, Rust structure scanner, clippy at Level 2)
   bash/             → Bash/Shell pack (validators, knowledge, anti-patterns)
   ai-ml/            → AI/ML pack (agents, knowledge, commands)
+  factory/          → Factory pack: issue queue to reviewed pull requests (agents, command, the craftsman-factory spine); a mode of execution, not a language (ADR-0032)
 ci/                 → CI pipeline integration; ci/adapters/ = CI providers
 adapters/           → host agent runtimes (a different axis from ci/adapters/)
   hermes/           → Nous Research Hermes: pre_verify hook, Claude Code wrapper

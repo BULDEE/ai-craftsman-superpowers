@@ -71,6 +71,12 @@ example: [an entity in a bounded context](examples/scaffold/01-entity-bounded-co
 |---------|--------------|------------|---------|
 | `/craftsman:ci` | Export quality gates to CI/CD (GitHub, GitLab, Bitbucket, Jenkins) | you | [export the GitHub gate](examples/ci/01-export-github-gate.md) |
 
+## Factory
+
+| Command | What it does | Started by | Example |
+|---------|--------------|------------|---------|
+| `/craftsman:factory` | Drain a queue of labelled GitHub or Linear issues into reviewed pull requests with a review-depth label. Never merges. Claude Code only | you | [drain the queue](examples/factory/01-drain-the-queue.md) |
+
 ## Shell helpers
 
 On Claude Code these are on the plugin's PATH. Elsewhere, call them from the
@@ -81,4 +87,5 @@ plugin root (`bash <plugin root>/bin/<name>`).
 | `craftsman-healthcheck --report` | The same diagnostic as `/craftsman:healthcheck`, from a shell |
 | `craftsman-ci export --target <t>` | Export doctrine (`agents-md`, `cursor`, `copilot`; `all` writes these three), Codex roles (`codex-agents`) or the Grok gate (`grok-hooks`) |
 | `craftsman-grok-install` | Install on Grok and write the global gate `~/.grok/hooks/craftsman.json` |
+| `craftsman-factory <command>` | The factory's script: `init`, `queue`, `step`, `summary`, `learn`, `page` (`craftsman-factory --help`). `/craftsman:factory` drives it; `check` runs the factory's gate on the current worktree |
 | `craftsman-runtime metrics` | Print the metrics database of the current host and session |

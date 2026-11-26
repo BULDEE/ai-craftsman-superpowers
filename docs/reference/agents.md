@@ -1,6 +1,6 @@
 # Agents Reference
 
-The plugin provides **12 agents** (6 core, 6 shipped as ordinary copies of the packs' agents, which `scripts/native-manifests.py` checks byte for byte) organized in two categories:
+The plugin provides **17 agents** (6 core, 11 shipped as ordinary copies of the packs' agents, which `scripts/native-manifests.py` checks byte for byte). Twelve are organized in two categories; the five `factory-*` agents are pipeline steps dispatched by `/craftsman:factory` and are described [at the end](#factory-pack):
 - **4 Reviewers** - read-only analysis and code review
 - **7 Craftsmen** - implementation specialists with domain expertise
 
@@ -342,6 +342,22 @@ All agents are defined as `.md` files with YAML frontmatter. Supported fields:
 | `memory` | Memory scope | `project`, `user` |
 
 ## Creating Custom Agents
+
+## Factory Pack
+
+Five agents that are steps of a pipeline, not specialists to call on. Each
+reads files, writes exactly one file, and replies with one line. They are
+dispatched by `/craftsman:factory`, with a prompt its script generates; none
+declares `isolation: worktree`, because the job's worktree is created by the
+script and handed to them as a path (ADR-0032).
+
+| Agent | Step | Writes | Tools |
+|-------|------|--------|-------|
+| `factory-intake` | Decide: ACCEPT, NEEDS-INFO, REJECT or ESCALATE; rate risk and surfaces | `intake.md` | Read, Glob, Grep, Write |
+| `factory-spec-writer` | Model a domain change, then specify with testable acceptance criteria | `design.md`, `spec.md` | Read, Glob, Grep, Write |
+| `factory-builder` | Implement test-first and commit; never pushes | `build.md` | Read, Glob, Grep, Bash, Edit, Write |
+| `factory-reviewer` | Review the committed diff through one lens (a pack's reviewer, security, architecture, UI, API) | `round-N/review-<name>.md` | Read, Glob, Grep, Bash, Write |
+| `factory-fetch` | Courier between Linear's MCP server and the factory's files | `inbox/*.json` | everything but Bash, Edit, Agent, web |
 
 See [Master Guide](../guides/master.md) for creating your own agents, or use `/craftsman:scaffold` to generate one.
 

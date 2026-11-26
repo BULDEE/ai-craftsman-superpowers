@@ -26,6 +26,14 @@ languages:
     validators: ["hooks/typescript-validator.sh", "hooks/layer-validator.sh", "hooks/persistence-validator.sh", "hooks/security-validator.sh"]
     static_analysis: ["static-analysis/eslint.sh"]
     test_commands: ["jest", "vitest", "npm test", "pnpm test", "yarn test"]
+    # What a skipped test looks like in this language, as a regular expression
+    # matched against each line a branch ADDS. Read by the factory's gate
+    # (packs/factory): a skip a branch adds is recorded for its reviewer and
+    # lowers the review confidence. It never fails a build on its own, because
+    # retiring a test is sometimes right and only a reader can tell.
+    test_skip_markers:
+      - '\b(it|test|describe)\.(skip|todo)\b'
+      - '\bx(it|test|describe)\s*\('
     # What these runners print on a run that exits 0 having tested nothing,
     # so that run grants no verification evidence (CR-255). POSIX ERE, matched
     # per output line; each one was captured from the real runner
@@ -53,6 +61,9 @@ languages:
     validators: ["hooks/layer-validator.sh", "hooks/persistence-validator.sh", "hooks/security-validator.sh"]
     static_analysis: ["static-analysis/eslint.sh"]
     test_commands: ["jest", "vitest", "mocha", "npm test", "pnpm test", "yarn test"]
+    test_skip_markers:
+      - '\b(it|test|describe)\.(skip|todo)\b'
+      - '\bx(it|test|describe)\s*\('
     # What these runners print on a run that exits 0 having tested nothing,
     # so that run grants no verification evidence (CR-255). POSIX ERE, matched
     # per output line; each one was captured from the real runner

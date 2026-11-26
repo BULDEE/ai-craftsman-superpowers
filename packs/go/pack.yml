@@ -38,6 +38,13 @@ languages:
     supersedes:
       - errcheck=GO004,GO006
     test_commands: ["go test ./...", "gotestsum"]
+    # What a skipped test looks like in this language, as a regular expression
+    # matched against each line a branch ADDS. Read by the factory's gate
+    # (packs/factory): a skip a branch adds is recorded for its reviewer and
+    # lowers the review confidence. It never fails a build on its own, because
+    # retiring a test is sometimes right and only a reader can tell.
+    test_skip_markers:
+      - '\bt\.Skip(f|Now)?\s*\('
     lsp: "gopls"
     # No metrics_dialect. Measured, not assumed: the shared extractor keys on
     # `function` and on control heads that open with a parenthesis, and Go has

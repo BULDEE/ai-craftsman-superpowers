@@ -231,7 +231,7 @@ n'est encore qualifiée, donc pas de badge.
 
 ## Commandes
 
-Quinze commandes ne démarrent que si vous les tapez ; sept (`challenge`,
+Seize commandes ne démarrent que si vous les tapez ; sept (`challenge`,
 `debug`, `test`, `team`, `rag`, `mlops`, `agent-design`) peuvent être lancées
 par le modèle quand le contexte s'y prête. Chaque commande a un exemple
 commenté avec sa sortie attendue : [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.md).
@@ -243,11 +243,12 @@ commenté avec sa sortie attendue : [COMMANDS-QUICK-REF.md](COMMANDS-QUICK-REF.m
 | Ingénierie IA/ML | `rag`, `mlops`, `agent-design` |
 | Utilitaires | `setup`, `healthcheck`, `metrics`, `team` |
 | CI/CD | `ci` |
+| Factory | `factory` : une file d'issues labellisées transformée en pull requests relues, jamais mergées ([guide](docs/guides/factory.md)) |
 
 Agents derrière ces commandes : `team-lead`, `architect` (sans Write/Edit),
 `doc-writer`, `security-pentester`, `legacy-surgeon`, `ui-ux-director`, plus
-des relecteurs propres aux packs Symfony, React et IA/ML. Les 12 missions
-d'agents sont livrées comme des fichiers ordinaires. Liste complète :
+des relecteurs propres aux packs Symfony, React et IA/ML, et les cinq agents
+du pack factory. Les 17 missions d'agents sont livrées comme des fichiers ordinaires. Liste complète :
 [référence des agents](docs/reference/agents.md).
 
 ## Face à ce que vous avez déjà

@@ -1,0 +1,26 @@
+name: factory
+version: "1.0.0"
+description: "Craftsman factory - an issue queue turned into reviewed pull requests, judged by the same gate as the hooks and the CI"
+compatibility:
+  core: ">=4.19.0"
+  # `*`: the factory is a mode of execution, not a language. It reads which
+  # languages a diff is written in from the other packs' manifests and holds
+  # no list of its own (ADR-0032).
+  stack: ["*"]
+
+rules:
+  builtin: []
+  static_analysis: []
+
+hooks:
+  validators: []
+
+commands:
+  scaffold_types: []
+
+agents: ["agents/factory-intake.md", "agents/factory-spec-writer.md", "agents/factory-builder.md", "agents/factory-reviewer.md", "agents/factory-fetch.md"]
+
+# Command suggestions this pack contributes to the routing table.
+routes:
+  - trigger: "Drain a queue of labelled issues into reviewed pull requests"
+    command: "/craftsman:factory"

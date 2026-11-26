@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `/craftsman:factory`: a queue of labelled issues turned into reviewed pull
+  requests (ADR-0032). A new pack, `packs/factory/`, in the mould of
+  `packs/ai-ml`. A script, `craftsman-factory`, owns every job's state and
+  decides each next step; the session that runs the command only starts the
+  agents the script names and never reads issue text. Pipeline: intake,
+  design for domain changes, spec, test-first build in a worktree per job, a
+  deterministic gate, review routed by the languages of the diff and the
+  surfaces the intake rated. A job ends as a pull request with a review-depth
+  label (`review:skim`, `review:standard`, `review:deep`) computed from the
+  job's facts; a reviewer can lower it, nothing raises it, and nothing merges.
+  The queue is GitHub Issues or Linear (API key, or a connected MCP server
+  through the `factory-fetch` agent); the forge is GitHub. What humans do with
+  the delivered pull requests is recorded in `metrics.db` and a threshold
+  change is proposed when a level is corrected more often than its name
+  promises. Claude Code only; the pack adds no hook handler. The cost shown
+  per job is an estimate read from subagent transcripts.
+- `test_skip_markers`, a language capability in `pack.yml`: what a skipped test
+  looks like, as a regular expression matched against each line a branch adds.
+  Declared for PHP, TypeScript, JavaScript, Python, Go, Rust and Bash, and
+  read by the factory's gate.
 - A release no longer stops a hook under Codex without saying so (CR-320).
   Codex trusts a plugin hook by its position in `hooks/hooks.json`, so a
   handler inserted ahead of others made Codex skip them until reviewed in
@@ -16,6 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   changed unless this changelog names its key. New handlers go at the end of
   their group. Measured on the 4.17.0 change that added the end-of-turn gate
   at the head of `Stop`: it is refused, on the three positions it moved.
+
+### Changed
+- The end-of-turn gate no longer holds a session for a finding a SUBAGENT left
+  in another git worktree. Measured before the change: a subagent's hook state
+  is filed under its parent's session id, so a session that dispatched a
+  builder into a worktree was sent back with "fix each one" for code it was
+  not working on. `post-write-check.sh` now records the subagent a landed
+  finding came from, and the gate skips those that sit outside the session's
+  own checkout. A finding the session's own agent left anywhere, and a
+  subagent's finding in the session's checkout, hold the turn as before.
 
 ## [4.19.0] - 2026-11-19
 

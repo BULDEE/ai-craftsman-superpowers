@@ -25,15 +25,30 @@ trap 'exit 0' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Is this file in the checkout the session works in? A finding a SUBAGENT left
+# in another git worktree is owed to that worktree's own judge (a factory job's
+# gate, a CI run), not to the session that dispatched the agent: an
+# orchestrator told to "fix each one" was being asked to write code it must
+# not touch. Outside a repository there is one checkout: the answer is yes,
+# and the gate holds as it always did.
+_same_checkout() { # <file> <cwd>
+    local mine theirs
+    mine=$(git -C "$2" rev-parse --show-toplevel 2>/dev/null) || return 0
+    theirs=$(git -C "$(dirname "$1")" rev-parse --show-toplevel 2>/dev/null) || return 0
+    [[ "$mine" == "$theirs" ]]
+}
+
 # One "<file>: <rules>" line per file still on disk, the path relative to the
-# project when it is under it.
+# project when it is under it. `landed_agents` names the subagent that wrote
+# the file, empty for the session's own agent, whose findings are always held.
 _open_findings() { # <state> <cwd>
-    local file rules
-    while IFS=$'\t' read -r file rules; do
+    local file rules agent
+    while IFS=$'\t' read -r file rules agent; do
         [[ -n "$file" && -f "$file" ]] || continue
+        [[ -z "$agent" ]] || _same_checkout "$file" "$2" || continue
         printf -- '- %s: %s\n' "${file#"$2"/}" "$rules"
-    done <<< "$(jq -r '.landed_violations // {} | to_entries[]
-        | select(.value | length > 0) | "\(.key)\t\(.value | join(", "))"' "$1" 2>/dev/null)"
+    done <<< "$(jq -r '(.landed_agents // {}) as $agents | .landed_violations // {} | to_entries[]
+        | select(.value | length > 0) | "\(.key)\t\(.value | join(", "))\t\($agents[.key] // "")"' "$1" 2>/dev/null)"
 }
 
 # Every turn ends here, so the common case, nothing open, exits on the session

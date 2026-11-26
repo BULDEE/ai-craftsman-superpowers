@@ -108,8 +108,15 @@ _settle_session_state() {
     dir_bucket=$(dirname "$file" | sed -E "s|${PWD}/||")
     rules_json=$(_blocked_rules_json)
 
+    # The subagent this write came from, when there is one: the end-of-turn
+    # gate does not hold the dispatching session for what an agent left in
+    # another worktree (hooks/lib/session_state.py, `landed_agents`).
+    local agent
+    agent=$(printf '%s' "$INPUT" | jq -r '.agent_id // empty' 2>/dev/null | tr -cd 'A-Za-z0-9_-')
+
     RECORDED_PATTERNS=$(python3 "$SCRIPT_DIR/lib/session_state.py" record-violation \
-        "$SESSION_STATE" "$(_pending_key "$file")" "$dir_bucket" "$rules_json" --detect --landed 2>&1) \
+        "$SESSION_STATE" "$(_pending_key "$file")" "$dir_bucket" "$rules_json" --detect --landed \
+        ${agent:+"--agent=${agent}"} 2>&1) \
         && RECORDED_PATTERNS_FRESH=true \
         || { echo "WARNING: session state write failed" >&2; RECORDED_PATTERNS=""; }
 }
